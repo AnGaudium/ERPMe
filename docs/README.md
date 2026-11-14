@@ -22,6 +22,7 @@ This folder is the source of truth for the ERPMe specification (D17). Everything
 | `catalogs/` | Data the core relies on: system accounts, transaction keys, movement types, edge cases | Versioned with the design item that owns it |
 | `open-questions.md` | Questions that need the author or legal verification | Add freely; close with a link to the answer |
 | `risks.md` | Risks and mitigations | Review at each phase gate |
+| `prompts/` | Briefs used to start AI sessions for larger tasks | Add one per task |
 | `archive/` | Frozen historical documents | Never edited |
 
 ## Spec files
