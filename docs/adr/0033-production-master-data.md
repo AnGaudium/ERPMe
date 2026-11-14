@@ -149,7 +149,7 @@ Agents read the structures through deterministic queries. They draft revisions f
 14. `item_production_setting` (company, item, production warehouse) holds `is_phantom`.
     - **Explosion.** A phantom is never planned or made on its own. It is exploded through its production version in that warehouse, selected with the exploded quantity and the `explosion_date`, routing ignored. A missing version gives `production_version_missing`.
     - **Planning.** Planning reads the setting through `production.contract` and skips phantoms. A phantom needs no `item_warehouse_planning` row.
-    - **Stock.** Whether stock of a phantom may exist and be used is business behavior. Interim, flagged: it is allowed, and DS-54 states whether MRP nets it.
+    - **Stock.** Whether stock of a phantom may exist and be used is business behavior. Interim, flagged: it is allowed, and DS-54 states whether MRP nets it. DS-54's interim: MRP does not net phantom stock ([ADR-0036](0036-multi-level-mrp.md) rule 7).
     - **Making as well as buying.** `production` becomes a value of ADR-0024's `replenishment_source`, for items made in that warehouse. Several sources at once with quotas come after Phase 1.
 
 **Queries for agents and people**

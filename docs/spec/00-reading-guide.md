@@ -142,9 +142,13 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Forecast, forecast run, forecast adjustment | forecast, forecast\_run, forecast\_adjustment | Weekly statistical demand spread to days; the job that computes it; a recorded change with a reason |
 | Planning run | planning\_run | The deterministic netting job; stores input and output hashes |
 | Planned order | planned\_order | A proposal to buy, move or produce (DS-54), with a stable business key; states proposed, firmed, converted, canceled |
-| Pegging | pegging (pegging\_target\_kind: demand\_line, forecast, safety\_stock, stock\_level, lot\_size\_excess) | What a planned order covers; sums exactly to its quantity |
+| Planning strategy | planning\_strategy: make\_to\_stock, make\_to\_order | Whether a node nets demand against free stock, or plans each sales line on its own against supply linked to it (`for_demand_supply_line_id`) ([ADR-0036](../adr/0036-multi-level-mrp.md)) |
+| Dependent demand | planned\_order\_component | Component demand of a planned production order, derived each run and pegged to it |
+| Availability date | availability\_date | When a planned production order's output can be used: planned end plus receiving days |
+| Capacity overload, leveling proposal | capacity\_overload; ListCapacityLoad, GetCapacityLevelingProposal | An overloaded work-center range, and a read-only proposal of new order dates that fit capacity |
+| Pegging | pegging (pegging\_target\_kind: demand\_line, forecast, safety\_stock, stock\_level, lot\_size\_excess, planned\_order) | What a planned order covers; sums exactly to its quantity |
 | Action message | action\_message: expedite, cancel, postpone, reduce | Advice on existing supply |
-| Planning exception | planning\_exception\_kind | A condition a buyer must look at, e.g. shortage inside lead time |
+| Planning exception | planning\_exception\_kind | A condition a buyer or planner must look at, e.g. shortage inside lead time or a capacity overload |
 | Projected availability | projected\_availability | Day-by-day stock plus supply minus demand, as `GetProjectedAvailability` returns it |
 | Goods received / invoice received clearing | gr\_ir\_clearing |  |
 | Price difference | price\_difference |  |

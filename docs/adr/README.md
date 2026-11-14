@@ -39,3 +39,4 @@ One file per decision, named `NNNN-short-title.md`, using [template.md](template
 | [ADR-0033](0033-production-master-data.md) | Production master data (DS-51) | Accepted (2026-11-14) |
 | [ADR-0034](0034-production-orders-and-shop-floor.md) | Production orders and shop floor (DS-52) | Accepted (2026-11-14) |
 | [ADR-0035](0035-production-costing.md) | Production costing (DS-53) | Accepted (2026-11-14) |
+| [ADR-0036](0036-multi-level-mrp.md) | Multi-level MRP (DS-54) | Accepted (2026-11-14) |

@@ -155,7 +155,8 @@ Module-specific codes are added by the DS item that owns the module, in the regi
 | `serial_not_in_bin` | validation | 422 | no | A scanned serial is not in the source bin with an allowed status ([ADR-0023](../adr/0023-warehouse-management.md) rule 14) |
 | `planning_network_cycle` | validation | 422 | no | The transfer sources would form a cycle; `details` names the warehouses ([ADR-0024](../adr/0024-planning.md) rule 3) |
 | `planning_run_in_progress` | conflict | 409 | yes | A planning run of the company is already running ([ADR-0024](../adr/0024-planning.md) rule 17) |
-| `planned_order_not_convertible` | precondition | 422 | no | The planned order is converted or canceled, or lacks a supplier or route ([ADR-0024](../adr/0024-planning.md) rule 22) |
+| `planned_order_not_convertible` | precondition | 422 | no | The planned order is converted or canceled, lacks a supplier or route, or its production version is missing or inactive ([ADR-0024](../adr/0024-planning.md) rule 22; [ADR-0036](../adr/0036-multi-level-mrp.md) rule 8) |
+| `make_to_order_not_allowed` | validation | 422 | no | `make_to_order` needs source `production`, method `net_requirements` and lot size `exact` ([ADR-0036](../adr/0036-multi-level-mrp.md) rule 9) |
 | `quantity_rounds_to_zero` | validation | 422 | no | The quantity converted to the inventory unit rounds to zero ([ADR-0018](../adr/0018-product-and-item-model.md) rule 11) |
 | `invalid_timestamp` | validation | 422 | no | ADR-0007 rule 3 |
 | `schema_version_unsupported` | validation | 422 | no | ADR-0008 rule 23; `details.served` lists the versions |

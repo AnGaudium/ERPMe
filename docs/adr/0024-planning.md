@@ -44,6 +44,7 @@ Planning answers, per item and warehouse: what to buy or move, how much, and by 
    | Safety stock | `safety_stock_method` (`fixed`, or `service_level` in the later slice), `safety_stock_quantity`, `service_level_percent` |
    | Lot size | `lot_size_method` (`exact`, `fixed` with `fixed_lot_quantity`, `supply_period` with `supply_period_days`) |
    | Fence and receiving | `firm_horizon_days`, `receiving_days` (receiving and inspection, on the warehouse's calendar) |
+   | Strategy | `planning_strategy`: `make_to_stock` (default) or `make_to_order` ([ADR-0036](0036-multi-level-mrp.md) rule 9) |
 
    It is master data. People with the permission change it directly; changes proposed by agents await approval (spec 14: an agent's change of master data requires approval) and carry their evidence. It replaces the entry for it in ADR-0018's "deliberately elsewhere" list.
 2. Supplier data:
@@ -74,7 +75,8 @@ Planning answers, per item and warehouse: what to buy or move, how much, and by 
    - `planning_horizon_days`;
    - `forecast_consumption_days`;
    - `conversion_window_days`;
-   - `backtest_weeks`.
+   - `backtest_weeks`;
+   - `conversion_lead_days` and `capacity_bucket` ([ADR-0036](0036-multi-level-mrp.md) rules 4, 11).
 
 **Demand and supply**
 
@@ -84,13 +86,13 @@ Planning answers, per item and warehouse: what to buy or move, how much, and by 
      - **demand:** sales order lines in states after `draft` (confirmed orders, not quotations), and transfer order lines at the source;
      - **supply:** purchase order lines in any state but `canceled`, drafts included; purchase request lines; transfer order lines at the destination, including goods in a `transit` warehouse;
      - **production orders** count from `Create`: components as demand, outputs as supply, through typed columns `production_order_component_id` and `production_order_output_id`; reopening an order clears `closed_reason` and restores open quantity ([ADR-0034](0034-production-orders-and-shop-floor.md) rules 6, 9);
-     - **converted planned orders** count as supply for the quantity not yet matched by open supply lines carrying their `origin_planned_order_id`;
+     - **converted planned orders** count as supply for the quantity not yet matched by open supply lines carrying their `origin_planned_order_id`; Converted production planned orders count nothing ([ADR-0036](0036-multi-level-mrp.md) rule 8).
      - **firmed planned orders**, and proposed ones frozen inside the firm fence, count as supply at their `need_date`. For `reorder_point` and `min_max` they are part of the inventory position.
    - **Overdue lines.** Demand or supply dated before the planning date counts at the planning date (interim, flagged).
 9. Stock on hand:
    - **Counted:** stock in status `available` in the warehouse, in any bin. `quality_inspection` and `blocked` stock do not count (interim, flagged).
    - **Never counted:** stock in `goods_sent` warehouses.
-   - **Reservations** (ADR-0023 rule 13) are ignored by netting. Demand counts in full and stock counts in full, so reserved stock is never counted twice. Reservations remain an allocation matter.
+   - **Reservations** (ADR-0023 rule 13) are ignored by netting. Demand counts in full and stock counts in full, so reserved stock is never counted twice. Reservations remain an allocation matter. Exception: make-to-order netting reads reservations for its own demand line ([ADR-0036](0036-multi-level-mrp.md) rule 9).
    - **Expiring lots:** a lot that expires before the projection consumes it (oldest expiry first) raises the exception `stock_expiring`. The quantity still counts, because availability is not lot-aware.
    - **Related queries.** `GetProjectedAvailability` runs this netting read-only for one item and warehouse, without a plan. `GetAvailableToPromise` (ADR-0023) is on hand minus reservations, today.
 
@@ -123,7 +125,7 @@ Planning answers, per item and warehouse: what to buy or move, how much, and by 
 
 **Netting**
 
-14. Netting per method, at the planning date. Safety stock (`net_requirements` only) is a floor in the trigger, never a demand. Levels of the other methods include whatever safety the user sets.
+14. Netting per method, at the planning date. Safety stock (`net_requirements` only) is a floor in the trigger, never a demand. Levels of the other methods include whatever safety the user sets. Across bill of materials levels: [ADR-0036](0036-multi-level-mrp.md) rule 10.
 
     | Method | Trigger | Shortfall |
     | --- | --- | --- |
@@ -145,7 +147,7 @@ Planning answers, per item and warehouse: what to buy or move, how much, and by 
 **The planning graph and the run**
 
 16. The planning graph:
-    - **Nodes and edges.** Nodes are (item, warehouse). Edges are typed: `transfer` (ratio 1, offset = the route's lead time) now; `bill_of_materials` (ratio = component quantity, offset = production lead time) in Phase 2. Phantom items, scrap factors and co-products are outside this ADR.
+    - **Nodes and edges.** Nodes are (item, warehouse). Edges are typed: `transfer` (ratio 1, offset = the route's lead time) now; `bill_of_materials` (ratio = component quantity, offset = production lead time) in Phase 2. Phantom items, scrap factors and co-products are outside this ADR. Now Phase 1: [ADR-0036](0036-multi-level-mrp.md) rules 1–7.
     - **Order.** The run plans nodes in topological order, downstream first. Ties are broken by item code, then warehouse code, never by IDs (ADR-0006 rule 6).
     - **Dependent demand.** A planned transfer creates demand at the source on its release date, pegged to the transfer.
     - **Short source.** When a source cannot cover all destinations, which destination goes first is business behavior (open question). Interim, flagged: by `need_date`, then destination warehouse code.
@@ -155,25 +157,25 @@ Planning answers, per item and warehouse: what to buy or move, how much, and by 
     - **Running.** They run on the `jobs` queue as internal callers (ADR-0013 rule 9), on behalf of the requester, or of the company's `planning_owner_id` for scheduled runs ([ADR-0027](0027-cross-cutting-ownership.md) rule 15), with an explicit `planning_date` (ADR-0007 rule 17). Their `transaction_timeout` is the long-job 15 minutes (ADR-0022 rule 9).
     - **Concurrency.** One run per company at a time: a second run is rejected with `planning_run_in_progress`, through a lock on the company's planning state row.
     - **Mode.** Phase 1 runs regeneratively only.
-    - **Result.** Counts per output kind, `input_hash` (canonical JSON of every input row, ADR-0008 rule 12 forms) and `output_hash`. These and the planned orders, messages and exceptions are listed like events and excluded from `plan_hash` (as ADR-0023 rule 11), so a run never fails on `plan_hash_mismatch`.
+    - **Result.** Counts per output kind, `input_hash` (canonical JSON of every input row, ADR-0008 rule 12 forms) and `output_hash`. These and the planned orders, messages and exceptions are listed like events and excluded from `plan_hash` (as ADR-0023 rule 11), so a run never fails on `plan_hash_mismatch`. `input_hash` also covers production inputs ([ADR-0036](0036-multi-level-mrp.md) rule 13).
     - **Simulation.** Simulation runs the real handler and rolls back (ADR-0008 rule 9). A client-facing simulation must limit `scope` to at most 50 items, to stay within the 30 s command timeout.
 
 **Planned orders**
 
 18. A `planned_order` holds:
-    - a business key: item, warehouse, `order_type` (`purchase`, `transfer`, `production` in Phase 2), source (supplier or route), `need_date` (only for `net_requirements`; `reorder_point` and `min_max` keep one open proposal per key without it), `sequence`;
+    - a business key: item, warehouse, `order_type` (`purchase`, `transfer`, `production` in Phase 2), source (supplier or route), `need_date` (only for `net_requirements`; `reorder_point` and `min_max` keep one open proposal per key without it), `sequence`; `production` planned orders: [ADR-0036](0036-multi-level-mrp.md) rules 4–5.
     - quantity and `release_date`;
     - `state`: `proposed`, `firmed`, `converted` or `canceled`;
     - pegging rows.
 
     A run matches proposals to existing ones by business key and updates them in place. It creates new ones, and cancels proposals no longer needed. A canceled row never blocks a new proposal: the new one takes the next `sequence`. Firmed and converted orders are never changed by a run; a firmed order whose release date has passed raises `firmed_order_overdue`.
-19. The firm fence covers release dates strictly before planning date + `firm_horizon_days` (default 0, so no fence). Inside it a run changes no existing proposal. A new shortage there is proposed with its release date moved to the first date outside the fence, and raises `shortage_inside_lead_time`; the projection continues with it. Commands:
+19. The firm fence covers release dates strictly before planning date + `firm_horizon_days` (default 0, so no fence). Inside it a run changes no existing proposal. A new shortage there is proposed with its release date moved to the first date outside the fence, and raises `shortage_inside_lead_time`; the projection continues with it. Commands: Production planned orders start no earlier than `earliest_start` = max(planning date, fence end) + `conversion_lead_days` ([ADR-0036](0036-multi-level-mrp.md) rule 4).
     - `FirmPlannedOrder`;
     - `UpdatePlannedOrder`, which sets quantity or dates and implies firming;
     - `CancelPlannedOrder`, which cancels a proposed or firmed order; a later run may propose again if the need remains.
 
     Wrong states return `invalid_state_transition`.
-20. Pegging rows hold planned order, `pegging_target_kind` (`demand_line`, `forecast`, `safety_stock`, `stock_level`, `lot_size_excess`), target reference and quantity. A planned order's pegging sums exactly to its quantity (DS-16). Through a route, the destination's planned transfer pegs destination demand, and the source's dependent demand pegs that transfer. Demand-line targets are `demand_supply_line_id` ([ADR-0028](0028-document-lifecycle-hardening.md) rule 2).
+20. Pegging rows hold planned order, `pegging_target_kind` (`demand_line`, `forecast`, `safety_stock`, `stock_level`, `lot_size_excess`), target reference and quantity. A planned order's pegging sums exactly to its quantity (DS-16). Through a route, the destination's planned transfer pegs destination demand, and the source's dependent demand pegs that transfer. Demand-line targets are `demand_supply_line_id` ([ADR-0028](0028-document-lifecycle-hardening.md) rule 2). Dependent demand pegs with target kind `planned_order` ([ADR-0036](0036-multi-level-mrp.md) rule 5).
 21. Action messages and exceptions:
     - **Action messages** on existing supply: `expedite` and `cancel` in the first slice; `postpone` and `reduce` later. Each carries its projected effect.
     - **Exceptions** (`planning_exception_kind`):
@@ -186,14 +188,15 @@ Planning answers, per item and warehouse: what to buy or move, how much, and by 
       - `stock_expiring`;
       - `firmed_order_overdue`;
       - `planning_parameter_missing` (no supplier, no route, no lead time). The run skips the item and continues.
+      - `capacity_overload` (per work center and overloaded range; [ADR-0036](0036-multi-level-mrp.md) rule 11).
     - **Work items.** The consumer `planning_work_items` of `PlanningCompleted` keeps one work item per buyer (`buyer_id`, ADR-0018 rule 3) listing that buyer's open exceptions, and closes exceptions that a run no longer raises. Superseded: one work item per open exception, owned by the buyer; the per-buyer list is a query ([ADR-0031](0031-design-simplifications.md) rule 17).
 22. Conversion:
-    - **Grouping.** `ConvertPlannedOrder` takes firmed or proposed planned orders. Purchase orders are grouped by supplier, warehouse, and release date within `conversion_window_days`; transfer orders by route.
+    - **Grouping.** `ConvertPlannedOrder` takes firmed or proposed planned orders. Purchase orders are grouped by supplier, warehouse, and release date within `conversion_window_days`; transfer orders by route. Production planned orders convert through `production.contract` ([ADR-0036](0036-multi-level-mrp.md) rule 8).
     - **Hand-over.** The command sets `converted` and calls the posting interface `inventory.contract.request_replenishment`, which writes one `replenishment_request` with a line per planned order (carrying `origin_planned_order_id`) and emits `ReplenishmentRequested` from `inventory`, so every importer imports downward (ADR-0022 rule 2).
     - **Drafts.** The `purchasing` consumer of `ReplenishmentRequested` groups the request's purchase lines by supplier, warehouse and release window into draft purchase requests (interim, flagged: the default target, following spec 09's request → order chain). `inventory` creates the draft transfer orders itself. Drafts are created as actor `system` on behalf of the converter, follow their own approval (DS-28), and carry `origin_planned_order_id`.
     - **Splits.** A planned order converts whole; a split is two `UpdatePlannedOrder` calls in Phase 1.
     - **Canceled drafts.** When the document lines of a converted order close with `closed_reason` `canceled` (rule 8), the next run sets it `canceled` and may propose again.
-    - **Auto-conversion.** Converting under a value threshold by policy is an open question (DS-28). Sending to a supplier always stays a separate approved step.
+    - **Auto-conversion.** Converting under a value threshold by policy is an open question (DS-28). Sending to a supplier always stays a separate approved step. For agents, `UpdatePlannedOrder`, `FirmPlannedOrder` and `ConvertPlannedOrder` are proposal-bound for every order type ([ADR-0036](0036-multi-level-mrp.md) rule 12).
 
 **Agents, events, queries, performance**
 
@@ -204,9 +207,9 @@ Planning answers, per item and warehouse: what to buy or move, how much, and by 
     - proposes forecast adjustments, under rule 12;
     - resolves exceptions by drafting.
 
-    It never changes approved data directly. "Approval-bound commands" are change proposals ([ADR-0029](0029-proposals-and-agent-safety.md) rule 5).
-24. Events: `ForecastCompleted`, `PlanningCompleted`, `PlannedOrderFirmed`, `PlannedOrderConverted` (from `planning`, for live screens and the audit trail, DS-30); `ReplenishmentRequested` (from `inventory`). Queries: `GetProjectedAvailability`, `ListPlannedOrder`, `ListPegging`, `ListForecast`.
-25. Performance target: a regenerative run over 2,000 items × 4 warehouses × a 180-day horizon finishes in 2 minutes or less, using under 2 GB of memory, on the test server. The nightly report records the run time and node count (DS-16, DS-17).
+    It never changes approved data directly. "Approval-bound commands" are change proposals ([ADR-0029](0029-proposals-and-agent-safety.md) rule 5). Its planned order changes are change proposals ([ADR-0036](0036-multi-level-mrp.md) rule 12).
+24. Events: `ForecastCompleted`, `PlanningCompleted`, `PlannedOrderFirmed`, `PlannedOrderConverted` (from `planning`, for live screens and the audit trail, DS-30); `ReplenishmentRequested` (from `inventory`). Queries: `GetProjectedAvailability`, `ListPlannedOrder`, `ListPegging`, `ListForecast`. Queries also: `ListCapacityLoad`, `GetCapacityLevelingProposal`; `ListPegging` gains `depth` ([ADR-0036](0036-multi-level-mrp.md) rules 5, 11, 12).
+25. Performance target: a regenerative run over 2,000 items × 4 warehouses × a 180-day horizon finishes in 2 minutes or less, using under 2 GB of memory, on the test server. The nightly report records the run time and node count (DS-16, DS-17). With bills of materials: [ADR-0036](0036-multi-level-mrp.md) rule 13.
 
 **Build order**
 

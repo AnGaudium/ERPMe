@@ -54,7 +54,7 @@ It adds only what production needs:
        - `operation_number`, `consumption_method`, `is_fixed_quantity`;
        - `phantom_path` (the phantom lines it came through);
        - `requested_date`: the scheduled start of its operation, or the order's start.
-     - **`production_order_output`:** main output, co-products and by-products, with planned quantity, `output_type` and `cost_coefficient`. The main output's planned quantity is G. That quantity is the supply for planning and the base for tolerance and completion. Its `requested_date` is the order's end.
+     - **`production_order_output`:** main output, co-products and by-products, with planned quantity, `output_type` and `cost_coefficient`. The main output's planned quantity is G. That quantity is the supply for planning and the base for tolerance and completion. Its `requested_date` is the order's end. Output supply rows carry `for_demand_supply_line_id` from the header ([ADR-0036](0036-multi-level-mrp.md) rule 9).
      - **`production_order_operation`:** copied from the routing:
        - work center, control and `is_milestone`;
        - durations, activity standards and scrap rate;
@@ -63,7 +63,7 @@ It adds only what production needs:
      - **`production_order_output_serial`:** for serial-tracked output, the serials assigned to the order (rule 16). Not version content: it changes after release without a change order.
    - **Version content.** Content excludes `execution_state` and `is_content_edited` (ADR-0009 rule 9).
 2. Creating and editing:
-   - **Explosion.** `CreateProductionOrder` selects the production version (ADR-0033 rule 13), unless the client names one, under a share lock on `production_structure` (ADR-0027 rule 10, class 3), so a revision cannot be withdrawn meanwhile. It copies the components, outputs and operations of the revisions valid on `planned_start_date`. Components are exploded through phantoms, with quantities by ADR-0033 rule 6.
+   - **Explosion.** `CreateProductionOrder` selects the production version (ADR-0033 rule 13), unless the client names one, under a share lock on `production_structure` (ADR-0027 rule 10, class 3), so a revision cannot be withdrawn meanwhile. It copies the components, outputs and operations of the revisions valid on `planned_start_date`. Components are exploded through phantoms, with quantities by ADR-0033 rule 6. Conversion from a planned order uses the shared planning function ([ADR-0036](0036-multi-level-mrp.md) rule 3).
    - **Backward scheduling.** Select the version and the routing revision valid on `planned_end_date`, schedule backward to obtain `planned_start_date`, then explode at that date. If the routing revision valid there differs, schedule once more with it. The response shows both dates.
    - **Re-explosion.** While the order is in `draft`, changing `planned_start_date`, `good_quantity` or the version explodes again, unless lines were edited by hand (`is_content_edited`). In that case quantities scale by the new Q, fixed-quantity lines do not scale, and the snapshot revisions stay. The response says which happened.
    - **Editing.** Lines may be added, removed or changed per order. The edits are version content, so an approval binds them.
@@ -75,7 +75,7 @@ It adds only what production needs:
    - **Backflush warehouse.** A backflush component must be issued from the production warehouse (`backflush_outside_production_warehouse`).
 3. Scheduling:
    - **The rule.** Operation dates come from `setup_duration`, `run_duration` × expected quantity / base quantity, `queue_time` and `move_time`, on the work centers' calendars (ADR-0033 rules 10, 11), at infinite capacity. An order without operations uses the version's fixed lead time.
-   - **Load view.** `ListWorkCenterLoad` (work center, day or week buckets) adds up the remaining scheduled hours of draft and approved orders that are not technically complete, against available hours.
+   - **Load view.** `ListWorkCenterLoad` (work center, day or week buckets) adds up the remaining scheduled hours of draft and approved orders that are not technically complete, against available hours. Real orders only; planned orders are added by planning's `ListCapacityLoad` ([ADR-0036](0036-multi-level-mrp.md) rule 11).
    - **Later.** Finite sequencing and levelling are DS-54's capacity check, proposed by the planning agent, never applied without approval.
 4. Rework and disassembly:
    - **`rework`.** No explosion. The client enters the components, usually the item itself, which may be issued from `quality_inspection` (rule 11), and the operations. The main output is the same item or another named item. The cycle this creates is a production order fact, which the costing solver handles (ADR-0025 rule 6), never a bill of materials.
@@ -130,7 +130,7 @@ It adds only what production needs:
 **Components: reservation, staging, issue and return**
 
 9. Reservation:
-   - **Demand and supply lines.** Component lines are demand lines and output lines supply lines (`demand_supply_line`) from `Create`. This is interim and flagged, as ADR-0024 rule 8's list is. Their typed columns `production_order_component_id` and `production_order_output_id` are added to `demand_supply_line` before step 3. ADR-0028 rule 2 left these columns to the author under B3, so they are flagged too (open question).
+   - **Demand and supply lines.** Component lines are demand lines and output lines supply lines (`demand_supply_line`) from `Create`. This is interim and flagged, as ADR-0024 rule 8's list is. Their typed columns `production_order_component_id` and `production_order_output_id` are added to `demand_supply_line` before step 3. ADR-0028 rule 2 left these columns to the author under B3, so they are flagged too (open question). The output supply rows also carry `for_demand_supply_line_id`, flagged with these columns ([ADR-0036](0036-multi-level-mrp.md) rule 9).
    - **Open quantity.** It never goes below 0, even after over-issue.
    - **At release.** Components are reserved through `inventory.contract.create_stock_reservation` (ADR-0023 rule 13) up to available to promise. `production` passes the reservation's `destination_bin_id` (the supply bin) and `release_sequence` (operation order), so inventory never reads production tables.
    - **Shortages.** The rest is a shortage, with the check result `component_shortage`. `ReserveProductionOrderComponent` (effect class `other`) reserves again later; humans and the production agent run it directly.
@@ -193,7 +193,7 @@ It adds only what production needs:
 
       Serial-tracked output is never received automatically.
 14. Make to order:
-    - **The rule.** When `for_demand_supply_line_id` is set and that demand is in the same warehouse, `available` output is reserved for it, up to that demand's unreserved open quantity. Output in inspection is reserved when it is released: a `production` consumer of `WarehouseTaskConfirmed` runs the reservation (effect class `other`).
+    - **The rule.** When `for_demand_supply_line_id` is set and that demand is in the same warehouse, `available` output is reserved for it, up to that demand's unreserved open quantity. Output in inspection is reserved when it is released: a `production` consumer of `WarehouseTaskConfirmed` runs the reservation (effect class `other`). Planning nets the line against this order through the supply link ([ADR-0036](0036-multi-level-mrp.md) rule 9).
     - **Status.** Interim, flagged: this automatic reservation is business behavior (open question).
 
 **Cost object and traceability**
@@ -220,6 +220,7 @@ It adds only what production needs:
 18. Events, permissions and queries:
     - **Events.** Beyond ADR-0009 rule 22's document events: `ProductionOrderCompleted` and `ProductionOrderReopened`. Reservations emit ADR-0023's events.
     - **Permissions.** Record scope for production documents uses `production_warehouse_id` as the warehouse dimension (ADR-0017 rule 9 gets a note). DS-15 adds a shop-floor role template.
+    - **Planning interfaces.** `production.contract` also exposes `plan_production`, `create_production_order_from_plan` and `get_order_inspection_quantities` ([ADR-0036](0036-multi-level-mrp.md) rules 3, 8, 9).
     - **Queries.**
       - `GetProductionOrderStatus`: progress per operation and output; components required, reserved, staged, issued and backflushed; shortages; postings; cost object.
       - `ListProductionOrder`.

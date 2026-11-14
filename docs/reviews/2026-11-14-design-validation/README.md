@@ -21,6 +21,7 @@ The scripts are in [lab/](lab/):
 | `t03_cost_object_area.py` | 4 scenarios: cost-object lines in area `inventory`, the company check, append-only activation rows |
 | `costing_solver.py` | First solver prototype: stock and production nodes, uniform WIP share (L-05) |
 | `costing_lab2.py` | Full production costing model of ADR-0035 over two periods (L-06) |
+| `mrp_lab.py` | Multi-level MRP of ADR-0036: network order, phantom collapse, co-product supply, make to order, conversion (L-08) |
 
 ## Findings
 
@@ -32,6 +33,7 @@ The scripts are in [lab/](lab/):
 | L-04 | DS-06 comments said `cost_object` is Phase 2 and owned by `ledger` | Fixed (ADR-0032; ADR-0034 rule 15) |
 | L-05 | First prototype: stock and production nodes with co-products by coefficient, a by-product, a transfer, a rework self-loop, and WIP as one uniform share of all cost. One global elimination. Value was conserved, and the result equals fixed-point iteration to 10⁻¹⁸⁸. It had no pools, no normal capacity, no abnormal cost, and none of ADR-0035's WIP methods | Narrowed; superseded by L-06 |
 | L-06 | Second prototype, the model of ADR-0035, over two periods. Every check passed and value was conserved exactly in both periods | Basis of ADR-0035 |
+| L-08 | MRP prototype: determinism, pegging sums, phantom collapse, co-product supply and make-to-order isolation pass. Converting a make-to-order planned order first double-counted its components on the next run (bolt demand 200 to 352), because the real order's supply was not linked to its sales line. With the link (`for_demand_supply_line_id` on supply rows), demand stays 200 | Basis of [ADR-0036](../../adr/0036-multi-level-mrp.md) rules 8–9. The prototype is simplified: no calendars, fence, lot splitting, reservations or inspection stock |
 | L-07 | Review of the L-03 fix: the activation row was read before the area-state lock, cost objects of another company were accepted, and activation rows could change. Cost-object lines were in area `general`, so late pool postings would not make the inventory costing stale | Fixed in DS-06 and tested (`t03_cost_object_area.py`, 4 of 4) |
 
 L-06 covered:
