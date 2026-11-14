@@ -49,14 +49,14 @@ A small shop and a managed distribution warehouse run on the same model.
    - for bin-managed warehouses, `outbound_flow` (`direct`; `staged` in the second slice), `default_receiving_bin_id` and `default_shipping_bin_id`;
    - `is_handling_unit_managed`.
 
-   A plain warehouse may become bin-managed once, by `ConvertWarehouse` with `is_bin_managed: true` (`human_only`). It moves every stock row to a chosen bin by warehouse movements in one transaction. The reverse is not supported.
+   A plain warehouse may become bin-managed once, by `ConvertWarehouse` with `is_bin_managed: true` (`human_only`). It moves every stock row to a chosen bin by warehouse movements in one transaction. The reverse is not supported. Superseded: every warehouse has a default bin, `UpdateWarehouse` sets `is_bin_managed` on physical warehouses, and `ConvertWarehouse` is removed ([ADR-0031](0031-design-simplifications.md) rules 7–9).
 
-   Only `physical` warehouses manage bins. In `transit` and `goods_sent` warehouses stock rows have no bin, and handling units travel with their content and a null bin (rule 6). Stock there is always `available`.
+   Only `physical` warehouses manage bins. In `transit` and `goods_sent` warehouses stock rows have no bin, and handling units travel with their content and a null bin (rule 6). Stock there is always `available`. Superseded: such warehouses use their default bin, never a null one ([ADR-0031](0031-design-simplifications.md) rule 8).
 
    | Feature | Plain warehouse | Bin-managed warehouse |
    | --- | --- | --- |
    | Stock status and `is_inspection_required` | Yes | Yes |
-   | Reservations; `status_change` and `count` tasks (with null bins in plain warehouses) | Yes | Yes |
+   | Reservations; `status_change` and `count` tasks (in plain warehouses count tasks cover items and `status_change` uses the default bin, [ADR-0031](0031-design-simplifications.md)) | Yes | Yes |
    | Handling units | Yes | Yes |
    | Bins, putaway and removal strategies, putaway, pick, move and replenishment tasks | No | Yes |
 
@@ -74,7 +74,7 @@ A small shop and a managed distribution warehouse run on the same model.
      | Capacity | Optional `maximum_weight` (kg, gross), `maximum_volume` (m³), `maximum_handling_units` |
      | Booleans | `is_mixed_item_allowed`, `is_mixed_lot_allowed`, `is_blocked_for_putaway`, `is_blocked_for_picking` (manual blocks only), `is_active` |
 
-   - Bins are created and changed in batches (ADR-0008). A bin with stock cannot be deactivated (`bin_not_empty`).
+   - Bins are created and changed in batches (ADR-0008). A bin with stock cannot be deactivated (`bin_not_empty`). Every warehouse also has a default zone and a default bin (code `DEFAULT`, barcode `<warehouse code>-DEFAULT`), which cannot be deactivated while the warehouse is not bin-managed ([ADR-0031](0031-design-simplifications.md) rule 7).
 3. Product and partner fields:
    - The product (ADR-0018 rule 3) gets:
      - `is_inspection_required`;
@@ -89,7 +89,7 @@ A small shop and a managed distribution warehouse run on the same model.
 
 4. The stock key:
    - **Key.** `stock_quantity`'s key is (company, item, warehouse, bin, lot or serial, `stock_status`, `handling_unit_id`), plus the reserved `owner_partner_id` ([ADR-0030](0030-commercial-seams-and-imports.md) rule 8).
-   - **Bin.** Every row of a bin-managed warehouse has a bin; no row of another warehouse has one.
+   - **Bin.** Every row of a bin-managed warehouse has a bin; no row of another warehouse has one. Superseded: every row has a bin, the default bin outside bin-managed warehouses ([ADR-0031](0031-design-simplifications.md) rule 8).
    - **Stock status.** `stock_status` is a classification, not a lifecycle state: `available`, `quality_inspection` or `blocked`.
    - **No value.** Statuses, bins and handling units carry no value. `stock_value` stays per (item, warehouse), and inventory accounts are unchanged (ADR-0020 rule 8).
    - **Presentation.** Whether a regime wants quality or blocked stock presented apart is an open question; none is known for TT99.
@@ -99,9 +99,9 @@ A small shop and a managed distribution warehouse run on the same model.
    - Every full key is checked on its current balance only: no bin, status or handling unit goes below zero now.
    - A backdated document names where the goods are now. Its dated check still runs at the inventory level.
    - Bin-level `GetStockBalance` has no `as_of`.
-   - The negative-stock open question is extended to this split.
+   - The negative-stock open question is extended to this split. The dated check uses the algorithm of [ADR-0031](0031-design-simplifications.md) rule 14.
 6. Handling units:
-   - **Fields.** A `handling_unit` holds `code` and `barcode` (unique in the company), `handling_unit_type_id` (company data: pallet, carton or tote, with tare weight and dimensions), `parent_handling_unit_id` (one level in Phase 1: a carton on a pallet), `warehouse_id`, `bin_id` (null in `transit` and `goods_sent`) and `state`.
+   - **Fields.** A `handling_unit` holds `code` and `barcode` (unique in the company), `handling_unit_type_id` (company data: pallet, carton or tote, with tare weight and dimensions), `parent_handling_unit_id` (one level in Phase 1: a carton on a pallet), `warehouse_id`, `bin_id` (the default bin in `transit` and `goods_sent`, [ADR-0031](0031-design-simplifications.md) rule 8) and `state`.
    - **States.** `open`: content may change. `closed`: content changes only by `UnpackHandlingUnit`. `shipped`: set by the goods issue.
    - **Location.** The unit's row is authoritative for an empty unit. For a unit with content, the unit, its stock rows and its children are in one bin (DS-16).
    - **Moves.** Scanning a unit moves all its content in one task.
@@ -119,7 +119,7 @@ A small shop and a managed distribution warehouse run on the same model.
    | `purchase_receipt`, `other_receipt` | The line's bin, or the default receiving bin | `quality_inspection` if required, else `available` | Putaway, unless the line names a `storage` or `picking` bin |
    | `sales_return_receipt` | A `returns` bin | `blocked` | Disposition (rule 19), then putaway if restocked |
    | `opening_balance` | The final bin named in the import (DS-21) | Any | None |
-   | `sales_issue`, `transfer_out` | The non-pickable bin the confirmed picks moved the goods to: the default shipping bin (direct flow) or a `staging` or `shipping` bin (staged flow); in a plain warehouse, the warehouse | `available` | Pick tasks precede it (rules 14–15) in bin-managed warehouses |
+   | `sales_issue`, `transfer_out` | The non-pickable bin the confirmed picks moved the goods to: the default shipping bin (direct flow) or a `staging` or `shipping` bin (staged flow); in a plain warehouse, its default bin ([ADR-0031](0031-design-simplifications.md)) | `available` | Pick tasks precede it (rules 14–15) in bin-managed warehouses |
    | `purchase_return`, `scrap`, `other_issue`, `internal_consumption` | The line's bin | Any (rejected goods are mostly `blocked`) | None |
    | `transfer_in` | Default receiving bin | `available` | Putaway |
    | `stock_count_shortage`, `stock_count_surplus` | The counted bin | The counted status | None |
@@ -130,7 +130,7 @@ A small shop and a managed distribution warehouse run on the same model.
 
    Dispatch to a customer may be a `sales_issue`, or a `transfer_out` to a `goods_sent` warehouse (ADR-0020 rule 4).
 8. Warehouse movements:
-   - **Lines.** `warehouse_movement` lines are written by confirmed tasks and by the pack and unpack commands. Each line holds item, lot or serial, quantity in the inventory unit, from and to bin, status and handling unit (inside one warehouse), `business_date` (`clock.today`, for history only), and its source: `warehouse_task_id`, or the pack, unpack, conversion or count-correction command that wrote it. They also carry the reserved `owner_partner_id` ([ADR-0030](0030-commercial-seams-and-imports.md) rule 8).
+   - **Lines.** `warehouse_movement` lines are written by confirmed tasks and by the pack and unpack commands. Each line holds item, lot or serial, quantity in the inventory unit, from and to bin, status and handling unit (inside one warehouse), `business_date` (`clock.today`, for history only), and its source: `warehouse_task_id`, or the pack, unpack or count-correction command that wrote it. They also carry the reserved `owner_partner_id` ([ADR-0030](0030-commercial-seams-and-imports.md) rule 8).
    - **Properties.** They are append-only and post no journal. Per (item, warehouse, lot or serial) their quantities net to zero (DS-16).
    - **Stock.** `stock_quantity` per full key equals material lines plus warehouse movements. Both are written through the stock lock helper.
    - **In the plan.** Warehouse movements are stock movements in a plan (ADR-0008 rule 12).
@@ -189,7 +189,7 @@ A small shop and a managed distribution warehouse run on the same model.
     - **Physical facts.** Count shortages and blocking found damage always post, then cancel reservations deterministically, by the demand document's date, number and `line_number` descending, until the limit holds, and raise an exception.
     - **Author questions.** Which reservation loses, whether overbooking is allowed, and the priority among demands are open questions. Interim, flagged: newest loses, no overbooking, first come first served.
     - **Lots.** Availability is not lot-aware. A reservation whose lots fail shelf-life rules at pick time gives a short pick. Planning ignores reservations in netting and counts demand in full ([ADR-0024](0024-planning.md) rule 9).
-    - **Build step.** Reservations, the check and the posting interfaces are step 3 core; documents call them at step 5.
+    - **Build step.** Reservations, the check and the posting interfaces are step 3 core; documents call them at step 5. Picked and fulfilled quantities stay stored here, checked by INV-58; the open quantity of the demand line is stored in `demand_supply_line` ([ADR-0031](0031-design-simplifications.md) rules 5, 6).
 
 **Picking and outbound**
 
@@ -216,7 +216,7 @@ A small shop and a managed distribution warehouse run on the same model.
     - `CreateDelivery` takes the picked stock (lots, serials, bins, handling units) of one or more demand lines. The delivery never needs updating after approval (ADR-0009 rule 9), and a short pick simply yields a partial delivery.
     - In the `staged` flow, picks go to `staging`; packing closes handling units in `packing`; `PostDelivery` posts the goods issue from the `shipping` bin.
     - In the `direct` flow, `PostDelivery` issues from the default shipping bin the picks moved to.
-    - In a plain warehouse there are no tasks: `CreateDelivery` takes stock from the warehouse, and the reservation goes straight to `fulfilled` at `PostDelivery`.
+    - In a plain warehouse there are no tasks: `CreateDelivery` takes stock from the warehouse's default bin ([ADR-0031](0031-design-simplifications.md)), and the reservation goes straight to `fulfilled` at `PostDelivery`.
     - Value and ownership change only at `PostDelivery` (ADR-0020).
     - Pick batches and waves (second slice) group the pick tasks of several demand documents, sorted by zone and `pick_sequence`. Each document is released as its own internal command, so locks stay small.
 17. Replenishment uses `bin_item`: one pick face per item per warehouse, with `minimum_quantity` and `maximum_quantity`. A replenishment task is created when a pick task's creation would take the face below its minimum, and by the daily job in the second slice, with at most one open task per `bin_item`.
@@ -224,7 +224,7 @@ A small shop and a managed distribution warehouse run on the same model.
 **Counting and returns**
 
 18. Counting:
-    - **Tasks.** A count task covers bins or items. While a count task is open, its bins are blocked for putaway, picking and replenishment. The block is derived from the open task, never written into the manual block flags.
+    - **Tasks.** A count task covers bins or items. While a count task is open, its bins are blocked for putaway, picking and replenishment. The block is derived from the open task, never written into the manual block flags. In a warehouse that is not bin-managed, count tasks cover items and no bin block applies ([ADR-0031](0031-design-simplifications.md) rule 10).
     - **Counting.** Counts are blind by default. Serial items are counted by scanning serials.
     - **Confirmation.** Confirming the task creates a `draft` `stock_count` (ADR-0020 rule 18) per bin, lot or serial and status, which stores the book quantity at confirmation beside the counted quantity, and the block lifts. Posting posts counted minus that stored book quantity, so picks and putaways after confirmation never become count differences. It posts through its normal lifecycle, with policy and approval (ADR-0009 rules 11, 13); a scan never posts a count difference.
     - **Bin differences.** A shortage in one bin and a surplus of the same item and lot in another are either netted per (item, warehouse, lot), with the bins corrected by warehouse movements, or posted gross. This is a required regime setting (`stock_count.bin_difference_method`), seeded unverified as `net` (open question).
@@ -240,9 +240,9 @@ A small shop and a managed distribution warehouse run on the same model.
     - **Created by the system:** putaway, pick and replenishment tasks, through `inventory.contract.create_warehouse_task`.
     - **Created by a person or an agent draft:** the command `CreateWarehouseTask` for `move`, `status_change` and `count`.
     - **Task handling:** `AssignWarehouseTask` (the Assign verb is widened to warehouse tasks); `StartWarehouseTask`, which sets `in_progress`; `ConfirmWarehouseTask`; `CancelWarehouseTask`.
-    - **Other commands:** `PackHandlingUnit`, `UnpackHandlingUnit`, `RunPickRelease`, `CreateDelivery`, `PostDelivery`, `ConvertWarehouse`. The verbs Pack, Unpack, Start and Convert are added to the glossary, and Cancel is widened to tasks.
+    - **Other commands:** `PackHandlingUnit`, `UnpackHandlingUnit`, `RunPickRelease`, `CreateDelivery`, `PostDelivery` (`ConvertWarehouse` removed, [ADR-0031](0031-design-simplifications.md)). The verbs Pack, Unpack, Start and Convert are added to the glossary, and Cancel is widened to tasks.
     - **Events:** `WarehouseTaskCreated`, `WarehouseTaskConfirmed` (with a shortage flag), `WarehouseTaskCanceled`, `StockReservationCreated`, `StockReservationCanceled`.
-21. Exceptions become work items (DS-29) from step 5: a short pick, a putaway without a target, or a reservation canceled by a physical fact. Before step 5 they are tasks without assignee and are listed by `ListWarehouseTask`. Agents read through the query layer (DS-33) and act only through draft commands: putaway rules, minimums and maximums, count plans, exception resolution. Slotting proposals come after Phase 1. Agent changes to putaway rules, pick-face levels and count plans go through change proposals ([ADR-0029](0029-proposals-and-agent-safety.md) rule 5).
+21. Exceptions become work items (DS-29) from step 5: a short pick, a putaway without a target, or a reservation canceled by a physical fact. Before step 5 they are tasks without assignee and are listed by `ListWarehouseTask`. Agents read through the query layer (DS-33) and act only through draft commands: putaway rules, minimums and maximums, count plans, exception resolution. Slotting proposals come after Phase 1. Agent changes to putaway rules, pick-face levels and count plans go through change proposals ([ADR-0029](0029-proposals-and-agent-safety.md) rule 5). From step 5, one work item per exception ([ADR-0031](0031-design-simplifications.md) rule 16).
 22. Printing (DS-27) covers bin labels, handling-unit labels, putaway and pick lists on paper, and confirmation from a desktop screen, so warehouses without phones work from step 5. The PWA (DS-31) comes at step 9; offline scanning after Phase 1.
 23. Queries and reports (DS-33):
     - `GetStockBalance`, extended by bin, status and handling unit;
@@ -297,7 +297,7 @@ A small shop and a managed distribution warehouse run on the same model.
   - ADR-0018 rule 3, ADR-0019.
   - The glossary verb table: Assign widened.
 - **DS-04:**
-  - errors `bin_required`, `bin_not_in_warehouse`, `warehouse_not_bin_managed`, `bin_blocked`, `bin_not_empty`, `bin_management_locked`, `stock_status_not_available`, `stock_reserved`, `reservation_exceeds_available`, `handling_unit_mismatch`, `handling_unit_closed`, `handling_unit_nesting_exceeded`, `task_quantity_exceeded`, `lot_shelf_life_too_short`, `serial_not_in_bin`;
+  - errors `bin_required`, `bin_not_in_warehouse`, `warehouse_not_bin_managed`, `bin_blocked`, `bin_not_empty`, `bin_management_locked` (removed by [ADR-0031](0031-design-simplifications.md)), `stock_status_not_available`, `stock_reserved`, `reservation_exceeds_available`, `handling_unit_mismatch`, `handling_unit_closed`, `handling_unit_nesting_exceeded`, `task_quantity_exceeded`, `lot_shelf_life_too_short`, `serial_not_in_bin`;
   - check results `capacity_not_checked`, `bin_capacity_exceeded`, `mixed_stock_not_allowed`, `no_pickable_stock`;
   - `negative_stock` worded for both levels; `invalid_state_transition` covering tasks;
   - the canonical plan section: task proposals are never hashed (also ADR-0008 rule 12).

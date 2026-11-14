@@ -34,3 +34,4 @@ One file per decision, named `NNNN-short-title.md`, using [template.md](template
 | [ADR-0028](0028-document-lifecycle-hardening.md) | Document lifecycle hardening (DS-46) | Accepted (2026-11-14) |
 | [ADR-0029](0029-proposals-and-agent-safety.md) | Change proposals and agent safety (DS-47) | Accepted (2026-11-14) |
 | [ADR-0030](0030-commercial-seams-and-imports.md) | Commercial seams and staged imports (DS-48) | Accepted (2026-11-14) |
+| [ADR-0031](0031-design-simplifications.md) | Design simplifications (DS-49) | Accepted (2026-11-14) |

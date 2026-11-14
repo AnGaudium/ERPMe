@@ -76,7 +76,7 @@ Accounting and business choices stay with the author, as flagged interims: close
 8. `owner_partner_id` (null for own stock) is reserved now, as a column, on `stock_quantity` (part of its key), `material_document_line`, `warehouse_movement`, `stock_reservation` and `warehouse_task`.
    - **Non-owned stock** is goods sold but held for a customer, or consignment later. It has quantity and no value, so it never enters `stock_value` and leaves INV-20 unaffected. It is not available to promise.
    - **What changes when it first appears.** The dated negative check (ADR-0020 rule 10) and the keys of INV-21, INV-24, INV-50, INV-51 and INV-52 become per owner, and INV-54 counts own stock only, when non-owned stock is first created. A serial stays one physical unit whoever owns it, so the serial rule and INV-22 stay across owners. Until then every row has a null owner.
-   - **Index.** The stock key's unique index treats the null owner as one value (`NULLS NOT DISTINCT`), as for bin and handling unit.
+   - **Index.** The stock key's unique index treats the null owner as one value (`NULLS NOT DISTINCT`), as for handling unit (bins are never null, [ADR-0031](0031-design-simplifications.md) rule 8).
    - **Phase 1** creates no non-owned stock. The columns cost nothing before step 3; adding them after go-live would migrate append-only tables.
    - **Accounting is the author's** (open question): goods sold but held, and whether delivery and invoice must share a date in Vietnam.
 

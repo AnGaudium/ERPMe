@@ -23,7 +23,7 @@ The actor, `on_behalf_of` and `agent_run_id` are never in the request; the dispa
 | Field | Present | Meaning |
 | --- | --- | --- |
 | `command_type`, `mode` | always | Echo of the request (a replay echoes the stored `mode: execute`) |
-| `plan` | always | `{"journal_lines": [...], "stock_movements": [...]}` as produced by the handler, filtered by the actor's field permissions; generated IDs are real IDs here, tokens only inside the hash |
+| `plan` | always | `{"journal_lines": [...], "stock_movements": [...], "document_versions": [...], "record_versions": [...]}` as produced by the handler ([ADR-0031](../adr/0031-design-simplifications.md) rules 1–2), filtered by the actor's field permissions; generated IDs are real IDs here, tokens only inside the hash |
 | `result` | always | The command's result model, e.g. the created document's `id` and, after execution, its number; also part of the hashed plan |
 | `plan_hash` | always | SHA-256 of the canonical plan and result (ADR-0008 rule 12) |
 | `recorded_at` | `execute` and replays | Instant of the transaction (ADR-0007 rule 10) |
@@ -141,10 +141,9 @@ Module-specific codes are added by the DS item that owns the module, in the regi
 | `negative_stock_value` | precondition | 422 | no | A value-only inventory line would make a warehouse's stock value negative ([ADR-0021](../adr/0021-landed-cost.md) rule 9) |
 | `bin_required` | validation | 422 | no | A line in a bin-managed warehouse has no bin ([ADR-0023](../adr/0023-warehouse-management.md) rule 4) |
 | `bin_not_in_warehouse` | validation | 422 | no | The bin belongs to another warehouse ([ADR-0023](../adr/0023-warehouse-management.md) rule 2) |
-| `warehouse_not_bin_managed` | validation | 422 | no | A bin was given for a warehouse that does not manage bins ([ADR-0023](../adr/0023-warehouse-management.md) rule 1) |
+| `warehouse_not_bin_managed` | validation | 422 | no | A bin was given for a warehouse that does not manage bins; omit it and the handler fills the default bin ([ADR-0023](../adr/0023-warehouse-management.md) rule 1; [ADR-0031](../adr/0031-design-simplifications.md) rule 8) |
 | `bin_blocked` | precondition | 422 | no | The bin is blocked for putaway or picking, manually or by an open count ([ADR-0023](../adr/0023-warehouse-management.md) rule 2, 18) |
 | `bin_not_empty` | precondition | 422 | no | A bin with stock cannot be deactivated ([ADR-0023](../adr/0023-warehouse-management.md) rule 2) |
-| `bin_management_locked` | precondition | 422 | no | `is_bin_managed` cannot change after the first posting except by `ConvertWarehouse` ([ADR-0023](../adr/0023-warehouse-management.md) rule 1) |
 | `stock_status_not_available` | precondition | 422 | no | The stock to reserve, pick or issue is not in an allowed status ([ADR-0023](../adr/0023-warehouse-management.md) rule 7, 14) |
 | `stock_reserved` | precondition | 422 | no | A voluntary issue or block would cut into reserved stock ([ADR-0023](../adr/0023-warehouse-management.md) rule 13) |
 | `reservation_exceeds_available` | precondition | 422 | no | A reservation would exceed available to promise ([ADR-0023](../adr/0023-warehouse-management.md) rule 13) |
@@ -216,5 +215,5 @@ Warehouse task proposals (target and source bins) and planning run results are l
 1. Take the full plan and result, before field filtering.
 2. Replace each ID created by `context.new_id(table)` during the run with `new:<table>:<n>`, numbering per table from 1 in creation order. Keep IDs that existed before the run, client-supplied IDs and client-supplied instants.
 3. Remove values of the types `DocumentNumber` and `SystemInstant`.
-4. Serialize `{"journal_lines": …, "stock_movements": …, "result": …}` as JSON with keys sorted, separators `,` and `:` without spaces, UTF-8, no escaping of non-ASCII characters. Numbers, dates and instants are already strings in canonical form.
+4. Serialize `{"journal_lines": …, "stock_movements": …, "document_versions": …, "record_versions": …, "result": …}` ([ADR-0031](../adr/0031-design-simplifications.md) rule 1; the two new lists hold canonical content, tokenized by steps 2–3) as JSON with keys sorted, separators `,` and `:` without spaces, UTF-8, no escaping of non-ASCII characters. Numbers, dates and instants are already strings in canonical form.
 5. `plan_hash` = lowercase hex SHA-256 of those bytes. A batch hashes the list of item plans in item order the same way.

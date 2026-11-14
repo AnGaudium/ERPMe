@@ -59,6 +59,7 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Partner exposure | partner\_exposure | Open receivable and payable amounts of a partner by kind and due bucket |
 | Credit exposure | credit\_exposure | Partner exposure plus invoices in issuing, delivered but not invoiced value and undelivered submitted or approved orders; read under the partner lock |
 | Owner partner | owner\_partner\_id | Reserved stock axis naming who owns stock we hold; null for own stock; non-owned stock has quantity and no value |
+| Default bin | default\_bin\_id | The bin every warehouse gets at creation, with a default zone; the only bin of a warehouse that is not bin-managed, filled in by handlers and hidden in the UI ([ADR-0031](../adr/0031-design-simplifications.md)) |
 | Pending receipt adjustment | pending\_receipt\_adjustment | A stock-bound price difference from an invoice posted before the goods arrived, consumed by the receipt |
 | Has posting | has\_posting | Set on an operational account by its first journal line; freezes its code, mapping, postable flag and currency ([ADR-0010](../adr/0010-system-chart-of-accounts.md) rule 12) |
 | Control kind | control\_kind | inventory, receivable, payable, gr\_ir, cost\_object, fixed\_asset, loan or none: which core module owns postings to a system account and which invariant checks it |
@@ -207,7 +208,7 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Event subject, subject sequence | event\_subject, subject\_sequence | The record an event is about, and its event counter 1, 2, 3, …: the only ordering of events ([ADR-0013](../adr/0013-outbox-and-events.md)) |
 | Consumer | consumer | A registered handler of event types; changes data only through commands inside its delivery transaction |
 | Event delivery | event\_delivery | One row per (consumer, event): pending, done, held or skipped; delivered in subject order; a held delivery blocks later ones until a human retries or skips it |
-| Queue | queue (events, jobs, integrations, pdf) | Procrastinate queues of the technical queue |
+| Queue | queue (events, jobs, integrations, pdf) | Worker queues; `jobs` runs Procrastinate jobs and long-job consumers ([ADR-0031](../adr/0031-design-simplifications.md) rule 15) |
 | Technical job | job | Background job on the technical queue (Procrastinate); distinct from work\_item |
 | Idempotency key | idempotency\_key | Per (actor, command type), Principle 9; retention and rules in DS-04 |
 | Schema version | schema\_version | Version of a command schema (semver, [07](07-shared-foundation.md#extensibility-and-upgrades)) or an event schema (DS-13); rules in DS-04 |
@@ -278,7 +279,7 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Pack, Unpack | Put stock into or take it out of a handling unit | Packed, Unpacked |
 | Firm | Fix a proposal so later runs keep it, e.g. a planned order | Firmed |
 | Activate | Start enforcing something once, irreversibly, e.g. a subledger | Activated |
-| Convert | Turn a record into another mode or form once: a warehouse to bin management, a planned order into draft documents | Converted |
+| Convert | Turn a record into another form once, e.g. a planned order into draft documents | Converted |
 | Match, Unmatch | Link or unlink bank lines or documents; open items are settled against each other by an `open_item_matching` document | Matched, Unmatched |
 | Transfer | Move records to another account or owner, e.g. a partner's open items | Transferred |
 | Allocate | Distribute an amount or quantity over targets | Allocated |

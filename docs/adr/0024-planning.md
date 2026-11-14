@@ -183,7 +183,7 @@ Planning answers, per item and warehouse: what to buy or move, how much, and by 
       - `stock_expiring`;
       - `firmed_order_overdue`;
       - `planning_parameter_missing` (no supplier, no route, no lead time). The run skips the item and continues.
-    - **Work items.** The consumer `planning_work_items` of `PlanningCompleted` keeps one work item per buyer (`buyer_id`, ADR-0018 rule 3) listing that buyer's open exceptions, and closes exceptions that a run no longer raises.
+    - **Work items.** The consumer `planning_work_items` of `PlanningCompleted` keeps one work item per buyer (`buyer_id`, ADR-0018 rule 3) listing that buyer's open exceptions, and closes exceptions that a run no longer raises. Superseded: one work item per open exception, owned by the buyer; the per-buyer list is a query ([ADR-0031](0031-design-simplifications.md) rule 17).
 22. Conversion:
     - **Grouping.** `ConvertPlannedOrder` takes firmed or proposed planned orders. Purchase orders are grouped by supplier, warehouse, and release date within `conversion_window_days`; transfer orders by route.
     - **Hand-over.** The command sets `converted` and calls the posting interface `inventory.contract.request_replenishment`, which writes one `replenishment_request` with a line per planned order (carrying `origin_planned_order_id`) and emits `ReplenishmentRequested` from `inventory`, so every importer imports downward (ADR-0022 rule 2).
