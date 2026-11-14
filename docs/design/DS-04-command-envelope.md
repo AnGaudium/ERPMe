@@ -171,6 +171,12 @@ Module-specific codes are added by the DS item that owns the module, in the regi
 | `close_checklist_incomplete` | precondition | 422 | no | A required close task of the area is not done or no longer current; `details` lists them ([ADR-0012](../adr/0012-posting-periods-and-closing.md) rule 12) |
 | `account_determination_missing` | precondition | 422 | no | No determination row matches the key and determinants; `details` names them and the command that adds a row ([ADR-0015](../adr/0015-account-determination.md) rule 10) |
 | `account_determination_mismatch` | precondition | 422 | no | The determined account does not have a system account or control kind the key requires ([ADR-0015](../adr/0015-account-determination.md) rule 12) |
+| `document_line_referenced` | precondition | 422 | no | A line another document refers to cannot be deleted ([ADR-0028](../adr/0028-document-lifecycle-hardening.md) rule 3) |
+| `referenced_line_immutable` | precondition | 422 | no | A referenced line's item, unit or warehouse cannot change ([ADR-0028](../adr/0028-document-lifecycle-hardening.md) rule 3) |
+| `quantity_below_fulfilled` | precondition | 422 | no | A line's quantity cannot go below what referring documents fulfilled ([ADR-0028](../adr/0028-document-lifecycle-hardening.md) rule 3) |
+| `change_pending` | conflict | 409 | no | A change waits for approval; cancel the change first (`CancelChange<Type>`), or update after the decision ([ADR-0028](../adr/0028-document-lifecycle-hardening.md) rule 4) |
+| `approval_context_changed` | precondition | 422 | no | The policy now requires a higher approval procedure than the approval obtained; `details` give approved and current amounts and procedures; submit again ([ADR-0028](../adr/0028-document-lifecycle-hardening.md) rule 14) |
+| `e_invoice_invalid` | validation | 422 | no | The package's e-invoice validation failed; `details.package_code` names the package rule ([ADR-0028](../adr/0028-document-lifecycle-hardening.md) rule 8) |
 | `open_item_mismatch` | validation | 422 | no | A line refers to an open item of another partner, account, currency or company ([ADR-0026](../adr/0026-open-item-core.md) rule 4) |
 | `open_item_oversettled` | precondition | 422 | no | A settlement exceeds the item's open transaction amount, or the item is settled; post the excess as a payment on account (interim, flagged) ([ADR-0026](../adr/0026-open-item-core.md) rules 6, 8) |
 | `open_item_settled` | precondition | 422 | no | The document's open items have settlements from other documents; reverse those first ([ADR-0026](../adr/0026-open-item-core.md) rule 11) |
@@ -180,6 +186,7 @@ Module-specific codes are added by the DS item that owns the module, in the regi
 | `control_dimension_missing` | precondition | 422 | no | A line on an account whose control kind is active lacks a required dimension (partner and open item, item and warehouse, cost object, fixed asset; loan: partner and open item); trigger-level failures map to it (ADR-0014 rule 10; [ADR-0025](../adr/0025-later-phase-seams.md) rule 4) |
 | `subledger_activation_date_not_reached` | precondition | 422 | no | A line on an activated subledger account is dated before the company's activation date ([ADR-0025](../adr/0025-later-phase-seams.md) rule 4) |
 | `partner_duplicate_suspected` | check result | — | — | Another partner of the company has the same tax ID; the command succeeds and a work item is created ([ADR-0019](../adr/0019-partners-and-crm-foundation.md) rule 4) |
+| `partner_snapshot_stale` | check result | — | — | The document's partner data differs from the partner master; warns (interim, flagged; for the tax ID on e-invoiced types `Issue` is rejected with `e_invoice_invalid`) ([ADR-0028](../adr/0028-document-lifecycle-hardening.md) rule 16) |
 | `capacity_not_checked` | check result | — | — | A bin capacity could not be checked because weight or dimensions are missing; `details` names the fields ([ADR-0023](../adr/0023-warehouse-management.md) rule 12) |
 | `bin_capacity_exceeded` | check result | — | — | A confirmed target bin exceeds its capacity; the fact is recorded ([ADR-0023](../adr/0023-warehouse-management.md) rule 12) |
 | `mixed_stock_not_allowed` | check result | — | — | A confirmed target bin breaks its mix rules; the fact is recorded ([ADR-0023](../adr/0023-warehouse-management.md) rule 12) |
@@ -189,7 +196,7 @@ Module-specific codes are added by the DS item that owns the module, in the regi
 | `customs_assessment_differs` | check result | — | — | Assessed import tax differs from the amount recomputed from the tax codes; the assessed amount is kept ([ADR-0021](../adr/0021-landed-cost.md) rule 10) |
 | `consent_missing` | precondition | 422 | no | The message's purpose needs consent that the data subject has not given ([ADR-0019](../adr/0019-partners-and-crm-foundation.md) rule 9) |
 | `approval_required` | precondition | 422 | no | The policy engine requires an approval first (DS-28) |
-| `invalid_state_transition` | precondition | 422 | no | The command is not allowed in the document's or warehouse task's state; `details` lists the allowed commands ([ADR-0009](../adr/0009-document-lifecycle.md) rule 5) |
+| `invalid_state_transition` | precondition | 422 | no | The command is not allowed in the document's (including `issuing` and change states, ADR-0028) or warehouse task's state; `details` lists the allowed commands ([ADR-0009](../adr/0009-document-lifecycle.md) rule 5) |
 | `posting_date_mismatch` | validation | 422 | no | `Post` carries a `posting_date` different from the document's ([ADR-0009](../adr/0009-document-lifecycle.md) rule 9) |
 | `document_referenced` | precondition | 422 | no | Delete, cancel or reverse of a document that other documents refer to ([ADR-0009](../adr/0009-document-lifecycle.md) rules 7, 19) |
 | `rate_limited` | rate_limited | 429 | yes | `details.retry_after_seconds` says when to retry |

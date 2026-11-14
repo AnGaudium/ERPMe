@@ -39,7 +39,7 @@ The simulator runs fictional companies day by day. It writes what happened in bu
    | `concurrency_group` | Optional. A hint used only by parallel test PAR-01; sequential replays ignore it |
 
    A log file starts with a header line (rule 13); `scenario.yaml` `events` have no header.
-5. Business event types in log schema 0.1.0, with the first step at which each is executable:
+5. Business event types in log schema 0.2.0 (0.2.0 adds the ADR-0028 events), with the first step at which each is executable:
 
    | Area | Types | First step |
    | --- | --- | --- |
@@ -56,9 +56,10 @@ The simulator runs fictional companies day by day. It writes what happened in bu
    | Landed cost | `purchase_cost_invoice_received`: as a cost-source journal (rule 10) from step 3; as the purchase cost invoice from step 5 | 3 |
    | Opening | `opening_balances_recorded` (DS-21) | 4 |
    | Purchasing | `purchase_requested`, `purchase_ordered`, `purchase_invoice_received`, `customs_declared` | 5 |
-   | Sales | `quotation_requested` (e-mail), `sales_ordered`, `sales_invoice_issued` (with installments from the payment term), `credit_note_issued` | 5 |
+   | Sales | `quotation_requested` (e-mail), `sales_ordered`, `sales_order_changed`, `sales_invoice_issued` (with installments from the payment term), `credit_note_issued` | 5 |
    | Cash | `payment_received`, `payment_made`, `bank_statement_received`, `netting_agreed`, `advance_paid` | 6 |
    | Tax | `tax_rate_changed`, `invoice_replaced`, `invoice_adjusted` | 7 |
+   | E-invoice (stub adapter from step 5, ADR-0028 rule 12) | `e_invoice_rejected`, `e_invoice_outage` | 5 |
 
    A new type or optional field raises the schema's minor version; a change of meaning raises its major version and needs a migration note. Readers accept older minor versions of the same major version.
 6. Payloads carry every business fact a recomputation needs, so results can be computed from the log alone (DS-16 rule 29):
@@ -189,7 +190,7 @@ The simulator runs fictional companies day by day. It writes what happened in bu
     | `added_in` | |
     | `description` | |
 
-    Version 0.1.0 has 52 edge cases (EC-46 to EC-52 for open items, ADR-0026), EC-32 to EC-40 for warehouse management (ADR-0023) and EC-41 to EC-45 for planning (ADR-0024):
+    Version 0.1.0 has 57 edge cases (EC-46 to EC-52 for open items, ADR-0026; EC-53 to EC-55, EC-59, EC-60 for the document lifecycle, ADR-0028), EC-32 to EC-40 for warehouse management (ADR-0023) and EC-41 to EC-45 for planning (ADR-0024):
     - 23 from [12-testing.md](../spec/12-testing.md#synthetic-dataset), counting landed cost after partial sale and after period lock separately;
     - eight that ADRs require: foreign-currency journal, reversal of an internal document, transfer through transit, preliminary price missing, degenerate costing, one cost source over several receipts, cost before receipt, import VAT on customs.
 

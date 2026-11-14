@@ -76,7 +76,7 @@ Planning answers, per item and warehouse: what to buy or move, how much, and by 
 
 **Demand and supply**
 
-8. Open demand and supply lines are a read model owned by `inventory`, so planning in layer 4 can read it through `inventory.contract` (ADR-0022 rules 2, 4).
+8. Open demand and supply lines are a read model owned by `inventory`, so planning in layer 4 can read it through `inventory.contract` (ADR-0022 rules 2, 4). Its rows are never deleted or rebuilt, unique per source line and direction, and closed with `closed_reason`; execution tables refer to them ([ADR-0028](0028-document-lifecycle-hardening.md) rule 2).
    - **Lines.** `demand_supply_line` holds item, warehouse, `direction` (demand or supply), open quantity in the inventory unit, `requested_date`, `ordered_date` (supply), `source_kind`, the source document line, `origin_planned_order_id` and `closed_reason` (`fulfilled`, `canceled`). DS-22 documents write it through posting interfaces in their own transactions, as they do reservations (ADR-0023 rule 13). A purchase request line's open quantity falls by what is ordered from it (a requirement on DS-22), so a request and its order are never counted twice. Planning reads only `inventory.contract`; it never imports `purchasing` or `sales`.
    - **What counts.** Which document types and states count as demand and supply is business behavior (open question). Interim, flagged:
      - **demand:** sales order lines in states after `draft` (confirmed orders, not quotations), and transfer order lines at the source;
@@ -170,7 +170,7 @@ Planning answers, per item and warehouse: what to buy or move, how much, and by 
     - `CancelPlannedOrder`, which cancels a proposed or firmed order; a later run may propose again if the need remains.
 
     Wrong states return `invalid_state_transition`.
-20. Pegging rows hold planned order, `pegging_target_kind` (`demand_line`, `forecast`, `safety_stock`, `stock_level`, `lot_size_excess`), target reference and quantity. A planned order's pegging sums exactly to its quantity (DS-16). Through a route, the destination's planned transfer pegs destination demand, and the source's dependent demand pegs that transfer.
+20. Pegging rows hold planned order, `pegging_target_kind` (`demand_line`, `forecast`, `safety_stock`, `stock_level`, `lot_size_excess`), target reference and quantity. A planned order's pegging sums exactly to its quantity (DS-16). Through a route, the destination's planned transfer pegs destination demand, and the source's dependent demand pegs that transfer. Demand-line targets are `demand_supply_line_id` ([ADR-0028](0028-document-lifecycle-hardening.md) rule 2).
 21. Action messages and exceptions:
     - **Action messages** on existing supply: `expedite` and `cancel` in the first slice; `postpone` and `reduce` later. Each carries its projected effect.
     - **Exceptions** (`planning_exception_kind`):

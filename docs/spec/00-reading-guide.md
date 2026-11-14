@@ -22,7 +22,7 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Actor, principal acted for | actor, on\_behalf\_of | Actor kinds: human, agent, integration, system. A system actor is a deterministic job (costing, FX revaluation, closing entries, scheduled matching); its on\_behalf\_of is always the accountable human: the policy owner or the human who triggered the job Actor rows: `user_account`, `agent_type` with `agent_run`, `integration_client`, registered system job ([ADR-0017](../adr/0017-permission-envelope.md)). |
 | Company, branch | company (company\_id), branch | The legal entity with its currency, time zone, package, regime, costing scope and fiscal calendar owner; a branch or dependent unit of it, also an analytical dimension ([ADR-0027](../adr/0027-cross-cutting-ownership.md) rule 5) |
 | Document | document | Header and lines |
-| Document state | draft, pending\_approval, approved, posted, reversed, canceled, closed | Documents in a final state (posted, reversed, canceled, closed) are immutable; `closed` ends an approved non-posting document that has had activity, `canceled` one that has had none; column `document.state` ([ADR-0009](../adr/0009-document-lifecycle.md)) |
+| Document state | draft, pending\_approval, approved, issuing, posted, reversed, canceled, closed | Documents in a final state (posted, reversed, canceled, closed) are immutable; `closed` ends an approved non-posting document that has had activity, `canceled` one that has had none; column `document.state` ([ADR-0009](../adr/0009-document-lifecycle.md)) |
 | Document type | document\_type; is\_posting, is\_approval\_hold\_allowed, is\_reversible | Registered once per type; the flags say whether it posts, whether its posting may wait for approval, and whether it can be reversed ([ADR-0009](../adr/0009-document-lifecycle.md) rule 2) |
 | Reversal document | reversal\_of | Points to the document it reverses; passes the same period checks as any document; for internal document types, and, as a flagged interim rule, for outside-party documents nothing refers to yet ([ADR-0009](../adr/0009-document-lifecycle.md) rule 19). Column `reversal_of_id` ([ADR-0004](../adr/0004-naming-conventions.md) rule 12) |
 | Correction document | correction\_of | A return, credit note, debit note, adjustment or replacement invoice that corrects a posted document, created from it. Column `correction_of_id` ([ADR-0009](../adr/0009-document-lifecycle.md) rule 23) |
@@ -46,6 +46,9 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Installment | installment\_number | One due part of a document under its payment term; each is its own control line and open item |
 | Payment term | payment\_term, payment\_term\_line | Installments of a document: percent, due days, base date and optional early-payment discount |
 | Open item matching | open\_item\_matching | Internal document that settles two items of one partner and account against each other |
+| Change order | is\_change\_order\_allowed, pending\_version, change\_state: none, drafting, pending\_approval | A change to an approved order kept as a pending version (the version row `document.pending_version` points to) while the approved version stays in force ([ADR-0028](../adr/0028-document-lifecycle-hardening.md)) |
+| Issuing | issuing, is\_e\_invoice\_capable, posting\_intent | State of an e-invoiced document after `Issue` and before posting; the frozen plan waits on the posting intent; posted on acceptance, back to draft on rejection |
+| Policy input hash | policy\_input\_hash | Hash of the inputs a policy decision evaluated; posting asks again when it changes, and an approval stands while the required procedure does not rise |
 | Partner exposure | partner\_exposure | Open receivable and payable amounts of a partner by kind and due bucket |
 | Has posting | has\_posting | Set on an operational account by its first journal line; freezes its code, mapping, postable flag and currency ([ADR-0010](../adr/0010-system-chart-of-accounts.md) rule 12) |
 | Control kind | control\_kind | inventory, receivable, payable, gr\_ir, cost\_object, fixed\_asset, loan or none: which core module owns postings to a system account and which invariant checks it |
@@ -252,6 +255,11 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Post | Make a document part of the books or the stock records | Posted |
 | Reverse | Post a reversal document for a posted document | Reversed |
 | Cancel | End an open document that is not posted, or an open warehouse task or reservation | Canceled |
+| Issue | Request legal issuance of a document; it posts when the issue is accepted (e.g. `IssueSalesInvoice`) | IssueRequested |
+| Record | Store an outcome reported by an outside system, e.g. an e-invoice outcome | Recorded |
+| Recall | Take back a request sent to an outside system before it took effect | Recalled |
+| Complete | Finish a held step by a human, e.g. a posting after acceptance | Completed |
+| Reopen | Return a document to draft after an outside step failed | Reopened |
 | Erase | Remove a data subject's personal data irreversibly | Erased |
 | Request | Hand work to another module for execution, e.g. replenishment or an e-invoice | Requested |
 | Pack, Unpack | Put stock into or take it out of a handling unit | Packed, Unpacked |

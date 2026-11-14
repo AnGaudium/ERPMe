@@ -67,14 +67,14 @@ Before step 1 code freezes the platform modules, every entity that several modul
      - `return_to_supplier`, `return_from_customer`;
      - `opening_balance`, matching the movement type of the same name. Account opening balances have their own type in DS-21.
    - **Non-posting demand document:** `transfer_order`.
-   - **Order references.** Lines of `goods_receipt`, `delivery` and the return types have nullable order-line reference columns (`purchase_order_line_id`, `sales_order_line_id`), reserved in the step 3 design (typed line references come with a later hardening item). Commercial documents at step 5 fill them, and the core table does not change (B3). Before step 5, `needs_reference` is satisfied by a free-text reference.
+   - **Order references.** Lines of `goods_receipt`, `delivery` and the return types have nullable order-line reference columns (`purchase_order_line_id`, `sales_order_line_id`), reserved in the step 3 design (typed line references, [ADR-0028](0028-document-lifecycle-hardening.md) rule 2). Commercial documents at step 5 fill them, and the core table does not change (B3). Before step 5, `needs_reference` is satisfied by a free-text reference.
    - **Correction types.** The return stock documents may carry `correction_of_id` to the receipt or delivery they correct (ADR-0009 rule 23); the DS-09 deliverable decides. The commercial correction types `purchase_return` and `sales_return` refer to them.
 8. Owners of entities that had none:
 
    | Entity | Owner |
    | --- | --- |
    | `customs_declaration` and its tax rows | `purchasing`, step 5 (ADR-0021 rule 10) |
-   | E-invoice records and intents | `tax` (DS-24). A sales document requests issuance through `tax.contract.request_e_invoice` synchronously, which writes the e-invoice record and its intent; the external consumer then issues it asynchronously. Imports go downward (as ADR-0024 rule 22) |
+   | E-invoice records and intents | `tax` (DS-24). A sales document requests issuance through `tax.contract.request_e_invoice` synchronously, which writes the e-invoice record and its intent; the external consumer then issues it asynchronously, and the document posts on acceptance ([ADR-0028](0028-document-lifecycle-hardening.md) rule 7). Imports go downward (as ADR-0024 rule 22) | 
    | Audit records | `audit` (layer 2, DS-36), with one row per executed command: `command_type`, `actor_kind`, `actor_id`, `agent_run_id`, `idempotency_key` (needed by INV-81) |
    | Full data export (spec 15) | DS-21, as `ExportCompanyData`: a company package with master data, documents with all versions, journal and material lines, open items, stock, attachments and audit rows, one JSON Lines file per table plus the attachment files. It is not the import batch format |
    | Management reporting | DS-33 semantic views; statutory reports stay DS-26 |

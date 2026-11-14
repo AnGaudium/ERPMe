@@ -4,6 +4,7 @@ Dated record of gate decisions, the week list and one line per Friday review ([R
 
 | Date | Step | Entry |
 | --- | --- | --- |
+| 2026-11-14 | 0 | Hardening batch: DS-46 added and done: [ADR-0028](../adr/0028-document-lifecycle-hardening.md) document lifecycle hardening accepted under ADR-0005 after three review rounds (Claude Fable 5.2); answers findings A-1, O-1, O-2, F7, C-7. Questions for the author: e-invoice posting model, change order behavior, stale partner snapshot, INV-10 reading |
 | 2026-11-14 | 0 | Hardening batch: DS-45 added and done: [ADR-0027](../adr/0027-cross-cutting-ownership.md) ownership of cross-cutting entities and consistency fixes accepted under ADR-0005 after two review rounds (Claude Fable 5.2). Questions for the author: trace scope in Phase 1, 911/421 verification |
 | 2026-11-14 | 0 | Hardening batch (design assessment 1): DS-44 added and done: [ADR-0026](../adr/0026-open-item-core.md) open-item core accepted under ADR-0005 after three review rounds (Claude Fable 5.2); answers finding F2. Questions for the author: build placement at step 1, specific-only book rate on open-item accounts, interim accounting choices, INV-32 overlap |
 | 2026-11-14 | 0 | DS-41 added with the author's agreement and done: [ADR-0025](../adr/0025-later-phase-seams.md) seams for production and asset subledgers accepted under ADR-0005 after three review rounds (Claude Fable 5.2); system chart 0.1.0 now 116 accounts. Four questions for the author |

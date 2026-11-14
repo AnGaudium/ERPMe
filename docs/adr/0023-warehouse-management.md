@@ -182,7 +182,7 @@ A small shop and a managed distribution warehouse run on the same model.
 **Reservations and availability**
 
 13. Reservations:
-    - **Rows.** A `stock_reservation` holds stock for a demand line (a sales order or transfer order line; production later): item, warehouse, quantity, optional lot (by agreement), `picked_quantity`, `fulfilled_quantity` and `state` (`open`, `picked`, `fulfilled` when fulfilled equals quantity, `canceled`). Its reserved amount is quantity minus `fulfilled_quantity`. It never names a serial.
+    - **Rows.** A `stock_reservation` holds stock for a demand line (a sales order or transfer order line; production later): item, warehouse, quantity, optional lot (by agreement), `picked_quantity`, `fulfilled_quantity` and `state` (`open`, `picked`, `fulfilled` when fulfilled equals quantity, `canceled`). Its reserved amount is quantity minus `fulfilled_quantity`. It never names a serial. The demand line is referred to by `demand_supply_line_id` ([ADR-0028](0028-document-lifecycle-hardening.md) rule 2).
     - **Interfaces.** `inventory.contract.create_stock_reservation` and `cancel_stock_reservation` are posting interfaces called by document commands (DS-22), which emit the reservation events; they are not user commands. Available to promise per (item, warehouse) is `available` quantity minus the reserved amounts of reservations in `open` or `picked`. `GetAvailableToPromise` answers it from on-hand stock only in Phase 1. Available stock still in a receiving bin counts, so a pick release before putaway may be short; that is expected.
     - **Limits.** A reservation never exceeds available to promise (`reservation_exceeds_available`); the unreserved rest of a demand line is a backorder.
     - **Voluntary issues.** Scrap, internal consumption, other issues, purchase returns, transfers, reversals and `status_change` to `blocked` are rejected with `stock_reserved` when they would cut into reservations.
@@ -194,7 +194,7 @@ A small shop and a managed distribution warehouse run on the same model.
 **Picking and outbound**
 
 14. Pick tasks:
-    - **Creation.** Pick tasks serve demand lines, not deliveries. `RunPickRelease` (a deterministic job, per demand document, step 3) turns reservations into pick tasks. Each task carries the demand line's unit and the inventory quantity (ADR-0018 rule 11); the client derives a breakdown such as "2 cartons and 3 bottles" from `product_uom`.
+    - **Creation.** Pick tasks serve demand lines, not deliveries. `RunPickRelease` (a deterministic job, per demand document, step 3) turns reservations into pick tasks. Each task carries the demand line's unit and the inventory quantity (ADR-0018 rule 11); the client derives a breakdown such as "2 cartons and 3 bottles" from `product_uom`. Tasks refer to `demand_supply_line_id` ([ADR-0028](0028-document-lifecycle-hardening.md) rule 2).
     - **Serial items.** Tasks name the bin, not the serial. The serials are scanned at confirmation and checked against bin and status (`serial_not_in_bin`).
     - **Removal order.** Removal reads only `storage` and `picking` bins with status `available`, minus the quantity of open tasks leaving each key. It orders by:
       1. lot: `fefo` by `expiry_date` (lots without one last), skipping lots below the customer's minimum remaining shelf life, with the planned delivery date as reference, or the business date when the line has none; `fifo` by the lot's earliest receipt posting date (FIFO needs lot tracking; untracked items use bin order);

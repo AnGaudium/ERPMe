@@ -31,3 +31,4 @@ One file per decision, named `NNNN-short-title.md`, using [template.md](template
 | [ADR-0025](0025-later-phase-seams.md) | Seams for production and asset subledgers (DS-41) | Accepted (2026-11-14) |
 | [ADR-0026](0026-open-item-core.md) | Open-item core (DS-44) | Accepted (2026-11-14) |
 | [ADR-0027](0027-cross-cutting-ownership.md) | Ownership of cross-cutting entities and consistency fixes (DS-45) | Accepted (2026-11-14) |
+| [ADR-0028](0028-document-lifecycle-hardening.md) | Document lifecycle hardening (DS-46) | Accepted (2026-11-14) |
