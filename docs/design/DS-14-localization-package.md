@@ -97,6 +97,20 @@ In CSV templates the basis is six columns: `basis` (`legal_source`, `author_deci
 
 Seed lists (`valuation_classes.csv`, `item_groups.csv`, `partner_groups.csv`) have `code`, `name_en`, `name_<language>` and the basis columns. The TT99 content is in [DS-19-vietnam-tt99](DS-19-vietnam-tt99/README.md) ([ADR-0039](../adr/0039-vietnam-package-tt99.md)). `unreached_system_accounts.csv` has `system_account` and `reason`. `close_checklist.yaml` carries `period_pattern` and `special_period_count` with one basis, and the tasks of ADR-0012.
 
+## Tax files (CSV)
+
+At package level under `tax/` ([ADR-0041](../adr/0041-tax-engine.md) rules 1–3, 19–20):
+
+| File | Columns |
+| --- | --- |
+| `tax_codes.csv` | `code`, names, `tax_kind`, `direction`, `calculation`, `sequence`, `base_includes` (kinds separated by `;`), `transaction_key`, `deductibility`, `import_treatment`, `fixed_asset_code`, `e_invoice_label` |
+| `tax_rates.csv` | `tax_code`, `effective_from`, `rate_percent` |
+| `tax_matrix.csv` | `direction`, `partner_tax_group`, `item_tax_group`, `effective_from`, `tax_codes` (separated by `;`) |
+| `item_tax_groups.csv`, `partner_tax_groups.csv` | `code`, names, and for partner groups the `directions` they apply to |
+| `returns/<form>.csv` | `box`, labels, `source`: `base:<code>`, `tax:<code>`, `deductible:<code>`, `prior_decrease`, `prior_increase`, `formula:<expression over [box]>` with `+`, `-`, `pos()`, `neg()`, or `carry:<box>`, separated by `;` |
+
+Every row carries the basis columns.
+
 ## Regime settings (YAML)
 
 Each entry is one dated rule. The values below show the format only; the Vietnam values and their bases are set in DS-19.

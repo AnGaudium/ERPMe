@@ -39,3 +39,46 @@
   effective_from: 2026-01-01
   status: unverified
   open_question: "(DS-36) Attachment retention"
+
+# --- Tax (ADR-0041 rule 5) ---
+- key: tax.rate_date_basis
+  value: {sales_invoice: invoice_date, purchase_invoice: supplier_invoice_date, customs_declaration: declaration_date, correction: original_line_tax_date}
+  effective_from: 2026-01-01
+  status: unverified
+  open_question: "(DS-23) Tax date and declaration date"
+
+- key: tax.declaration_date_basis
+  value: {sale: invoice_date, purchase: invoice_date, import: tax_payment_voucher_date}
+  effective_from: 2026-01-01
+  status: unverified
+  open_question: "(DS-03, DS-19, DS-23) Which date places a purchase or sales document in a VAT period?"
+
+- key: tax.rounding_level
+  value: line
+  effective_from: 2026-01-01
+  status: unverified
+  open_question: "(DS-23) VAT rounding level"
+
+- key: tax.non_cash_payment_threshold
+  value: {amount: "5000000", currency: VND, includes_tax: true, aggregate_same_day_same_seller: true}
+  effective_from: 2026-01-01
+  status: unverified
+  open_question: "(DS-23) Input VAT and non-cash payment"
+
+- key: tax.stated_amount_tolerance
+  value: {per_line_minor_units: 1}
+  effective_from: 2026-01-01
+  status: unverified
+  open_question: "(DS-23) Input VAT and non-cash payment"
+
+- key: tax.apportionment
+  value: {taxable_boxes: ["29", "30", "32"], total_boxes: ["26", "29", "30", "32"], true_up: fiscal_year_end}
+  effective_from: 2026-01-01
+  status: unverified
+  open_question: "(DS-23) Input VAT and non-cash payment"
+
+- key: tax.return_period
+  value: {options: [monthly, quarterly], default: monthly}
+  effective_from: 2026-01-01
+  status: unverified
+  open_question: "(DS-23) Tax date and declaration date"

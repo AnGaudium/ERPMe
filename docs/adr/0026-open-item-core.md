@@ -46,7 +46,7 @@ DS-25 keeps payments, bank statements, matching UX, netting, payment allocation 
 
 **Settlement**
 
-6. A settlement:
+6. A settlement, which records its `evidence_method` (`cash`, `bank_transfer`, `card`, `offset`, `third_party`) and emits `OpenItemSettled` for input VAT deductibility ([ADR-0041](0041-tax-engine.md) rule 15):
    - locks the item; is rejected when its transaction amount exceeds the open transaction amount, including on a settled item (`open_item_oversettled`);
    - is rejected when it is dated before a revaluation line of the item that has not itself been reversed (`open_item_revaluation_later`: reverse or rerun that revaluation first, ADR-0011 rule 19; interim, flagged). A `reverse_and_repost` revaluation counts as reversed, because the revaluation job posts its reversal, dated the first day of the next period, in the same run;
    - takes the carrying amount as of the settlement's posting date, computed from the item's lines dated on or before it (not the current cache);

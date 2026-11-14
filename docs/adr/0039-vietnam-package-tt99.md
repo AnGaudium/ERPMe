@@ -78,7 +78,7 @@ Under ADR-0016 rule 12, production refuses unverified content until the author v
 
 **Default account determination**
 
-7. Format: `transaction_key`, the determinant columns of ADR-0015 rule 9, `account_code`, the basis columns and a `note`. The determinant columns use seed codes for valuation class, item group and partner group.
+7. Format: `transaction_key`, the determinant columns of ADR-0015 rule 9, `account_code`, the basis columns and a `note`. The determinant columns use seed codes for valuation class, item group and partner group. The template may name the package's own tax codes, as the fixed-asset input codes to 1332 do ([ADR-0041](0041-tax-engine.md) rule 1).
    - **Company data.** The template never names warehouses, tax codes or currencies, which are company data or DS-23's. Companies add those rows, for example a warehouse row to 158 for a bonded warehouse; DS-23 adds tax code rows, for example 1332 for input tax on fixed assets.
    - **Seeds:**
      - valuation classes `raw_material` (152), `tools_supplies` (153), `semi_finished` and `finished_goods` (155), `merchandise` (156);

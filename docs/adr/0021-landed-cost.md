@@ -99,7 +99,7 @@ The customs declaration, supplier cost invoices and invoice price differences to
     - credits each tax's payable account through its tax code's key (`import_export_duty`, `special_consumption_tax`, `import_tax`; DS-23 adds keys for other import taxes);
     - debits either `purchase_cost_clearing`, when the tax code's `import_treatment` is `capitalize`, or the recoverable tax account through `input_tax`, when it is `recoverable` (e.g. deductible import VAT to 1331, [08](../spec/08-l10n-vn.md#imports-and-purchase-costs)).
 
-    `import_treatment`, including when import VAT is not deductible and is capitalized, is a package rule with a basis, flagged until verified (open question; DS-19, DS-23).
+    `import_treatment`, including when import VAT is not deductible and is capitalized, is a package rule with a basis, flagged until verified (open question; DS-19, DS-23). Import tax codes and the tax rows written at posting: [ADR-0041](0041-tax-engine.md) rules 1, 11.
     - The declaration proposes a `landed_cost` with one cost line per declaration line and capitalized tax. Each cost line targets only receipt lines of that item, prorated by received over declared quantity, less what is already allocated (one declaration, receipts of 600 and then 400 units).
     - A customs amendment is the correction type `customs_declaration_amendment` (`correction_of_id`), posting differences.
     - `customs_declaration` is not reversible, deliberately stricter than ADR-0009 rule 19's interim: it records an outside party's document, and the amendment type corrects it.

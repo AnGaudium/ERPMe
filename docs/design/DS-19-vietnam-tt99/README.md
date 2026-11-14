@@ -12,6 +12,7 @@ Draft package data decided by [ADR-0039](../../adr/0039-vietnam-package-tt99.md)
 | [regimes/tt99/valuation_classes.csv](regimes/tt99/valuation_classes.csv), [item_groups.csv](regimes/tt99/item_groups.csv), [partner_groups.csv](regimes/tt99/partner_groups.csv) | Seed codes used by the determination |
 | [regimes/tt99/close_checklist.yaml](regimes/tt99/close_checklist.yaml) | Period pattern and special periods; tasks come in step 8 |
 | [regimes/tt99/settings.yaml](regimes/tt99/settings.yaml) | Regime rules: FX, closing, movement types, landed cost, counts, production |
+| [tax/](tax/tax_codes.csv) | Tax codes, dated rates, tax matrix, item and partner tax groups, the 01/GTGT form ([ADR-0041](../adr/0041-tax-engine.md)) |
 
 Bases: TT99 rows that only restate Appendix II carry it as legal source (not yet verified). Every package choice is `unverified` and cites an open question, except the two author decisions (purchase invoice posting date; rounding to 515 and 635). Production refuses unverified content (ADR-0016 rule 12).
 

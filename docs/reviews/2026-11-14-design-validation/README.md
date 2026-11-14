@@ -22,7 +22,8 @@ The scripts are in [lab/](lab/):
 | `costing_solver.py` | First solver prototype: stock and production nodes, uniform WIP share (L-05) |
 | `costing_lab2.py` | Full production costing model of ADR-0035 over two periods (L-06) |
 | `mrp_lab.py` | Multi-level MRP of ADR-0036: network order, phantom collapse, co-product supply, make to order, conversion (L-08) |
-| `check_package.py` | A package regime against the core catalogs and open questions: ADR-0010 rules 11, 17 and template analogues of 16; ADR-0015 rules 4, 9, 10, 13; ADR-0016 rule 6 bases; required settings; per legal form. `--self-test` applies twelve broken copies (L-09) |
+| `check_package.py` | A package regime against the core catalogs and open questions: ADR-0010 rules 11, 17 and template analogues of 16; ADR-0015 rules 4, 9, 10, 13; ADR-0016 rule 6 bases; required settings; per legal form. tax files (ADR-0041 rule 20). `--self-test` applies eighteen broken copies (L-09, L-10) |
+| `tax_lab.py` | The tax computation of [ADR-0041](../adr/0041-tax-engine.md) on 20,000 random documents (line and document rounding, prices including tax, symmetry under every mode, compound bases, zero and assessed codes), the company-currency tie-out, and the seed data with a credit note across the rate change (L-10) |
 
 ## Findings
 
@@ -37,6 +38,7 @@ The scripts are in [lab/](lab/):
 | L-07 | Review of the L-03 fix: the activation row was read before the area-state lock, cost objects of another company were accepted, and activation rows could change. Cost-object lines were in area `general`, so late pool postings would not make the inventory costing stale | Fixed in DS-06 and tested (`t03_cost_object_area.py`, 4 of 4) |
 | L-08 | MRP prototype: determinism, pegging sums, phantom collapse, co-product supply and make-to-order isolation pass. Converting a make-to-order planned order first double-counted its components on the next run (bolt demand 200 to 352), because the real order's supply was not linked to its sales line. With the link (`for_demand_supply_line_id` on supply rows), demand stays 200 | Basis of [ADR-0036](../../adr/0036-multi-level-mrp.md) rules 8–9. The prototype is simplified: no calendars, fence, lot splitting, reservations or inspection stock |
 | L-09 | TT99 package ([ADR-0039](../adr/0039-vietnam-package-tt99.md)): every seeded combination resolves uniquely for each of the four legal forms, and twelve broken copies each fail (`--self-test`). The first draft had a cost behavior on the direct-cost account 62771 (found by the check), and review found that the check missed postings without a valuation class (no generic price difference row), package choices recorded as legal sources, and a setting mixing a decided and an undecided value | Fixed in the template and the check before acceptance |
+| L-10 | Tax ([ADR-0041](../adr/0041-tax-engine.md)): all computation properties hold on 20,000 random documents. The first document-level allocation was not sign-symmetric (a credit note negating an invoice got different line taxes in about 2% of documents), fixed by normalizing by the sign of the code's total. Review found that the first design let filed returns change (a mutable subledger), recomputed taxes at posting after an e-invoice was sent, and did not tie foreign-currency tax rows to the journal; the lab now checks the tie-out and the 8% to 10% correction case | Fixed in ADR-0041 rules 6, 8, 9, 12, 13 |
 
 L-06 covered:
 - pools fed by indirect materials at solved prices, split into fixed and variable parts;

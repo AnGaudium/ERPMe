@@ -44,7 +44,7 @@ Checks:
 
 **Modules, contracts and layers**
 
-2. Modules of `erpme` (ADR-0004 rule 7) by layer. A module imports only from lower layers. A module is created by the first work package that needs it (B7). New modules beyond this list are added by ADR.
+2. Modules of `erpme` (ADR-0004 rule 7) by layer. A module imports only from lower layers. A module is created by the first work package that needs it (B7). New modules beyond this list are added by ADR. Exception within layer 3: `tax` may import the `ledger` contract to post tax adjustments, and `ledger` never imports `tax`; settlements reach `tax` through the `OpenItemSettled` event ([ADR-0041](0041-tax-engine.md) rule 15).
 
    | Layer | Modules |
    | --- | --- |

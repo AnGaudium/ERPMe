@@ -183,6 +183,10 @@ Module-specific codes are added by the DS item that owns the module, in the regi
 | `period_sequence_violation` | precondition | 422 | no | A period state change would break the period sequence; `details` names the blocking period ([ADR-0012](../adr/0012-posting-periods-and-closing.md) rule 8) |
 | `close_checklist_incomplete` | precondition | 422 | no | A required close task of the area is not done or no longer current; `details` lists them ([ADR-0012](../adr/0012-posting-periods-and-closing.md) rule 12) |
 | `account_determination_missing` | precondition | 422 | no | No determination row matches the key and determinants; `details` names them and the command that adds a row ([ADR-0015](../adr/0015-account-determination.md) rule 10) |
+| `tax_matrix_missing` | precondition | 422 | no | No tax matrix row for the direction, partner tax group, item tax group and tax date; `details` names them ([ADR-0041](../adr/0041-tax-engine.md) rule 7) |
+| `tax_rate_missing` | precondition | 422 | no | The tax code has no rate on the tax date ([ADR-0041](../adr/0041-tax-engine.md) rule 7) |
+| `tax_matrix_row_invalid` | validation | 422 | no | A company tax matrix row would shadow a package key; company rows are allowed only for company-added groups ([ADR-0041](../adr/0041-tax-engine.md) rule 3) |
+| `tax_inclusive_multiple_codes` | validation | 422 | no | Prices including tax are allowed only with one percent tax code on the line ([ADR-0041](../adr/0041-tax-engine.md) rule 9) |
 | `account_determination_mismatch` | precondition | 422 | no | The determined account does not have a system account or control kind the key requires ([ADR-0015](../adr/0015-account-determination.md) rule 12) |
 | `document_line_referenced` | precondition | 422 | no | A line another document refers to cannot be deleted ([ADR-0028](../adr/0028-document-lifecycle-hardening.md) rule 3) |
 | `referenced_line_immutable` | precondition | 422 | no | A referenced line's item, unit or warehouse cannot change ([ADR-0028](../adr/0028-document-lifecycle-hardening.md) rule 3) |
@@ -247,6 +251,8 @@ Module-specific codes are added by the DS item that owns the module, in the regi
 | `scan_unavailable` | check result | — | — | No scanner is deployed and scan mode is `optional`; the attachment passed unscanned ([ADR-0038](../adr/0038-audit-and-observability.md) rule 14) |
 | `audit_changes_summarized` | check result | — | — | The command changed more than 10,000 tracked rows; the audit record stores field names and hashes instead of values ([ADR-0038](../adr/0038-audit-and-observability.md) rule 3) |
 | `quantity_rounded` | check result | — | — | A quantity was rounded to its unit's precision; `details` carry the entered and the rounded value so the user sees both ([ADR-0018](../adr/0018-product-and-item-model.md) rule 11) |
+| `tax_code_differs_from_matrix` | check result | — | — | A line's tax code differs from the matrix's, where ADR-0018 rule 16 allows it ([ADR-0041](../adr/0041-tax-engine.md) rule 7) |
+| `tax_amount_differs_from_computed` | check result | — | — | A supplier's stated tax differs from the computed one beyond `tax.stated_amount_tolerance`; the stated amount is used ([ADR-0041](../adr/0041-tax-engine.md) rule 10) |
 | `consent_missing` | precondition | 422 | no | The message's purpose needs consent that the data subject has not given ([ADR-0019](../adr/0019-partners-and-crm-foundation.md) rule 9) |
 | `approval_required` | precondition | 422 | no | The policy engine requires an approval first (DS-28) |
 | `invalid_state_transition` | precondition | 422 | no | The command is not allowed in the document's (including `issuing` and change states, ADR-0028) or warehouse task's state; `details` lists the allowed commands ([ADR-0009](../adr/0009-document-lifecycle.md) rule 5) |

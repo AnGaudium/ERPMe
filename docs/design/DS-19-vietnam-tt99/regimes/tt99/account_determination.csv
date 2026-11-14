@@ -40,7 +40,16 @@ revenue_posting,,,other,,,,5118,unverified,(DS-19) TT99 default account determin
 revenue_deduction_trade_discount,,,,,,,5211,unverified,(DS-19) TT99 default account determination,,,,,
 revenue_deduction_return,,,,,,,5212,unverified,(DS-19) TT99 default account determination,,,,,
 revenue_deduction_allowance,,,,,,,5213,unverified,(DS-19) TT99 default account determination,,,,,
-input_tax,,,,,,,1331,unverified,(DS-19) TT99 default account determination,,,,,"DS-23 adds tax code rows, e.g. 1332 for fixed assets"
+input_tax,,,,,,,1331,unverified,(DS-19) TT99 default account determination,,,,,
+input_tax,,,,,vat_in_fa_10,,1332,unverified,(DS-19) TT99 default account determination,,,,,Fixed-asset input VAT (ADR-0041 rule 1)
+input_tax,,,,,vat_in_fa_reducible,,1332,unverified,(DS-19) TT99 default account determination,,,,,Fixed-asset input VAT (ADR-0041 rule 1)
+input_tax,,,,,vat_in_fa_5,,1332,unverified,(DS-19) TT99 default account determination,,,,,Fixed-asset input VAT (ADR-0041 rule 1)
+input_tax,,,,,import_vat_fa_10,,1332,unverified,(DS-19) TT99 default account determination,,,,,Fixed-asset input VAT (ADR-0041 rule 1)
+input_tax,,,,,import_vat_fa_reducible,,1332,unverified,(DS-19) TT99 default account determination,,,,,Fixed-asset input VAT (ADR-0041 rule 1)
+input_tax,,,,,import_vat_fa_5,,1332,unverified,(DS-19) TT99 default account determination,,,,,Fixed-asset input VAT (ADR-0041 rule 1)
+input_tax_non_deductible,,,,,,,6425,unverified,(DS-19) TT99 default account determination,,,,,Interim: non-deductible input VAT to administrative taxes and fees; alternatives the cost of the goods or 811 (ADR-0041 rule 11)
+environmental_protection_tax,,,,,,,33381,unverified,(DS-19) TT99 default account determination,,,,,
+trade_remedy_duty,,,,,,,3333,unverified,(DS-19) TT99 default account determination,,,,,"Interim: with import duties, as practice books them; alternative 33382"
 output_tax,,,,,,,33311,unverified,(DS-19) TT99 default account determination,,,,,
 import_tax,,,,,,,33312,unverified,(DS-19) TT99 default account determination,,,,,
 import_export_duty,,,,,,,3333,unverified,(DS-19) TT99 default account determination,,,,,

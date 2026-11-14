@@ -44,3 +44,4 @@ One file per decision, named `NNNN-short-title.md`, using [template.md](template
 | [ADR-0038](0038-audit-and-observability.md) | Audit log, observability and attachment handling (DS-36) | Accepted (2026-11-14) |
 | [ADR-0039](0039-vietnam-package-tt99.md) | Vietnam package, TT99 regime content (DS-19) | Accepted (2026-11-14) |
 | [ADR-0040](0040-ui-architecture.md) | UI architecture and schema-driven renderer (DS-30) | Accepted (2026-11-14) |
+| [ADR-0041](0041-tax-engine.md) | Tax engine (DS-23) | Accepted (2026-11-14) |

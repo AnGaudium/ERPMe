@@ -203,6 +203,14 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Classification scheme | classification\_scheme, classification\_value, product\_classification | Company-defined grouping of products for analysis; `product_line` is seeded and protected; one value per scheme per product |
 | Product category | product\_category | Built-in hierarchy of products that proposes defaults when a product is created |
 | Item tax group, partner tax group | item\_tax\_group, partner\_tax\_group | The two axes of the dated tax matrix (with direction) that proposes and checks a line's tax codes (DS-23) |
+| Tax code | tax\_code | Package rule naming one tax treatment: kind, direction, calculation, transaction key, deductibility, import treatment; rates dated per code ([ADR-0041](../adr/0041-tax-engine.md)) |
+| Tax matrix | tax\_matrix | Dated map from direction, partner tax group and item tax group to tax codes, as a fiscal position does |
+| Document line tax | document\_line\_tax | Base, rate and tax per document line and code, part of the document's content and frozen with it |
+| Tax line | tax\_line | Immutable tax subledger row written at posting, tied to the journal tax line |
+| Tax line adjustment | tax\_line\_adjustment | Append-only later change of a tax line: payment evidence, cash payment, lapsed due date, apportionment, period move |
+| Deductibility state | deductible, deductible\_until\_due, not\_deductible | Projection of a purchase VAT row from its initial state and adjustments |
+| Tax return | tax\_return | Immutable snapshot of a filed return; later changes appear as prior-period adjustments |
+| Declaration date | declaration\_date | The date that places a tax row or adjustment in a return period |
 | Tracking | tracking: none, lot, serial | Whether a product's stock movements carry lots or serial numbers |
 | Partner kind | partner\_kind: organization, household\_business, individual | Decides row-conditional data labels: name, tax ID, addresses, phones, emails and bank accounts of household businesses and individuals are personal; unknown kind is treated as personal ([ADR-0019](../adr/0019-partners-and-crm-foundation.md)) |
 | Partner role, profile | partner\_role; customer\_profile, supplier\_profile, employee\_profile | Roles added to one partner over time, deactivated not deleted; each role's own data in its profile, selected by the document's role. Employees are partners with the employee role |

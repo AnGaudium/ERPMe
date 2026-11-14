@@ -27,7 +27,7 @@ A localization package (`l10n_<country>`) is a directory with a manifest, data f
 | Numbering formats per document type | package template | ADR-0009 |
 | Print templates | package template | DS-27 |
 | Regime settings (FX rules, reversal method, closing rules, default posting dates, rounding of named calculations) | package rule | this ADR, rules 9–12 |
-| Tax codes, date-effective rates, tax return formats | package rule | DS-23 |
+| Tax codes, date-effective rates, tax matrix (company rows only for company-added groups), tax return formats ([ADR-0041](0041-tax-engine.md) rules 1–3, 19–20) | package rule | DS-23 |
 | Statutory reports and books | package rule | DS-26 |
 | Default data labels and personal data rules | package rule | DS-32, [17](../spec/17-seatmap-data-classification.md) |
 | Translations and accounting terminology | translation | rules 18–19 |

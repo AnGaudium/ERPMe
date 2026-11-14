@@ -1,0 +1,6 @@
+code,name_en,name_vi,description,basis,basis_document,basis_article,basis_date,verified_by,verified_on
+standard,Standard rate,Thuế suất phổ thông,"Goods and services at 10% excluded from the temporary reduction (Resolution 204/2025/QH15: telecoms; finance, banking, securities, insurance; real estate; metal products; mining products except coal; excise goods except gasoline)",unverified,"(DS-23) Vietnamese tax codes, matrix and 01/GTGT boxes",,,,
+standard_reducible,"Standard rate, reduction eligible","Thuế suất phổ thông, được giảm thuế",10% goods and services eligible for the reduction to 8% while it applies,unverified,"(DS-23) Vietnamese tax codes, matrix and 01/GTGT boxes",,,,
+reduced,Reduced rate,Thuế suất 5%,Goods and services at 5% (VAT Law Article 9 clause 2),unverified,"(DS-23) Vietnamese tax codes, matrix and 01/GTGT boxes",,,,
+not_subject,Not subject to VAT,Không chịu thuế GTGT,Goods and services not subject to VAT (VAT Law Article 5),unverified,"(DS-23) Vietnamese tax codes, matrix and 01/GTGT boxes",,,,
+not_declared,Not declared for VAT,"Không phải kê khai, tính nộp thuế GTGT","Receipts that are not sales, such as compensation, declared as not declared",unverified,"(DS-23) Vietnamese tax codes, matrix and 01/GTGT boxes",,,,

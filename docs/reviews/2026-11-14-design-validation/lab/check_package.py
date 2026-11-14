@@ -140,6 +140,8 @@ def run(docs, pkg, regime, quiet=False):
 
     # Determination rows (ADR-0015 rules 4, 9).
     DETS = ['valuation_class', 'warehouse', 'item_group', 'partner_group', 'tax_code', 'currency']
+    _tc = os.path.join(pkg, 'tax', 'tax_codes.csv')
+    pkg_tax_codes = {r['code'] for r in load(_tc)} if os.path.exists(_tc) else set()
     seen = set()
     for i, d in enumerate(det, 2):
         k = d['transaction_key']; where = f'determination line {i} ({k})'
@@ -149,7 +151,8 @@ def run(docs, pkg, regime, quiet=False):
         for dn in DETS:
             if d[dn] and dn not in allowed: fail(f'{where}: sets {dn}, which the key does not declare')
             if d[dn] and dn in seeds and d[dn] not in seeds[dn]: fail(f'{where}: {dn} {d[dn]} not seeded')
-            if d[dn] and dn in ('warehouse', 'tax_code', 'currency'): fail(f'{where}: a template leaves {dn} empty')
+            if d[dn] and dn in ('warehouse', 'currency'): fail(f'{where}: a template leaves {dn} empty')
+            if d[dn] and dn == 'tax_code' and d[dn] not in pkg_tax_codes: fail(f'{where}: tax code {d[dn]} is not a package tax code')
         ident = (k,) + tuple(d[x] for x in DETS)
         if ident in seen: fail(f'{where}: duplicate row')
         seen.add(ident)
@@ -212,6 +215,102 @@ def run(docs, pkg, regime, quiet=False):
     if os.path.exists(cl):
         basis_yaml(yaml.safe_load(open(cl, encoding='utf-8')), 'close_checklist.yaml')
 
+    # Tax files (ADR-0041 rule 20), at package level.
+    tdir = os.path.join(pkg, 'tax')
+    if os.path.isdir(tdir):
+        import re as _re
+        tcodes_rows = load(os.path.join(tdir, 'tax_codes.csv'))
+        tcodes = {r['code']: r for r in tcodes_rows}
+        if len(tcodes) != len(tcodes_rows): fail('tax codes: duplicate code')
+        trates = load(os.path.join(tdir, 'tax_rates.csv'))
+        tmatrix = load(os.path.join(tdir, 'tax_matrix.csv'))
+        itg = load(os.path.join(tdir, 'item_tax_groups.csv'))
+        ptg = load(os.path.join(tdir, 'partner_tax_groups.csv'))
+        datere = _re.compile(r'^\d{4}-\d{2}-\d{2}$')
+        for name, rows, key in (('tax code', tcodes_rows, 'code'), ('rate', trates, 'tax_code'), ('matrix', tmatrix, 'item_tax_group'),
+                                ('item tax group', itg, 'code'), ('partner tax group', ptg, 'code')):
+            for r in rows: basis_csv(r, f'{name} {r[key]}')
+        kinds = {'vat', 'import_duty', 'special_consumption', 'environmental_protection', 'trade_remedy'}
+        enums = {'tax_kind': kinds, 'direction': {'sale', 'purchase', 'import'}, 'calculation': {'percent', 'none', 'assessed'},
+                 'deductibility': {'', 'deductible', 'not_deductible'}, 'import_treatment': {'', 'capitalize', 'recoverable'},
+                 'e_invoice_label': {'', '0%', 'KCT', 'KKKNT'}}
+        resolved = {d['tax_code'] for d in det if d['transaction_key']} | {''}
+        for c, r in tcodes.items():
+            for col, ok in enums.items():
+                if r[col] not in ok: fail(f'tax code {c}: {col} {r[col]!r}')
+            if r['transaction_key'] not in TK: fail(f'tax code {c}: unknown transaction key {r["transaction_key"]}')
+            elif not any(d['transaction_key'] == r['transaction_key'] and d['tax_code'] in ('', c) for d in det):
+                fail(f'tax code {c}: key {r["transaction_key"]} has no determination row (ADR-0015 rule 13)')
+            if r['direction'] == 'import' and not r['import_treatment']: fail(f'tax code {c}: import code without import_treatment')
+            if r['tax_kind'] == 'vat' and r['direction'] in ('purchase', 'import') and not r['deductibility']: fail(f'tax code {c}: VAT input code without deductibility')
+            if r['calculation'] == 'none' and r['direction'] == 'sale' and not r['e_invoice_label']: fail(f'tax code {c}: no e-invoice label')
+            if r['calculation'] == 'percent' and r['e_invoice_label']: fail(f'tax code {c}: a percent code prints its rate, no label')
+            for k in [x for x in r['base_includes'].split(';') if x]:
+                if k not in kinds: fail(f'tax code {c}: base_includes unknown kind {k}')
+            if r['fixed_asset_code'] and (r['fixed_asset_code'] not in tcodes or tcodes[r['fixed_asset_code']]['direction'] != r['direction']):
+                fail(f'tax code {c}: bad fixed_asset_code {r["fixed_asset_code"]}')
+        seen_r = set()
+        for r in trates:
+            if not datere.match(r['effective_from']): fail(f'rate {r["tax_code"]}: date {r["effective_from"]!r}')
+            if (r['tax_code'], r['effective_from']) in seen_r: fail(f'rate {r["tax_code"]} {r["effective_from"]}: duplicate')
+            seen_r.add((r['tax_code'], r['effective_from']))
+            if r['tax_code'] not in tcodes: fail(f'rate for unknown code {r["tax_code"]}')
+            elif tcodes[r['tax_code']]['calculation'] != 'percent': fail(f'rate on non-percent code {r["tax_code"]}')
+        first = min([r['effective_from'] for r in trates + tmatrix] or ['9999'])
+        dates = sorted({first} | {r['effective_from'] for r in trates + tmatrix})
+        for c, r in tcodes.items():
+            if r['calculation'] == 'percent':
+                own = [x['effective_from'] for x in trates if x['tax_code'] == c]
+                if not own or min(own) > first: fail(f'tax code {c}: no rate from {first}')
+        seen_m = set()
+        for m in tmatrix:
+            k = (m['direction'], m['partner_tax_group'], m['item_tax_group'], m['effective_from'])
+            if k in seen_m: fail(f'tax matrix: duplicate {k}')
+            seen_m.add(k)
+            if not datere.match(m['effective_from']): fail(f'tax matrix: date {m["effective_from"]!r}')
+            for c in m['tax_codes'].split(';'):
+                if c not in tcodes: fail(f'tax matrix: unknown code {c}')
+                elif tcodes[c]['direction'] != m['direction']: fail(f'tax matrix: {c} direction {tcodes[c]["direction"]} on a {m["direction"]} row')
+            if m['partner_tax_group'] not in [g['code'] for g in ptg] or m['item_tax_group'] not in [g['code'] for g in itg]:
+                fail(f'tax matrix: unknown group in {m["direction"]}/{m["partner_tax_group"]}/{m["item_tax_group"]}')
+        groups_for = {d: [g['code'] for g in ptg if d in g['directions'].split(';')] for d in ('sale', 'purchase')}
+        for d, pgs in groups_for.items():
+            for pg_, ig in itertools.product(pgs, [g['code'] for g in itg]):
+                for day in dates:
+                    if not [m for m in tmatrix if (m['direction'], m['partner_tax_group'], m['item_tax_group']) == (d, pg_, ig) and m['effective_from'] <= day]:
+                        fail(f'tax matrix: no row for {d}/{pg_}/{ig} on {day}'); break
+        rdir_ = os.path.join(tdir, 'returns')
+        boxre = _re.compile(r'\[([0-9a-z]+)\]')
+        formre = _re.compile(r'^[\s\[\]0-9a-z+\-()]*$')
+        for fn in sorted(os.listdir(rdir_)) if os.path.isdir(rdir_) else []:
+            rows = load(os.path.join(rdir_, fn)); boxes = [r['box'] for r in rows]
+            if len(set(boxes)) != len(boxes): fail(f'return {fn}: duplicate box')
+            for r in rows:
+                basis_csv(r, f'return {fn} box {r["box"]}')
+                for part in r['source'].split(';'):
+                    kind, _, arg = part.partition(':')
+                    if kind in ('base', 'tax', 'deductible'):
+                        if arg not in tcodes: fail(f'return {fn} box {r["box"]}: unknown code in {part!r}')
+                        elif kind == 'tax' and tcodes[arg]['calculation'] == 'none': fail(f'return {fn} box {r["box"]}: tax of a code without tax {arg}')
+                        elif kind == 'deductible' and not tcodes[arg]['deductibility']: fail(f'return {fn} box {r["box"]}: deductible of a non-input code {arg}')
+                    elif kind in ('prior_decrease', 'prior_increase') and not arg:
+                        pass
+                    elif kind == 'carry':
+                        if arg not in boxes: fail(f'return {fn} box {r["box"]}: carry of unknown box {arg}')
+                    elif kind == 'formula':
+                        expr = arg.replace('pos', '').replace('neg', '')
+                        if not formre.match(expr): fail(f'return {fn} box {r["box"]}: bad formula {arg!r}')
+                        for b in boxre.findall(arg):
+                            if b not in boxes: fail(f'return {fn} box {r["box"]}: formula refers to unknown box {b}')
+                    else:
+                        fail(f'return {fn} box {r["box"]}: bad source {part!r}')
+        tax_settings = {'tax.rate_date_basis', 'tax.declaration_date_basis', 'tax.rounding_level', 'tax.non_cash_payment_threshold',
+                        'tax.stated_amount_tolerance', 'tax.apportionment', 'tax.return_period'}
+        pkg_settings_path = os.path.join(pkg, 'settings.yaml')
+        have = {e['key'] for e in (yaml.safe_load(open(pkg_settings_path, encoding='utf-8')) or [])} if os.path.exists(pkg_settings_path) else set()
+        for k in sorted(tax_settings - have): fail(f'required tax setting {k} missing')
+        notes.append(f'tax: {len(tcodes)} codes, {len(trates)} rates, {len(tmatrix)} matrix rows')
+
     if not quiet:
         print(f'legal forms {forms}; chart rows {len(chart)}; determination rows {len(det)}; combinations resolved {combos}; settings {len(settings)}')
         for n in notes: print('NOTE', n)
@@ -236,6 +335,15 @@ def self_test(docs, pkg, regime):
             assert len(keep) == len(lines) - 1, (fn, prefix)
             open(p, 'w', encoding='utf-8').write('\n'.join(keep))
         return apply
+    def drop_pkg(d, rel, prefix):
+        p = os.path.join(d, rel)
+        lines = open(p, encoding='utf-8').read().split('\n')
+        keep = [x for x in lines if not x.startswith(prefix)]
+        assert len(keep) == len(lines) - 1, (rel, prefix)
+        open(p, 'w', encoding='utf-8').write('\n'.join(keep))
+    def edit_pkg(d, rel, old, new):
+        p = os.path.join(d, rel)
+        t = open(p, encoding='utf-8').read(); assert old in t, (rel, old); open(p, 'w', encoding='utf-8').write(t.replace(old, new, 1))
     M = [
         ('inventory account mapped to a receivable', edit('chart_template.csv', ',true,inventory_merchandise,', ',true,receivable_trade,')),
         ('missing revenue row', drop('account_determination.csv', 'revenue_posting,,,service,')),
@@ -248,6 +356,12 @@ def self_test(docs, pkg, regime):
         ('two bases on one setting', edit('package:settings.yaml', '  status: unverified\n', '  status: unverified\n  legal_source: {document: x, article: y, date: 2026-01-01}\n')),
         ('inventory key on a cost-object account', edit('account_determination.csv', 'inventory_posting,raw_material,,,,,,152,', 'inventory_posting,raw_material,,,,,,154,')),
         ('closed question cited', edit('account_determination.csv', '(DS-19) TT99 default account determination', '"(DS-19, step 1) Who verifies the unverified legal rules"')),
+        ('tax matrix row missing', lambda d: drop_pkg(d, 'tax/tax_matrix.csv', 'sale,export,reduced,')),
+        ('tax rate missing', lambda d: drop_pkg(d, 'tax/tax_rates.csv', 'vat_out_5,')),
+        ('unknown code in the tax matrix', lambda d: edit_pkg(d, 'tax/tax_matrix.csv', ',vat_out_5,', ',vat_out_7,')),
+        ('direction mismatch in the tax matrix', lambda d: edit_pkg(d, 'tax/tax_matrix.csv', 'purchase,domestic,reduced,2026-01-01,vat_in_5,', 'purchase,domestic,reduced,2026-01-01,vat_out_5,')),
+        ('bad return source', lambda d: edit_pkg(d, 'tax/returns/01_gtgt.csv', 'formula:[35]-[25]', 'formula:[35]-[99]')),
+        ('tax code without basis', lambda d: edit_pkg(d, 'tax/tax_codes.csv', ',unverified,"(DS-23) Vietnamese tax codes, matrix and 01/GTGT boxes",', ',,,')),
         ('stated unreached account removed', edit('unreached_system_accounts.csv', 'inventory_other,', 'inventory_otherx,')),
     ]
     wrong = 0
