@@ -268,7 +268,11 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Change tracking | is\_change\_tracked | Table declaration that makes the write helpers record field changes: master data, settings, role assignments, period state, production structures |
 | Audit denial | audit\_denial | Coalesced record of commands or queries refused for permission, human-only, proposal, policy, outbound scope or segregation reasons |
 | Agent run, agent type | agent\_run, agent\_type | One agent execution (actor context, taint, spend, outcome); an agent kind's declared permissions and budgets; module `agent_runs`, layer 2 |
-| Work item | work\_item | Business work for a person or agent, with claim and due date; module `work`, layer 2 (DS-29) |
+| Work item | work\_item | Business work for a person or agent, with claim and due date; module `work`, layer 2 (DS-29); kinds registered in [work-item-kinds.csv](../catalogs/work-item-kinds.csv) ([ADR-0042](../adr/0042-work-queue.md)) |
+| Policy rule | policy\_rule | Row of the company's threshold table: action, type, actor kind, ordered conditions, effect, owner ([ADR-0043](../adr/0043-policy-and-approval.md)). Agents, systems and integrations start from a baseline (a person posts; approval for types with no posting step) that only an allow rule lifts |
+| Approval procedure | approval\_procedure | One-level approval by a role in the document's scope, with a rank unique per company; an approval satisfies decisions requiring its rank or lower |
+| Consequence posting | is\_consequence\_posting | A deterministic posting run on behalf of the person who started its chain, evaluated by policy as that person |
+| Period unlock request | period\_unlock\_request | Non-posting document asking to unlock a period area; its approval lets `UnlockPostingPeriod` run once ([ADR-0043](../adr/0043-policy-and-approval.md)) |
 | Attachment | attachment, attachment\_link | File stored once per company by SHA-256, outside the database, linked to any record; module `attachments`, layer 2 |
 | Scan state | attachment.state: pending\_scan, clean, rejected | Result of scanning an uploaded file; only `clean` attachments may be linked to a posted document |
 | Effect class | effect\_class: posting, master\_data\_change, outbound\_send, other | Registry attribute of every command, used by agent-safety checks (INV-80) |
@@ -324,7 +328,7 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Reject | Reject a document version | Rejected |
 | Post | Make a document part of the books or the stock records | Posted |
 | Reverse | Post a reversal document for a posted document | Reversed |
-| Cancel | End an open document that is not posted, or an open warehouse task or reservation | Canceled |
+| Cancel | End an open document that is not posted, or an open warehouse task, reservation or work item | Canceled |
 | Clear | Remove a flag deliberately with a reason, e.g. a document version's taint (`ClearTaint`) | Cleared |
 | Resume | Continue a stopped job from where it stopped, e.g. an import batch (`ResumeImport`) | Resumed |
 | Abandon | Stop a job for good; what it already posted stays until reversed, e.g. an import batch | Abandoned |
@@ -338,6 +342,11 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Pack, Unpack | Put stock into or take it out of a handling unit | Packed, Unpacked |
 | Firm | Fix a proposal so later runs keep it, e.g. a planned order | Firmed |
 | Activate | Start enforcing something once, irreversibly, e.g. a subledger | Activated |
+| Claim | A person or agent run takes a work item as its only worker | Claimed |
+| Unclaim | Give up the claim of a work item | Unclaimed |
+| Resolve | Close a work item whose exception a person has dealt with | Resolved |
+| Enable | Put a policy rule version in force; reversible, unlike Activate | Enabled |
+| Disable | Take a policy rule version out of force | Disabled |
 | Reserve | Hold stock for a demand line, e.g. components of a production order | Reserved |
 | Release | Make a draft revision of master data effective from its start date, e.g. a bill of materials revision | Released |
 | Convert | Turn a record into another form once, e.g. a planned order into draft documents | Converted |
@@ -358,7 +367,7 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Retry | Try a held step again, e.g. a held event delivery | Retried |
 | Replay | Deliver retained events again to a consumer that has not handled them | Replayed |
 
-Work items get the verbs Claim and Release from DS-29, because Lock belongs to posting periods; a command batch needs no verb ([ADR-0008](../adr/0008-command-envelope-and-registry.md) rule 20). A posted document is never canceled: it is corrected by a correction document or, if its type is internal, reversed (Principle 5, [ADR-0009](../adr/0009-document-lifecycle.md) rules 19, 23), so Cancel never applies to posted documents.
+Work items get the verbs Claim and Unclaim ([ADR-0042](../adr/0042-work-queue.md)), because Lock belongs to posting periods and Release to master data revisions; a command batch needs no verb ([ADR-0008](../adr/0008-command-envelope-and-registry.md) rule 20). A posted document is never canceled: it is corrected by a correction document or, if its type is internal, reversed (Principle 5, [ADR-0009](../adr/0009-document-lifecycle.md) rules 19, 23), so Cancel never applies to posted documents.
 
 **Allowed abbreviations** ([ADR-0004](../adr/0004-naming-conventions.md) rule 2). No other abbreviation is used in an identifier. Terms not listed are written in full: `cost_of_goods_sold`, `receivable`, `payable`, `general_ledger`, `bill_of_materials`.
 

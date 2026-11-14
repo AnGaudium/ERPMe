@@ -11,7 +11,7 @@ Agents propose; people or policy approve. Today the design enforces this only fo
    - **Document lifecycle.** The proposal uses the existing document states, policy, approval and segregation of duties.
    - **Execution.** A consumer executes it after a human approval.
    - **Agents never run such commands directly**, and agent types need no permission on them.
-2. **One policy hook** at a fixed set of policy points. Each decision records its rule, whether it allowed action without a human, and whether a confirmation is required.
+2. **One policy hook** at a fixed set of policy points. Each decision records its rule, whether it allowed action without a human, and whether a confirmation is required. The table, defaults and floors (including change proposals always needing approval): [ADR-0043](0043-policy-and-approval.md) rules 7–12.
 3. **Taint on data.** Taint is an immutable property of each document version, inherited by the versions and documents derived from it. A human can clear it explicitly in an immutable clearance record (interim, flagged). Fields from outside content are marked `is_untrusted`, and a run that is given such data becomes tainted.
 4. **Consumers.** Consumers acting on an agent's events are limited to the same intersection of rights that limits the agent.
 5. **Auto-post.** An auto-post is a posting by a system job allowed by a policy rule that requires confirmation. The rule's owner confirms it in an immutable record before the period is locked.
@@ -46,7 +46,7 @@ The hard floor on what a tainted run may read stays the literal spec 03 rule 1 u
    - **Failure.** A retryable error (`concurrent_update`, `timeout`) rolls back the delivery and is retried (ADR-0013 rule 8). On any non-retryable error, such as `plan_hash_mismatch` or `target_changed`, the consumer rolls back to the savepoint and runs `UpdateChangeProposal` as `system`, which commits with the delivery. That writes the next version with the error and the new plan, voids the approval (ADR-0009 rule 9), returns the proposal to `draft`, and creates a work item.
    - **Expiry.** A system job cancels proposals that are not approved within `change_proposal_ttl_days`, with reason `expired` (company setting, interim default 14).
    - **Query.** `ListChangeProposal`.
-4. Agent calls:
+4. Agent calls: Policy may make people propose too, through a deny-only `direct_master_data_change` rule ([ADR-0043](0043-policy-and-approval.md) rule 12).
    - **Scope.** The dispatcher rejects an allowed-target command with `proposal_required` when it comes from an agent actor, or from any actor carrying an `origin_agent_run_id`. The executing consumer carries none, because the human `Approve` reset the origin (ADR-0013 rule 2). This applies in both simulate and execute mode. The error's fix names `CreateChangeProposal`.
    - **Humans.** A human with the permission may run such a command directly, unless policy (DS-28) requires a proposal for humans too.
    - **Bank accounts.** Interim, flagged: a change of a partner's bank account always goes through a proposal, also when a human starts it, approved by a human who wrote no version of it.
@@ -63,14 +63,14 @@ The hard floor on what a tainted run may read stays the literal spec 03 rule 1 u
 
 **Policy hook**
 
-6. The dispatcher evaluates policy (DS-28) once per command at these policy points, and the handler stores the `policy_decision`:
+6. The dispatcher evaluates policy (DS-28) once per command at these policy points, and the handler stores the `policy_decision`: Also a policy point: `Post` of an approved document by an actor of another kind than its decision's ([ADR-0043](0043-policy-and-approval.md) rule 9).
    - `Submit` of any document, including change proposals;
    - `Post` from `draft`;
    - `Issue` (ADR-0028 rule 7);
    - `Post` of an approved document, only when its `policy_input_hash` changed (ADR-0028 rule 14).
 
    This replaces ADR-0008 rule 5's "before a handler that posts" and ADR-0009 rule 11's separate statement. A replayed command (ADR-0008 rule 18) does not evaluate policy again. A handler whose policy inputs are read under locks calls the hook through `context.evaluate_policy(input)` after taking them, e.g. the credit check; such commands are registered `is_policy_in_handler`, and the dispatcher skips its own evaluation and asserts that the hook ran exactly once ([ADR-0030](0030-commercial-seams-and-imports.md) rule 7).
-7. A `policy_decision` records:
+7. A `policy_decision` records: It also stores `required_rank`, `human_post` and every matching rule with its version ([ADR-0043](0043-policy-and-approval.md) rules 7–8).
    - the outcome: `allowed`, `approval_required`, `human_only` or `denied`;
    - the `policy_rule_id`;
    - `is_confirmation_required`;
@@ -87,7 +87,7 @@ The hard floor on what a tainted run may read stays the literal spec 03 rule 1 u
    - **Clearing.** `ClearTaint` (`human_only`, reason required) writes an immutable `taint_clearance` row: `document_version_id`, human actor, reason, `cleared_at`. The human for whom the tainted run acted cannot clear it (`segregation_of_duties`). Clearing never changes field attributes or read-taint.
    - **Status of this rule.** Interim, flagged: it changes the untrusted-content mechanism (ADR-0005 item 7; open question).
 9. Effective taint means `is_tainted` with no clearance on that version. A version written later by a tainted run is tainted again.
-10. Run taint:
+10. Run taint: Work items carry `is_tainted` as an OR over their raises ([ADR-0042](0042-work-queue.md) rule 5).
     - **`is_untrusted`.** A schema attribute separate from data labels (spec 17). It is set on fields filled from outside content: e-mail bodies, supplier e-invoice free text, bank statement texts and `interaction_summary` (ADR-0019 rule 20).
     - **When a run becomes tainted.** When the query layer (DS-33) returns to it any of: an `is_untrusted` field; a row of an effectively tainted version; a work item created from a tainted event; or an attachment from outside content.
     - **Views.** DS-33 views omit `is_untrusted` fields unless they are asked for, so listing documents does not taint a run.
@@ -102,7 +102,7 @@ The hard floor on what a tainted run may read stays the literal spec 03 rule 1 u
 
 **Auto-post**
 
-13. Definition and confirmation:
+13. Definition and confirmation: Confirmation is by the owner on the rule's latest version, for `system` and `integration` postings ([ADR-0043](0043-policy-and-approval.md) rule 14).
     - **Definition.** An auto-post is a posting by actor `system` whose decision is `allowed` with `is_confirmation_required`, set by the policy rule that allowed it. An example is a deterministic bank match (spec 14).
     - **What is not an auto-post.** Close jobs (costing, FX revaluation, closing entries) are close tasks confirmed through the close (ADR-0012) and set no confirmation.
     - **Wording.** "Agent auto-post" in spec 03 rule 6 and ADR-0012 rule 13 means an auto-post as defined here, so its meaning is unchanged. Agents themselves only draft (ADR-0003 R8), and tainted runs never post (spec 03 rule 1).

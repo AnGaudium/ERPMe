@@ -31,7 +31,7 @@ Before step 1 code freezes the platform modules, every entity that several modul
    | `work` | `work_item`, claims, due dates and links (DS-29) | Work items are created from layers 3–4 (ADR-0023 rule 21; ADR-0024 rule 21; ADR-0013 rule 8) |
    | `attachments` | `attachment` and `attachment_link` (rule 2) | E-invoice XML, bank files, e-mails, customs scans, product images and print PDFs are stored once and linked from any module |
 
-   Within layer 2, `documents` and `permissions` may import the `agent_runs` contract, and `agent_runs` imports neither of them, so there is no cycle. `documents` may also import the `attachments` contract to check scan state at `Post`; `attachments` imports neither ([ADR-0038](0038-audit-and-observability.md) rule 14).
+   Within layer 2, `documents` and `permissions` may import the `agent_runs` contract, and `agent_runs` imports neither of them, so there is no cycle. `documents` may also import the `attachments` contract to check scan state at `Post`; `attachments` imports neither ([ADR-0038](0038-audit-and-observability.md) rule 14). `registry` also imports `policy` and `work`; `documents`, `outbox`, `permissions`, `attachments`, `agent_runs` and `policy` import `work`; layers 3–4 raise and resolve work items through `work.contract` ([ADR-0042](0042-work-queue.md) rules 5–6; [ADR-0043](0043-policy-and-approval.md) rule 1).
 2. Attachments:
    - **Identity and storage.** An `attachment` is unique per (`company_id`, SHA-256). It records media type, size, storage key, data label and source kind. The bytes live in an object store, never in the database (DS-37).
    - **Data labels.** A second upload of the same bytes in the same company reuses the row and keeps the stricter data label.
@@ -113,7 +113,7 @@ Before step 1 code freezes the platform modules, every entity that several modul
     11. Numbering counters.
     12. `event_subject` rows.
 
-    The idempotency record is taken first (ADR-0008 rule 16) and held to commit. Account rows locked by the first-posting trigger (ADR-0014 rule 12) are taken in line order after the open items and before numbering counters. They are outside the helper's assertion, because they are locked once per account in its life. Work item claims run in their own transactions.
+    The idempotency record is taken first (ADR-0008 rule 16) and held to commit. Account rows locked by the first-posting trigger (ADR-0014 rule 12) are taken in line order after the open items and before numbering counters. They are outside the helper's assertion, because they are locked once per account in its life. Work item claims run in their own transactions. For a command of an agent run bound to a work item, that item row follows `FOR KEY SHARE` (claims, assignments and lease expiry take it `FOR UPDATE`); work item rows raised by a command are the last class, in (`kind`, `open_key`) order ([ADR-0042](0042-work-queue.md) rules 5, 9).
 
 **Catalog and glossary consistency**
 

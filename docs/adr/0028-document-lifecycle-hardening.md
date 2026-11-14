@@ -94,7 +94,7 @@ This ADR amends the document lifecycle (ADR-0009) in five places, before step 3 
 
 **Approval context**
 
-14. Recording and re-checking:
+14. Recording and re-checking: Approvals compare by procedure rank ([ADR-0043](0043-policy-and-approval.md) rule 2).
     - **At `Submit`** (and at `Issue` or `Post` from `draft`), the `policy_decision` records the approval procedure required and a `policy_input_hash`. The hash covers the inputs evaluated: amounts in company currency at the rates applied, partner exposure, and price and margin checks.
     - **The approval row** refers to the `policy_decision_id` it satisfies.
     - **At `Post` of an approved document, and at `Issue`**, the policy is asked again when the `policy_input_hash` differs. The existing approvals stand when they satisfy the new decision's procedure (the comparison is DS-28's). Otherwise the command is rejected with `approval_context_changed`, whose `details` give the approved and current amounts and procedures.

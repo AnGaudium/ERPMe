@@ -30,7 +30,7 @@ Each company's fiscal year (ADR-0007) contains regular posting periods and up to
 | `RestrictPostingPeriod` | `open` | `soft_locked` | The previous period in the sequence (rule 8) is `soft_locked` or `locked` in that area |
 | `OpenPostingPeriod` | `soft_locked` | `open` | The next regular period in the sequence is `open` in that area (special periods are not considered) |
 | `LockPostingPeriod` | `soft_locked` | `locked` | The previous period is `locked` in that area; for `general`, the period's subledger areas are `locked`; the area's close tasks are complete and current (rule 12) |
-| `UnlockPostingPeriod` | `locked` | `soft_locked` | It is the latest `locked` period in that area; for a subledger area, `general` of that period is not `locked`; approved through the policy engine (DS-28); a reason is required |
+| `UnlockPostingPeriod` | `locked` | `soft_locked` | It is the latest `locked` period in that area; for a subledger area, `general` of that period is not `locked`; approved through the policy engine (DS-28); a reason is required; approval through an approved `period_unlock_request`, closed by the unlock ([ADR-0043](0043-policy-and-approval.md) rule 16) |
 
 8. The sequence is: the regular periods of a fiscal year in order, then its special periods in order; the first regular period of the next year follows the previous year's last regular period, not its special periods, so audit adjustments of a closed year do not hold up the new year. A condition that fails returns `period_sequence_violation`, naming the period that blocks.
 9. Every state change is recorded with actor, time, reason and approval (audit, DS-36) and emits an event (`PostingPeriodRestricted`, `PostingPeriodOpened`, `PostingPeriodLocked`, `PostingPeriodUnlocked`). A posting takes a share lock on the area state rows it touches before any stock or numbering lock (ADR-0009 rule 15); a state change takes an exclusive lock, so no posting enters while a period is being locked. Audit columns `reason` and `policy_decision_id`: [ADR-0038](0038-audit-and-observability.md) rules 2, 9.
@@ -81,8 +81,8 @@ DS-12 is needed by DS-06 (journal), DS-09 (costing), ADR-0011 (revaluation) and 
 - DS-14, DS-19: period pattern, special period count, checklist template and closing rules per regime.
 - DS-15: chief-accountant role; permission to change period states and run close tasks; `fiscal_calendar_owner`.
 - DS-26 and step 8: content and order of close tasks.
-- DS-28: approval of `UnlockPostingPeriod`; a possible limit on future-dated postings.
-- DS-29: work items cannot use the verb `Lock`, which now belongs to posting periods; it uses `Claim` and `Release`.
+- DS-28: approval of `UnlockPostingPeriod` through an approved `period_unlock_request` ([ADR-0043](0043-policy-and-approval.md) rule 16); a possible limit on future-dated postings.
+- DS-29: work items cannot use the verb `Lock`, which now belongs to posting periods; they use `Claim` and `Unclaim`, because `Release` belongs to master data revisions ([ADR-0042](0042-work-queue.md) rule 9).
 - DS-36: audit of state changes.
 
 ## Revisit when

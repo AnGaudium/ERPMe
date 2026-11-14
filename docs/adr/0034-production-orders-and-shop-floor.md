@@ -86,7 +86,7 @@ It adds only what production needs:
 
 **Lifecycle and execution state**
 
-5. Document states follow ADR-0009 rule 6:
+5. Document states follow ADR-0009 rule 6: Release is `submit` of type `production_order` for policy ([ADR-0043](0043-policy-and-approval.md) rule 17).
    - **Release.** `SubmitProductionOrder` is a policy point (ADR-0029 rule 6). An `approved` order is "released": execution may start, it gets its number and its cost object, and its components are reserved (rule 9). An agent releases only by `Submit` under policy; a tainted run cannot (ADR-0029 rule 11).
    - **`Cancel`.** Allowed only while no posting document of the order exists, reversed or not. Canceling:
      - cancels open warehouse tasks and reservations;

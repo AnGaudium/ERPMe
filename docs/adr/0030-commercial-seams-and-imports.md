@@ -65,7 +65,7 @@ Accounting and business choices stay with the author, as flagged interims: close
    - the undelivered value of orders in `pending_approval` or `approved`.
 
    DS-22 composes it. It differs from partner exposure (ADR-0026), which is the ledger part alone.
-7. Credit check points:
+7. Credit check points: Credit excess is a condition of the same evaluation, with a seeded rule requiring approval ([ADR-0043](0043-policy-and-approval.md) rules 4, 15).
    - **Where.** At order `Submit` (a policy point, ADR-0029 rule 6) and at `PostDelivery`, when goods leave. Interim, flagged, with EC-21's open question.
    - **How.** The handler locks classes 1–8 of ADR-0027 rule 10, then the partner row (class 9), then reads the exposure. It passes the result to the policy hook through `context.evaluate_policy(input)`, the dispatcher's one hook (ADR-0029 rule 6), called at that point so that inputs read under locks are current. Such commands are registered `is_policy_in_handler` (ADR-0008 rule 1). For them the dispatcher skips its own evaluation and asserts that the hook ran exactly once.
    - **Concurrency.** Two concurrent orders of one partner therefore see each other's exposure.

@@ -176,7 +176,7 @@ Planning answers, per item and warehouse: what to buy or move, how much, and by 
 
     Wrong states return `invalid_state_transition`.
 20. Pegging rows hold planned order, `pegging_target_kind` (`demand_line`, `forecast`, `safety_stock`, `stock_level`, `lot_size_excess`), target reference and quantity. A planned order's pegging sums exactly to its quantity (DS-16). Through a route, the destination's planned transfer pegs destination demand, and the source's dependent demand pegs that transfer. Demand-line targets are `demand_supply_line_id` ([ADR-0028](0028-document-lifecycle-hardening.md) rule 2). Dependent demand pegs with target kind `planned_order` ([ADR-0036](0036-multi-level-mrp.md) rule 5).
-21. Action messages and exceptions:
+21. Action messages and exceptions: Kinds `planning_exception` and `capacity_overload` ([ADR-0042](0042-work-queue.md) rule 18).
     - **Action messages** on existing supply: `expedite` and `cancel` in the first slice; `postpone` and `reduce` later. Each carries its projected effect.
     - **Exceptions** (`planning_exception_kind`):
       - `shortage_inside_lead_time`;
