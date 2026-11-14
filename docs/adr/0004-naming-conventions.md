@@ -1,6 +1,6 @@
 # ADR-0004: Naming conventions
 
-Status: proposed. Design item: DS-01. Related decisions: D4, D8, D13, D14. Principles 1, 2, 5, 7, 8, 9, 10.
+Status: accepted (2026-11-14). Drafted by an agent; the author delegated all technical decisions to the agent, with ease of use by AI agents as the overriding goal, and accepted by that instruction. Design item: DS-01. Related decisions: D4, D8, D13, D14. Principles 1, 2, 5, 7, 8, 9, 10.
 
 ## Decision
 
@@ -27,7 +27,7 @@ Every code identifier is an English word or phrase from the glossary in [00-read
 9. Table names are singular `snake_case` nouns from the glossary (`journal_entry`, `material_document`) and unique across the whole database, so a glossary identifier names one table. Tables created by a third-party library (Alembic's `alembic_version`, Procrastinate's `procrastinate_*`) keep the library's names and are outside these rules.
 10. A line table is `<header>_line` unless the glossary names it otherwise (`journal_line`).
 11. A link table for a many-to-many relation is named after the relation when the glossary has a word for it; otherwise `<table_a>_<table_b>` in alphabetical order.
-12. A surrogate key column is named `id`; whether a table's primary key also contains other columns (e.g. for partitioning) is decided by DS-02 and DS-06. A foreign key column is `<relation>_id`, where the relation name is the referenced table's name (`partner_id`, `company_id`) or, when a table refers to the same table more than once or the glossary names the relation, that relation name (`reversal_of_id` for the relation `reversal_of`; see open questions).
+12. A surrogate key column is named `id`; whether a table's primary key also contains other columns (e.g. for partitioning) is decided by DS-02 and DS-06. A foreign key column is `<relation>_id`, where the relation name is the referenced table's name (`partner_id`, `company_id`) or, when a table refers to the same table more than once or the glossary names the relation, that relation name (`reversal_of_id` for the relation `reversal_of`). There are no exceptions to the `_id` suffix, so an agent can tell every foreign key by its name.
 13. Column suffixes and prefixes by meaning. The examples show the form only; the actual columns of each table are decided by DS-02, DS-03, DS-06 and DS-10.
 
 | Kind | Form | Example |
@@ -38,7 +38,7 @@ Every code identifier is an English word or phrase from the glossary in [00-read
 | Amount | `<currency type>_amount`, currency types from the glossary; how debit and credit are represented is DS-06 | `transaction_amount`, `company_amount` |
 | Quantity | `quantity`, or `<unit role>_quantity` when more than one unit is stored | `quantity`, `purchase_quantity` |
 | Count | `<noun>_count` | `line_count` |
-| Lifecycle state | `state` (see open questions for work items) | `state` |
+| Lifecycle state | `state`, for every lifecycle, work items included; never `status` | `state` |
 | Human-readable key, display text | `code`, `name` | `code`, `name` |
 
 14. Enumerated values are lowercase `snake_case` English words (`pending_approval`, `soft_locked`). They are stored as `text` with a `CHECK` constraint or as a reference table, never as a PostgreSQL `ENUM` type, so a value can be added or retired in an ordinary migration. Their UI labels go through i18n.
@@ -66,6 +66,7 @@ DS-01 must be decided before DS-02 to DS-18, because every later design item nam
 - pydantic v2 command schemas are the single source for JSON Schema, REST, MCP and the TypeScript types (ADR-0001, ADR-0002, Principle 10). Any renaming between layers would have to be written and kept in sync by hand.
 - SQLAlchemy 2 Core and Alembic generate constraint names; PostgreSQL truncates identifiers longer than 63 bytes, and SQLAlchemy shortens convention names with a hash suffix, both without error.
 - Modules call each other only through commands and events, checked by import-linter ([07-shared-foundation.md](../spec/07-shared-foundation.md#extensibility-and-upgrades)). The module list and the database layout are decided in DS-18.
+- The author's overriding goal for technical choices is that the system is easy for AI agents to use; when options compete, the more uniform and machine-checkable one wins.
 - Most code is written by AI agents (ADR-0001). The format rules (case, regular expression, verb list, length) can be checked by the command registry and CI; the choice of glossary word is checked by the reviewer (runbook stage 5).
 
 ## Options considered
@@ -102,5 +103,7 @@ DS-01 must be decided before DS-02 to DS-18, because every later design item nam
 - [docs/spec/00-reading-guide.md](../spec/00-reading-guide.md): rules 6 and 7 point here; glossary rows added; command verb list and allowed abbreviations added.
 - [docs/design/backlog.md](../design/backlog.md): DS-01 row links to this ADR.
 - [docs/adr/README.md](README.md): index row.
-- [docs/open-questions.md](../open-questions.md): foreign key column for `reversal_of`; `state` versus a work item's "status"; the identifier for Principle 6's trace.
+- [docs/open-questions.md](../open-questions.md): three questions raised by this ADR, closed by it: foreign key column for `reversal_of`; `state` for work items; `derivation_trace` for Principle 6's trace.
+- [docs/spec/02-principles.md](../spec/02-principles.md): Principle 8 says a work item has a state.
+- [docs/runbook/step-log.md](../runbook/step-log.md): DS-01 entry.
 - [AGENTS.md](../../AGENTS.md): naming rule points here.

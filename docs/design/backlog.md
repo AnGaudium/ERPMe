@@ -6,7 +6,7 @@ Forty design items, in the order they are needed. Items DS-01 to DS-18 must be d
 
 | ID | Design item | Output | Depends on | Needed by |
 | --- | --- | --- | --- | --- |
-| DS-01 | Glossary and naming conventions: tables, columns, commands (verb + noun), events, modules. Extends the authoritative glossary in [00-reading-guide.md](../spec/00-reading-guide.md) in place | ADR, glossary rows added to `docs/spec/00-reading-guide.md`. Draft: [ADR-0004](../adr/0004-naming-conventions.md) (proposed) | — | Step 0 |
+| DS-01 | Glossary and naming conventions: tables, columns, commands (verb + noun), events, modules. Extends the authoritative glossary in [00-reading-guide.md](../spec/00-reading-guide.md) in place | ADR, glossary rows added to `docs/spec/00-reading-guide.md`. Done: [ADR-0004](../adr/0004-naming-conventions.md) | — | Step 0 |
 | DS-02 | ID and numeric model: ID strategy; precision of quantity, unit price, company and foreign currency; rounding rules, including where rounding differences go (a rounding line on a defined system account; never silently in cost) | ADR | DS-01 | Step 0 |
 | DS-03 | Time model: document date, posting date, recording timestamp, time zones, fiscal calendar | ADR | DS-01 | Step 0 |
 | DS-04 | Command envelope and registry: schema conventions, `actor`/`on_behalf_of`, idempotency key and retention (the same key with a different payload is rejected), `plan_hash` via run-and-rollback, computed over a canonical form without surrogate IDs, document numbers or timestamps; simulation must not hold stock locks; schema versioning, error model | ADR, spec | DS-01–03 | Step 0 |

@@ -23,7 +23,7 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Company, branch | company (company\_id), branch | Branch is an analytical dimension |
 | Document | document | Header and lines |
 | Document state | draft, pending\_approval, approved, posted, reversed | Only posted documents are immutable |
-| Reversal document | reversal\_of | Points to the document it reverses; passes the same period checks as any document |
+| Reversal document | reversal\_of | Points to the document it reverses; passes the same period checks as any document. Column `reversal_of_id` ([ADR-0004](../adr/0004-naming-conventions.md) rule 12) |
 | Journal entry, journal line | journal\_entry, journal\_line |  |
 | Universal journal | journal\_line | One table carrying all analytical dimensions; canonical list in [05](05-accounting-inventory-core.md) |
 | Material document | material\_document | Quantities. Zero or one accounting document per material document; value-only accounting documents (e.g. revaluations) have no material document |
@@ -61,7 +61,8 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Technical job | job | Background job on the technical queue (Procrastinate); distinct from work\_item |
 | Idempotency key | idempotency\_key | Per (actor, command type), Principle 9; retention and rules in DS-04 |
 | Schema version | schema\_version | Version of a command schema (semver, [07](07-shared-foundation.md#extensibility-and-upgrades)) or an event schema (DS-13); rules in DS-04 |
-| Lifecycle state column | state | Column holding a lifecycle value, such as a document state or a posting period state; see open questions for work items |
+| Lifecycle state column | state | Column holding a lifecycle value: document, posting period, work item and every other lifecycle. Never `status` |
+| Derivation trace | derivation\_trace (derivation\_trace\_id) | Record that explains a derived value (cost, price, tax): its source lines and the rules applied, Principle 6. Built thin for costing in step 3 (DS-09). Not OpenTelemetry's `trace_id`, which is kept for observability (DS-36) |
 
 **Command verbs** ([ADR-0004](../adr/0004-naming-conventions.md) rules 17–22). A command type starts with one of these verbs; its event, if any, ends with the event form. The intent column says what the verb is for, nothing more: which states and preconditions allow a command is decided by DS-05 and the DS item that owns the noun. A new verb is added here, with its intent and event form, in the same change as the first command that needs it; a verb never takes a second meaning.
 
