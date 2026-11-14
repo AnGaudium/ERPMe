@@ -1,6 +1,6 @@
 -- DS-06 universal journal: DDL draft for ADR-0014.
 -- PostgreSQL 18. Draft for review; not yet executed. The ADR's rules win if this file disagrees.
--- Table schemas are placed by DS-18; domains live in schema `types` (ADR-0006 rule 8).
+-- Tables live in schema `erpme` (ADR-0022 rule 7); domains live in schema `types` (ADR-0006 rule 8).
 -- Primary and foreign keys are shown inline; in migrations they get names from the
 -- MetaData naming convention (ADR-0004 rule 15).
 -- Referenced tables (company, document, account, system_account, posting_period, fiscal_year,

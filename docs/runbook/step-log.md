@@ -4,6 +4,7 @@ Dated record of gate decisions, the week list and one line per Friday review ([R
 
 | Date | Step | Entry |
 | --- | --- | --- |
+| 2026-11-14 | 0 | DS-18 done: [ADR-0022](../adr/0022-repository-and-engineering-conventions.md) accepted under ADR-0005 after three review rounds (Claude Fable 5.2). All step 0 design items DS-01 to DS-18 are now accepted on stacked branches awaiting the author's merge. Three questions for the author (test server host, sign-off practice and bot identities, `erpme.sdk` licence). Next: work packages 5-9 |
 | 2026-11-14 | 0 | DS-17 done: [DS-17](../design/DS-17-synthetic-dataset.md) synthetic dataset spec and [edge-cases.csv](../catalogs/edge-cases.csv) 0.1.0 (31 edge cases) accepted under ADR-0005 after three review rounds (Claude Fable 5.2). Two questions for the author (EC-20/21/22 outcomes; fictional ID ranges) |
 | 2026-11-14 | 0 | DS-16 done: [DS-16](../design/DS-16-invariants-and-harness.md) invariant catalog and harness spec, [invariants.csv](../catalogs/invariants.csv) 0.1.0 accepted under ADR-0005 after three review rounds (Claude Fable 5.2). No questions for the author; golden values stay his (ADR-0005 item 3) |
 | 2026-11-14 | 0 | DS-11 ADR part done: [ADR-0021](../adr/0021-landed-cost.md) accepted under ADR-0005 after three review rounds (Claude Fable 5.2). Five questions for the author, needed before the step 3 gate but not yet in the ADR-0003 R10 schedule |

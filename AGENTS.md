@@ -12,7 +12,7 @@ This file applies to every coding or design agent working in this repository.
 
 ## Current phase
 
-Design, Build step 0. Do not write production code until the step 0 design items (DS-01 to DS-18) are decided. Design work produces files under `docs/adr/`, `docs/design/` and `docs/catalogs/`.
+Build step 0. The step 0 design items DS-01 to DS-18 are accepted under ADR-0005 (on branches until the author merges them). Production code starts with step 0 work package 5, the repository skeleton of [ADR-0022](docs/adr/0022-repository-and-engineering-conventions.md), once merged. Once the skeleton exists, run `erpme-dev ci` before proposing any change; CI runs the same commands.
 
 ## Rules
 

@@ -25,3 +25,4 @@ One file per decision, named `NNNN-short-title.md`, using [template.md](template
 | [ADR-0019](0019-partners-and-crm-foundation.md) | Partners, contacts and CRM foundation (DS-20 partner part, DS-35) | Accepted (2026-11-14) |
 | [ADR-0020](0020-inventory-and-costing-model.md) | Inventory and costing model (DS-09) | Accepted (2026-11-14) |
 | [ADR-0021](0021-landed-cost.md) | Landed cost (DS-11) | Accepted (2026-11-14) |
+| [ADR-0022](0022-repository-and-engineering-conventions.md) | Repository and engineering conventions (DS-18) | Accepted (2026-11-14) |

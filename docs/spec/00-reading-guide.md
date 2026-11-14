@@ -140,7 +140,12 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Simulator triple | (simulator version, seed, dataset version) | Identifies a run; with the package and catalog versions it yields a byte-identical log and input files |
 | Adapter | erpme\_adapters.step\_n | Translates business events mechanically into the commands that exist at build step n; decides no accounting |
 | Profile | profile | Versioned simulator parameters for a dataset size, e.g. `vn_trading_small@1` |
-| Module | module | Python package `erpme.<module>`; list and database layout in DS-18 ([ADR-0004](../adr/0004-naming-conventions.md)) |
+| Module | module | Python package `erpme.<module>`; list, layers and database layout in [ADR-0022](../adr/0022-repository-and-engineering-conventions.md) |
+| Posting interface | `<module>.contract.<verb>_<noun>` | A function in a module's `contract.py` that takes the caller's `context` and writes within the calling command's transaction and plan (ADR-0022 rule 4) |
+| Composition root | erpme.app | Registers every module's handlers and runs startup checks; entry points `erpme serve`, `erpme worker`, `erpme admin` |
+| Build step marker | build\_step | `[tool.erpme] build_step` in the root `pyproject.toml`: the current build step, raised by the author at each gate |
+| Developer CLI | erpme-dev | Runs every check; CI jobs call only its subcommands (ADR-0022 rule 14) |
+| Check role | erpme\_check | Database role for invariant checks: SELECT only, subject to RLS |
 | Command type | command\_type | Name of a command: `PascalCase` verb from the command verb list + glossary noun, e.g. `PostGoodsReceipt`; `snake_case` form for MCP tools and handlers |
 | Query | query | Read-only operation: `Get<Noun>` (one record), `List<Noun>` (filtered list). Not a command; no idempotency key |
 | Event, event type | event, event\_type | A fact written to the outbox: `PascalCase` noun + the verb's event form, e.g. `GoodsReceiptPosted`; schema in DS-13 |
@@ -230,6 +235,7 @@ Work items get the verbs Claim and Release from DS-29, because Lock belongs to p
 | l10n, i18n | localization, internationalization |
 | llm, ui | large language model, user interface |
 | api, rest, mcp, url, http, oidc | the standard interface and protocol terms |
+| sdk, db, crm | software development kit, database, customer relationship management (module names, ADR-0022) |
 | json, xml, html, csv, xlsx, pdf, sql | the standard file format and language names |
 | pk, fk, uq, ix, ck, trg | prefixes of database constraint, index and trigger names only ([ADR-0004](../adr/0004-naming-conventions.md) rule 15) |
 

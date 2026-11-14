@@ -4,6 +4,8 @@ How the testing described in [12-testing.md](../spec/12-testing.md) is run day t
 
 ## Environments
 
+Repository layout, CI jobs, the `erpme-dev` commands and the test server are fixed by [ADR-0022](../adr/0022-repository-and-engineering-conventions.md).
+
 | Environment | Runs | Data | From |
 | --- | --- | --- | --- |
 | Local / agent workspace | Unit tests, testcontainers PostgreSQL, small dataset | Synthetic only | Step 0 |

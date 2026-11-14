@@ -62,7 +62,7 @@ DS-13 is needed by DS-29 (work queue), DS-24 (e-invoices), DS-27 (PDF), DS-32 (a
 - DS-04 / ADR-0008: `context.emit`; event registry with upcasters; internal command calls (rule 9) recorded in ADR-0008; simulation responses list emitted event types; verbs Retry and Replay.
 - DS-15: consumers act on behalf of the event's human under its company; row-level security on outbox and delivery tables.
 - DS-16: invariants that every committed command's events and deliveries exist and that each delivery is applied once.
-- DS-18: delivery workers, `NOTIFY`, backoff, retention jobs, Procrastinate stalled-job handling for the worker loop.
+- DS-18: delivery workers, `NOTIFY`, backoff, retention jobs, Procrastinate stalled-job handling for the worker loop; decided in [ADR-0022](0022-repository-and-engineering-conventions.md) rule 12.
 - DS-24, DS-27: e-invoice, email and PDF integration consumers, intents and provider status queries; rate limits.
 - DS-29, DS-32: work items from events; agent runs from work items; tainted events.
 - DS-30: live UI updates. DS-36: held deliveries on the dashboard; spans linked to `trace_id`; audit separate from events.

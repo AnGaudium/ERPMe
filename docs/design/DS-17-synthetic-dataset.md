@@ -212,7 +212,7 @@ The simulator runs fictional companies day by day. It writes what happened in bu
     - Medium and large locks are verified by the nightly run.
     - The test server caches runs by triple and never edits one in place.
     - The dataset licence is CC0 ([18-license-governance.md](../spec/18-license-governance.md)).
-27. Budget: generating the small dataset twice and comparing it with its lock takes 30 seconds or less, within the DS-16 rule 21 test job.
+27. Budget: generating the small dataset twice and comparing it with its lock takes 30 seconds or less, within the `dataset` CI job ([ADR-0022](../adr/0022-repository-and-engineering-conventions.md) rule 16).
 
 ## Options considered
 
