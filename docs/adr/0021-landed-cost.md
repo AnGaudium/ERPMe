@@ -118,7 +118,7 @@ The customs declaration, supplier cost invoices and invoice price differences to
     - no source is allocated beyond its amount;
     - per source line, the `purchase_cost_clearing` balance equals its unallocated rest.
 
-    A close task (ADR-0012) lists sources still unallocated at period end. `purchase_cost_clearing` is a liability in the system chart but carries a debit while costs wait; its presentation is DS-19's.
+    A close task (ADR-0012) lists sources still unallocated at period end. `purchase_cost_clearing` is a liability in the system chart but carries a debit while costs wait; its presentation is DS-19's. TT99: 33882, under other payables, a debit balance under other receivables (interim, [ADR-0039](0039-vietnam-package-tt99.md) rule 8; DS-26).
 15. DS-17 edge cases: landed cost after partial sale and after period close (existing); one declaration covering several receipts; customs assessed before the goods receipt.
 16. Open questions for the author:
     - the earlier-unlocked case (rule 6);
@@ -155,7 +155,7 @@ DS-11's ADR part is needed by ADR-0020 (receipt values and costing), DS-22 (purc
 - ADR-0020: value-only `receipt_addition` lines, the costing rerun used by rule 7.
 - DS-16: invariants of rule 14. DS-17: edge cases of rule 15.
 - DS-18: catalog and `inventory_value_role` checks.
-- DS-19: `landed_cost.closed_period_method`; `import_treatment` rules; presentation of `purchase_cost_clearing`.
+- DS-19: `landed_cost.closed_period_method`; presentation of `purchase_cost_clearing` ([ADR-0039](0039-vietnam-package-tt99.md) rules 8, 9). `import_treatment` rules moved to DS-23 ([ADR-0039](0039-vietnam-package-tt99.md) rule 10).
 - DS-22: cost invoices, GR/IR, price differences to stock through `landed_cost` in the invoice's batch.
 - DS-23: tax codes for import taxes with `import_treatment`.
 - Step 3 spec: rerun formula, layout of consumer lines, performance for many locked periods.

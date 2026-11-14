@@ -88,7 +88,7 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Abnormal cost, residual cost | production\_abnormal\_cost, production\_residual\_cost | Consumption above norm at completion, and cost of a completed order with no output in the period; both to cost of goods sold |
 | Cost estimate | cost\_estimate, cost\_estimate\_line, activity\_rate | Planned cost of a production version by cost component; the benchmark for target cost and variances |
 | Target cost, variance | variance categories: input price, input quantity, resource usage, scrap, lot size, remaining | The released estimate scaled to output, and the analysis of actual against it; never posted |
-| Cost behavior | cost\_behavior: variable, fixed | Whether an overhead account varies with output; drives normal-capacity absorption |
+| Cost behavior | cost\_behavior: variable, fixed | Whether a production cost account varies with output; splits pool groups and drives normal-capacity absorption |
 | Production order period cost | production\_order\_period\_cost | Per order, period and cost component: opening, incurred, abnormal, to-output and closing amounts |
 | By-product price | by\_product\_price | Company price list valuing by-products (interim stand-in for net realisable value) |
 | Backflush | backflush\_at\_operation, backflush\_at\_receipt | Automatic issue of components on confirmation or receipt, by cumulative progress |
@@ -105,6 +105,8 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Fixed asset | fixed\_asset | An asset record (stub until Phase 3); also a system account node and a control kind |
 | Costing graph | costing\_graph | Stock nodes (item, valuation area) and cost-object nodes (production orders and cost pools, [ADR-0035](../adr/0035-production-costing.md)), linked by the period's value flows; solved per strongly connected component |
 | Operational account | account | Where postings land; points to exactly one system\_account |
+| Detail account | account | Operational account a package or company opens below a statutory account, e.g. 5152 under 515, so each maps to one system account ([ADR-0039](../adr/0039-vietnam-package-tt99.md)) |
+| Legal form | company.legal\_form | Type of enterprise under national law (e.g. joint stock); selects chart template rows through `condition` |
 | Transaction key | transaction\_key | Drives account determination: transaction key × valuation class × valuation area → operational account; catalog [transaction-keys.csv](../catalogs/transaction-keys.csv) ([ADR-0015](../adr/0015-account-determination.md)) |
 | Account determination | account\_determination | Company table mapping a transaction key and determinant values to an operational account; the row that matches on the most significant determinants wins (key order); cross-checked against the key's required system accounts |
 | Determinant | determinants | What a transaction key's account depends on, most significant first: valuation\_class, warehouse, item\_group, partner\_group, tax\_code, currency |

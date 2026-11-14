@@ -10,7 +10,7 @@ A localization package (`l10n_<country>`) is a directory with a manifest, data f
 
 **Package and manifest**
 
-1. A package is a directory `l10n/<code>/` in the repository (location fixed by DS-18) with `code` `l10n_<country>` (ADR-0004 rule 8). Its `manifest.yaml` declares `code`, `name`, `country` (ISO 3166-1 alpha-2), `version` (semver), `core_version` (the range of core versions it works with), `license` (AGPL-3.0 for packages in this repository, as the core, [18](../spec/18-license-governance.md)), `languages` (BCP 47), `regimes` (each with a `code` such as `tt99` and a `name`) and its component files. Format and example: [DS-14-localization-package.md](../design/DS-14-localization-package.md).
+1. A package is a directory `l10n/<code>/` in the repository (location fixed by DS-18) with `code` `l10n_<country>` (ADR-0004 rule 8). Its `manifest.yaml` declares `code`, `name`, `country` (ISO 3166-1 alpha-2), `version` (semver), `core_version` (the range of core versions it works with), `license` (AGPL-3.0 for packages in this repository, as the core, [18](../spec/18-license-governance.md)), `languages` (BCP 47), `regimes` (each with a `code` such as `tt99` and a `name`) and its component files. Format and example: [DS-14-localization-package.md](../design/DS-14-localization-package.md). The manifest also declares `legal_forms`, which select chart template rows ([ADR-0039](0039-vietnam-package-tt99.md) rule 5).
 2. A company uses exactly one package and one of its regimes, chosen when the company is created (`CreateCompany`); `company.localization_package` and `company.accounting_regime` record them. Changing regime later is out of scope for Phase 1.
 3. One installation has one version of each package. The package's code ships with the application build; its data is loaded when the application is deployed, with the database migrations (DS-37). At startup the application refuses to run if a package's loaded data version differs from its code version; downgrades are refused.
 4. In Phase 1, packages live only in this repository and go through the same review as the core ([ADR-0003](0003-build-operating-rules.md) R5); packages from elsewhere come after Phase 1.
@@ -22,7 +22,7 @@ A localization package (`l10n_<country>`) is a directory with a manifest, data f
 | Component | Kind | Format owner |
 | --- | --- | --- |
 | Operational chart template per regime, mapped to system accounts | package template | ADR-0010, DS-19 |
-| Default account determination per regime; valuation classes; item groups | package template | ADR-0015, DS-19 |
+| Default account determination per regime; valuation classes; item groups; partner groups; statement of unreached system accounts ([ADR-0039](0039-vietnam-package-tt99.md) rules 4, 7) | package template | ADR-0015, DS-19 |
 | Close checklist template, period pattern, special period count | package template | ADR-0012 |
 | Numbering formats per document type | package template | ADR-0009 |
 | Print templates | package template | DS-27 |

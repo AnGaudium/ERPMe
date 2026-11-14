@@ -1,0 +1,41 @@
+# Package rules for every regime of l10n_vn (accounting_regime null; ADR-0016 rule 9; ADR-0039 rule 9).
+- key: reversal.method
+  value: storno
+  effective_from: 2026-01-01
+  status: unverified
+  open_question: "(DS-05, DS-06) Reversal: storno (negative amounts) or swapped debit and credit?"
+
+- key: reversal.locked_period_posting_date
+  value: first_day_of_earliest_open_period
+  effective_from: 2026-01-01
+  status: unverified
+  open_question: "(DS-05, DS-06) Posting date of a reversal when the original document's period is locked."
+
+- key: reversal.material_document_value
+  value: original_line_value
+  effective_from: 2026-01-01
+  status: unverified
+  open_question: "(DS-05, DS-06) Value of a reversed material document."
+
+- key: posting_date.default.purchase_invoice
+  value: last_day_of_document_month_if_open
+  effective_from: 2026-01-01
+  author_decision: {reference: "open-questions (DS-03, DS-19, DS-22) purchase invoice posting date", date: 2026-11-14, by: "Vinh An Tran"}
+
+- key: posting_date.default.purchase_invoice_month_closed
+  value: first_day_of_earliest_open_period
+  effective_from: 2026-01-01
+  status: unverified
+  open_question: "(DS-03, DS-12, DS-19, DS-22) When the invoice's month is already closed (soft-locked or locked), which posting date should a late purchase invoice default to?"
+
+- key: posting_date.default.other
+  value: document_date
+  effective_from: 2026-01-01
+  status: unverified
+  open_question: "(DS-03, DS-19, DS-23) Which date places a purchase or sales document in a VAT period?"
+
+- key: attachment_retention_years
+  value: 10
+  effective_from: 2026-01-01
+  status: unverified
+  open_question: "(DS-36) Attachment retention"

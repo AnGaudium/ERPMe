@@ -180,6 +180,8 @@ The accounting choices are the author's (ADR-0005 item 1). Each one below is a r
     - `cost_behavior` of overhead accounts;
     - subledger activation before the first release (ADR-0034 rule 15).
 
+    TT99 keys and the `cost_behavior` seeds: [ADR-0039](0039-vietnam-package-tt99.md) rules 6, 9.
+
     **Account mapping.** TT99 maps the leaves to 621, 622 and 627 and WIP to 154. TT133 maps them to sub-accounts of 154 per cost element plus one for WIP, because an operational account maps to one system account (ADR-0010 rule 11). The mapping is DS-19's and the author's (the DS-41 question).
 19. Catalog changes, version 0.x:
     - **Movement types:**

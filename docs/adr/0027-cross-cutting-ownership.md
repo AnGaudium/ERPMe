@@ -53,7 +53,7 @@ Before step 1 code freezes the platform modules, every entity that several modul
 **Master records**
 
 5. Master records needed by step 1, owned by `master_data` (DS-20):
-   - **`company`:** `code`, `legal_name`, `tax_id`, `company_currency` (ADR-0011 rule 6), `time_zone` (ADR-0007), `localization_package` and `accounting_regime` (ADR-0016 rule 2), `valuation_area_level` (ADR-0015 rule 8), `fiscal_calendar_owner_id` and `fiscal_year_lead_days` (ADR-0012 rule 3), `is_active`.
+   - **`company`:** `code`, `legal_name`, `tax_id`, `company_currency` (ADR-0011 rule 6), `time_zone` (ADR-0007), `localization_package` and `accounting_regime` (ADR-0016 rule 2), `legal_form` (null where the package declares none, [ADR-0039](0039-vietnam-package-tt99.md) rule 5), `valuation_area_level` (ADR-0015 rule 8), `fiscal_calendar_owner_id` and `fiscal_year_lead_days` (ADR-0012 rule 3), `is_active`.
    - **`branch`:** `company_id`, `code`, `name`, `tax_id` for dependent units where the regime uses one, `address`, `is_active`.
    - **Stubs:** `cost_center` and `project` are created as stubs (`id`, `company_id`, `code`, `name`), because `journal_line` refers to them from step 1. DS-20 completes them by step 2.
 6. Employee references (`salesperson_id`, `buyer_id`) point to partners with the `employee` role (ADR-0019 rule 3). The DS-06 DDL and ADR-0014 rule 9 are corrected.

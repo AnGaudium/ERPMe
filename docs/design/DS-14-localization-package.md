@@ -13,6 +13,8 @@ l10n/l10n_vn/
       account_determination.csv    # package template: default determination (ADR-0015)
       valuation_classes.csv        # package template
       item_groups.csv              # package template
+      partner_groups.csv           # package template (ADR-0039)
+      unreached_system_accounts.csv  # package template: ADR-0010 rule 17 statement (ADR-0039)
       close_checklist.yaml         # package template (ADR-0012)
       settings.yaml                # package rules: regime settings (ADR-0016 rules 9-12)
   settings.yaml                    # package rules for every regime (accounting_regime null)
@@ -38,11 +40,18 @@ languages: [vi]
 regimes:
   - code: tt99
     name: Circular 99/2025/TT-BTC
+legal_forms:                     # optional; select chart template rows (ADR-0039 rule 5)
+  - code: joint_stock
+    name_en: Joint-stock company
+    name_vi: Công ty cổ phần
+    legal_source: {document: "<law>", article: "<article>", date: "<date>"}
 components:
   chart_template: regimes/{regime}/chart_template.csv
   account_determination: regimes/{regime}/account_determination.csv
   valuation_classes: regimes/{regime}/valuation_classes.csv
   item_groups: regimes/{regime}/item_groups.csv
+  partner_groups: regimes/{regime}/partner_groups.csv
+  unreached_system_accounts: regimes/{regime}/unreached_system_accounts.csv
   close_checklist: regimes/{regime}/close_checklist.yaml
   regime_settings: [settings.yaml, regimes/{regime}/settings.yaml]
   numbering: numbering.yaml
@@ -72,7 +81,21 @@ In CSV templates the basis is six columns: `basis` (`legal_source`, `author_deci
 | `is_postable` | `true` or `false` |
 | `system_account` | System account code for postable accounts (ADR-0010 rule 11) |
 | `currency` | Optional currency restriction (ADR-0010 rule 10) |
+| `condition` | Empty, `legal_form=<value>` or `legal_form!=<value>`: the row applies only to companies of that legal form; each legal form must yield a valid tree ([ADR-0039](../adr/0039-vietnam-package-tt99.md) rule 5) |
+| `cost_behavior` | `variable` or `fixed` on every production cost account, empty otherwise ([ADR-0035](../adr/0035-production-costing.md) rule 7; [ADR-0039](../adr/0039-vietnam-package-tt99.md) rule 6) |
 | basis columns | As above |
+
+## Account determination (CSV)
+
+| Column | Meaning |
+| --- | --- |
+| `transaction_key` | Code from the transaction key catalog |
+| `valuation_class`, `warehouse`, `item_group`, `partner_group`, `tax_code`, `currency` | Determinants; empty means any ([ADR-0015](../adr/0015-account-determination.md) rule 9). Templates use seed codes for valuation class, item group and partner group, and leave warehouse, tax code and currency empty |
+| `account_code` | Operational account code of the regime's chart template |
+| basis columns | As above |
+| `note` | Why an interim choice was made and its alternatives |
+
+Seed lists (`valuation_classes.csv`, `item_groups.csv`, `partner_groups.csv`) have `code`, `name_en`, `name_<language>` and the basis columns. The TT99 content is in [DS-19-vietnam-tt99](DS-19-vietnam-tt99/README.md) ([ADR-0039](../adr/0039-vietnam-package-tt99.md)). `unreached_system_accounts.csv` has `system_account` and `reason`. `close_checklist.yaml` carries `period_pattern` and `special_period_count` with one basis, and the tasks of ADR-0012.
 
 ## Regime settings (YAML)
 

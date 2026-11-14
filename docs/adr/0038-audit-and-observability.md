@@ -118,7 +118,7 @@ The retention periods and the strictness of scanning are flagged for the author.
     - **Scan mode.** `attachment_scan_mode` is an installation setting: `required`, or `optional`, under which attachments pass with the check result `scan_unavailable` when no scanner is deployed. `production` requires `required` (flagged; open question).
     - **Untrusted content.** Attachments from outside content are untrusted (ADR-0029 rule 10).
 15. Retention:
-    - **Accounting attachments.** `Post` sets `attachment.is_accounting_evidence` on every linked attachment; it is never unset. Bytes of such an attachment are kept `attachment_retention_years` after its last link ends. This is a regime setting, seeded `unverified` at 10 years for accounting vouchers. Under ADR-0016 rule 12 an unverified setting fails closed, so such bytes are not purged until the author verifies it.
+    - **Accounting attachments.** `Post` sets `attachment.is_accounting_evidence` on every linked attachment; it is never unset. Bytes of such an attachment are kept `attachment_retention_years` after its last link ends. This is a regime setting, seeded `unverified` at 10 years for accounting vouchers. Under ADR-0016 rule 12 an unverified setting fails closed, so such bytes are not purged until the author verifies it. TT99 seed: package `settings.yaml` ([ADR-0039](0039-vietnam-package-tt99.md) rule 9).
     - **Erasure.** Erasure removes a subject's links except links to posted accounting documents, which stay as voucher evidence; ADR-0027 rule 2 gets a note.
     - **Other attachments.** Their bytes are deleted when the last link goes, including at erasure (ADR-0019 rule 10).
 

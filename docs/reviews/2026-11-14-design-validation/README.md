@@ -22,6 +22,7 @@ The scripts are in [lab/](lab/):
 | `costing_solver.py` | First solver prototype: stock and production nodes, uniform WIP share (L-05) |
 | `costing_lab2.py` | Full production costing model of ADR-0035 over two periods (L-06) |
 | `mrp_lab.py` | Multi-level MRP of ADR-0036: network order, phantom collapse, co-product supply, make to order, conversion (L-08) |
+| `check_package.py` | A package regime against the core catalogs and open questions: ADR-0010 rules 11, 17 and template analogues of 16; ADR-0015 rules 4, 9, 10, 13; ADR-0016 rule 6 bases; required settings; per legal form. `--self-test` applies twelve broken copies (L-09) |
 
 ## Findings
 
@@ -33,8 +34,9 @@ The scripts are in [lab/](lab/):
 | L-04 | DS-06 comments said `cost_object` is Phase 2 and owned by `ledger` | Fixed (ADR-0032; ADR-0034 rule 15) |
 | L-05 | First prototype: stock and production nodes with co-products by coefficient, a by-product, a transfer, a rework self-loop, and WIP as one uniform share of all cost. One global elimination. Value was conserved, and the result equals fixed-point iteration to 10⁻¹⁸⁸. It had no pools, no normal capacity, no abnormal cost, and none of ADR-0035's WIP methods | Narrowed; superseded by L-06 |
 | L-06 | Second prototype, the model of ADR-0035, over two periods. Every check passed and value was conserved exactly in both periods | Basis of ADR-0035 |
-| L-08 | MRP prototype: determinism, pegging sums, phantom collapse, co-product supply and make-to-order isolation pass. Converting a make-to-order planned order first double-counted its components on the next run (bolt demand 200 to 352), because the real order's supply was not linked to its sales line. With the link (`for_demand_supply_line_id` on supply rows), demand stays 200 | Basis of [ADR-0036](../../adr/0036-multi-level-mrp.md) rules 8–9. The prototype is simplified: no calendars, fence, lot splitting, reservations or inspection stock |
 | L-07 | Review of the L-03 fix: the activation row was read before the area-state lock, cost objects of another company were accepted, and activation rows could change. Cost-object lines were in area `general`, so late pool postings would not make the inventory costing stale | Fixed in DS-06 and tested (`t03_cost_object_area.py`, 4 of 4) |
+| L-08 | MRP prototype: determinism, pegging sums, phantom collapse, co-product supply and make-to-order isolation pass. Converting a make-to-order planned order first double-counted its components on the next run (bolt demand 200 to 352), because the real order's supply was not linked to its sales line. With the link (`for_demand_supply_line_id` on supply rows), demand stays 200 | Basis of [ADR-0036](../../adr/0036-multi-level-mrp.md) rules 8–9. The prototype is simplified: no calendars, fence, lot splitting, reservations or inspection stock |
+| L-09 | TT99 package ([ADR-0039](../adr/0039-vietnam-package-tt99.md)): every seeded combination resolves uniquely for each of the four legal forms, and twelve broken copies each fail (`--self-test`). The first draft had a cost behavior on the direct-cost account 62771 (found by the check), and review found that the check missed postings without a valuation class (no generic price difference row), package choices recorded as legal sources, and a setting mixing a decided and an undecided value | Fixed in the template and the check before acceptance |
 
 L-06 covered:
 - pools fed by indirect materials at solved prices, split into fixed and variable parts;

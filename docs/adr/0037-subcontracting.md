@@ -23,7 +23,7 @@ Outsourced work runs on the production core:
 
 1. A processor location is a `physical` warehouse with `processor_partner_id` (ADR-0020 rule 1 gets the column), not bin-managed. A company has at most one active location per processor.
    - **Ownership.** Stock there is ours and valued, in the area the company's valuation level gives (ADR-0020 rule 2).
-   - **Inventory key.** Its stock lines use a new inventory key `inventory_at_processor_posting`, with the inventory leaves and determinants valuation class and warehouse. A regime can therefore show stock at processors on its own account.
+   - **Inventory key.** Its stock lines use a new inventory key `inventory_at_processor_posting`, with the inventory leaves and determinants valuation class and warehouse. A regime can therefore show stock at processors on its own account. TT99: the same accounts as ordinary stock ([ADR-0039](0039-vietnam-package-tt99.md) rule 8).
    - **Accounting at sending.** Interim, flagged: materials stay inventory until the service receipt consumes them, as in SAP. TT99 describes 154 at sending (research note 02). Choosing that is the author's (open question), and it would need the transfer to post per order.
    - **Sending.** Materials go there by an ordinary transfer, moving quantity and value (ADR-0020 rule 6). No invoice is issued for materials sent to a domestic processor (Decree 254/2026/NĐ-CP Art. 7, unverified). Whether an internal transport document is needed is the regime's setting (DS-24).
    - **Allowed movements.** Only transfers in and out, production issues and returns, count differences and opening balances (stock at processors at cut-over) may post at a processor location. Anything else is rejected with `movement_not_allowed_at_processor`.
@@ -58,7 +58,7 @@ Outsourced work runs on the production core:
    - **Reversal.** Refused once an invoice refers to the receipt. Otherwise it reverses, in this order: the automatic receipt, the backflush, the cost and the progress.
    - **Agents.** A receipt drafted from a processor's delivery note is tainted (ADR-0029 rule 10), so a human posts it. Simulation applies as for any command.
 6. Afterwards:
-   - **Invoice differences.** The invoice clears GR/IR at the order price (ADR-0030 rule 4). A service has no pending receipt adjustment, so a difference posts straight to the order's `production_cost_other` while the order is not closed, and after close to the price-difference account, never the stock-bound path, since a service has no receipt lines. Both are interim and flagged.
+   - **Invoice differences.** The invoice clears GR/IR at the order price (ADR-0030 rule 4). A service has no pending receipt adjustment, so a difference posts straight to the order's `production_cost_other` while the order is not closed, and after close to the price-difference account, never the stock-bound path, since a service has no receipt lines. Both are interim and flagged. After close the difference posts without a valuation class, so it reaches the generic price difference row ([ADR-0039](0039-vietnam-package-tt99.md) rule 8).
    - **Actual consumption.** When the processor reports actual consumption, a `production_issue` or return at the processor location adjusts the order.
    - **Leftovers** come back by transfer.
 
