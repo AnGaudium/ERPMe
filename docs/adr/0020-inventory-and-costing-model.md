@@ -1,0 +1,95 @@
+# ADR-0020: Inventory and costing model
+
+Status: accepted (2026-11-14) under ADR-0005, reviewed by Claude Fable 5.2. Design item: DS-09 (ADR part for step 0; the period-end costing algorithm is specified for step 3). Related decisions: D5, D6, D10. Principles 2, 5, 6, 9. ADR-0004, ADR-0005, ADR-0006, ADR-0007, ADR-0008, ADR-0009, ADR-0010, ADR-0012, ADR-0014, ADR-0015, ADR-0016, ADR-0018.
+
+## Decision
+
+Quantities move in material documents; values move in journal entries; both belong to the same posting document and are written in the same transaction (spec [05](../spec/05-accounting-inventory-core.md)). Every material document line has a movement type from a core catalog that gives its direction, how its value is found, its role in costing and which transaction key offsets it; where these are accounting rules (returns, count differences) the catalog leaves them to a required regime setting. Stock quantity is kept per item, warehouse and lot or serial, and stock value per item and warehouse, both changed only through the stock lock helper, serialized per (item, warehouse), so stock never goes negative (Principle 9). Phase 1 uses periodic weighted average (D6): issues carry a deterministic preliminary price, and period-end actual costing computes each item's actual average per valuation area by an exact solve over all areas linked by transfers, then posts value-only adjustments with a derivation trace, never editing earlier lines. Goods in transit and goods sent are warehouses of their own kinds, attached to the valuation area of a physical warehouse, so transfers through them keep the issuing warehouse's average and their own accounts stay equal to the stock report. Lots and serials carry no cost. The schema leaves room for bills of materials (Phase 2), bins and catch weight (after Phase 1).
+
+### Rules
+
+**Warehouses and valuation areas**
+
+1. A `warehouse` belongs to one company: `code`, `name`, `kind` (`physical`; `transit` for goods the company owns on the way; `goods_sent` for goods delivered to customers or agents and still owned), `branch_id`, address, `is_active`, and for `transit` and `goods_sent`, `valuation_warehouse_id`: the physical warehouse whose valuation area it belongs to. The inventory key of a stock line follows the warehouse kind: `inventory_posting`, `inventory_in_transit_posting`, `inventory_goods_sent_posting` (ADR-0015).
+2. With `valuation_area_level` `company`, all warehouses of the company form one valuation area. With `warehouse`, each physical warehouse is a valuation area, together with the transit and goods-sent warehouses attached to it. A line records its area as `valuation_warehouse_id` (null for company level).
+
+**Material documents and movement types**
+
+3. A `material_document` belongs to one posting document (`document_id`, unique; ADR-0014 rule 2). Its lines (`material_document_line`) have `line_number`, `item_id`, `warehouse_id`, `movement_type_id`, `direction` (`in` or `out`, from the movement type, flipped when `is_reversal` is true), `is_reversal`, `quantity` (positive, in the item's inventory unit, ADR-0018 rule 11), `lot_id` or `serial_number_id` when the product is tracked, `company_amount` (the value moved), `valuation_warehouse_id`, `derivation_trace_id`, and the reserved `bin_id` and `catch_weight_quantity` (empty until after Phase 1). They are append-only, protected by triggers like journal rows (ADR-0014 rule 13); the journal line that posts each value refers to its material line.
+4. The movement type catalog is `docs/catalogs/movement-types.csv` (core catalog, uuid5 IDs, versioned like the system chart, 0.x until the step 0 gate; ADR-0010 rule 9). Each type declares `code`, `name`, `direction`, `value_source` (`document`: from the document; `preliminary_price`; `issuing_value`: the value that left, for the receiving side of a transfer; `regime`: rule 5), `costing_role` (`receipt`: enters the period's receipts, negative when the direction is out; `revalued_issue`: valued at the preliminary price and revalued at period end; `transfer`; `regime`), `offset_transaction_key` (empty for transfers), `needs_reference` and its nearest SAP analog. Version 0.1.0 has 13 types: purchase receipt and return, sales issue and return receipt, transfer out and in, stock count shortage and surplus, internal consumption, other receipt, other issue, scrap and opening balance. Moving goods into or out of transit or goods-sent warehouses is a transfer; selling goods sent is a sales issue from the goods-sent warehouse. This ADR adds the keys `other_receipt_offset`, `other_issue_offset` and `scrap` to the transaction key catalog. Production types are reserved for Phase 2.
+5. Value source and costing role of `purchase_return`, `sales_return_receipt`, `stock_count_shortage` and `stock_count_surplus` are accounting rules, so the catalog marks them `regime` and the core reads them only from the required regime settings `movement_type.<code>.value_source` and `movement_type.<code>.costing_role` (ADR-0016 rule 10): a posting without them fails with `regime_configuration_missing`, and an `unverified` one is refused in production (ADR-0016 rule 12). The Vietnam package (DS-19) seeds them with basis `unverified` and the interim values in the catalog's `meaning` column, until the author answers the open questions (sales return cost; purchase return value; count difference valuation).
+6. A transfer posts both stock lines at the issuing value, and each stock line always has its journal line (credit on the issuing warehouse, debit on the receiving one, carrying their `warehouse_id`), even when both determine the same operational account, so material line values equal their journal lines, inventory value per warehouse as a view over `journal_line` (ADR-0014 rule 17) equals `stock_value`, and every inventory account equals the stock value of its warehouses. A transfer between valuation areas moves at the issuing area's average: preliminary during the period, actual after costing ([08](../spec/08-l10n-vn.md#costing)).
+7. Reversible stock document types are transfers, stock counts, internal consumption, other receipts and issues, scrap and opening balances, as internal documents (ADR-0009 rule 19); goods receipts and deliveries are corrected by return documents (ADR-0009 rule 23), with their flags set by DS-22. A reversal repeats the lines with `is_reversal` true and the opposite direction; each line keeps its type's costing role with the opposite sign (a negative receipt, a negative issue), and its value follows the flagged regime setting for the value of a reversed material document (ADR-0009 rule 20; interim: the original line's value). It is refused when the stock it returns has been consumed, which is the check of rule 10 (ADR-0009 rule 18).
+
+**Stock balances and locking**
+
+8. `stock_quantity` holds quantity per (company, item, warehouse, lot or serial, bin reserved); `stock_value` holds value per (company, item, warehouse). The stock valuation report sums `stock_value` per item, valuation area and inventory account; the inventory-control accounts equal it (DS-16). Both tables are written only through the stock lock helper in the posting transaction and read only through its functions and views (ADR-0008 rule 10); no other SQL or trigger writes them.
+9. The helper locks, for every (item, warehouse) a document touches, its `stock_value` row (created on first use), in ascending order of item and warehouse IDs, before any numbering lock; quantity rows of lots and serials are reached only under that lock. Value-only inventory journal lines (landed cost added to stock, price differences to stock, costing adjustments) carry item and warehouse (ADR-0014 rule 10) and go through the same helper, which updates `stock_value`; ADR-0010 rule 5 counts them as postings through the inventory module.
+10. No stock quantity may be negative, and a serial number never has more than one unit on hand. Under the helper's lock, a posting is rejected with `negative_stock` if, for any (item, warehouse, lot or serial) it touches, the closing quantity of its posting date or of any later date would fall below zero; quantities within one day are not ordered (ADR-0007 rule 10). Whether this end-of-day rule is the right time point for backdated documents is the existing open question; it is the interim rule, flagged.
+
+**Price control and costing**
+
+11. Price control is `periodic_average` (ADR-0018 rule 3; D6). `preliminary_price` rows hold, per (item, valuation area, posting period), the price issues use. When period N−1 has an actual average for the item and area, the row for N is that average. Otherwise the price is the unit value of the latest movement with costing role `receipt` or a `transfer_in`, in that area, on or before the line's posting date, ordered by posting date, document type code, document number and `line_number`; if the area has none, the item's latest such price in any area of the company; if there is none at all, a line that needs the preliminary price (an issue, or a count surplus valued at it) is rejected with `preliminary_price_missing`, naming the item, until a receipt exists or a human sets a price with `UpdatePreliminaryPrice` (`human_only`, audited, since under rule 13 it can become the final cost). Such a line's value is `round_amount(quantity × preliminary price)` (ADR-0006 rule 18).
+12. Period-end actual costing is a sequential close task per company and period (ADR-0012 rules 13, 16). For each item it computes the actual average of every valuation area from the opening value and quantity plus the period's receipts, including value-only additions classed by the `inventory_value_role` their document type declares in the registry (`receipt_addition` for landed cost and price differences to stock; `costing_adjustment` for costing adjustment documents, which do not count; ADR-0008 rule 1), solving all areas linked by transfers together as one exact linear system in rational arithmetic, so the result is the same on every run and equal to the naive recomputation. It posts value-only adjustment documents (one per company and period, or split by item range when large) that revalue revalued issues and transfers to actual averages, with each movement type's offset key, and a derivation trace per item and area (Principle 6). BOM levels join the system in Phase 2 ([05](../spec/05-accounting-inventory-core.md)).
+13. Degenerate cases follow one rule: when an item's area has no receipts and no opening quantity, when its closing quantity is zero but value remains, when its closing value or its average would be negative, or when the system has no unique solution (e.g. goods transferred back and forth within a day), the area keeps the preliminary price for its issues, and any residual value is posted per warehouse as its own line with the `inventory_revaluation_offset` key and a derivation trace (interim, flagged: where such residuals go is an accounting rule; the regime may map the key). Rounding residuals of the revaluation are posted the same way (ADR-0006 rule 21). The formulas and the adjustment document layout are specified for step 3.
+14. A backdated document in a period that is not locked makes the costing of that period and later unlocked periods stale (ADR-0012 rules 10, 12); a rerun posts only the difference (ADR-0012 rule 15). Locked periods are never recosted.
+15. Landed cost added in the same open period raises the receipt's value through a value-only line (rule 9) before costing; landed cost of a closed period is posted now and allocated by consumer (DS-11).
+16. A change of `valuation_area_level` after stock is posted is not supported in Phase 1; how it would be applied waits for the VAS 29 question (ADR-0015 rule 8).
+
+**Lots, serials and counts**
+
+17. `lot` (company, item, `code`, optional `expiry_date`, `manufacture_date`) and `serial_number` (company, item, `code`) are tracked on material document lines and in `stock_quantity`; they carry no cost ([07](../spec/07-shared-foundation.md#units-of-measure)). A serial-tracked line has quantity 1. Shelf life and expiry rules for picking come after Phase 1.
+18. A stock count (`stock_count` document) holds counted quantities per item, warehouse and lot; posting it creates count shortage and surplus movements for the differences, with the movement types' value sources and keys (rule 5).
+
+**Simulation and agents**
+
+19. In simulation the stock lock helper keeps balances in memory and takes no lock (ADR-0008 rule 10); the plan shows quantities, values and the preliminary prices used. The query `GetStockBalance` returns quantity and value per item, warehouse and lot, as of a date.
+
+## Context
+
+DS-09's ADR part is needed by ADR-0014 (material document link), ADR-0015 (inventory keys), DS-11 (landed cost) and DS-16 (stock invariants); the algorithm by step 3. Constraints:
+
+- Material and accounting documents written together; movement types as configuration deciding quantity and value updates and transaction keys; price control per item with a preliminary price; period-end actual costing solving warehouses together (BOM levels in Phase 2); landed cost rules ([05](../spec/05-accounting-inventory-core.md)). Periodic weighted average per warehouse or company; transfers at the issuing warehouse's average ([08](../spec/08-l10n-vn.md#costing)).
+- Lots and serials without cost; stock and cost in the stock unit; backdated documents re-cost unlocked periods with adjustment documents ([07](../spec/07-shared-foundation.md)). Stock posting serialized per (item, warehouse) (Principle 9). No negative stock and inventory accounts equal to the valuation report are gate conditions ([12](../spec/12-testing.md); step 3).
+- Open questions: negative-stock time point, sales return cost, reversed material document value, costing scope change, where the existing costing engine lives.
+- SAP practice (D5): material documents with movement types (101, 122, 301, 601, 651, 701/702 …), valuation area, stock in transit as a stock type, material ledger periodic unit price with multilevel settlement. ADR-0005: the mechanism is the agent's, the accounting rules the author's.
+
+## Options considered
+
+| Option | For | Against |
+| --- | --- | --- |
+| Transit and goods sent as warehouse kinds attached to a physical warehouse's area (chosen) | One stock model; their accounts reconcile; transfers keep the issuing average | A setting per transit warehouse |
+| Stock types or special stock flags (SAP) | Fewer warehouses | A second axis in every stock query and key |
+| Value per (item, valuation area) only | One value row | Cannot reconcile accounts that differ by warehouse kind |
+| Exact rational solve (chosen) | Deterministic; equals the naive recomputation | Larger systems for many linked areas |
+| Iteration to a tolerance | Simple | Results depend on the tolerance; `plan_hash` and references may differ |
+| Fixed value sources for returns and counts in the core | Simple | Decides accounting rules reserved to the author |
+| Skip journal lines for same-account transfers | Fewer lines | Two posting shapes; per-warehouse value from the journal no longer equals stock value |
+
+## Constraints that come with the decision
+
+- DS-04: errors `negative_stock`, `preliminary_price_missing`; command `UpdatePreliminaryPrice` (`human_only`); query `GetStockBalance`.
+- ADR-0010: rule 5 includes value-only lines through the inventory module. ADR-0014: value-only inventory lines carry item and warehouse. ADR-0015: no separate transfer key; costing scope change not supported in Phase 1.
+- DS-11: landed cost value-only lines and the consumer split.
+- DS-16: invariants: inventory-control accounts equal the valuation report per account; no negative quantity on any date; one unit per serial; material line values equal their journal lines.
+- DS-17: edge cases for transfers through transit, backdating, counts, lots, serials, degenerate costing.
+- DS-18: triggers and lock order; check that every document type posting value-only inventory lines declares `inventory_value_role`. DS-19: required regime settings for the four `regime` movement types, seeded `unverified`; count difference accounts; whether goods contributed as capital need `owner_capital` on `other_receipt_offset`.
+- Step 3 algorithm spec: equations, rounding, adjustment layout.
+
+## Revisit when
+
+- Throughput of stock postings for one (item, warehouse) is measurably limited by the lock.
+- A customer needs standard or moving-average price control (after Phase 1).
+
+## Documents updated
+
+- [docs/catalogs/movement-types.csv](../catalogs/movement-types.csv): new, version 0.1.0.
+- [docs/catalogs/transaction-keys.csv](../catalogs/transaction-keys.csv): three keys added.
+- [docs/catalogs/README.md](../catalogs/README.md): movement types status.
+- [docs/adr/0010-system-chart-of-accounts.md](0010-system-chart-of-accounts.md), [docs/adr/0015-account-determination.md](0015-account-determination.md): notes.
+- [docs/spec/00-reading-guide.md](../spec/00-reading-guide.md): glossary rows for valuation area, warehouse kind, material document line, movement type, value source, costing role, stock quantity, stock value, preliminary price, lot, serial number, stock count.
+- [docs/design/DS-04-command-envelope.md](../design/DS-04-command-envelope.md): error codes.
+- [docs/design/backlog.md](../design/backlog.md): DS-09 row links here.
+- [docs/adr/README.md](README.md): index row.
+- [docs/open-questions.md](../open-questions.md): negative-stock rule; purchase return value; count difference valuation.
+- [docs/runbook/step-log.md](../runbook/step-log.md): entry at acceptance.

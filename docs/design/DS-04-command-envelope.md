@@ -128,6 +128,8 @@ Module-specific codes are added by the DS item that owns the module, in the regi
 | `validation_failed` | validation | 422 | no | A field is missing, of the wrong type or out of range; one item per field |
 | `unknown_field` | validation | 422 | no | The request or payload has a field the schema does not define |
 | `too_many_decimal_places` | validation | 422 | no | ADR-0006 rule 14 |
+| `negative_stock` | precondition | 422 | no | The posting would make a stock quantity negative at the end of its date or a later date; `details` names item, warehouse, lot and date ([ADR-0020](../adr/0020-inventory-and-costing-model.md) rule 10) |
+| `preliminary_price_missing` | precondition | 422 | no | A line valued at the preliminary price (an issue or a count surplus) needs one and none exists for the item in the company; `details` names the item and valuation area; fix by posting a receipt or `UpdatePreliminaryPrice` ([ADR-0020](../adr/0020-inventory-and-costing-model.md) rule 11) |
 | `quantity_rounds_to_zero` | validation | 422 | no | The quantity converted to the inventory unit rounds to zero ([ADR-0018](../adr/0018-product-and-item-model.md) rule 11) |
 | `invalid_timestamp` | validation | 422 | no | ADR-0007 rule 3 |
 | `schema_version_unsupported` | validation | 422 | no | ADR-0008 rule 23; `details.served` lists the versions |

@@ -1,0 +1,14 @@
+code,name,direction,value_source,costing_role,offset_transaction_key,needs_reference,sap_analog,added_in,meaning
+purchase_receipt,Purchase receipt,in,document,receipt,gr_ir_clearing,true,101,0.1.0,"Goods received against a purchase order, valued from the order; offset to GR/IR clearing."
+purchase_return,Purchase return,out,regime,regime,gr_ir_clearing,true,122,0.1.0,"Goods returned to a supplier. Set by regime; interim seed (unverified): document value, negative receipt."
+sales_issue,Sales issue,out,preliminary_price,revalued_issue,cost_of_goods_sold,true,601,0.1.0,"Goods issued for a sale, valued at the preliminary price and revalued at period end."
+sales_return_receipt,Sales return receipt,in,regime,regime,cost_of_goods_sold,true,651,0.1.0,"Goods a customer returned. Set by regime; interim seed (unverified): document value (the original issue cost), receipt."
+transfer_out,Transfer out,out,preliminary_price,transfer,,true,301,0.1.0,Issuing side of a transfer between warehouses; the receiving side is transfer_in on the same document.
+transfer_in,Transfer in,in,issuing_value,transfer,,true,301,0.1.0,Receiving side of a transfer; takes exactly the value that left.
+stock_count_shortage,Stock count shortage,out,regime,regime,inventory_count_shortage,true,702,0.1.0,"Quantity missing at a stock count. Set by regime; interim seed (unverified): preliminary price, revalued issue."
+stock_count_surplus,Stock count surplus,in,regime,regime,inventory_count_surplus,true,701,0.1.0,"Quantity found in excess at a stock count. Set by regime; interim seed (unverified): preliminary price, receipt."
+internal_consumption,Internal consumption,out,preliminary_price,revalued_issue,consumption,false,201,0.1.0,Goods issued for internal use.
+other_receipt,Other receipt,in,document,receipt,other_receipt_offset,false,501,0.1.0,"Goods received without a purchase order, valued from the document."
+other_issue,Other issue,out,preliminary_price,revalued_issue,other_issue_offset,false,201,0.1.0,Goods issued for a purpose no other movement type covers.
+scrap,Scrap,out,preliminary_price,revalued_issue,scrap,false,551,0.1.0,Goods destroyed or written off.
+opening_balance,Opening balance,in,document,receipt,opening_balance,false,561,0.1.0,"Stock taken over at migration, valued from the import (DS-21)."

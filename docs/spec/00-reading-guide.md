@@ -48,8 +48,16 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Item group | item\_group | Company grouping of items for revenue, cost of goods sold and consumption accounts |
 | Partner group | partner\_group | Company grouping of partners that gives new partners their default reconciliation accounts |
 | Valuation class | valuation\_class | Attribute of a stock item; company data seeded from the regime template; drives inventory account determination |
-| Valuation area | valuation\_area, valuation\_area\_level | Warehouse or company, per the company's costing policy (`valuation_area_level`), not changeable by command once stock is posted |
-| Movement type | movement\_type | Configuration table |
+| Valuation area | valuation\_area\_level, valuation\_warehouse\_id | The company, or a physical warehouse with its attached transit and goods-sent warehouses, per the company's costing policy (`valuation_area_level`), not changeable by command once stock is posted; a line records it as `valuation_warehouse_id` (null at company level) |
+| Movement type | movement\_type | Core catalog [movement-types.csv](../catalogs/movement-types.csv): direction, value source, costing role and offset transaction key of a stock movement ([ADR-0020](../adr/0020-inventory-and-costing-model.md)) |
+| Value source | value\_source: document, preliminary\_price, issuing\_value, regime | How a movement type finds the value of a line; for returns and count differences a required regime setting |
+| Costing role | costing\_role: receipt, revalued\_issue, transfer, regime | How a movement type takes part in period-end costing: enters the receipts, is revalued to the actual average, or moves value between areas |
+| Preliminary price | preliminary\_price | Deterministic price per item, valuation area and period that issues use until period-end costing; error `preliminary_price_missing` when none can be found |
+| Warehouse kind | kind: physical, transit, goods\_sent | Goods on the way and goods sent but still owned are warehouses of their own kinds, attached to a physical warehouse's valuation area; the kind picks the inventory key |
+| Material document line | material\_document\_line | One stock movement: item, warehouse, movement type, quantity in the inventory unit, lot or serial, value |
+| Stock quantity, stock value | stock\_quantity, stock\_value | Quantity per item, warehouse and lot or serial; value per item and warehouse; changed only through the stock lock helper |
+| Lot, serial number | lot, serial\_number | Tracking of stock movements, with no cost of their own; lots may carry expiry dates |
+| Stock count | stock\_count | Counted quantities; differences post as count shortage and surplus movements |
 | Goods received / invoice received clearing | gr\_ir\_clearing |  |
 | Price difference | price\_difference |  |
 | Price control | price\_control | Per product, read through its items ([ADR-0018](../adr/0018-product-and-item-model.md)). Phase 1: periodic weighted average with a preliminary price. Standard price and moving average after Phase 1 |
