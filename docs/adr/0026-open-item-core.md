@@ -30,6 +30,8 @@ DS-25 keeps payments, bank statements, matching UX, netting, payment allocation 
    | Links | `predecessor_open_item_id` (rule 12) |
 
    DS-25 attributes such as dunning level, payment block and dispute live in a side table keyed by `open_item_id`, so the core table does not change.
+
+   The side table is `open_item_collection`; `original_posting_date` and the due-date check are corrected in the DDL ([ADR-0048](0048-cash-bank-receivables-payables.md) rules 17, 18).
 2. `open_item_kind` is a core catalog: `invoice`, `credit` (credit notes and debit notes that reduce an invoice), `advance` (non-monetary per spec 07, excluded from revaluation by kind, ADR-0011 rule 18), `payment_on_account` (money received or paid without an item to settle), `loan` (one per drawdown, ADR-0025), `other`. DS-25 may add kinds; statutory presentation per kind and side is DS-26's (ADR-0010 rule 15), and the meaning of each kind for presentation is the regime's (open question).
 
 **One posting path**
@@ -55,6 +57,8 @@ DS-25 keeps payments, bank statements, matching UX, netting, payment allocation 
    - with `realized_fx_basis` `revalued`: the share settled ÷ open transaction amount of the open company and group amounts including revaluation; with `original` (only meaningful with `delta`, ADR-0011 rule 16): the same share of the amounts excluding revaluation, and the matching share of revaluation is released to the revaluation target in the same entry (interim, flagged);
    - the settlement that settles the item takes exactly what is left, so a settled item has all open amounts zero;
    - realized FX is the settlement's amount in each currency minus the carrying amount leaving, posted through the realized FX keys (ADR-0011 rule 15).
+
+   Evidence values are `cash`, `bank_transfer`, `card`, `offset`, `third_party` and `none`, stored on `journal_line.evidence_method` ([ADR-0048](0048-cash-bank-receivables-payables.md) rule 18).
 7. Open-item accounts use the `specific` method only; `moving_average` (ADR-0011 rule 15) applies to balance-level accounts such as cash and bank (interim, flagged; open question).
 8. Overpayment: the excess of a payment over the items it names is posted by the document as a new `payment_on_account` item (interim, flagged: the business may instead refund or hold). Write-offs and early-payment discounts settle items through the same interface with their own lines; their accounting and approval are DS-25's and the regime's (flagged).
 9. Matching items of one partner and account in one currency is an `open_item_matching` document (internal, ADR-0009 rule 19): two lines netting to zero in transaction currency, each settling one item at that item's carrying amount, plus realized FX lines for the difference (flagged). A credit note always creates a `credit` item; applying it to an invoice is always an `open_item_matching`, which the correction document may create in the same command. Who may post a matching (agent draft, policy, human) is DS-28's. Netting across accounts or partners, and across currencies, is DS-25's. Matchings pass the usual policy points ([ADR-0043](0043-policy-and-approval.md) rule 17).

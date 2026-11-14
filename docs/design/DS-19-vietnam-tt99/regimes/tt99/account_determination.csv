@@ -76,3 +76,13 @@ production_abnormal_cost,,,,,,,6325,unverified,(DS-19) TT99 default account dete
 production_unabsorbed_overhead,,,,,,,6325,unverified,(DS-19) TT99 default account determination,,,,,
 production_residual_cost,,,,,,,6325,unverified,(DS-19) TT99 default account determination,,,,,
 production_external_service,,,,,,,62771,unverified,(DS-19) TT99 default account determination,,,,,
+bank_charge,,,,,,,6427,unverified,(DS-19) TT99 default account determination,,,,,"Interim (ADR-0048 rule 20)."
+cash_surplus,,,,,,,3381,unverified,(DS-19) TT99 default account determination,,,,,"Interim (ADR-0048 rule 20)."
+cash_shortage,,,,,,,1381,unverified,(DS-19) TT99 default account determination,,,,,"Interim (ADR-0048 rule 20)."
+payment_difference_income,,,,,,,711,unverified,(DS-19) TT99 default account determination,,,,,"Interim (ADR-0048 rule 20)."
+payment_difference_expense,,,,,,,811,unverified,(DS-19) TT99 default account determination,,,,,"Interim (ADR-0048 rule 20)."
+bad_debt_expense,,,,,,,6426,unverified,(DS-19) TT99 default account determination,,,,,"Interim (ADR-0048 rule 20)."
+bad_debt_allowance,,,,,,,2293,unverified,(DS-19) TT99 default account determination,,,,,"Interim (ADR-0048 rule 20)."
+bad_debt_recovery,,,,,,,711,unverified,(DS-19) TT99 default account determination,,,,,"Interim (ADR-0048 rule 20)."
+payable_release_income,,,,,,,711,unverified,(DS-19) TT99 default account determination,,,,,"Interim (ADR-0048 rule 20)."
+currency_exchange_clearing,,,,,,,998,unverified,(DS-19) TT99 default account determination,,,,,"Interim (ADR-0048 rule 20): a technical account."

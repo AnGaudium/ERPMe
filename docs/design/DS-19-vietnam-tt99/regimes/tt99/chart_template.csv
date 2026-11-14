@@ -213,4 +213,5 @@ code,name_en,name_vi,parent_code,is_postable,system_account,currency,condition,c
 82112,Top-up CIT expense under global minimum tax rules,Chi phí thuế thu nhập doanh nghiệp bổ sung theo quy định về thuế tối thiểu toàn cầu,8211,true,income_tax_expense,,,,legal_source,Circular 99/2025/TT-BTC,Appendix II,2026-01-01,,
 8212,Deferred corporate income tax expense,Chi phí thuế TNDN hoãn lại,821,true,income_tax_expense,,,,legal_source,Circular 99/2025/TT-BTC,Appendix II,2026-01-01,,
 911,Determination of business results,Xác định kết quả kinh doanh,,true,income_summary,,,,legal_source,Circular 99/2025/TT-BTC,Appendix II,2026-01-01,,
+998,"Currency exchange clearing (technical, zero per exchange)",Tài khoản trung gian mua bán ngoại tệ (kỹ thuật),,true,currency_exchange_clearing,,,,unverified,(DS-19) Detail accounts and mapping of the TT99 chart template,Article 11,2026-01-01,,
 999,"Opening balance clearing (technical, zero after migration)",Tài khoản trung gian số dư đầu kỳ (kỹ thuật),,true,opening_balance_clearing,,,,unverified,(DS-19) Detail accounts and mapping of the TT99 chart template,Article 11,2026-01-01,,

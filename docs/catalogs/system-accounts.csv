@@ -40,6 +40,7 @@ fixed_asset_accumulated_depreciation,fixed_asset,asset,credit,true,false,fixed_a
 construction_in_progress,asset,asset,debit,false,false,fixed_asset,true,0.1.0,Construction in progress,Cost of assets being built or acquired and not yet in use.
 deferred_tax_asset,asset,asset,debit,false,false,none,true,0.1.0,Deferred tax assets,Income tax recoverable in later periods.
 asset_other,asset,asset,debit,false,false,none,true,0.1.0,Other assets,Assets not covered by another system account.
+currency_exchange_clearing,asset,asset,debit,false,false,none,true,0.1.0,Currency exchange clearing,"Technical account between the two sides of a currency exchange; zero per document in company and group currency, never revalued (ADR-0048 rule 12)."
 liability,,liability,credit,false,false,none,false,0.1.0,Liabilities,Root of everything the company owes.
 payable,liability,liability,credit,false,false,none,false,0.1.0,Payables,Amounts the company owes others.
 payable_trade,payable,liability,credit,false,true,payable,true,0.1.0,Trade payables,"Amounts owed to suppliers for goods and services, by open item; advances to suppliers are open items on the debit side."

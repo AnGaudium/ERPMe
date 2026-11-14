@@ -170,6 +170,16 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | GR/IR position | purchase\_order\_line\_gr\_ir\_layer | A purchase order line's unit positions, each priced once at the GR/IR price in force when first posted; postings are differences of rounded cumulative values; returns and credits take the latest positions ([ADR-0047](../adr/0047-commercial-documents-and-pricing.md) rule 13) |
 | Credit hold | credit\_hold | A hold `sales` sets on demand rows of a customer over its credit limit; pick release and delivery of held lines are refused ([ADR-0047](../adr/0047-commercial-documents-and-pricing.md) rule 18) |
 | Three-way match | match\_quantity\_exceeded, match\_price\_difference | The check of a purchase invoice against its order and receipts, within company tolerances ([ADR-0047](../adr/0047-commercial-documents-and-pricing.md) rule 14) |
+| Money account | money\_account | A cash box or bank account of the company, on its own operational account ([ADR-0048](../adr/0048-cash-bank-receivables-payables.md) rule 2) |
+| Payment document | cash\_receipt, cash\_payment, bank\_receipt, bank\_payment | A receipt or payment by cash or bank, whose lines settle named open items, create advances, or post to an account ([ADR-0048](../adr/0048-cash-bank-receivables-payables.md) rule 3) |
+| Bank statement | bank\_statement, bank\_statement\_line | An imported statement whose lines are matched to documents by a deterministic cascade ([ADR-0048](../adr/0048-cash-bank-receivables-payables.md) rules 8–9) |
+| Partner netting | partner\_netting | Settling a partner's receivables against its payables on different accounts, in one currency ([ADR-0048](../adr/0048-cash-bank-receivables-payables.md) rule 10) |
+| Write-off | write\_off | Settling an item that will not be paid: a small difference, a bad debt or a payable no longer owed ([ADR-0048](../adr/0048-cash-bank-receivables-payables.md) rule 11) |
+| Advance settlement | advance\_settlement | An employee's accounting for an advance with expenses ([ADR-0048](../adr/0048-cash-bank-receivables-payables.md) rule 13) |
+| Cash count | cash\_count, cash\_count\_adjustment | A record of counted cash, kept as evidence; a difference is posted by the adjustment it creates ([ADR-0048](../adr/0048-cash-bank-receivables-payables.md) rule 4) |
+| Currency exchange | currency\_exchange | Moving money between two money accounts in different currencies, through the unrevalued clearing account ([ADR-0048](../adr/0048-cash-bank-receivables-payables.md) rule 12) |
+| Collection status | open\_item\_collection, partner\_collection | Dunning level, payment block, dispute and open complaint, kept beside open items and partners ([ADR-0048](../adr/0048-cash-bank-receivables-payables.md) rule 17) |
+| Evidence method | evidence\_method | How a settlement or an advance was paid: cash, bank transfer, card, offset, third party, or none; matchings against advances copy the advance's method ([ADR-0048](../adr/0048-cash-bank-receivables-payables.md) rule 18; ADR-0041 rule 15) |
 | Transaction, company, group currency | transaction\_currency, company\_currency, group\_currency |  |
 | Period-end actual costing | period\_end\_actual\_costing | Periodic weighted average |
 | Landed cost | landed\_cost | Receipt value adjustment: allocates amounts held on `purchase_cost_clearing` (duty, freight, price differences) to receipt lines. Same period: added to the receipt value before costing. Locked period: posted in the first unlocked period, split by consumer ([ADR-0021](../adr/0021-landed-cost.md)) |
@@ -383,6 +393,7 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Release | Make a draft revision of master data effective from its start date, e.g. a bill of materials revision | Released |
 | Convert | Turn a record into another form once, e.g. a planned order into draft documents | Converted |
 | Match, Unmatch | Link or unlink bank lines or documents; open items are settled against each other by an `open_item_matching` document | Matched, Unmatched |
+| Ignore | Set an imported line aside with a reason, so that no rule or person matches it ([ADR-0048](../adr/0048-cash-bank-receivables-payables.md) rule 8) | Ignored |
 | Transfer | Move records to another account or owner, e.g. a partner's open items | Transferred |
 | Allocate | Distribute an amount or quantity over targets | Allocated |
 | Import | Read an external file into the system | Imported |

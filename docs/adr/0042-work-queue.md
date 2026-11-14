@@ -136,6 +136,8 @@ Every exception, pending approval and other piece of business work is one `work_
     - input VAT pending payment evidence and non-deductible (ADR-0041 rule 11).
 
     Unmatched bank lines and low stock (Principle 8) come with DS-25 and planning.
+
+    `bank_line_unmatched` is added ([ADR-0048](0048-cash-bank-receivables-payables.md) rule 9).
 19. Defects never enter the queue (ADR-0003 R7), and technical jobs are not work items (spec 07).
 
 **Build order**

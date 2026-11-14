@@ -26,10 +26,10 @@
   open_question: "(DS-10, DS-19) Which published quote (buy, sell, transfer or average) does each rate type use under TT99"
 
 - key: fx.document_rate.allowed
-  value: {options: [never, within_tolerance], default: never, tolerance_percent: "1"}
+  value: {options: [never, within_tolerance, always], default: never, tolerance_percent: "1", per_group: {cash_and_bank: always}}
   effective_from: 2026-01-01
   status: unverified
-  open_question: "(DS-10, DS-19) Which published quote (buy, sell, transfer or average) does each rate type use under TT99"
+  open_question: "(DS-25, DS-40) Cash, bank, receivable and payable choices"
 
 - key: fx.book_rate_method
   value: {open_item_accounts: specific, balance_accounts: moving_average}
@@ -196,3 +196,15 @@
   effective_from: 2026-01-01
   status: unverified
   open_question: "(DS-53) Production costing choices, interim and flagged"
+
+- key: cash.netting_requires_agreement
+  value: true
+  effective_from: 2026-01-01
+  status: unverified
+  open_question: "(DS-25, DS-40) Cash, bank, receivable and payable choices"
+
+- key: cash.bad_debt_provision.buckets
+  value: [{from_days: 180, to_days: 365, percent: "30"}, {from_days: 365, to_days: 730, percent: "50"}, {from_days: 730, to_days: 1095, percent: "70"}, {from_days: 1095, percent: "100"}]
+  effective_from: 2026-01-01
+  status: unverified
+  open_question: "(DS-25, DS-40) Cash, bank, receivable and payable choices"

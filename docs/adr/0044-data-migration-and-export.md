@@ -91,6 +91,8 @@ The migration period is then locked.
    - **Installments** still open become one item each.
    - **Checks.** INV-30 to INV-33 hold (EC-50).
    - **Employee advances** need the employee as a partner (ADR-0019 rule 3).
+
+   Each opening item line carries the old system's posting date as `original_posting_date`; advance and payment-on-account lines carry no due date and do carry `evidence_method`, how the advance was paid ([ADR-0048](0048-cash-bank-receivables-payables.md) rule 18).
 9. Opening stock uses the stock document type `opening_balance` (ADR-0020 rule 7). Each line carries item, warehouse, bin (the default bin where there are no bins, ADR-0031 rule 8), stock status, handling unit, lot or serial, and quantity.
    - **Value per area.** The file gives one total value per item and valuation area. The handler spreads it over that item's lines by quantity, by largest remainder, so the lines sum exactly to the old books' value. A line without its total is rejected with `opening_unit_value_differs`.
    - **Preliminary price.** The total divided by the quantity becomes the first preliminary price (a note on ADR-0020 rule 11), so no costing run is needed in the migration period.

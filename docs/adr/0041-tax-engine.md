@@ -137,6 +137,8 @@ Tax codes, dated rates and a dated tax matrix are package rules, read live. The 
       - matching against a credit note reduces the amount that needs evidence and counts as neither cash nor an offset.
     - **Imports.** Import VAT rows follow the customs declaration's link to its supplier invoice lines (ADR-0021) to find the open items whose settlements give evidence.
     - **The due-date job.** A daily job applies `due_date_lapse`.
+
+    Value `none` is added (write-offs, payment discounts, credit note matchings, balance transfers); a matching against an advance or a payment on account copies that item's own method, which its origin line records. The value is stored on the journal line ([ADR-0048](0048-cash-bank-receivables-payables.md) rule 18).
 16. Apportionment. Rows with `input_use: shared` are apportioned at period end by the ratio of `tax.apportionment` (taxable revenue boxes over total revenue boxes), with an annual true-up at fiscal year end. A close task posts the result as `apportionment` adjustments.
 17. Declaration date. It comes from `tax.declaration_date_basis`:
     - **Sales:** the invoice date.

@@ -57,6 +57,8 @@ Policy is a deterministic threshold table per company, as runbook B7 asks.
    For a configurable line without an item or preliminary price, the cost conditions use the configuration estimate, and an unknown cost makes the decision need human confirmation ([ADR-0046](0046-product-configuration.md) rule 14).
 
    Condition `is_match_exceeded` (a purchase invoice outside the three-way match tolerances) is added ([ADR-0047](0047-commercial-documents-and-pricing.md) rule 14).
+
+    Conditions `is_direct_expense`, `is_bank_account_recent` and `is_rate_unusual` are added for payment documents ([ADR-0048](0048-cash-bank-receivables-payables.md) rules 3, 12).
 4. Policy input. Each document type registers a `policy_input` function, which gives:
    - amounts in company currency at the rates applied;
    - discount and margin;
@@ -144,6 +146,8 @@ Policy is a deterministic threshold table per company, as runbook B7 asks.
     It seeds no thresholds and no rule that lets a non-human post; those are the company's and the author's (open question).
 
     A rule requiring `standard` approval for both `submit` and `post` of a purchase invoice, for every actor kind, when `is_match_exceeded` is seeded ([ADR-0047](0047-commercial-documents-and-pricing.md) rule 14).
+
+    A rule requiring `standard` approval for `submit` and `post` of `general_journal`, for every actor kind, is seeded ([ADR-0048](0048-cash-bank-receivables-payables.md) rule 15).
 
 **Specific points**
 

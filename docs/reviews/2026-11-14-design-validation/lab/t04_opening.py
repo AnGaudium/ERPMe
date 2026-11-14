@@ -57,8 +57,8 @@ def opening(cx, cur, lines):
 def opening_item(cx):
     d = doc(cx, "opening_open_item_entry"); e = entry(cx, d, 2); l1 = new(); oi = new()
     cx.execute("""insert into open_item (id,company_id,partner_id,account_id,open_item_kind,natural_side,transaction_currency,origin_document_id,origin_journal_line_id,
-      document_date,posting_date,due_date,original_transaction_amount,original_company_amount,open_transaction_amount,open_company_amount,reference)
-      values (%s,%s,%s,%s,'invoice','debit','USD',%s,%s,'2026-11-20','2026-12-31','2027-01-20',500,12600000,500,12600000,'HD-0001234')""",
+      document_date,posting_date,original_posting_date,due_date,original_transaction_amount,original_company_amount,open_transaction_amount,open_company_amount,reference)
+      values (%s,%s,%s,%s,'invoice','debit','USD',%s,%s,'2026-11-20','2026-12-31','2026-11-20','2027-01-20',500,12600000,500,12600000,'HD-0001234')""",
       (oi, I["co"], I["partner"], I["a_rec"], d, l1))
     line(cx, e, 1, "a_rec", "debit", "USD", 500, 12600000, id=l1, partner_id=I["partner"], open_item_id=oi)
     line(cx, e, 2, "a_clr", "credit", "USD", -500, -12600000)

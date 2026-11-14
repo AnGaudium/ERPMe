@@ -70,6 +70,8 @@ Every document has one row in a shared `document` table (type, company, state, v
     - Sales invoices and every document issued as an e-invoice: never reversible; corrected by adjustment or replacement invoices ([08](../spec/08-l10n-vn.md#e-invoicing-and-tax)).
     - Documents created by system jobs (costing adjustments, FX revaluation, closing entries): reversibility is decided by DS-09, DS-10 and DS-12.
     - For every reversible type, `Reverse` is rejected with `document_referenced` while a document that is not reversed or canceled refers to the document.
+
+    Payments, `advance_settlement` and the internal `currency_exchange`, `partner_netting`, `write_off`, `cash_count_adjustment`, `provision_entry` and `prepaid_amortization` are reversible as [ADR-0048](0048-cash-bank-receivables-payables.md) rules 1 and 16 say.
 20. Whether the reversal posts negative amounts (storno) or swapped debit and credit, which posting date it defaults to when the original period is locked, and the value of a reversed material document are accounting rules: configuration of the localization package, flagged until the author decides (existing open questions). The core provides both reversal methods.
 21. A reversal document cannot itself be reversed; to restore a transaction, a new document is created. Interim rule, listed as an open question for the author.
 

@@ -119,6 +119,7 @@ CREATE TABLE open_item (
     payment_term_id             uuid REFERENCES payment_term (id),
     document_date               date NOT NULL,
     posting_date                date NOT NULL,
+    original_posting_date       date NOT NULL,          -- the posting date, or the old system's date for opening items (ADR-0026 rule 1; ADR-0044 rule 8; ADR-0048 rule 18)
     due_date                    date,
     discount_due_date           date,
     discount_percent            types.percent,
@@ -136,7 +137,9 @@ CREATE TABLE open_item (
     is_reversed                 boolean NOT NULL DEFAULT false,
     last_settlement_date        date,
     predecessor_open_item_id    uuid REFERENCES open_item (id),
-    CONSTRAINT ck_open_item_due_date CHECK (due_date IS NOT NULL OR open_item_kind IN ('advance', 'payment_on_account', 'loan', 'other'))
+    CONSTRAINT ck_open_item_due_date CHECK ((open_item_kind IN ('invoice', 'credit') AND due_date IS NOT NULL)
+                                           OR (open_item_kind IN ('advance', 'payment_on_account', 'loan') AND due_date IS NULL)
+                                           OR open_item_kind = 'other')
 );
 CREATE INDEX ix_open_item_company_id_partner_id ON open_item (company_id, partner_id) WHERE NOT is_settled AND NOT is_reversed;
 CREATE INDEX ix_open_item_company_id_account_id ON open_item (company_id, account_id) WHERE NOT is_settled AND NOT is_reversed;
@@ -175,6 +178,7 @@ CREATE TABLE journal_line (
     material_document_line_id  uuid          REFERENCES material_document_line (id),
     open_item_id               uuid          REFERENCES open_item (id),
     purchase_order_line_id     uuid,         -- ADR-0030 rule 3: GR/IR per order line; FK to purchase_order_line added at step 5
+    evidence_method            text          CONSTRAINT ck_journal_line_evidence_method CHECK (evidence_method IS NULL OR (open_item_id IS NOT NULL AND evidence_method IN ('cash', 'bank_transfer', 'card', 'offset', 'third_party', 'none'))),   -- lines of ADR-0048 rule 18
     derivation_trace_id        uuid          REFERENCES derivation_trace (id),
     description                text,
     recorded_at                timestamptz   NOT NULL DEFAULT now(),

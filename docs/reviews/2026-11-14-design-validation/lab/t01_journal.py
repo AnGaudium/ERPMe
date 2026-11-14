@@ -49,8 +49,8 @@ def line(cx, e, n, acct, side, amt, period="p1", **kw):
 def open_item(cx, d, line_id, partner="partner", amt=1000):
     oi = new()
     cx.execute("""insert into open_item (id,company_id,partner_id,account_id,open_item_kind,natural_side,transaction_currency,origin_document_id,origin_journal_line_id,
-      document_date,posting_date,due_date,original_transaction_amount,original_company_amount,open_transaction_amount,open_company_amount)
-      values (%s,%s,%s,%s,'invoice','debit','VND',%s,%s,'2027-01-15','2027-01-15','2027-02-15',%s,%s,%s,%s)""",
+      document_date,posting_date,original_posting_date,due_date,original_transaction_amount,original_company_amount,open_transaction_amount,open_company_amount)
+      values (%s,%s,%s,%s,'invoice','debit','VND',%s,%s,'2027-01-15','2027-01-15','2027-01-15','2027-02-15',%s,%s,%s,%s)""",
       (oi, ids["co"], ids[partner], ids["a_rec"], d, line_id, amt, amt, amt, amt)); return oi
 
 def invoice_ok(cx):

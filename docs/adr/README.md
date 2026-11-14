@@ -51,3 +51,4 @@ One file per decision, named `NNNN-short-title.md`, using [template.md](template
 | [ADR-0045](0045-master-data-and-price-lists.md) | Master data model and price lists (DS-20) | Accepted (2026-11-15) |
 | [ADR-0046](0046-product-configuration.md) | Product configuration (DS-56) | Accepted (2026-11-15) |
 | [ADR-0047](0047-commercial-documents-and-pricing.md) | Commercial documents and the pricing procedure (DS-22) | Accepted (2026-11-15) |
+| [ADR-0048](0048-cash-bank-receivables-payables.md) | Cash, bank, receivables and payables processes (DS-25) | Accepted (2026-11-15) |
