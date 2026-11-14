@@ -4,6 +4,7 @@ Dated record of gate decisions, the week list and one line per Friday review ([R
 
 | Date | Step | Entry |
 | --- | --- | --- |
+| 2026-11-14 | 0 | DS-04 done: [ADR-0008](../adr/0008-command-envelope-and-registry.md) and [DS-04-command-envelope.md](../design/DS-04-command-envelope.md) accepted under ADR-0005 after two review rounds (Claude Fable 5.2). One open question for the author (integrations and `human_only`) |
 | 2026-11-14 | 0 | DS-03 done: [ADR-0007](../adr/0007-time-model.md) time model accepted under ADR-0005 after two review rounds (Claude Fable 5.2). Three legal points raised as open questions |
 | 2026-11-14 | 0 | DS-02 done: [ADR-0006](../adr/0006-id-and-numeric-model.md) ID and numeric model accepted under ADR-0005 after two review rounds (Claude Fable 5.2). Two legal points raised as open questions |
 | 2026-11-14 | 0 | [ADR-0005](../adr/0005-technical-decisions-delegated.md) accepted by the author: agents decide technical questions and accept technical ADRs and DS files after an independent review; the author keeps the reserved list (items 1–11) |

@@ -3,7 +3,8 @@
 - [ ] Verify against the original TT99 text: FX rules (413, 515, 635), the standard-cost method, removal of accounts 611/631.
 - [ ] Confirm TT133's status and the B03 requirement for TT133 businesses.
 - [ ] Verify Decree 70/2025 on e-invoices, the VAT deduction rule for invoices of VND 5 million or more, and the implementing decree of the Personal Data Protection Law.
-- [ ] Detailed design of command schemas and generating REST, MCP and UI forms from one source (decided in step 0; tools decided in ADR-0002).
+- [x] Detailed design of command schemas and generating REST, MCP and UI forms from one source (decided in step 0; tools decided in ADR-0002). Answered for command schemas, REST and MCP: [ADR-0008](adr/0008-command-envelope-and-registry.md); forms stay with DS-30.
+- [ ] (DS-04, DS-15) May an integration (actor kind `integration`) execute `human_only` commands such as reversing a posted document? The spec forbids agents only. Until answered, integrations are refused ([ADR-0008](adr/0008-command-envelope-and-registry.md) rule 2).
 - [ ] Policy-engine rule language and customer self-configuration (after Phase 1; Phase 1 uses a threshold table).
 - [ ] System account catalog; TT99, TT133 and US GAAP operational chart templates with mappings; transaction key × valuation class × valuation area → operational account tables per template. Whether foreign-invested companies that operate on a group chart but file VAS need an additional mapping to a country chart (after Phase 1).
 - [x] GitHub organization for the public repository (project name decided: ERPMe, D17). Answered: the existing repository `AnGaudium/ERPMe` is made public; an organization only when the first co-maintainer joins ([ADR-0003](adr/0003-build-operating-rules.md) R3).
