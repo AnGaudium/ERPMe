@@ -17,7 +17,8 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Term | Code identifier | Notes |
 | --- | --- | --- |
 | Command | command | Pydantic schema; see Principle 1 |
-| Command batch | command\_batch | A set of commands simulated and executed together; every data import is one |
+| Command batch | command\_batch | A set of commands simulated and executed together; every data import is posted through command batches, and large ones are staged in an import batch |
+| Import batch | import\_batch, import\_row | A staged data import above 1,000 rows: a stored file, rows with their own state, validated and posted in chunks of command batches, resumable ([ADR-0030](../adr/0030-commercial-seams-and-imports.md)) |
 | Simulation | simulate, plan\_hash | Principle 2 |
 | Actor, principal acted for | actor, on\_behalf\_of | Actor kinds: human, agent, integration, system. A system actor is a deterministic job (costing, FX revaluation, closing entries, scheduled matching); its on\_behalf\_of is always the accountable human: the policy owner or the human who triggered the job Actor rows: `user_account`, `agent_type` with `agent_run`, `integration_client`, registered system job ([ADR-0017](../adr/0017-permission-envelope.md)). |
 | Company, branch | company (company\_id), branch | The legal entity with its currency, time zone, package, regime, costing scope and fiscal calendar owner; a branch or dependent unit of it, also an analytical dimension ([ADR-0027](../adr/0027-cross-cutting-ownership.md) rule 5) |
@@ -56,6 +57,9 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Untrusted field | is\_untrusted | Schema attribute of a field filled from outside content; separate from data labels; a run given such a field becomes tainted |
 | Auto-post | auto\_post\_confirmation, is\_confirmation\_required | A posting by actor `system` that a policy rule allowed with confirmation required; its rule owner confirms it before the period is locked |
 | Partner exposure | partner\_exposure | Open receivable and payable amounts of a partner by kind and due bucket |
+| Credit exposure | credit\_exposure | Partner exposure plus invoices in issuing, delivered but not invoiced value and undelivered submitted or approved orders; read under the partner lock |
+| Owner partner | owner\_partner\_id | Reserved stock axis naming who owns stock we hold; null for own stock; non-owned stock has quantity and no value |
+| Pending receipt adjustment | pending\_receipt\_adjustment | A stock-bound price difference from an invoice posted before the goods arrived, consumed by the receipt |
 | Has posting | has\_posting | Set on an operational account by its first journal line; freezes its code, mapping, postable flag and currency ([ADR-0010](../adr/0010-system-chart-of-accounts.md) rule 12) |
 | Control kind | control\_kind | inventory, receivable, payable, gr\_ir, cost\_object, fixed\_asset, loan or none: which core module owns postings to a system account and which invariant checks it |
 | Effective control kind | effective control kind | The control kind a rule applies to a line: a gated kind (`cost_object`, `fixed_asset`, `loan`) counts as `none` before the company's subledger activation ([ADR-0025](../adr/0025-later-phase-seams.md)) |
@@ -262,6 +266,8 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Reverse | Post a reversal document for a posted document | Reversed |
 | Cancel | End an open document that is not posted, or an open warehouse task or reservation | Canceled |
 | Clear | Remove a flag deliberately with a reason, e.g. a document version's taint (`ClearTaint`) | Cleared |
+| Resume | Continue a stopped job from where it stopped, e.g. an import batch (`ResumeImport`) | Resumed |
+| Abandon | Stop a job for good; what it already posted stays until reversed, e.g. an import batch | Abandoned |
 | Issue | Request legal issuance of a document; it posts when the issue is accepted (e.g. `IssueSalesInvoice`) | IssueRequested |
 | Record | Store an outcome reported by an outside system, e.g. an e-invoice outcome | Recorded |
 | Recall | Take back a request sent to an outside system before it took effect | Recalled |

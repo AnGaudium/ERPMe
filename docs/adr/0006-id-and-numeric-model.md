@@ -58,7 +58,7 @@ DS-02 is needed by DS-04 (command envelope), DS-06 (journal), DS-10 (multi-curre
 
 - `Decimal` in Python and `NUMERIC` in PostgreSQL, no floats and no money as strings in the database (ADR-0001, ADR-0002); precision declared centrally ([07-shared-foundation.md](../spec/07-shared-foundation.md#document-lifecycle-numbering-and-posting-periods)).
 - Every journal entry balances per transaction, company and group currency, with conversion differences on a rounding line on a defined system account; rounding never silently lands in cost ([05](../spec/05-accounting-inventory-core.md), [07](../spec/07-shared-foundation.md), [12-testing.md](../spec/12-testing.md)).
-- Every import is a simulated command batch (D16, [15-migration-ux-docs.md](../spec/15-migration-ux-docs.md)), so a batch must be able to create a partner and then a document that refers to it. After Phase 1 an offline warehouse app queues commands ([07](../spec/07-shared-foundation.md#data-storage-and-synchronization)).
+- Every import is a simulated command batch (D16, [15-migration-ux-docs.md](../spec/15-migration-ux-docs.md)), so a batch must be able to create a partner and then a document that refers to it. After Phase 1 an offline warehouse app queues commands ([07](../spec/07-shared-foundation.md#data-storage-and-synchronization)). Imports above 1,000 rows are staged and posted as a sequence of such batches ([ADR-0030](0030-commercial-seams-and-imports.md) rule 9).
 - `plan_hash` excludes surrogate IDs (DS-04), so generated IDs do not affect simulation.
 - Agents call the commands through MCP and REST and read JSON (Principle 10). ADR-0005: the option easiest for AI agents wins among correct options.
 

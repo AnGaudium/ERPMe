@@ -33,3 +33,4 @@ One file per decision, named `NNNN-short-title.md`, using [template.md](template
 | [ADR-0027](0027-cross-cutting-ownership.md) | Ownership of cross-cutting entities and consistency fixes (DS-45) | Accepted (2026-11-14) |
 | [ADR-0028](0028-document-lifecycle-hardening.md) | Document lifecycle hardening (DS-46) | Accepted (2026-11-14) |
 | [ADR-0029](0029-proposals-and-agent-safety.md) | Change proposals and agent safety (DS-47) | Accepted (2026-11-14) |
+| [ADR-0030](0030-commercial-seams-and-imports.md) | Commercial seams and staged imports (DS-48) | Accepted (2026-11-14) |

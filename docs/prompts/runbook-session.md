@@ -10,7 +10,7 @@ You are working in the ERPMe repository. ERPMe is a fully open-source, agentic-b
 
 1. `AGENTS.md`, `docs/README.md`, `docs/spec/00-reading-guide.md` (precedence, scope labels, glossary).
 2. `docs/decisions.md` (D1–D17), `docs/spec/10-roadmap.md`, `docs/spec/11-build-order.md` (build principles B1–B8, ADR list, steps 0–11 and gates).
-3. `docs/spec/12-testing.md` (continuous testing, synthetic dataset, edge cases), `docs/design/backlog.md` (DS-01 to DS-47), `docs/adr/0002-core-technology-tools.md`, `docs/risks.md`, `docs/open-questions.md`.
+3. `docs/spec/12-testing.md` (continuous testing, synthetic dataset, edge cases), `docs/design/backlog.md` (DS-01 to DS-48), `docs/adr/0002-core-technology-tools.md`, `docs/risks.md`, `docs/open-questions.md`.
 4. Other spec files only as needed.
 
 ## What the runbook must cover

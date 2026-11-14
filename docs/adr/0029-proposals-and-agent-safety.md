@@ -66,7 +66,7 @@ The hard floor on what a tainted run may read stays the literal spec 03 rule 1 u
    - `Issue` (ADR-0028 rule 7);
    - `Post` of an approved document, only when its `policy_input_hash` changed (ADR-0028 rule 14).
 
-   This replaces ADR-0008 rule 5's "before a handler that posts" and ADR-0009 rule 11's separate statement. A replayed command (ADR-0008 rule 18) does not evaluate policy again.
+   This replaces ADR-0008 rule 5's "before a handler that posts" and ADR-0009 rule 11's separate statement. A replayed command (ADR-0008 rule 18) does not evaluate policy again. A handler whose policy inputs are read under locks calls the hook through `context.evaluate_policy(input)` after taking them, e.g. the credit check; such commands are registered `is_policy_in_handler`, and the dispatcher skips its own evaluation and asserts that the hook ran exactly once ([ADR-0030](0030-commercial-seams-and-imports.md) rule 7).
 7. A `policy_decision` records:
    - the outcome: `allowed`, `approval_required`, `human_only` or `denied`;
    - the `policy_rule_id`;

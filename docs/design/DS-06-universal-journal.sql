@@ -186,6 +186,7 @@ CREATE TABLE journal_line (
     tax_code_id                uuid          REFERENCES tax_code (id),
     material_document_line_id  uuid          REFERENCES material_document_line (id),
     open_item_id               uuid          REFERENCES open_item (id),
+    purchase_order_line_id     uuid,         -- ADR-0030 rule 3: GR/IR per order line; FK to purchase_order_line added at step 5
     derivation_trace_id        uuid          REFERENCES derivation_trace (id),
     description                text,
     recorded_at                timestamptz   NOT NULL DEFAULT now(),
@@ -211,6 +212,8 @@ CREATE INDEX ix_journal_line_open_item_id
     ON journal_line (open_item_id) WHERE open_item_id IS NOT NULL;
 CREATE INDEX ix_journal_line_material_document_line_id
     ON journal_line (material_document_line_id) WHERE material_document_line_id IS NOT NULL;
+CREATE INDEX ix_journal_line_purchase_order_line_id
+    ON journal_line (purchase_order_line_id) WHERE purchase_order_line_id IS NOT NULL;
 
 -- Rule 13: append-only.
 CREATE FUNCTION journal_reject_change() RETURNS trigger LANGUAGE plpgsql AS $$

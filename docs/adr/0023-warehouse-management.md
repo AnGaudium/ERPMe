@@ -88,7 +88,7 @@ A small shop and a managed distribution warehouse run on the same model.
 **Stock key, statuses, handling units**
 
 4. The stock key:
-   - **Key.** `stock_quantity`'s key is (company, item, warehouse, bin, lot or serial, `stock_status`, `handling_unit_id`).
+   - **Key.** `stock_quantity`'s key is (company, item, warehouse, bin, lot or serial, `stock_status`, `handling_unit_id`), plus the reserved `owner_partner_id` ([ADR-0030](0030-commercial-seams-and-imports.md) rule 8).
    - **Bin.** Every row of a bin-managed warehouse has a bin; no row of another warehouse has one.
    - **Stock status.** `stock_status` is a classification, not a lifecycle state: `available`, `quality_inspection` or `blocked`.
    - **No value.** Statuses, bins and handling units carry no value. `stock_value` stays per (item, warehouse), and inventory accounts are unchanged (ADR-0020 rule 8).
@@ -130,7 +130,7 @@ A small shop and a managed distribution warehouse run on the same model.
 
    Dispatch to a customer may be a `sales_issue`, or a `transfer_out` to a `goods_sent` warehouse (ADR-0020 rule 4).
 8. Warehouse movements:
-   - **Lines.** `warehouse_movement` lines are written by confirmed tasks and by the pack and unpack commands. Each line holds item, lot or serial, quantity in the inventory unit, from and to bin, status and handling unit (inside one warehouse), `business_date` (`clock.today`, for history only), and its source: `warehouse_task_id`, or the pack, unpack, conversion or count-correction command that wrote it.
+   - **Lines.** `warehouse_movement` lines are written by confirmed tasks and by the pack and unpack commands. Each line holds item, lot or serial, quantity in the inventory unit, from and to bin, status and handling unit (inside one warehouse), `business_date` (`clock.today`, for history only), and its source: `warehouse_task_id`, or the pack, unpack, conversion or count-correction command that wrote it. They also carry the reserved `owner_partner_id` ([ADR-0030](0030-commercial-seams-and-imports.md) rule 8).
    - **Properties.** They are append-only and post no journal. Per (item, warehouse, lot or serial) their quantities net to zero (DS-16).
    - **Stock.** `stock_quantity` per full key equals material lines plus warehouse movements. Both are written through the stock lock helper.
    - **In the plan.** Warehouse movements are stock movements in a plan (ADR-0008 rule 12).
@@ -182,7 +182,7 @@ A small shop and a managed distribution warehouse run on the same model.
 **Reservations and availability**
 
 13. Reservations:
-    - **Rows.** A `stock_reservation` holds stock for a demand line (a sales order or transfer order line; production later): item, warehouse, quantity, optional lot (by agreement), `picked_quantity`, `fulfilled_quantity` and `state` (`open`, `picked`, `fulfilled` when fulfilled equals quantity, `canceled`). Its reserved amount is quantity minus `fulfilled_quantity`. It never names a serial. The demand line is referred to by `demand_supply_line_id` ([ADR-0028](0028-document-lifecycle-hardening.md) rule 2).
+    - **Rows.** A `stock_reservation` holds stock for a demand line (a sales order or transfer order line; production later): item, warehouse, quantity, optional lot (by agreement), `picked_quantity`, `fulfilled_quantity` and `state` (`open`, `picked`, `fulfilled` when fulfilled equals quantity, `canceled`). Its reserved amount is quantity minus `fulfilled_quantity`. It never names a serial. The demand line is referred to by `demand_supply_line_id` ([ADR-0028](0028-document-lifecycle-hardening.md) rule 2). Reservations and tasks also carry the reserved `owner_partner_id` ([ADR-0030](0030-commercial-seams-and-imports.md) rule 8).
     - **Interfaces.** `inventory.contract.create_stock_reservation` and `cancel_stock_reservation` are posting interfaces called by document commands (DS-22), which emit the reservation events; they are not user commands. Available to promise per (item, warehouse) is `available` quantity minus the reserved amounts of reservations in `open` or `picked`. `GetAvailableToPromise` answers it from on-hand stock only in Phase 1. Available stock still in a receiving bin counts, so a pick release before putaway may be short; that is expected.
     - **Limits.** A reservation never exceeds available to promise (`reservation_exceeds_available`); the unreserved rest of a demand line is a backorder.
     - **Voluntary issues.** Scrap, internal consumption, other issues, purchase returns, transfers, reversals and `status_change` to `blocked` are rejected with `stock_reserved` when they would cut into reservations.
@@ -194,7 +194,7 @@ A small shop and a managed distribution warehouse run on the same model.
 **Picking and outbound**
 
 14. Pick tasks:
-    - **Creation.** Pick tasks serve demand lines, not deliveries. `RunPickRelease` (a deterministic job, per demand document, step 3) turns reservations into pick tasks. Each task carries the demand line's unit and the inventory quantity (ADR-0018 rule 11); the client derives a breakdown such as "2 cartons and 3 bottles" from `product_uom`. Tasks refer to `demand_supply_line_id` ([ADR-0028](0028-document-lifecycle-hardening.md) rule 2).
+    - **Creation.** Pick tasks serve demand lines, not deliveries. `RunPickRelease` (a deterministic job, per demand document, step 3) turns reservations into pick tasks. Each task carries the demand line's unit and the inventory quantity (ADR-0018 rule 11); the client derives a breakdown such as "2 cartons and 3 bottles" from `product_uom`. Tasks refer to `demand_supply_line_id` ([ADR-0028](0028-document-lifecycle-hardening.md) rule 2). Creation takes the `stock_value` lock of each item and warehouse before reading available bin stock ([ADR-0030](0030-commercial-seams-and-imports.md) rule 12).
     - **Serial items.** Tasks name the bin, not the serial. The serials are scanned at confirmation and checked against bin and status (`serial_not_in_bin`).
     - **Removal order.** Removal reads only `storage` and `picking` bins with status `available`, minus the quantity of open tasks leaving each key. It orders by:
       1. lot: `fefo` by `expiry_date` (lots without one last), skipping lots below the customer's minimum remaining shelf life, with the planned delivery date as reference, or the business date when the line has none; `fifo` by the lot's earliest receipt posting date (FIFO needs lot tracking; untracked items use bin order);
