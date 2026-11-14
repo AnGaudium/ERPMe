@@ -4,7 +4,7 @@ No parallel run with the old accounting software: the pilot customer goes live f
 
 1. **Phase 0 · Foundation:** command layer, append-only journal, multi-company, localization packages with accounting regimes, minimal extensibility (module boundaries), pipeline GitHub → test server for the core (staging is built at step 10, [ADR-0003](../adr/0003-build-operating-rules.md) R2), a model running scenarios continuously on the test server, invariant tests, the small and medium synthetic datasets for the Vietnamese company (one year of transactions in the medium size).
    - Gate (same as Build step 4): the medium synthetic dataset (Vietnamese company, one year) replays day by day through core commands, called through REST and MCP, with every invariant green after every simulated day. Costing, FX and balances match the golden scenarios and the naive recomputation. The coverage report shows every edge case for steps 1–3 exercised.
-2. **Phase 1 · Go-live with a trading pilot:** minimal CRM (partners, contacts, interaction timeline, email intake), sales, purchasing, imports and landed cost, multi-currency with FX revaluation, multiple warehouses and barcode, full accounting with the Vietnam package and the basic US package (cash, bank, AR/AP, tax and e-invoicing, periodic weighted average cost, period close, books, financial statements), Vietnamese print templates as configuration. Agents: purchase invoices, data migration, quotations, bank statement matching.
+2. **Phase 1 · Go-live with a trading pilot:** minimal CRM (partners, contacts, interaction timeline, email intake), sales, purchasing, imports and landed cost, multi-currency with FX revaluation, multiple warehouses and barcode, warehouse management ([ADR-0023](../adr/0023-warehouse-management.md)), full accounting with the Vietnam package and the basic US package (cash, bank, AR/AP, tax and e-invoicing, periodic weighted average cost, period close, books, financial statements), Vietnamese print templates as configuration. Agents: purchase invoices, data migration, quotations, bank statement matching.
    - Gate: the customer operates for real and closes at least 3 consecutive monthly periods, and files at least one VAT return from the system. Inventory matches the stock count, AR/AP match partner confirmations, bank balances match statements. The customer's chief accountant signs off.
 3. **Phase 2 · Assembly:** multi-level BOM, production cost, disassembly.
    - Gate: an assembly customer closes production cost for one period, matching a manual spreadsheet.
@@ -15,7 +15,7 @@ Pilot selection criteria (select and commit only after the platform is complete)
 
 ## Lean scope for Phases 0 and 1
 
-Phases 0 and 1 build only what a trading business, including importers with foreign-currency transactions, needs to operate for real. Month estimates below are estimates; gates are the conditions. Within 18 months, the Phase 1 gate lands around months 15–18. The schema still leaves room for later parts (bins, catch weight, multi-level approval, user-defined fields); only features and UI are deferred.
+Phases 0 and 1 build only what a trading business, including importers with foreign-currency transactions, needs to operate for real. Month estimates below are estimates; gates are the conditions. Within 18 months, the Phase 1 gate lands around months 15–18. The schema still leaves room for later parts (catch weight, multi-level approval, user-defined fields); only features and UI are deferred.
 
 | Month (estimate) | Work |
 | --- | --- |
@@ -48,6 +48,6 @@ Phases 0 and 1 build only what a trading business, including importers with fore
 - LLM gateway: one provider behind a common interface.
 - UI: list and form screens generated from command schemas for most screens. Hand-built only for the 6 most-used entry screens: sales invoice, goods receipt, goods issue, cash receipt, cash payment, journal entry.
 
-**After Phase 1:** user-defined fields and tables, plugin SDK, per-customer AI customization pipeline, multi-provider seatmap, scheduled multi-provider evaluation runs, local models and pseudonymization, bins, catch weight, other countries' localization packages (by the community), additional e-invoice providers, pgvector, chat channels, offline warehouse app, multi-level approval, assembly (Phase 2).
+**After Phase 1:** user-defined fields and tables, plugin SDK, per-customer AI customization pipeline, multi-provider seatmap, scheduled multi-provider evaluation runs, local models and pseudonymization, catch weight, other countries' localization packages (by the community), additional e-invoice providers, pgvector, chat channels, offline warehouse app, multi-level approval, assembly (Phase 2).
 
 **Support time:** from go-live, reserve 30–50% of time for the pilot customer. No feature releases on closing days or near tax deadlines.

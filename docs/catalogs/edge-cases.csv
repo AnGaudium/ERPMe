@@ -30,3 +30,12 @@ EC-28,year_end_close,close,8,year_closed,1,per_year,1,must_succeed,12-testing; A
 EC-29,one_cost_source_several_receipts,inventory,3,goods_received;purchase_cost_invoice_received;landed_cost_allocated,1,per_month,2,must_succeed,"ADR-0021 rules 2, 11",0.1.0,One cost source allocated over two partial receipts of the same goods (e.g. 600 then 400 units); from step 5 the source can be a customs declaration.
 EC-30,cost_before_receipt,inventory,3,purchase_cost_invoice_received;goods_received;landed_cost_allocated,1,per_quarter,1,must_succeed,ADR-0021 rule 3,0.1.0,A cost recorded before the goods receipt waits in clearing until allocated.
 EC-31,import_vat_on_customs,tax,7,customs_declared,1,per_month,2,must_succeed,ADR-0021 rule 11,0.1.0,"Import VAT on a customs declaration, recovered or capitalized per the tax code's import treatment."
+EC-32,short_pick,warehouse,3,goods_delivered,1,per_month,2,must_succeed,ADR-0023 rule 15,0.1.0,A pick confirmed with less than the task quantity; the bin is counted and the rest backordered.
+EC-33,putaway_without_free_bin,warehouse,3,goods_received,1,per_quarter,1,must_succeed,ADR-0023 rule 12,0.1.0,A receipt whose putaway rules find no bin with capacity; the task has no target.
+EC-34,fefo_below_customer_minimum,warehouse,3,goods_delivered,1,per_month,2,must_succeed,ADR-0023 rule 14,0.1.0,FEFO skips a near-expiry lot below the customer's minimum remaining shelf life.
+EC-35,handling_unit_split,warehouse,3,goods_delivered,1,per_month,2,must_succeed,ADR-0023 rule 6,0.1.0,A partial pick from a pallet.
+EC-36,count_during_picking,warehouse,3,stock_counted;goods_delivered,1,per_quarter,1,must_succeed,ADR-0023 rule 18,0.1.0,Picks after a count confirmation and before its posting do not become count differences.
+EC-37,quality_release,warehouse,3,goods_received,1,per_month,2,must_succeed,ADR-0023 rule 11,0.1.0,"Goods received into quality inspection, released or blocked."
+EC-38,pick_face_replenishment,warehouse,3,goods_delivered,1,per_month,2,must_succeed,ADR-0023 rule 17,0.1.0,A pick that takes a pick face below its minimum creates a replenishment task.
+EC-39,returns_disposition,warehouse,3,goods_returned_by_customer,1,per_month,2,must_succeed,ADR-0023 rule 19,0.1.0,"A customer return received blocked and disposed to restock, quality or scrap."
+EC-40,transfer_with_bins,warehouse,3,stock_transferred,2,per_month,4,must_succeed,ADR-0023 rule 7,0.1.0,"A transfer between two bin-managed warehouses, with putaway at the destination."

@@ -128,7 +128,7 @@ Module-specific codes are added by the DS item that owns the module, in the regi
 | `validation_failed` | validation | 422 | no | A field is missing, of the wrong type or out of range; one item per field |
 | `unknown_field` | validation | 422 | no | The request or payload has a field the schema does not define |
 | `too_many_decimal_places` | validation | 422 | no | ADR-0006 rule 14 |
-| `negative_stock` | precondition | 422 | no | The posting would make a stock quantity negative at the end of its date or a later date; `details` names item, warehouse, lot and date ([ADR-0020](../adr/0020-inventory-and-costing-model.md) rule 10) |
+| `negative_stock` | precondition | 422 | no | The posting would make a stock quantity negative: per (item, warehouse, lot or serial) at the end of its date or a later date ([ADR-0020](../adr/0020-inventory-and-costing-model.md) rule 10), or per bin, status and handling unit on the current balance ([ADR-0023](../adr/0023-warehouse-management.md) rule 5); `details` names the key and date |
 | `preliminary_price_missing` | precondition | 422 | no | A line valued at the preliminary price (an issue or a count surplus) needs one and none exists for the item in the company; `details` names the item and valuation area; fix by posting a receipt or `UpdatePreliminaryPrice` ([ADR-0020](../adr/0020-inventory-and-costing-model.md) rule 11) |
 | `allocation_basis_missing` | precondition | 422 | no | A landed cost allocation method lacks its basis, or the total basis is zero; `details` names the targets and the fix (set the item's weight, or choose another method) ([ADR-0021](../adr/0021-landed-cost.md) rule 4) |
 | `allocation_manual_sum_mismatch` | validation | 422 | no | Manual allocation amounts do not sum to the cost line ([ADR-0021](../adr/0021-landed-cost.md) rule 4) |
@@ -137,6 +137,21 @@ Module-specific codes are added by the DS item that owns the module, in the regi
 | `landed_cost_target_invalid` | validation | 422 | no | A target is not an unreversed purchase or other receipt line, or not of the cost line's item ([ADR-0021](../adr/0021-landed-cost.md) rules 1, 3) |
 | `landed_cost_period_mismatch` | precondition | 422 | no | The posting date does not fit the targets' receipt periods; `details` names the required period, its valid posting date range, or the groups to split ([ADR-0021](../adr/0021-landed-cost.md) rule 6) |
 | `negative_stock_value` | precondition | 422 | no | A value-only inventory line would make a warehouse's stock value negative ([ADR-0021](../adr/0021-landed-cost.md) rule 9) |
+| `bin_required` | validation | 422 | no | A line in a bin-managed warehouse has no bin ([ADR-0023](../adr/0023-warehouse-management.md) rule 4) |
+| `bin_not_in_warehouse` | validation | 422 | no | The bin belongs to another warehouse ([ADR-0023](../adr/0023-warehouse-management.md) rule 2) |
+| `warehouse_not_bin_managed` | validation | 422 | no | A bin was given for a warehouse that does not manage bins ([ADR-0023](../adr/0023-warehouse-management.md) rule 1) |
+| `bin_blocked` | precondition | 422 | no | The bin is blocked for putaway or picking, manually or by an open count ([ADR-0023](../adr/0023-warehouse-management.md) rule 2, 18) |
+| `bin_not_empty` | precondition | 422 | no | A bin with stock cannot be deactivated ([ADR-0023](../adr/0023-warehouse-management.md) rule 2) |
+| `bin_management_locked` | precondition | 422 | no | `is_bin_managed` cannot change after the first posting except by `ConvertWarehouse` ([ADR-0023](../adr/0023-warehouse-management.md) rule 1) |
+| `stock_status_not_available` | precondition | 422 | no | The stock to reserve, pick or issue is not in an allowed status ([ADR-0023](../adr/0023-warehouse-management.md) rule 7, 14) |
+| `stock_reserved` | precondition | 422 | no | A voluntary issue or block would cut into reserved stock ([ADR-0023](../adr/0023-warehouse-management.md) rule 13) |
+| `reservation_exceeds_available` | precondition | 422 | no | A reservation would exceed available to promise ([ADR-0023](../adr/0023-warehouse-management.md) rule 13) |
+| `handling_unit_mismatch` | validation | 422 | no | The scanned handling unit is not where the task expects or does not hold the item ([ADR-0023](../adr/0023-warehouse-management.md) rule 6) |
+| `handling_unit_closed` | precondition | 422 | no | The handling unit is closed; unpack it first ([ADR-0023](../adr/0023-warehouse-management.md) rule 6) |
+| `handling_unit_nesting_exceeded` | validation | 422 | no | Phase 1 allows one nesting level ([ADR-0023](../adr/0023-warehouse-management.md) rule 6) |
+| `task_quantity_exceeded` | validation | 422 | no | A confirmed quantity exceeds the task quantity ([ADR-0023](../adr/0023-warehouse-management.md) rule 15) |
+| `lot_shelf_life_too_short` | precondition | 422 | no | The scanned lot is below the customer's minimum remaining shelf life or expired ([ADR-0023](../adr/0023-warehouse-management.md) rule 14) |
+| `serial_not_in_bin` | validation | 422 | no | A scanned serial is not in the source bin with an allowed status ([ADR-0023](../adr/0023-warehouse-management.md) rule 14) |
 | `quantity_rounds_to_zero` | validation | 422 | no | The quantity converted to the inventory unit rounds to zero ([ADR-0018](../adr/0018-product-and-item-model.md) rule 11) |
 | `invalid_timestamp` | validation | 422 | no | ADR-0007 rule 3 |
 | `schema_version_unsupported` | validation | 422 | no | ADR-0008 rule 23; `details.served` lists the versions |
@@ -152,10 +167,14 @@ Module-specific codes are added by the DS item that owns the module, in the regi
 | `account_determination_missing` | precondition | 422 | no | No determination row matches the key and determinants; `details` names them and the command that adds a row ([ADR-0015](../adr/0015-account-determination.md) rule 10) |
 | `account_determination_mismatch` | precondition | 422 | no | The determined account does not have a system account or control kind the key requires ([ADR-0015](../adr/0015-account-determination.md) rule 12) |
 | `partner_duplicate_suspected` | check result | — | — | Another partner of the company has the same tax ID; the command succeeds and a work item is created ([ADR-0019](../adr/0019-partners-and-crm-foundation.md) rule 4) |
+| `capacity_not_checked` | check result | — | — | A bin capacity could not be checked because weight or dimensions are missing; `details` names the fields ([ADR-0023](../adr/0023-warehouse-management.md) rule 12) |
+| `bin_capacity_exceeded` | check result | — | — | A confirmed target bin exceeds its capacity; the fact is recorded ([ADR-0023](../adr/0023-warehouse-management.md) rule 12) |
+| `mixed_stock_not_allowed` | check result | — | — | A confirmed target bin breaks its mix rules; the fact is recorded ([ADR-0023](../adr/0023-warehouse-management.md) rule 12) |
+| `no_pickable_stock` | check result | — | — | No eligible stock for a pick (status, bin type, shelf life, open tasks); the line stays short and becomes an exception ([ADR-0023](../adr/0023-warehouse-management.md) rule 14) |
 | `customs_assessment_differs` | check result | — | — | Assessed import tax differs from the amount recomputed from the tax codes; the assessed amount is kept ([ADR-0021](../adr/0021-landed-cost.md) rule 10) |
 | `consent_missing` | precondition | 422 | no | The message's purpose needs consent that the data subject has not given ([ADR-0019](../adr/0019-partners-and-crm-foundation.md) rule 9) |
 | `approval_required` | precondition | 422 | no | The policy engine requires an approval first (DS-28) |
-| `invalid_state_transition` | precondition | 422 | no | The command is not allowed in the document's state; `details` lists the allowed commands ([ADR-0009](../adr/0009-document-lifecycle.md) rule 5) |
+| `invalid_state_transition` | precondition | 422 | no | The command is not allowed in the document's or warehouse task's state; `details` lists the allowed commands ([ADR-0009](../adr/0009-document-lifecycle.md) rule 5) |
 | `posting_date_mismatch` | validation | 422 | no | `Post` carries a `posting_date` different from the document's ([ADR-0009](../adr/0009-document-lifecycle.md) rule 9) |
 | `document_referenced` | precondition | 422 | no | Delete, cancel or reverse of a document that other documents refer to ([ADR-0009](../adr/0009-document-lifecycle.md) rules 7, 19) |
 | `rate_limited` | rate_limited | 429 | yes | `details.retry_after_seconds` says when to retry |
@@ -163,6 +182,8 @@ Module-specific codes are added by the DS item that owns the module, in the regi
 | `timeout` | unavailable | 503 | yes | `transaction_timeout` reached (ADR-0008 rule 11) |
 
 ## Canonical plan for hashing
+
+Warehouse task proposals (target and source bins) are listed like events and are not part of the hashed plan ([ADR-0023](../adr/0023-warehouse-management.md) rule 11).
 
 1. Take the full plan and result, before field filtering.
 2. Replace each ID created by `context.new_id(table)` during the run with `new:<table>:<n>`, numbering per table from 1 in creation order. Keep IDs that existed before the run, client-supplied IDs and client-supplied instants.

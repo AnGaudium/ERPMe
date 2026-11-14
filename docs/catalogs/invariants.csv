@@ -32,3 +32,10 @@ INV-30,open_items_equal_control_accounts,receivables_payables,day,4,,account;par
 INV-31,control_lines_carry_open_item,receivables_payables,day,4,,document;line,ADR-0010 rule 5; ADR-0014 rule 10,0.1.0,Every line on a receivable or payable account carries a partner and an open item.
 INV-32,carrying_amount_consistent,receivables_payables,day,4,,open_item,ADR-0011,0.1.0,An open item's company-currency carrying amount equals its original amount plus its revaluations and realized differences.
 INV-40,corrections_within_original,documents,day,5,,document,ADR-0009 rule 23,0.1.0,"Provisional, completed by DS-22: cumulative corrections of an original never exceed it, e.g. returns never above the quantity delivered."
+INV-50,warehouse_movements_net_zero,warehouse,day,3,,item;warehouse;lot,ADR-0023 rule 8,0.1.0,"Warehouse movements net to zero per item, warehouse and lot or serial."
+INV-51,stock_rows_equal_movements,warehouse,day,3,,item;warehouse;bin;lot;stock_status;handling_unit,ADR-0023 rule 8,0.1.0,stock_quantity per full key equals its material lines plus warehouse movements.
+INV-52,no_negative_current_stock,warehouse,day,3,,item;warehouse;bin;lot;stock_status;handling_unit,ADR-0023 rule 5,0.1.0,No current stock_quantity per full key is negative.
+INV-53,handling_unit_in_one_bin,warehouse,day,3,,handling_unit,ADR-0023 rule 6,0.1.0,"A handling unit, its stock rows and its children are in one warehouse and bin."
+INV-54,reservations_within_available,warehouse,day,3,ADR-0023 rule 13: no overbooking,item;warehouse,ADR-0023 rule 13,0.1.0,Open and picked reservations never exceed the available-status quantity per item and warehouse.
+INV-55,confirmed_task_equals_movements,warehouse,day,3,,warehouse_task,"ADR-0023 rules 8, 15",0.1.0,"Every confirmed putaway, pick, replenishment, move or status-change task has movements equal to its confirmed quantity; every movement names its task or its writing command."
+INV-56,bins_match_warehouse_mode,warehouse,day,3,,warehouse;bin,"ADR-0023 rules 1, 4",0.1.0,"Every stock row of a bin-managed warehouse has a bin of that warehouse, and no row of another warehouse has one."

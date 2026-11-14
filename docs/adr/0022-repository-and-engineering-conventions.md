@@ -51,7 +51,7 @@ Checks:
    | 6 · Composition | `app`: registers every module's handlers, consumers and queries; startup checks; entry points (rule 5) |
    | 5 · Interfaces | `api` (REST and MCP generated from the registry), `query` (read-only layer, DS-33), `agents` (after step 4), `sdk` (rule 4) |
    | 4 · Commercial | `sales`, `purchasing`, `cash` (from steps 5–6), `crm` |
-   | 3 · Core business | `ledger` (journal, accounts, account determination, multi-currency), `inventory` (material documents, stock, costing, landed cost), `master_data` (partners, products, warehouses, units, currencies), `tax` |
+   | 3 · Core business | `ledger` (journal, accounts, account determination, multi-currency), `inventory` (material documents, stock, costing, landed cost, and the warehouse management tables of [ADR-0023](0023-warehouse-management.md)), `master_data` (partners, products, warehouses, units, currencies), `tax` |
    | 2 · Platform | `registry` (command registry, dispatcher, envelope, idempotency; its public entry point `erpme.registry.dispatch`), `documents` (lifecycle, versions, numbering), `periods`, `permissions`, `outbox`, `audit`, `localization` (loader), `db` (engine, session settings, RLS context, the generic lock helper and the lock-order registry, the `MetaData` naming convention) |
    | 1 · Foundation | `numeric` (ADR-0006), `clock` (ADR-0007), `ids`, `i18n`, `errors` |
 
@@ -148,6 +148,8 @@ Checks:
     2. `stock_value` rows ascending by item and warehouse ID, then lot and serial quantity rows (ADR-0020 rule 9);
     3. numbering counters (ADR-0009);
     4. `event_subject` rows, taken when the dispatcher writes the command's events after the handler returns (ADR-0013 rules 3, 4).
+
+    With warehouse management the full order is [ADR-0023](0023-warehouse-management.md) rule 10: period rows, the warehouse task row, handling unit rows, `stock_value` rows, `stock_quantity` rows, bin rows, numbering counters, `event_subject` rows.
 
     The owning modules (`periods`, `inventory`, `documents`, `outbox`) implement their helpers on the generic helper and register them with their position; the helper raises in tests when one command takes locks out of order. A deadlock across items of one batch is detected by PostgreSQL and returned as `concurrent_update` (ADR-0008 rule 11).
 

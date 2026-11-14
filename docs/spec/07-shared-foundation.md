@@ -36,7 +36,7 @@ An accounting regime (`accounting_regime`) is part of a localization package (se
 - **Barcode per packaging unit:** scanning a carton barcode converts to the stock unit.
 - **Rounding:** rules per unit. Rounding differences must never silently land in cost.
 - (Phase 1) **Lots and serials** are tracked in stock movements and carry no cost of their own.
-- (After Phase 1) **Bins.**
+- (Phase 1) **Bins and warehouse management** (author's decision 2026-11-14; [ADR-0023](../adr/0023-warehouse-management.md)).
 
 ## Approval engine
 

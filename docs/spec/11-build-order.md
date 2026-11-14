@@ -25,7 +25,7 @@ Cite these as "Build principle B5" and so on.
 - Costing model: price control per item, period-end actual costing, movement types table, GR/IR clearing account.
 - Multi-currency: transaction, company and optional group currency; rate types (transaction, book, revaluation, customs); FX rules inside the accounting regime.
 - Landed cost: a cost that arrives in the same open period is added to the receipt value before period-end costing; a cost that belongs to an earlier, closed period is posted in the current period and allocated by the quantity each consumer took (stock on hand, transfers to other warehouses, COGS, production). Linked to the customs declaration and cost documents.
-- Analytical dimensions from the canonical list, and reserved columns for bins and catch weight.
+- Analytical dimensions from the canonical list, and bins and warehouse management ([ADR-0023](../adr/0023-warehouse-management.md)), and reserved columns for catch weight.
 - Outbox event format.
 - Localization package structure, the system chart and many-to-one mapping rules, i18n with English source.
 

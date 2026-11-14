@@ -16,7 +16,7 @@ A partner is one record per company for every party the company deals with — c
 
 | Profile | Fields (Phase 1) | Owner of the rules |
 | --- | --- | --- |
-| `customer_profile` | `receivable_account_id` (ADR-0015 rule 11), `payment_term_id`, `credit_limit` and its currency, `price_list_id`, `salesperson_id`, default `currency` | DS-22 (credit limit), DS-25 (terms) |
+| `customer_profile` | `receivable_account_id` (ADR-0015 rule 11), `payment_term_id`, `credit_limit` and its currency, `price_list_id`, `salesperson_id`, default `currency`, `minimum_remaining_shelf_life_days` ([ADR-0023](0023-warehouse-management.md) rule 3) | DS-22 (credit limit), DS-25 (terms) |
 | `supplier_profile` | `payable_account_id`, `payment_term_id`, `buyer_id`, default `currency` | DS-22, DS-25 |
 | `employee_profile` | `user_account_id` (optional), `receivable_account_id` for advances (`receivable_employee_advance`) | DS-25 |
 

@@ -58,6 +58,19 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Stock quantity, stock value | stock\_quantity, stock\_value | Quantity per item, warehouse and lot or serial; value per item and warehouse; changed only through the stock lock helper |
 | Lot, serial number | lot, serial\_number | Tracking of stock movements, with no cost of their own; lots may carry expiry dates |
 | Stock count | stock\_count | Counted quantities; differences post as count shortage and surplus movements |
+| Bin management | is\_bin\_managed, outbound\_flow: direct, staged | Warehouse settings: every stock row has a bin; outbound picks go to the default shipping bin (direct) or through staging and packing (staged) ([ADR-0023](../adr/0023-warehouse-management.md)) |
+| Zone, bin, bin type | zone, bin, bin\_type | Storage places inside a warehouse |
+| Stock status | stock\_status: available, quality\_inspection, blocked | A classification of stock usability (not a lifecycle state); carries no value |
+| Handling unit, handling unit type | handling\_unit, handling\_unit\_type | A pallet, carton or tote with its own barcode; one nesting level in Phase 1; carries no value |
+| Storage condition | storage\_condition | Company data such as ambient, cold or hazardous, matched by putaway rules |
+| Warehouse movement | warehouse\_movement | Quantity-only move inside one warehouse (bin, status, handling unit); no journal entry |
+| Warehouse task | warehouse\_task | Work in a warehouse: putaway, pick, replenishment, move, status change, count; states open, assigned, in\_progress, confirmed, canceled |
+| Putaway rule, removal strategy | putaway\_rule, removal\_strategy: fefo, fifo | Rule tables that choose target bins and the stock to pick, deterministically |
+| Stock reservation, available to promise | stock\_reservation, available\_to\_promise | Stock held for a demand line; available stock minus reserved quantities until the goods issue |
+| Pick batch | pick\_batch | Pick tasks of several demand documents walked together; a wave is a batch released at a set time |
+| Pick face | bin\_item | The fixed picking bin of an item in a warehouse, with minimum and maximum quantities for replenishment |
+| Demand line | demand line | A document line that needs stock (sales order line, transfer order line; production component later); reservations and pick tasks serve it |
+| Putaway preview | putaway\_preview | Query result showing the bins a draft putaway rule set would choose |
 | Goods received / invoice received clearing | gr\_ir\_clearing |  |
 | Price difference | price\_difference |  |
 | Price control | price\_control | Per product, read through its items ([ADR-0018](../adr/0018-product-and-item-model.md)). Phase 1: periodic weighted average with a preliminary price. Standard price and moving average after Phase 1 |
@@ -204,12 +217,15 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Reject | Reject a document version | Rejected |
 | Post | Make a document part of the books or the stock records | Posted |
 | Reverse | Post a reversal document for a posted document | Reversed |
-| Cancel | End an open document that is not posted | Canceled |
+| Cancel | End an open document that is not posted, or an open warehouse task or reservation | Canceled |
+| Pack, Unpack | Put stock into or take it out of a handling unit | Packed, Unpacked |
+| Convert | Change a record to another mode once, e.g. a warehouse to bin management | Converted |
 | Match, Unmatch | Link or unlink open items, bank lines or documents | Matched, Unmatched |
 | Allocate | Distribute an amount or quantity over targets | Allocated |
 | Import | Read an external file into the system | Imported |
 | Run | Start a deterministic system job, e.g. period-end actual costing | Completed (`<job noun>Completed`) |
-| Assign | Set the owner of a work item | Assigned |
+| Assign | Set the owner of a work item or a warehouse task | Assigned |
+| Start | A person begins work on an assigned warehouse task | Started |
 | Close | End further activity on an approved record that has had some, e.g. an order | Closed |
 | Restrict | Narrow who may post in a posting period (open to soft-locked) | Restricted |
 | Open | Let a restricted posting period accept postings from everyone with permission again (soft-locked to open) | Opened |
@@ -231,6 +247,7 @@ Work items get the verbs Claim and Release from DS-29, because Lock belongs to p
 | fx | foreign exchange |
 | vat | value-added tax |
 | gr\_ir | goods received / invoice received |
+| fefo, fifo | first expired first out, first in first out |
 | hs | Harmonized System (customs commodity codes) |
 | l10n, i18n | localization, internationalization |
 | llm, ui | large language model, user interface |

@@ -75,7 +75,7 @@ DS-06 is needed by step 1 (ledger) and by every module that posts. Constraints:
 ## Constraints that come with the decision
 
 - DS-08: transaction keys, including the rounding key.
-- DS-09: material documents; value-only entries; costing order within a day; bins and catch weight.
+- DS-09: material documents; value-only entries; costing order within a day; catch weight. Bins: [ADR-0023](0023-warehouse-management.md).
 - DS-15: row-level security on journal tables.
 - DS-16: invariants of rule 15.
 - DS-18: triggers and constraints in migrations; CI tests that `UPDATE`, `DELETE` and `TRUNCATE` fail.
