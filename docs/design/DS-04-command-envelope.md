@@ -152,6 +152,9 @@ Module-specific codes are added by the DS item that owns the module, in the regi
 | `task_quantity_exceeded` | validation | 422 | no | A confirmed quantity exceeds the task quantity ([ADR-0023](../adr/0023-warehouse-management.md) rule 15) |
 | `lot_shelf_life_too_short` | precondition | 422 | no | The scanned lot is below the customer's minimum remaining shelf life or expired ([ADR-0023](../adr/0023-warehouse-management.md) rule 14) |
 | `serial_not_in_bin` | validation | 422 | no | A scanned serial is not in the source bin with an allowed status ([ADR-0023](../adr/0023-warehouse-management.md) rule 14) |
+| `planning_network_cycle` | validation | 422 | no | The transfer sources would form a cycle; `details` names the warehouses ([ADR-0024](../adr/0024-planning.md) rule 3) |
+| `planning_run_in_progress` | conflict | 409 | yes | A planning run of the company is already running ([ADR-0024](../adr/0024-planning.md) rule 17) |
+| `planned_order_not_convertible` | precondition | 422 | no | The planned order is converted or canceled, or lacks a supplier or route ([ADR-0024](../adr/0024-planning.md) rule 22) |
 | `quantity_rounds_to_zero` | validation | 422 | no | The quantity converted to the inventory unit rounds to zero ([ADR-0018](../adr/0018-product-and-item-model.md) rule 11) |
 | `invalid_timestamp` | validation | 422 | no | ADR-0007 rule 3 |
 | `schema_version_unsupported` | validation | 422 | no | ADR-0008 rule 23; `details.served` lists the versions |
@@ -171,6 +174,8 @@ Module-specific codes are added by the DS item that owns the module, in the regi
 | `bin_capacity_exceeded` | check result | — | — | A confirmed target bin exceeds its capacity; the fact is recorded ([ADR-0023](../adr/0023-warehouse-management.md) rule 12) |
 | `mixed_stock_not_allowed` | check result | — | — | A confirmed target bin breaks its mix rules; the fact is recorded ([ADR-0023](../adr/0023-warehouse-management.md) rule 12) |
 | `no_pickable_stock` | check result | — | — | No eligible stock for a pick (status, bin type, shelf life, open tasks); the line stays short and becomes an exception ([ADR-0023](../adr/0023-warehouse-management.md) rule 14) |
+| `planning_parameter_missing` | check result | — | — | An item was skipped by the run: no supplier, route or lead time ([ADR-0024](../adr/0024-planning.md) rule 21) |
+| `forecast_history_insufficient` | check result | — | — | Too little history for the forecast method ([ADR-0024](../adr/0024-planning.md) rule 11) |
 | `customs_assessment_differs` | check result | — | — | Assessed import tax differs from the amount recomputed from the tax codes; the assessed amount is kept ([ADR-0021](../adr/0021-landed-cost.md) rule 10) |
 | `consent_missing` | precondition | 422 | no | The message's purpose needs consent that the data subject has not given ([ADR-0019](../adr/0019-partners-and-crm-foundation.md) rule 9) |
 | `approval_required` | precondition | 422 | no | The policy engine requires an approval first (DS-28) |
@@ -183,7 +188,7 @@ Module-specific codes are added by the DS item that owns the module, in the regi
 
 ## Canonical plan for hashing
 
-Warehouse task proposals (target and source bins) are listed like events and are not part of the hashed plan ([ADR-0023](../adr/0023-warehouse-management.md) rule 11).
+Warehouse task proposals (target and source bins) and planning run results are listed like events and are not part of the hashed plan ([ADR-0023](../adr/0023-warehouse-management.md) rule 11; [ADR-0024](../adr/0024-planning.md) rule 17).
 
 1. Take the full plan and result, before field filtering.
 2. Replace each ID created by `context.new_id(table)` during the run with `new:<table>:<n>`, numbering per table from 1 in creation order. Keep IDs that existed before the run, client-supplied IDs and client-supplied instants.

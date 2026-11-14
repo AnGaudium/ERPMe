@@ -52,7 +52,7 @@ Goods and services are modeled at two levels: a `product` holds everything that 
 | Shelf life, lot expiry dates | DS-09 (lots) |
 | Supplier's and customer's own item codes, names and units (`partner_item`; needed by the purchase invoice agent's stored mappings, [14](../spec/14-agent-workflows.md)) | DS-20 partner part |
 | Prices | DS-20 price lists, per item |
-| Reorder point, minimum order quantity, lead time, default warehouse | Per item and warehouse, after Phase 1 (no replenishment planning in Phase 1) |
+| Reorder point, minimum order quantity, lead time, default warehouse | Planning parameters per item and warehouse and supplier terms ([ADR-0024](0024-planning.md) rules 1, 2); the building phase is the author's decision |
 | Manufacturer, brand | Classification schemes |
 | Images and documents | Attachments; owner to be assigned (no backlog item yet) |
 | Kits and bills of materials | Phase 2 |

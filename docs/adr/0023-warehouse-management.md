@@ -188,7 +188,7 @@ A small shop and a managed distribution warehouse run on the same model.
     - **Voluntary issues.** Scrap, internal consumption, other issues, purchase returns, transfers, reversals and `status_change` to `blocked` are rejected with `stock_reserved` when they would cut into reservations.
     - **Physical facts.** Count shortages and blocking found damage always post, then cancel reservations deterministically, by the demand document's date, number and `line_number` descending, until the limit holds, and raise an exception.
     - **Author questions.** Which reservation loses, whether overbooking is allowed, and the priority among demands are open questions. Interim, flagged: newest loses, no overbooking, first come first served.
-    - **Lots.** Availability is not lot-aware. A reservation whose lots fail shelf-life rules at pick time gives a short pick.
+    - **Lots.** Availability is not lot-aware. A reservation whose lots fail shelf-life rules at pick time gives a short pick. Planning ignores reservations in netting and counts demand in full ([ADR-0024](0024-planning.md) rule 9).
     - **Build step.** Reservations, the check and the posting interfaces are step 3 core; documents call them at step 5.
 
 **Picking and outbound**

@@ -50,7 +50,7 @@ Checks:
    | --- | --- |
    | 6 · Composition | `app`: registers every module's handlers, consumers and queries; startup checks; entry points (rule 5) |
    | 5 · Interfaces | `api` (REST and MCP generated from the registry), `query` (read-only layer, DS-33), `agents` (after step 4), `sdk` (rule 4) |
-   | 4 · Commercial | `sales`, `purchasing`, `cash` (from steps 5–6), `crm` |
+   | 4 · Commercial | `sales`, `purchasing`, `cash` (from steps 5–6), `crm`, `planning` ([ADR-0024](0024-planning.md); it reads `inventory.contract`'s `demand_supply_line` and hands over through `inventory.contract.request_replenishment`) |
    | 3 · Core business | `ledger` (journal, accounts, account determination, multi-currency), `inventory` (material documents, stock, costing, landed cost, and the warehouse management tables of [ADR-0023](0023-warehouse-management.md)), `master_data` (partners, products, warehouses, units, currencies), `tax` |
    | 2 · Platform | `registry` (command registry, dispatcher, envelope, idempotency; its public entry point `erpme.registry.dispatch`), `documents` (lifecycle, versions, numbering), `periods`, `permissions`, `outbox`, `audit`, `localization` (loader), `db` (engine, session settings, RLS context, the generic lock helper and the lock-order registry, the `MetaData` naming convention) |
    | 1 · Foundation | `numeric` (ADR-0006), `clock` (ADR-0007), `ids`, `i18n`, `errors` |
@@ -129,7 +129,7 @@ Checks:
    - **How settings are applied.** Per role with `ALTER ROLE … SET` in `provision/roles.sql`, and with `SET LOCAL` inside a transaction when a registered job needs longer:
      - every session runs in UTC;
      - `lock_timeout` is 5 s;
-     - `transaction_timeout` is 30 s for commands and queries, 4 min for consumer transactions (inside ADR-0013's 5-minute lease), and 15 min for registered long jobs (period-end costing, close tasks);
+     - `transaction_timeout` is 30 s for commands and queries, 4 min for consumer transactions (inside ADR-0013's 5-minute lease), and 15 min for registered long jobs (period-end costing, planning and forecast runs per [ADR-0024](0024-planning.md) rule 17, close tasks);
      - `idle_in_transaction_session_timeout` is 60 s;
      - `statement_timeout` is 30 s for `erpme_readonly` (DS-33 may lower it).
    - **Timeouts and limits.** Exceeding a timeout returns `concurrent_update` or `timeout` (ADR-0008 rule 11). Request bodies are limited to 10 MiB (`request_too_large`), and batches to 1,000 items (`batch_too_large`). A batch that cannot finish within its timeout should be split by the caller.

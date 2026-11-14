@@ -71,6 +71,21 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Pick face | bin\_item | The fixed picking bin of an item in a warehouse, with minimum and maximum quantities for replenishment |
 | Demand line | demand line | A document line that needs stock (sales order line, transfer order line; production component later); reservations and pick tasks serve it |
 | Putaway preview | putaway\_preview | Query result showing the bins a draft putaway rule set would choose |
+| Planning parameters | item\_warehouse\_planning | Planning method, source, levels, safety stock, lot size, firm horizon and receiving days of an item in a warehouse ([ADR-0024](../adr/0024-planning.md)) |
+| Supplier item, supplier purchasing term, supplier item lead time | supplier\_item, supplier\_purchasing\_term, supplier\_item\_lead\_time | A supplier's lead times, minimum, multiple and preference per item; minimum amount and container capacity per supplier; measured lead-time mean and deviation |
+| Replenishment request | replenishment\_request | Hand-over of converted planned orders from planning to the purchasing and inventory modules |
+| Sales history | sales\_history | Imported weekly sales per item and warehouse for weeks before the first posting, written by `ImportSalesHistory` ([ADR-0024](../adr/0024-planning.md)) |
+| Demand event | demand\_event | A calendar-tagged event such as Tết with its date window per year, used for event indices |
+| Transfer route | transfer\_route | Source and destination warehouse with lead time, for transfer replenishment |
+| Working calendar | working\_calendar | Working weekdays and holidays of a warehouse or supplier |
+| Demand and supply line | demand\_supply\_line | Read model of open demand and supply per item, warehouse and date, written by documents |
+| Forecast, forecast run, forecast adjustment | forecast, forecast\_run, forecast\_adjustment | Weekly statistical demand spread to days; the job that computes it; a recorded change with a reason |
+| Planning run | planning\_run | The deterministic netting job; stores input and output hashes |
+| Planned order | planned\_order | A proposal to buy, move or (Phase 2) produce, with a stable business key; states proposed, firmed, converted, canceled |
+| Pegging | pegging (pegging\_target\_kind: demand\_line, forecast, safety\_stock, stock\_level, lot\_size\_excess) | What a planned order covers; sums exactly to its quantity |
+| Action message | action\_message: expedite, cancel, postpone, reduce | Advice on existing supply |
+| Planning exception | planning\_exception\_kind | A condition a buyer must look at, e.g. shortage inside lead time |
+| Projected availability | projected\_availability | Day-by-day stock plus supply minus demand, as `GetProjectedAvailability` returns it |
 | Goods received / invoice received clearing | gr\_ir\_clearing |  |
 | Price difference | price\_difference |  |
 | Price control | price\_control | Per product, read through its items ([ADR-0018](../adr/0018-product-and-item-model.md)). Phase 1: periodic weighted average with a preliminary price. Standard price and moving average after Phase 1 |
@@ -219,7 +234,8 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Reverse | Post a reversal document for a posted document | Reversed |
 | Cancel | End an open document that is not posted, or an open warehouse task or reservation | Canceled |
 | Pack, Unpack | Put stock into or take it out of a handling unit | Packed, Unpacked |
-| Convert | Change a record to another mode once, e.g. a warehouse to bin management | Converted |
+| Firm | Fix a proposal so later runs keep it, e.g. a planned order | Firmed |
+| Convert | Turn a record into another mode or form once: a warehouse to bin management, a planned order into draft documents | Converted |
 | Match, Unmatch | Link or unlink open items, bank lines or documents | Matched, Unmatched |
 | Allocate | Distribute an amount or quantity over targets | Allocated |
 | Import | Read an external file into the system | Imported |

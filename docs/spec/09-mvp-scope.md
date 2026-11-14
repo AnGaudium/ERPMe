@@ -12,6 +12,7 @@ The MVP covers the full chain of a trading and assembly business: CRM, purchasin
 | Assembly (Phase 2) | Multi-level BOM, assembly and disassembly orders, cost = components + allocated costs | MRP, routing, operations, shop floor, quality |
 | Accounting | Two-tier chart, Vietnam package (TT99 and TT133), basic US package, double-entry ledger, multi-currency and FX revaluation, cash, advances, AR/AP and netting, banking, VAT and 01/GTGT XML, e-invoicing, posting periods, statutory books, financial statements including B03 | Fixed assets and loans (right after MVP), consolidation |
 | Costing | Periodic weighted average per warehouse or company, with preliminary price (previous costed period's average, or latest receipt price) | Moving average, FIFO, standard cost (revisit under TT99) |
+| Planning | Proposed in [ADR-0024](../adr/0024-planning.md), pending the author's decision on phase and feature list: reorder point, min/max and time-phased netting per item and warehouse, transfer routes, weekly forecast with Tết-anchored event indices, planned orders converted to drafts, exceptions per buyer | Manufacturing MRP with bills of materials (Phase 2, same engine) |
 | Other | Approval engine, work queue, read-only query layer, data migration and opening balances | Payroll, HR, projects, helpdesk |
 
 B03 (cash flow statement) is part of the mandatory annual statements, so it is in the MVP. For TT133 customers this needs confirmation (unverified).

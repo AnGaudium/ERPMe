@@ -1,6 +1,6 @@
 # Design backlog
 
-Forty-one design items, in the order they are needed. Items DS-01 to DS-18 must be decided before the first line of code (Build step 0); every other item must be finished before the step listed in "Needed by". Each item produces a file in the repo: an ADR in `docs/adr/` for decisions, a specification in `docs/design/` for models and algorithms, or a catalog file for data such as account and movement-type lists. A design item is done when its file exists, it cites the decided items it depends on, and its open points are listed as open questions.
+Forty-two design items, in the order they are needed. Items DS-01 to DS-18 must be decided before the first line of code (Build step 0); every other item must be finished before the step listed in "Needed by". Each item produces a file in the repo: an ADR in `docs/adr/` for decisions, a specification in `docs/design/` for models and algorithms, or a catalog file for data such as account and movement-type lists. A design item is done when its file exists, it cites the decided items it depends on, and its open points are listed as open questions.
 
 ## Before the first line of code (step 0)
 
@@ -44,7 +44,7 @@ Forty-one design items, in the order they are needed. Items DS-01 to DS-18 must 
 | DS-31 | Warehouse PWA: receipt, issue, transfer and count flows; barcode per packaging unit. Task flows per ADR-0023. | UX spec | DS-09, 30 | Step 9 |
 | DS-32 | Agent runtime: LLM gateway interface, single-provider seat config, data labels and routing switch, run records, budgets, untrusted-content tainting, fixed tool lists, replay evaluation harness | ADR, spec | DS-15 | First agent (after step 4) |
 | DS-33 | Read-only query layer: semantic views, read-only role, time limits, MCP resources | Spec | DS-06, 15 | First agent (after step 4) |
-| DS-34 | Workflow designs, one per agent: deterministic cascade, inputs and outputs, policy thresholds, shadow-mode metrics. Data migration, quotation, bank matching, purchase invoices | Spec per workflow | DS-32, 33 | After steps 4, 5, 6, 7 respectively |
+| DS-34 | Workflow designs, one per agent: deterministic cascade, inputs and outputs, policy thresholds, shadow-mode metrics. Data migration, quotation, bank matching, purchase invoices; planning agent (ADR-0024) | Spec per workflow | DS-32, 33 | After steps 4, 5, 6, 7 respectively; planning agent with its building phase (ADR-0024) |
 | DS-35 | Minimal CRM: partners, contacts, interaction timeline, email intake | Spec. Foundation: [ADR-0019](../adr/0019-partners-and-crm-foundation.md) | DS-20 | Step 5 |
 | DS-36 | Audit log and observability: audit record model, OpenTelemetry, operations dashboard (dead tuples, queue lag) | Spec | DS-13 | Audit step 1; dashboard step 10 |
 | DS-37 | Deployment and operations: Docker Compose, backup and restore, upgrade and migration policy, LTS | Spec | DS-18 | Step 10 |
@@ -52,3 +52,4 @@ Forty-one design items, in the order they are needed. Items DS-01 to DS-18 must 
 | DS-39 | TT133 regime in the Vietnam package | Package | DS-19 | Step 10 |
 | DS-40 | Go-live kit: cut-over checklist, rehearsal procedure, schema freeze; reader for the pilot's current system if missing (e.g. MISA) | Spec | DS-21 | Step 11 |
 | DS-42 | Warehouse management: bins, zones, stock statuses, handling units, warehouse tasks and movements, putaway and removal strategies, reservations and available to promise, picking from demand lines, deliveries from picks, packing, replenishment, counts, returns (author's decision 2026-11-14: Phase 1) | ADR. ADR done: [ADR-0023](../adr/0023-warehouse-management.md) | DS-09, 20, 21, 22, 27, 29, 31, 33 | ADR now; data step 2, core step 3, documents step 5, PWA step 9 |
+| DS-43 | Planning: parameters, supplier terms, transfer routes, calendars, demand and supply read model, weekly forecast, planning run over the (item, warehouse) graph, planned orders with pegging, action messages, exceptions per buyer, conversion through events, planning agent (author's request 2026-11-14) | ADR. ADR done: [ADR-0024](../adr/0024-planning.md) | DS-09, 16, 17, 20, 22, 28, 29, 33, 34, 42 | ADR now; building phase pending the author's decision |

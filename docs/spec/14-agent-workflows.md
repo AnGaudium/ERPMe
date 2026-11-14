@@ -7,7 +7,7 @@ The first four workflows are numbered by pilot value: structured, low-risk data 
 3. **Request intake and quotation drafting:** email first, chat channels after Phase 1. Needs clean master data and price lists, so it follows data migration.
 4. **Bank statement matching:** start with statement-file import for 2–3 common banks, because Vietnamese bank APIs require individual partnerships.
 
-Next: repeat-sales suggestions (needs order history, so no value for a new install), replenishment suggestions, payment reminders, period-close assistant (runs the checklist, reconciles, flags anomalies).
+Next: repeat-sales suggestions (needs order history, so no value for a new install), replenishment suggestions (the planning agent of [ADR-0024](../adr/0024-planning.md) rule 23), payment reminders, period-close assistant (runs the checklist, reconciles, flags anomalies).
 
 ## Deterministic first, LLM last
 

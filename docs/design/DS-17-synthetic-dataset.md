@@ -51,6 +51,7 @@ The simulator runs fictional companies day by day. It writes what happened in bu
    | Journal | `document_reversed` | 1 |
    | Stock | `goods_received`, `goods_delivered`, `goods_returned_to_supplier`, `goods_returned_by_customer` (stock side), `stock_transferred`, `stock_dispatched`, `stock_arrived`, `stock_counted`, `goods_consumed`, `goods_scrapped` | 3 |
    | Landed cost | `landed_cost_allocated` (an accountant allocates a cost source to receipts) | 3 |
+   | Planning | `replenishment_planned` (a planner runs planning and converts), `forecast_adjusted`, `sales_history_recorded` (history imported before the calendar) | 5 |
    | Landed cost | `purchase_cost_invoice_received`: as a cost-source journal (rule 10) from step 3; as the purchase cost invoice from step 5 | 3 |
    | Opening | `opening_balances_recorded` (DS-21) | 4 |
    | Purchasing | `purchase_requested`, `purchase_ordered`, `purchase_invoice_received`, `customs_declared` | 5 |
@@ -187,7 +188,7 @@ The simulator runs fictional companies day by day. It writes what happened in bu
     | `added_in` | |
     | `description` | |
 
-    Version 0.1.0 has 40 edge cases, EC-32 to EC-40 for warehouse management (ADR-0023):
+    Version 0.1.0 has 45 edge cases, EC-32 to EC-40 for warehouse management (ADR-0023) and EC-41 to EC-45 for planning (ADR-0024):
     - 23 from [12-testing.md](../spec/12-testing.md#synthetic-dataset), counting landed cost after partial sale and after period lock separately;
     - eight that ADRs require: foreign-currency journal, reversal of an internal document, transfer through transit, preliminary price missing, degenerate costing, one cost source over several receipts, cost before receipt, import VAT on customs.
 
