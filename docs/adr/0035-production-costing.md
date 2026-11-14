@@ -126,15 +126,15 @@ The accounting choices are the author's (ADR-0005 item 1). Each one below is a r
 **By-products, co-products and disassembly**
 
 13. Splits:
-    - **By-product value.** `by_product_receipt` has value source `regime` (ADR-0020 rule 5). The Vietnam package seeds it, `unverified`, as the company price list `by_product_price` per item and period, standing for net realisable value (VAS 02 para 09). A missing price rejects the receipt (`by_product_price_missing`).
-    - **Co-products.** They share by coefficients; `relative_sales_value` from a price list is an option. Coefficients that sum to zero are rejected when the order is released (`co_product_weights_zero`).
+    - **By-product value.** `by_product_receipt` has value source `regime` (ADR-0020 rule 5). The Vietnam package seeds it, `unverified`, as the company's price list of kind `by_product` per item and period ([ADR-0045](0045-master-data-and-price-lists.md) rule 2), standing for net realisable value (VAS 02 para 09). A missing price rejects the receipt (`by_product_price_missing`).
+    - **Co-products.** They share by coefficients; `relative_sales_value` from a price list is an option. Coefficients that sum to zero are rejected when the order is released (`co_product_weights_zero`). The list is the default sale list ([ADR-0045](0045-master-data-and-price-lists.md) rule 6).
     - **Disassembly.** Outputs share by the unit costs in their own released estimates, then by preliminary prices, then by quantity. Flagged.
 
 **Cost estimates and variances**
 
 14. `cost_estimate`:
     - **Header and lines.** It has a header (production version, costing date, `state` `draft` or `released`, price basis) and `cost_estimate_line` rows (cost component, component item or activity type, quantity, price, amount, level), rolled up level by level from the released estimates of made components.
-    - **Price basis.** `actual_average` (the last closed period's actual price; interim default, flagged), `preliminary_price` or `purchase_price`.
+    - **Price basis.** `actual_average` (the last closed period's actual price; interim default, flagged), `preliminary_price` or `purchase_price`. `purchase_price` is the preferred supplier's purchase-list price ([ADR-0045](0045-master-data-and-price-lists.md) rule 6).
     - **Rates.** `activity_rate` (work center, activity type, period, rate) holds planned rates. Overhead uses a planned surcharge per cost center.
     - **Commands.** `CreateCostEstimate` computes it on the server. `ReleaseCostEstimate` freezes it as the version's benchmark. Both are effect class `other`, because estimates never value stock.
 15. Variance analysis:
@@ -161,7 +161,7 @@ The accounting choices are the author's (ADR-0005 item 1). Each one below is a r
     - `pool_allocation_rule` (cost center, group, driver);
     - `normal_capacity` (cost center, driver, period, quantity);
     - `activity_rate`;
-    - `by_product_price`;
+    - `by_product_price`, which is the company's price list of kind `by_product` ([ADR-0045](0045-master-data-and-price-lists.md) rule 2);
     - `production_order_period_cost`, written only by the job.
 18. Settings. These are seeded `unverified` and flagged (ADR-0016 rule 12), and the regime makes them binding, as questions to the author:
     - `wip_method`;

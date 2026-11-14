@@ -15,8 +15,8 @@ I = {k: new() for k in ["user", "co", "sa_cash", "sa_bank", "sa_rec", "sa_clr", 
 tag = str(I["co"])[-8:]
 X("insert into currency values ('VND',0),('USD',2) on conflict do nothing")
 X("insert into user_account values (%s)", (I["user"],))
-X("insert into company (id,code,legal_name,company_currency,time_zone,localization_package,accounting_regime,valuation_area_level,fiscal_calendar_owner_id)"
-  " values (%s,%s,'Co4','VND','Asia/Ho_Chi_Minh','vn','tt99','warehouse',%s)", (I["co"], 'C4-' + tag, I["user"]))
+X("insert into company (id,code,legal_name,company_currency,time_zone,localization_package,accounting_regime,valuation_area_level,fiscal_calendar_owner_id,default_language)"
+  " values (%s,%s,'Co4','VND','Asia/Ho_Chi_Minh','vn','tt99','warehouse',%s,'vi')", (I["co"], 'C4-' + tag, I["user"]))
 for k, code, kind in [("sa_cash", "cash_on_hand", "none"), ("sa_bank", "cash_in_bank", "none"), ("sa_rec", "receivable_trade", "receivable"),
                       ("sa_clr", "opening_balance_clearing", "none"), ("sa_eq", "owner_capital", "none")]:
     X("insert into system_account values (%s,%s,%s)", (I[k], code + '_' + tag, kind))
@@ -29,7 +29,7 @@ X("insert into posting_period (id,company_id,fiscal_year_id,start_date,end_date)
 for p in ["mig", "jan"]:
     for area in ["general", "inventory", "receivable", "payable"]:
         X("insert into posting_period_area_state values (%s,%s,'open')", (I[p], area))
-X("insert into partner values (%s,%s,%s)", (I["partner"], I["co"], 'CUS-OLD-' + tag))
+X("insert into partner (id, company_id, code, name, partner_kind, country) values (%s,%s,%s,'Old customer','organization','VN')", (I["partner"], I["co"], 'CUS-OLD-' + tag))
 c.close()
 SA = {"a_cash": "sa_cash", "a_bank": "sa_bank", "a_rec": "sa_rec", "a_clr": "sa_clr", "a_eq": "sa_eq"}
 

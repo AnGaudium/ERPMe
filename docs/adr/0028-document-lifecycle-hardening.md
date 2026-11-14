@@ -86,7 +86,7 @@ This ADR amends the document lifecycle (ADR-0009) in five places, before step 3 
 11. Close check. ADR-0012 rule 13 gets a required core check task that blocks `LockPostingPeriod` while the period has any document whose `posting_date` falls in it and that is either:
     - in `issuing`, or
     - accepted but not posted.
-12. Placement: the two-phase lifecycle is built at step 5 with sales invoices. A deterministic stub adapter accepts or rejects from test data. DS-24 replaces the stub with the provider adapter at step 7, without changing the core.
+12. Placement: the two-phase lifecycle is built at step 5 with sales invoices. A deterministic stub adapter accepts or rejects from test data. DS-24 replaces the stub with the provider adapter at step 7, without changing the core. Note (author, 2026-11-15): the provider adapter is an add-on designed after the core, not a step 7 item; the stub stays in the core build and the tests ([backlog](../design/backlog.md), add-ons section).
 13. Whether e-invoiced documents may instead post first and be reversed while unissued is the author's (legal; open question). Also the author's:
     - which date governs posting and the e-invoice;
     - what "acceptance" means for invoice kinds without a tax authority code (unverified, spec 08);

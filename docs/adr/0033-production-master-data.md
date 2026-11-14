@@ -185,7 +185,7 @@ Agents read the structures through deterministic queries. They draft revisions f
       - a made item without a valid production version on its explosion date.
     - **Reserved parallel test.** PAR-12: two releases that together would close a cycle.
 17. Later than Phase 1, unless the author decides otherwise (open question):
-    - configured products (options chosen on the sales order, with the bill of materials and routing derived from rules);
+    - configured products (options chosen on the sales order, with the bill of materials and routing derived from rules): now in Phase 1 by the author's decision of 2026-11-15, as DS-56;
     - substitute components;
     - parallel and alternative operation sequences;
     - shift patterns;
@@ -194,6 +194,8 @@ Agents read the structures through deterministic queries. They draft revisions f
     - recycling loops.
 
     The norms that customs reports need are actual consumption norms (research note 02, unverified). Released revisions are planned norms and an input to DS-55.
+
+    Line options (choices on a line that create no item) and items created on order exist in Phase 1 and are the base product configuration builds on (DS-56; [ADR-0045](0045-master-data-and-price-lists.md) rules 15–16).
 
 ## Context
 

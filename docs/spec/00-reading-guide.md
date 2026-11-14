@@ -94,7 +94,7 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Target cost, variance | variance categories: input price, input quantity, resource usage, scrap, lot size, remaining | The released estimate scaled to output, and the analysis of actual against it; never posted |
 | Cost behavior | cost\_behavior: variable, fixed | Whether a production cost account varies with output; splits pool groups and drives normal-capacity absorption |
 | Production order period cost | production\_order\_period\_cost | Per order, period and cost component: opening, incurred, abnormal, to-output and closing amounts |
-| By-product price | by\_product\_price | Company price list valuing by-products (interim stand-in for net realisable value) |
+| By-product price | price\_list (kind by\_product) | The company's price list of kind `by_product`, valuing by-products (interim stand-in for net realisable value; [ADR-0045](../adr/0045-master-data-and-price-lists.md) rule 2) |
 | Backflush | backflush\_at\_operation, backflush\_at\_receipt | Automatic issue of components on confirmation or receipt, by cumulative progress |
 | As built | output\_serial\_number\_id, is\_as\_built\_required | The link from a component lot or serial to the assigned output serial it went into |
 | Low-level code | low\_level\_code | The longest path from a top item to an item in released bills of materials; MRP plans in that order |
@@ -162,6 +162,8 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Goods received / invoice received clearing | gr\_ir\_clearing |  |
 | Price difference | price\_difference |  |
 | Price control | price\_control | Per product, read through its items ([ADR-0018](../adr/0018-product-and-item-model.md)). Phase 1: periodic weighted average with a preliminary price. Standard price and moving average after Phase 1 |
+| Price list | price\_list, price\_list\_entry | Per company, kind sale, purchase or by-product, one currency, `is_tax_included` for sale lists; entries per item and unit with quantity breaks and dates, plus option extras; read by one lookup rule ([ADR-0045](../adr/0045-master-data-and-price-lists.md)) |
+| Price lookup | find\_price, GetPrice | The one computation of a list price for an item, unit, quantity, date and chosen options, with the rows used for the trace ([ADR-0045](../adr/0045-master-data-and-price-lists.md) rule 4) |
 | Transaction, company, group currency | transaction\_currency, company\_currency, group\_currency |  |
 | Period-end actual costing | period\_end\_actual\_costing | Periodic weighted average |
 | Landed cost | landed\_cost | Receipt value adjustment: allocates amounts held on `purchase_cost_clearing` (duty, freight, price differences) to receipt lines. Same period: added to the receipt value before costing. Locked period: posted in the first unlocked period, split by consumer ([ADR-0021](../adr/0021-landed-cost.md)) |
@@ -199,7 +201,14 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Partner, item, warehouse | partner, item, warehouse | One partner, many roles. An item is one sellable, stockable variant of a product; documents, stock and journal lines refer to items ([ADR-0018](../adr/0018-product-and-item-model.md)) |
 | Product | product | What all variants share: product category, buyer, item group, valuation class, units, tracking, item tax group, price control; a product without variants has one item |
 | Product type | product\_type: stock, non\_stock, service | Whether a product is kept and valued in stock |
-| Variant attribute | variant\_attribute, variant\_attribute\_value, item\_variant\_value | Company-defined dimension such as color or size; any number per product; each item has one value per attribute, unique combination (`variant_key`) |
+| Variant attribute | variant\_attribute, variant\_attribute\_value, item\_variant\_value | Company-defined dimension such as color or size; any number per product; `variant_mode` is `variant` (each item has one value per such attribute, unique combination `variant_key`) or `line_option` ([ADR-0045](../adr/0045-master-data-and-price-lists.md) rule 15) |
+| Line option | variant\_mode: line\_option; document\_line\_option | An attribute chosen on a document line that creates no item, may add a price extra, and travels to delivery and production ([ADR-0045](../adr/0045-master-data-and-price-lists.md)) |
+| Allowed value | product\_attribute\_value | A value a product allows for one of its attributes; none listed means every value ([ADR-0045](../adr/0045-master-data-and-price-lists.md) rule 15) |
+| Option extra | price\_list\_option\_extra | A price list's extra per inventory unit for a chosen line option value, for one product or all ([ADR-0045](../adr/0045-master-data-and-price-lists.md) rule 17) |
+| Declaring unit | is\_declaring\_unit | The company, or a branch that declares VAT with its own tax ID ([ADR-0041](../adr/0041-tax-engine.md) rule 11, [ADR-0045](../adr/0045-master-data-and-price-lists.md) rule 8) |
+| Cost center kind | cost\_center.kind | `production`, `production_service`, `selling`, `administration` or `other` ([ADR-0045](../adr/0045-master-data-and-price-lists.md) rule 9) |
+| Project state | project.state | `open` or `closed`; a posting to a closed project is rejected ([ADR-0045](../adr/0045-master-data-and-price-lists.md) rule 9) |
+| Item created on order | is\_item\_created\_on\_order | A product whose document lines may name a new combination of variant values; the item is created when the document leaves draft ([ADR-0045](../adr/0045-master-data-and-price-lists.md) rule 16) |
 | Unit of measure, inventory unit | uom, inventory\_uom\_id | Core catalog of units (companies may add their own) with quantity kind and decimal places; stock and cost are always in the product's inventory unit (the spec's stock unit) |
 | Unit conversion | uom\_conversion | Exact global conversion between two units of one kind: one from-unit = numerator / denominator to-units |
 | Product unit | product\_uom | Another unit a product may use, with its exact conversion to the inventory unit; with the inventory unit, the spec's UoM group |

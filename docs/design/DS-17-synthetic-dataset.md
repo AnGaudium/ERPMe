@@ -46,7 +46,7 @@ The simulator runs fictional companies day by day. It writes what happened in bu
    | Area | Types | First step |
    | --- | --- | --- |
    | Setup | `company_founded`, `exchange_rate_published` | 1 |
-   | Setup | `partner_registered`, `product_registered`, `warehouse_opened`, `price_list_published` | 2 |
+   | Setup | `partner_registered`, `product_registered`, `warehouse_opened`, `price_list_published` (`SetPriceListEntries`, [ADR-0045](../adr/0045-master-data-and-price-lists.md) rule 7) | 2 |
    | Setup | `partner_account_changed` (a partner's reconciliation account changes) | 5 |
    | Periods | `period_restricted`, `period_locked` (by a human, with area; ADR-0012 rule 7) | 1 |
    | Periods | `period_closed`, `year_closed` | 8 |

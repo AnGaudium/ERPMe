@@ -4,47 +4,13 @@
 -- Primary and foreign keys are shown inline; in migrations they get names from the
 -- MetaData naming convention (ADR-0004 rule 15).
 -- Referenced tables (document, account, system_account, posting_period, fiscal_year,
--- applied_rate, transaction_key, partner, item, warehouse,
+-- applied_rate, transaction_key, partner, item, warehouse (DS-20-master-data.sql),
 -- tax_code, open_item, payment_term and payment_term_line (below, ADR-0026), cost_object and fixed_asset (stubs below, ADR-0025), material_document, material_document_line,
 -- close_task, posting_period_area_state, currency) are defined by their own design items.
 -- IDs of journal rows come from context.new_id (ADR-0014 rule 14), so there are no ID defaults.
 
--- ADR-0027 rules 3 and 5: company, branch and stubs of cost_center and project are owned by master_data
--- (DS-20) and listed here because step 1 needs them; derivation_trace is owned by ledger.
--- All carry FORCE ROW LEVEL SECURITY and the generated company policy (ADR-0022 rule 8), except company,
--- whose policy compares its own id.
-CREATE TABLE company (
-    id                        uuid PRIMARY KEY,
-    code                      text NOT NULL UNIQUE,
-    legal_name                text NOT NULL,
-    tax_id                    text,
-    company_currency          text NOT NULL REFERENCES currency (code),
-    time_zone                 text NOT NULL,
-    localization_package      text NOT NULL,
-    accounting_regime         text NOT NULL,
-    valuation_area_level      text NOT NULL CONSTRAINT ck_company_valuation_area_level CHECK (valuation_area_level IN ('company', 'warehouse')),
-    fiscal_calendar_owner_id  uuid NOT NULL REFERENCES user_account (id),   -- a human user (ADR-0012 rule 3)
-    fiscal_year_lead_days     integer NOT NULL DEFAULT 30,
-    is_active                 boolean NOT NULL DEFAULT true
-);
-CREATE TABLE branch (
-    id          uuid PRIMARY KEY,
-    company_id  uuid NOT NULL REFERENCES company (id),
-    code        text NOT NULL,
-    name        text NOT NULL,
-    tax_id      text,
-    address     jsonb,
-    is_active   boolean NOT NULL DEFAULT true,
-    UNIQUE (company_id, code)
-);
-CREATE TABLE cost_center (
-    id uuid PRIMARY KEY, company_id uuid NOT NULL REFERENCES company (id),
-    code text NOT NULL, name text NOT NULL, UNIQUE (company_id, code)
-);
-CREATE TABLE project (
-    id uuid PRIMARY KEY, company_id uuid NOT NULL REFERENCES company (id),
-    code text NOT NULL, name text NOT NULL, UNIQUE (company_id, code)
-);
+-- ADR-0027 rules 3 and 5: company, branch, cost_center and project are owned by master_data and defined in
+-- DS-20-master-data.sql (ADR-0045); the lab loads both files together. derivation_trace is owned by ledger.
 CREATE TABLE derivation_trace (
     id            uuid PRIMARY KEY,
     company_id    uuid NOT NULL REFERENCES company (id),

@@ -6,7 +6,7 @@ X = c.execute
 ids = {k: new() for k in ["user","co","sa_rec","sa_rev","sa_inv","sa_cash","a_rec","a_rev","a_inv","a_cash","fy","p1","p0","partner","partner2","item","wh"]}
 X("insert into currency values ('VND',0),('USD',2)")
 X("insert into user_account values (%s)", (ids["user"],))
-X("insert into company (id,code,legal_name,company_currency,time_zone,localization_package,accounting_regime,valuation_area_level,fiscal_calendar_owner_id) values (%s,'C1','Co','VND','Asia/Ho_Chi_Minh','vn','tt99','warehouse',%s)", (ids["co"], ids["user"]))
+X("insert into company (id,code,legal_name,company_currency,time_zone,localization_package,accounting_regime,valuation_area_level,fiscal_calendar_owner_id,default_language) values (%s,'C1','Co','VND','Asia/Ho_Chi_Minh','vn','tt99','warehouse',%s,'vi')", (ids["co"], ids["user"]))
 for k, code, kind in [("sa_rec","receivable_trade","receivable"),("sa_rev","revenue_goods","none"),("sa_inv","inventory_goods","inventory"),("sa_cash","cash","none")]:
     X("insert into system_account values (%s,%s,%s)", (ids[k], code, kind))
 for a, s, code in [("a_rec","sa_rec","131"),("a_rev","sa_rev","511"),("a_inv","sa_inv","156"),("a_cash","sa_cash","111")]:
@@ -17,9 +17,20 @@ for p, st in [("p1","open"),("p0","locked")]:
     for area in ["general","inventory","receivable","payable"]:
         X("insert into posting_period_area_state values (%s,%s,%s)", (ids[p], area, st))
 for k, code in [("partner","CUS1"),("partner2","CUS2")]:
-    X("insert into partner values (%s,%s,%s)", (ids[k], ids["co"], code))
-X("insert into item values (%s,%s,'ITEM1')", (ids["item"], ids["co"]))
-X("insert into warehouse values (%s,%s,'WH1')", (ids["wh"], ids["co"]))
+    X("insert into partner (id, company_id, code, name, partner_kind, country) values (%s,%s,%s,%s,'organization','VN')", (ids[k], ids["co"], code, code))
+# DS-20 master data for the item and warehouse the journal lines refer to (ADR-0045)
+u, ig, vc, tg, pr = new(), new(), new(), new(), new()
+X("insert into uom (id, code, quantity_kind, decimal_places) values (%s,%s,'count',0)", (u, "EA-" + str(u)[-8:]))
+X("insert into item_group (id, company_id, code, name, basis) values (%s,%s,'goods','Goods','{}')", (ig, ids["co"]))
+X("insert into valuation_class (id, company_id, code, name, basis) values (%s,%s,'merchandise','Merchandise','{}')", (vc, ids["co"]))
+X("insert into item_tax_group (id, company_id, code, name, basis) values (%s,%s,'standard','Standard','{}')", (tg, ids["co"]))
+X("insert into product (id, company_id, code, name, product_type, item_group_id, valuation_class_id, inventory_uom_id, purchase_uom_id, sales_uom_id, item_tax_group_id) values (%s,%s,'P1','P1','stock',%s,%s,%s,%s,%s,%s)", (pr, ids["co"], ig, vc, u, u, u, tg))
+X("insert into item (id, company_id, product_id, code) values (%s,%s,%s,'ITEM1')", (ids["item"], ids["co"], pr))
+zn, bn = new(), new()
+with c.transaction():                                   # warehouse, default zone and bin in one command (ADR-0031 rule 8)
+    X("insert into warehouse (id, company_id, code, name, kind, default_bin_id) values (%s,%s,'WH1','WH1','physical',%s)", (ids["wh"], ids["co"], bn))
+    X("insert into zone (id, company_id, warehouse_id, code, name) values (%s,%s,%s,'DEFAULT','Default')", (zn, ids["co"], ids["wh"]))
+    X("insert into bin (id, company_id, warehouse_id, zone_id, code, barcode, bin_type) values (%s,%s,%s,%s,'DEFAULT',%s,'storage')", (bn, ids["co"], ids["wh"], zn, 'WH1-' + str(bn)[-12:]))
 c.close()
 
 def doc(cx, t="sales_invoice"):

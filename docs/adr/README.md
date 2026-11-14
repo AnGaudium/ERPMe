@@ -48,3 +48,4 @@ One file per decision, named `NNNN-short-title.md`, using [template.md](template
 | [ADR-0042](0042-work-queue.md) | Work queue (DS-29) | Accepted (2026-11-14) |
 | [ADR-0043](0043-policy-and-approval.md) | Policy table and one-level approval (DS-28) | Accepted (2026-11-14) |
 | [ADR-0044](0044-data-migration-and-export.md) | Data migration and full data export (DS-21) | Accepted (2026-11-14) |
+| [ADR-0045](0045-master-data-and-price-lists.md) | Master data model and price lists (DS-20) | Accepted (2026-11-15) |

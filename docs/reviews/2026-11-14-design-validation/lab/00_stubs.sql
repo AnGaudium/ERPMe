@@ -2,12 +2,12 @@
 DROP SCHEMA IF EXISTS erpme CASCADE; DROP SCHEMA IF EXISTS types CASCADE;
 CREATE SCHEMA types; CREATE SCHEMA erpme;
 SET search_path = erpme;
+CREATE EXTENSION IF NOT EXISTS btree_gist;             -- installed in production (ADR-0022 rule 8)
 CREATE DOMAIN types.amount AS numeric(24,4);
 CREATE DOMAIN types.quantity AS numeric(24,6);
 CREATE DOMAIN types.unit_price AS numeric(28,10);
 CREATE DOMAIN types.exchange_rate AS numeric(30,15);
 CREATE DOMAIN types.percent AS numeric(9,6);
-CREATE TABLE currency (code text PRIMARY KEY, minor_unit int NOT NULL DEFAULT 0);
 CREATE TABLE user_account (id uuid PRIMARY KEY);
 CREATE TABLE system_account (id uuid PRIMARY KEY, code text UNIQUE NOT NULL, control_kind text NOT NULL DEFAULT 'none');
 CREATE TABLE account (id uuid PRIMARY KEY, company_id uuid NOT NULL, code text NOT NULL, system_account_id uuid NOT NULL REFERENCES system_account(id),
@@ -20,8 +20,5 @@ CREATE TABLE material_document (id uuid PRIMARY KEY, document_id uuid NOT NULL U
 CREATE TABLE material_document_line (id uuid PRIMARY KEY, material_document_id uuid NOT NULL REFERENCES material_document(id));
 CREATE TABLE applied_rate (id uuid PRIMARY KEY);
 CREATE TABLE close_task (id uuid PRIMARY KEY);
-CREATE TABLE item (id uuid PRIMARY KEY, company_id uuid NOT NULL, code text NOT NULL);
-CREATE TABLE warehouse (id uuid PRIMARY KEY, company_id uuid NOT NULL, code text NOT NULL);
-CREATE TABLE partner (id uuid PRIMARY KEY, company_id uuid NOT NULL, code text NOT NULL);
 CREATE TABLE tax_code (id uuid PRIMARY KEY);
 CREATE TABLE transaction_key (id uuid PRIMARY KEY, code text);

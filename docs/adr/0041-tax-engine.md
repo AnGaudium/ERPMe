@@ -87,12 +87,14 @@ Tax codes, dated rates and a dated tax matrix are package rules, read live. The 
     - for imports, the customs declaration's tax rows (ADR-0021).
 
     Each row has:
-    - **Links and identity:** company, `declaring_unit` (the company, or a branch with its own tax ID, ADR-0027 rule 5), document and line, journal entry, the partner snapshot's tax ID (ADR-0028 rule 16);
+    - **Links and identity:** company, `declaring_unit` (the company, or a branch with `is_declaring_unit`, ADR-0027 rule 5), document and line, journal entry, the partner snapshot's tax ID (ADR-0028 rule 16);
     - **The tax:** `tax_code_id`, `tax_rate_id`, direction, `input_use`, `rate_percent`, and base and tax in document and company currency;
     - **Dates:** `tax_date`, `declaration_date`;
     - **Deductibility:** `initial_deductibility` (rule 14).
 
     **Zero rows.** Zero-rated, not-subject and no-VAT codes write rows with zero tax, so return bases come from `tax_line` alone.
+
+    A branch is a declaring unit when `is_declaring_unit` is set ([ADR-0045](0045-master-data-and-price-lists.md) rule 8).
 12. Company currency and the journal:
     - **Journal tax lines.** The journal gets one tax line per tax code and entry, converted once by `convert_amount` (ADR-0011 rule 5) and carrying `tax_code_id`. Base lines carry no tax code (ADR-0014 rule 9).
     - **Tax rows.** Their company amounts are that journal line's company amount, spread over the rows by largest remainder over their exact converted values, so the subledger and the journal tie by construction.

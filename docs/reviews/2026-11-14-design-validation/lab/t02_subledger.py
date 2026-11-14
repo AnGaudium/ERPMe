@@ -6,8 +6,8 @@ X = c.execute
 I = {k: new() for k in ["user", "co", "sa_wip", "sa_cash", "a_wip", "a_cash", "fy", "jan", "feb", "co1", "pool"]}
 X("insert into currency values ('VND',0) on conflict do nothing")
 X("insert into user_account values (%s)", (I["user"],))
-X("insert into company (id,code,legal_name,company_currency,time_zone,localization_package,accounting_regime,valuation_area_level,fiscal_calendar_owner_id)"
-  " values (%s,'C2','Co2','VND','Asia/Ho_Chi_Minh','vn','tt99','warehouse',%s)", (I["co"], I["user"]))
+X("insert into company (id,code,legal_name,company_currency,time_zone,localization_package,accounting_regime,valuation_area_level,fiscal_calendar_owner_id,default_language)"
+  " values (%s,'C2','Co2','VND','Asia/Ho_Chi_Minh','vn','tt99','warehouse',%s,'vi')", (I["co"], I["user"]))
 X("insert into system_account values (%s,'inventory_work_in_process_t2','cost_object'),(%s,'cash_t2','none')", (I["sa_wip"], I["sa_cash"]))
 X("insert into account (id,company_id,code,system_account_id) values (%s,%s,'154',%s),(%s,%s,'111',%s)",
   (I["a_wip"], I["co"], I["sa_wip"], I["a_cash"], I["co"], I["sa_cash"]))
