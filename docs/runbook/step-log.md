@@ -4,6 +4,7 @@ Dated record of gate decisions, the week list and one line per Friday review ([R
 
 | Date | Step | Entry |
 | --- | --- | --- |
+| 2026-11-14 | 0 | Author confirmed the Vietnam default for rounding differences: `rounding_gain` → 515, `rounding_loss` → 635 (TT99), changeable per company (DS-19) |
 | 2026-11-14 | 0 | Author's answer recorded: a late purchase invoice defaults to the last day of its month when that period is open (Vietnam package default). Open: the default when that month is closed; the VAT period date |
 | 2026-11-14 | 0 | Author's answers recorded: rounding mode per currency (ADR-0006 rule 17); rounding gain and loss accounts declared per company (rule 20, default pending confirmation); calendar-year fiscal year by default (ADR-0007 rule 21). E-invoice date finding added for verification |
 | 2026-11-14 | 0 | DS-04 done: [ADR-0008](../adr/0008-command-envelope-and-registry.md) and [DS-04-command-envelope.md](../design/DS-04-command-envelope.md) accepted under ADR-0005 after two review rounds (Claude Fable 5.2). One open question for the author (integrations and `human_only`) |
