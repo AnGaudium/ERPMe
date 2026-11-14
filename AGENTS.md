@@ -18,7 +18,7 @@ Design, Build step 0. Do not write production code until the step 0 design items
 
 - The documents in `docs/` are the source of truth. If something you need is missing or contradictory, record it in [docs/open-questions.md](docs/open-questions.md) and ask the author instead of guessing.
 - Never infer accounting, tax or legal rules. A rule marked "unverified" must not be hard-coded; it belongs in a localization package as flagged configuration.
-- Code identifiers, file names and documents are in English. The glossary in [docs/spec/00-reading-guide.md](docs/spec/00-reading-guide.md) is authoritative; DS-01 extends it in place, in that file. Never use transliterated Vietnamese identifiers.
+- Code identifiers, file names and documents are in English. The glossary in [docs/spec/00-reading-guide.md](docs/spec/00-reading-guide.md) is authoritative; DS-01 extends it in place, in that file; the naming rules are in [ADR-0004](docs/adr/0004-naming-conventions.md). Never use transliterated Vietnamese identifiers.
 - The core contains no country-specific rules; those belong in localization packages.
 - Cite reference IDs (Principle n, Dn, step n, Bn, DS-xx, INV-xx, EC-xx, ADR-nnnn) in commit messages, ADRs and open questions.
 - A decision that changes or adds to the design is written as an ADR using [docs/adr/template.md](docs/adr/template.md), and every document it affects is updated in the same change.

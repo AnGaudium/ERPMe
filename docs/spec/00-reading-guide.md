@@ -7,8 +7,8 @@ The `docs/` folder of this repository is the source specification for AI agents 
 3. **Normative words:** "must" and "must not" are mandatory; "should" is a recommendation, and doing otherwise requires the reason in an ADR; "may" is optional.
 4. **Unverified:** a legal rule marked "unverified" must not be hard-coded. Put it in the localization package as configuration, flag it, and keep it in the open questions.
 5. **When the documents are silent:** do not infer accounting, tax or legal rules; record an open question and ask the author. For small technical decisions, choose the simplest option consistent with ADR-0002 and record it.
-6. **Code identifiers are English**, following the glossary below. Never use transliterated Vietnamese for table, column, command or variable names.
-7. **Reference IDs:** Principles 1–13; decisions D1–D17; Build steps 0–11; build principles B1–B8 (`11-build-order.md`); chart-of-accounts rules 1–7 (`06-localization.md`); ADR-0001, ADR-0002; design items DS-xx; invariants INV-xx (DS-16); edge cases EC-xx (DS-17, see `12-testing.md`). Commits, new ADRs and open questions must cite these IDs.
+6. **Code identifiers are English**, following the glossary below and the naming conventions in [ADR-0004](../adr/0004-naming-conventions.md). Never use transliterated Vietnamese for table, column, command or variable names.
+7. **Reference IDs:** Principles 1–13; decisions D1–D17; Build steps 0–11; build principles B1–B8 (`11-build-order.md`); chart-of-accounts rules 1–7 (`06-localization.md`); ADR-nnnn (`docs/adr/`); design items DS-xx; invariants INV-xx (DS-16); edge cases EC-xx (DS-17, see `12-testing.md`). Commits, new ADRs and open questions must cite these IDs.
 
 **Glossary and code identifiers:**
 
@@ -53,6 +53,51 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Golden scenario | golden\_scenario | A business case with expected results from a hand-built spreadsheet |
 | Invariant | INV-xx | A named rule checked after every scenario; catalog in DS-16 |
 | Edge case | EC-xx | A named situation the simulator injects at a known frequency; catalog in DS-17 |
+| Module | module | Python package `erpme.<module>`; list and database layout in DS-18 ([ADR-0004](../adr/0004-naming-conventions.md)) |
+| Command type | command\_type | Name of a command: `PascalCase` verb from the command verb list + glossary noun, e.g. `PostGoodsReceipt`; `snake_case` form for MCP tools and handlers |
+| Query | query | Read-only operation: `Get<Noun>` (one record), `List<Noun>` (filtered list). Not a command; no idempotency key |
+| Event, event type | event, event\_type | A fact written to the outbox: `PascalCase` noun + the verb's event form, e.g. `GoodsReceiptPosted`; schema in DS-13 |
+| Outbox | outbox | Transactional outbox written in the same transaction as the state change (D4); design in DS-13 |
+| Technical job | job | Background job on the technical queue (Procrastinate); distinct from work\_item |
+| Idempotency key | idempotency\_key | Per (actor, command type), Principle 9; retention and rules in DS-04 |
+| Schema version | schema\_version | Version of a command schema (semver, [07](07-shared-foundation.md#extensibility-and-upgrades)) or an event schema (DS-13); rules in DS-04 |
+| Lifecycle state column | state | Column holding a lifecycle value, such as a document state or a posting period state; see open questions for work items |
+
+**Command verbs** ([ADR-0004](../adr/0004-naming-conventions.md) rules 17–22). A command type starts with one of these verbs; its event, if any, ends with the event form. The intent column says what the verb is for, nothing more: which states and preconditions allow a command is decided by DS-05 and the DS item that owns the noun. A new verb is added here, with its intent and event form, in the same change as the first command that needs it; a verb never takes a second meaning.
+
+| Verb | Intent | Event form |
+| --- | --- | --- |
+| Create | Bring a new document or master-data record into existence | Created |
+| Update | Change an existing document or master-data record | Updated |
+| Delete | Remove a record | Deleted |
+| Submit | Send a document version for approval | Submitted |
+| Approve | Approve a document version | Approved |
+| Reject | Reject a document version | Rejected |
+| Post | Make a document part of the books or the stock records | Posted |
+| Reverse | Post a reversal document for a posted document | Reversed |
+| Cancel | End an open document that is not posted | Canceled |
+| Match, Unmatch | Link or unlink open items, bank lines or documents | Matched, Unmatched |
+| Allocate | Distribute an amount or quantity over targets | Allocated |
+| Import | Read an external file into the system | Imported |
+| Run | Start a deterministic system job, e.g. period-end actual costing | Completed (`<job noun>Completed`) |
+| Assign | Set the owner of a work item | Assigned |
+
+Verbs for posting period states, work item locking and command batch execution are added by DS-12, DS-29 and DS-04. A posted document is never canceled: it is reversed (Principle 5), so Cancel never applies to posted documents.
+
+**Allowed abbreviations** ([ADR-0004](../adr/0004-naming-conventions.md) rule 2). No other abbreviation is used in an identifier. Terms not listed are written in full: `cost_of_goods_sold`, `receivable`, `payable`, `general_ledger`, `bill_of_materials`.
+
+| Abbreviation | Stands for |
+| --- | --- |
+| id | identifier |
+| uom | unit of measure |
+| fx | foreign exchange |
+| vat | value-added tax |
+| gr\_ir | goods received / invoice received |
+| l10n, i18n | localization, internationalization |
+| llm, ui | large language model, user interface |
+| api, rest, mcp, url, http, oidc | the standard interface and protocol terms |
+| json, xml, html, csv, xlsx, pdf, sql | the standard file format and language names |
+| pk, fk, uq, ix, ck, trg | prefixes of database constraint, index and trigger names only ([ADR-0004](../adr/0004-naming-conventions.md) rule 15) |
 
 **Regulatory terms:** definitions only; the rules themselves are in the localization files and the open questions.
 
