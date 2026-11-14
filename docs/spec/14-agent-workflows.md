@@ -1,9 +1,9 @@
 # First agentic workflows and guardrails
 
-The first four workflows are ordered by data availability and risk: structured, low-risk data first, so the pilot customer sees value in the first weeks.
+The first four workflows are numbered by pilot value: structured, low-risk data first, so the pilot customer sees value in the first weeks. The build order is in [11-build-order.md](11-build-order.md#steps-and-gates): data migration, quotation, bank matching, purchase invoices.
 
 1. **Purchase invoices from e-invoices:** fetch incoming invoices through the e-invoice provider, T-VAN or the receiving mailbox, and three-way match against the PO and goods receipt. Structured data, low risk, immediate benefit for accountants.
-2. **Data migration:** map master data from Excel or MISA, detect duplicates, look up tax IDs, build opening balances as a simulated command batch. This removes the biggest adoption barrier and never touches posted books.
+2. **Data migration:** map master data from the Excel template or the pilot's current system, detect duplicates, look up tax IDs, build opening balances as a simulated command batch. This removes the biggest adoption barrier and never touches posted books. The run's read scope is the import batch.
 3. **Request intake and quotation drafting:** email first, chat channels after Phase 1. Needs clean master data and price lists, so it follows data migration.
 4. **Bank statement matching:** start with statement-file import for 2–3 common banks, because Vietnamese bank APIs require individual partnerships.
 
@@ -22,13 +22,13 @@ Each workflow is a sequence of steps orchestrated by code, not a free agent (Pri
 
 Metric: the share of steps handled by deterministic functions in each workflow. It must rise over time, and LLM cost per document must fall with it.
 
-Default policy guardrails. Customers can adjust them per action type and threshold:
+Default policy guardrails. Customers can adjust them per action type and threshold, except the hard floors in [03-agent-safety.md](03-agent-safety.md) (untrusted content, segregation of duties and the "Human only" rows), which cannot be relaxed:
 
 | Agent action type | Default |
 | --- | --- |
 | Read, query, summarize | Automatic |
 | Create document drafts (quotation, PO, purchase invoice) | Automatic; a human confirms before posting |
-| High-confidence bank match below an amount threshold | Auto-post; a human reviews afterwards |
+| High-confidence bank match below an amount threshold | Draft. After shadow mode passes, deterministic matching may auto-post high-confidence matches below the threshold with no LLM contribution; a human reviews afterwards |
 | Post documents above the threshold, or post directly to expense | Requires approval |
 | Send messages or emails to customers or suppliers | Draft; a human sends. Auto-send only for permitted types |
 | Change master data (partner, item, price) | Requires approval |
@@ -39,5 +39,5 @@ Default policy guardrails. Customers can adjust them per action type and thresho
 An agent gains permissions only with evidence, never by impression.
 
 - **Metrics per workflow:** share of drafts accepted unedited and degree of editing; auto-match accuracy, defects found later and documents reversed because of the agent; handling time per document versus the baseline measured before enabling the agent; LLM cost per document.
-- **Shadow mode:** the agent only proposes, without effect, on a set of real transactions. Only when accuracy exceeds the threshold may it auto-post below the limit.
-- **The evaluation suite** draws on reference data, anonymized pilot data and the sample company, and runs with Principle 11.
+- **Shadow mode:** the agent only proposes, without effect, on a set of real transactions. Only when accuracy exceeds the threshold may the workflow auto-post below the limit, within the rules of [03-agent-safety.md](03-agent-safety.md).
+- **The evaluation suite** draws on the synthetic dataset. Anonymized pilot data is used only outside the repository; pilot data never enters the repository. The suite runs as set in [Principle 11](02-principles.md).

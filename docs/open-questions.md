@@ -3,9 +3,22 @@
 - [ ] Verify against the original TT99 text: FX rules (413, 515, 635), the standard-cost method, removal of accounts 611/631.
 - [ ] Confirm TT133's status and the B03 requirement for TT133 businesses.
 - [ ] Verify Decree 70/2025 on e-invoices, the VAT deduction rule for invoices of VND 5 million or more, and the implementing decree of the Personal Data Protection Law.
-- [ ] Detailed design of command schemas and generating REST, MCP and UI forms from one source (decided in step 0; tools decided in ADR-002).
+- [ ] Detailed design of command schemas and generating REST, MCP and UI forms from one source (decided in step 0; tools decided in ADR-0002).
 - [ ] Policy-engine rule language and customer self-configuration (after Phase 1; Phase 1 uses a threshold table).
-- [ ] System account catalog; TT99, TT133 and US GAAP operational chart templates with mappings; transaction key × valuation class → account tables per template. Whether foreign-invested companies that operate on a group chart but file VAS need an additional mapping to a country chart (after Phase 1).
+- [ ] System account catalog; TT99, TT133 and US GAAP operational chart templates with mappings; transaction key × valuation class × valuation area → operational account tables per template. Whether foreign-invested companies that operate on a group chart but file VAS need an additional mapping to a country chart (after Phase 1).
 - [ ] GitHub organization for the public repository (project name decided: ERPMe, D17).
 - [ ] Answers to partners' questions: will auditors and tax authorities accept the books, estimated monthly LLM cost, who supports customers when the author is busy, management reporting and BI, performance at about 100,000 documents per year.
-- [ ] Select the pilot customer by the Roadmap criteria, after the platform is complete (step 10).
+- [ ] Select the pilot customer by the [pilot selection criteria](spec/10-roadmap.md), after the platform is complete (step 10).
+- [ ] (DS-09) Where do the existing periodic-average costing engine and the two earlier documents (*Preliminary survey: VAS costing on Odoo 19* and *Open platform direction for Vietnamese manufacturing on Odoo 20 CE*) live, and will they be added to `docs/archive/`?
+- [ ] (DS-11) VAS treatment of landed cost that belongs to an earlier, closed period: is posting it in the current period and allocating it by consumer (stock on hand, transfers, COGS, production) acceptable? Verify.
+- [ ] (DS-10) Period-end FX revaluation: reverse at the start of the next period and repost, or post only the delta? Which book rate is used for realized FX after a revaluation?
+- [ ] (DS-09, DS-10, DS-11, DS-19) Which rate values an import goods receipt?
+- [ ] (DS-09, DS-10, DS-11, DS-19) Does the rate difference between goods receipt and purchase invoice go to FX gain or loss, or to price difference and inventory?
+- [ ] (DS-09, DS-10, DS-11, DS-19) Which TT99 account holds GR/IR clearing, and on which B01 line is it presented? Verify.
+- [ ] (DS-12) What does period control "per account type" mean?
+- [ ] (DS-05, DS-06) Reversal: storno (negative amounts) or swapped debit and credit? This is a localization choice, because it changes turnover in the Vietnamese trial balance.
+- [ ] (DS-05, DS-06) Posting date of a reversal when the original document's period is locked.
+- [ ] (DS-05, DS-06) Value of a reversed material document.
+- [ ] (DS-05, DS-06) Cost of a sales return: the original issue cost or the current preliminary price? Do returns enter the period average?
+- [ ] (DS-09) At which time point is the negative-stock check made when a document is backdated?
+- [ ] (DS-06) Is a dependent unit with its own tax ID a company or a branch?

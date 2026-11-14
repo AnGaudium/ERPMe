@@ -4,5 +4,5 @@ One file per decision, named `NNNN-short-title.md`, using [template.md](template
 
 | ADR | Title | Status |
 | --- | --- | --- |
-| [0001](0001-programming-language.md) | Programming language | Accepted, 2026-11-12 |
-| [0002](0002-core-technology-tools.md) | Core technology tools | Accepted, 2026-11-14 |
+| [ADR-0001](0001-programming-language.md) | Programming language | Accepted (2026-11-12) |
+| [ADR-0002](0002-core-technology-tools.md) | Core technology tools | Accepted (2026-11-14) |

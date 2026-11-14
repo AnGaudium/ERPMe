@@ -1,6 +1,6 @@
 # AI seatmap and data classification
 
-The seatmap defines which model does what, at which effort level, and which data classes it may see. It is a configuration file (`seatmap.yaml`) changed through the pipeline, and it must pass the agent evaluation suite before taking effect.
+The seatmap defines which model does what, at which effort level, and which data classes it may see. In Phase 1 it is a configuration file (`seatmap.yaml`) in the core repo, changed by commit, and it must pass the agent evaluation suite before taking effect. (After Phase 1) Each customer's seatmap changes through the customer pipeline.
 
 ## Multi-model, no lock-in to one provider (Phase 1: one provider behind a common interface)
 
@@ -13,7 +13,7 @@ The system works with many models and providers, including local models. No busi
 - **Prompts and skills are provider-neutral**, with small per-provider overlays where needed. Skills are Markdown following common conventions so different coding agents can read them.
 - **Agent tools go through MCP**, a provider-neutral protocol.
 - **Fallback chains may cross providers**, but always respect data labels: when the routing switch is on, a seat with personal data only falls back to another local model.
-- **Every (seat, model) pair must pass evaluation before use.** Changing a model is a configuration change through the pipeline, not a code change.
+- **Every (seat, model) pair must pass evaluation before use.** Changing a model is a configuration change (a commit in Phase 1, the customer pipeline after Phase 1), not a code change.
 
 ## Data classification and routing
 
@@ -21,7 +21,7 @@ The system provides the mechanism; whether to enforce it is the customer's decis
 
 - **Labels on every entity and field**, part of the self-describing data layer (Principle 7): public, internal, personal, sensitive personal.
 - **Default label personal** for contacts, users, employees, email and message content, and tax IDs and addresses of household businesses and individuals. A company's tax ID is public.
-- **When the switch is on, routing is enforced in the LLM gateway, not by prompt:** any request whose context contains a personal-labeled field may go only to a seat with a local model. The gateway rejects it if the selected seat uses a cloud model.
+- **When the switch is on, it is enforced in the LLM gateway, not by prompt.** Phase 1 has no local models: personal-labeled fields are removed from every LLM request, and the gateway rejects a request that still contains one. (After Phase 1) A request whose context contains a personal-labeled field may go only to a seat with a local model; the gateway rejects it if the selected seat uses a cloud model.
 - **Logging always on:** whether the switch is on or off, the gateway records which personal-labeled fields were sent to cloud models, for the legally required processing log.
 - (After Phase 1) **Optional pseudonymization** (only where the customer's policy allows): replace personal fields with surrogate codes before sending to a cloud model and restore them locally. Strict mode uses local models only.
 - **Embeddings and logs:** when the switch is on, embeddings of personal data are computed by a local embedding model. Agent run logs containing personal data are stored locally and follow the deletion process.

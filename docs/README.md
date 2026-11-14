@@ -4,7 +4,7 @@ This folder is the source of truth for the ERPMe specification (D17). Everything
 
 ## Reading order
 
-1. [spec/00-reading-guide.md](spec/00-reading-guide.md): how to read these documents, glossary of code identifiers.
+1. [spec/00-reading-guide.md](spec/00-reading-guide.md): how to read these documents, regulatory terms, glossary of code identifiers.
 2. [decisions.md](decisions.md): decided items D1–D17.
 3. [spec/01-vision.md](spec/01-vision.md) and [spec/02-principles.md](spec/02-principles.md).
 4. [spec/10-roadmap.md](spec/10-roadmap.md) and [spec/11-build-order.md](spec/11-build-order.md): phases, lean scope, build steps and gates.

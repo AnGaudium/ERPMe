@@ -1,4 +1,4 @@
-# Vision and decisions
+# Vision
 
 Build a completely new open-source ERP, designed from the ground up for agentic workflows. The target is trading and assembly businesses worldwide, with CRM from day one. English is the source language, with a Vietnamese translation shipped. The accounting and inventory core follows the SAP model: S/4HANA for the data model, Business One for SME scope and leanness. Every country-specific rule lives in a localization package; the first packages are Vietnam and the US, and the first pilot customer is in Vietnam. The architecture is simple and does not try to do everything, but whatever it does, it does in depth.
 
@@ -12,6 +12,6 @@ Kept from the earlier direction: fully open source with an OCA-style license; pa
 
 Overarching principle: **the business core is fully deterministic; AI lives only in the proposal layer.** The books never depend on whether an LLM answered correctly.
 
-**Motivation and open commitment.** The project is not for profit. The goal is a fully open, agentic-by-design ERP: no Enterprise edition, no closed modules, no split between open and paid features as in Odoo. Once Phase 1 is done and a customer runs on it, the expectation is that the community contributes to complete the solution, and every contribution stays in the same open codebase. Details in License and project governance.
+**Motivation and open commitment.** The project is not for profit. The goal is a fully open, agentic-by-design ERP: no Enterprise edition, no closed modules, no split between open and paid features as in Odoo. Once Phase 1 is done and a customer runs on it, the expectation is that the community contributes to complete the solution, and every contribution stays in the same open codebase. Details in [License and project governance](18-license-governance.md).
 
 **Resources and timeframe.** A team of one person who knows accounting and business processes, understands large systems and Odoo's problems, and uses AI for design and development. Timeframe 12–18 months: the most logical build order takes priority over dates. No commitment to any customer until the platform is complete. The solution must be lean and include only practical features.

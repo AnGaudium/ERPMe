@@ -11,4 +11,4 @@ ERPMe is a fully open-source ERP designed from the ground up for agentic workflo
 
 ## License
 
-The core will be licensed under AGPL-3.0; SDK and client libraries under Apache-2.0; documentation under CC BY-SA 4.0; sample data under CC0. See [docs/spec/18-license-governance.md](docs/spec/18-license-governance.md). License files are added before the repository is made public.
+The core will be licensed under AGPL-3.0; SDK and client libraries under Apache-2.0; documentation under CC BY-SA 4.0; the synthetic dataset under CC0. See [docs/spec/18-license-governance.md](docs/spec/18-license-governance.md). License files are added before the repository is made public.

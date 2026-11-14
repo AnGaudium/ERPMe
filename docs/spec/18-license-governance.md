@@ -5,7 +5,7 @@
 | Core and business modules | AGPL-3.0, OCA-style | Every modification and every plugin running in the core's process must be open. LGPL is not chosen because it allows closed modules running with the core, part of why Odoo's ecosystem is half-open |
 | SDK, command schemas, client libraries | Apache-2.0 | External integrations and agents are not constrained |
 | Documentation | CC BY-SA 4.0 | Allows translation and redistribution |
-| Sample data | CC0 | Free use for demos and training |
+| Synthetic dataset | CC0 | Free use for demos and training |
 
 - Contributions: DCO instead of a CLA. A trademark policy for the project name.
 - Governance: state clearly that in the early phase one person has final say (BDFL). Write down the conditions for inviting co-maintainers, e.g. a partner who has deployed successfully. Later, every repo has at least two people with merge rights.
@@ -22,6 +22,6 @@
 
 **How the community forms after Phase 1:** the real contributors to an ERP are partners and businesses with real needs, rarely independent developers. So prepare during Phases 0 and 1:
 
-- A reference customer in production, the sample company, a public demo and documentation good enough for outsiders to install and run it alone.
+- A reference customer in production, the synthetic dataset, a public demo and documentation good enough for outsiders to install and run it alone.
 - Areas that are easy to contribute to and barely touch the core: e-invoice adapters, bank statement readers, print templates, readers for other software's data, updates for new circulars and decrees, localization packages for other countries.
-- Invite Vietnamese Odoo partners who face exactly the problems this document describes.
+- Invite Vietnamese Odoo partners who face exactly the problems listed in [01-vision.md](01-vision.md).

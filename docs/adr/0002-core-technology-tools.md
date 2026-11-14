@@ -1,10 +1,14 @@
-# ADR-002: Core technology tools
+# ADR-0002: Core technology tools
 
-Status: accepted, 2026-11-14.
+Status: accepted (2026-11-14). Design item: —. Related decisions: D14.
 
-**Decision:** use popular, mature tools; let PostgreSQL do everything it can; write only what makes the product.
+## Decision
 
-**Context:** one developer, most code written by AI. Popular libraries help AI write correct code; every dependency is maintenance, so choose few.
+Use popular, mature tools; let PostgreSQL do everything it can; write only what makes the product.
+
+## Context
+
+One developer, most code written by AI. Popular libraries help AI write correct code; every dependency is maintenance, so choose few.
 
 **Backend:**
 
@@ -59,8 +63,14 @@ Status: accepted, 2026-11-14.
 
 **Self-written:** command registry and dispatcher (generating REST, MCP, forms, running simulation); universal journal and posting logic; cross-checked account determination; inventory and costing engine; policy table; localization package loader; form builder.
 
-**Revisit when:**
+## Revisit when
 
 - Procrastinate does not meet measured throughput: consider a dedicated queue.
 - The journal grows to where reports are measurably slow: partition by fiscal year.
 - WeasyPrint cannot render complex print templates: consider headless Chromium in the PDF worker.
+
+## Documents updated
+
+- [docs/decisions.md](../decisions.md): D14.
+- [docs/spec/00-reading-guide.md](../spec/00-reading-guide.md): rule 5 (small technical decisions).
+- [docs/open-questions.md](../open-questions.md): command schema tooling.
