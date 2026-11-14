@@ -22,7 +22,8 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Actor, principal acted for | actor, on\_behalf\_of | Actor kinds: human, agent, integration, system. A system actor is a deterministic job (costing, FX revaluation, closing entries, scheduled matching); its on\_behalf\_of is always the accountable human: the policy owner or the human who triggered the job |
 | Company, branch | company (company\_id), branch | Branch is an analytical dimension |
 | Document | document | Header and lines |
-| Document state | draft, pending\_approval, approved, posted, reversed | Only posted documents are immutable |
+| Document state | draft, pending\_approval, approved, posted, reversed, canceled, closed | Documents in a final state (posted, reversed, canceled, closed) are immutable; `closed` ends an approved non-posting document that has had activity, `canceled` one that has had none; column `document.state` ([ADR-0009](../adr/0009-document-lifecycle.md)) |
+| Document type | document\_type; is\_posting, is\_approval\_hold\_allowed, is\_reversible | Registered once per type; the flags say whether it posts, whether its posting may wait for approval, and whether it can be reversed ([ADR-0009](../adr/0009-document-lifecycle.md) rule 2) |
 | Reversal document | reversal\_of | Points to the document it reverses; passes the same period checks as any document. Column `reversal_of_id` ([ADR-0004](../adr/0004-naming-conventions.md) rule 12) |
 | Journal entry, journal line | journal\_entry, journal\_line |  |
 | Universal journal | journal\_line | One table carrying all analytical dimensions; canonical list in [05](05-accounting-inventory-core.md) |
@@ -44,7 +45,10 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Accounting regime | accounting\_regime | Rule set inside a localization package; the Vietnam package has two: TT99 and TT133 |
 | Localization package | localization\_package | e.g. l10n\_vn, l10n\_us |
 | Work queue item | work\_item | Business work; distinct from technical jobs (job) |
-| Policy, approval | policy, approval |  |
+| Policy, approval | policy, approval | An approval row binds to a document version and its `version_hash`; a new version voids it ([ADR-0009](../adr/0009-document-lifecycle.md) rule 11) |
+| Document version, version hash | document\_version, version\_hash | Every change to an unposted document writes a new version; its canonical content is hashed with SHA-256 |
+| Numbering series | numbering\_series | Gapless counter per company, document type, fiscal year and optional branch; posting documents are numbered at posting, by the fiscal year of the posting date ([ADR-0009](../adr/0009-document-lifecycle.md) rules 8, 15) |
+| Policy decision | policy\_decision | The policy engine's outcome (allow, deny, approval required, human only) stored against a document version ([ADR-0009](../adr/0009-document-lifecycle.md) rule 11) |
 | Partner, item, warehouse | partner, item, warehouse | One partner, many roles |
 | Data label | data\_label | public, internal, personal, sensitive\_personal |
 | Routing switch | routing\_switch | Per company, off by default. In Phase 1, when on, personal-labeled fields are removed from every LLM request |
@@ -106,6 +110,7 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Import | Read an external file into the system | Imported |
 | Run | Start a deterministic system job, e.g. period-end actual costing | Completed (`<job noun>Completed`) |
 | Assign | Set the owner of a work item | Assigned |
+| Close | End further activity on an approved record that has had some, e.g. an order | Closed |
 
 Verbs for posting period states and work item locking are added by DS-12 and DS-29; a command batch needs no verb ([ADR-0008](../adr/0008-command-envelope-and-registry.md) rule 20). A posted document is never canceled: it is reversed (Principle 5), so Cancel never applies to posted documents.
 

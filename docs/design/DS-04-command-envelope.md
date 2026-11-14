@@ -116,6 +116,7 @@ Module-specific codes are added by the DS item that owns the module, in the regi
 | `record_not_found` | not_found | 404 | no | A referenced `id` does not exist or is not visible to the actor; `details` names the table and the `List<Noun>` query (ADR-0006 rule 5) |
 | `plan_hash_mismatch` | conflict | 409 | no | ADR-0008 rule 13; `details` has the new `plan` and `plan_hash` |
 | `idempotency_key_reused` | conflict | 409 | no | ADR-0008 rule 16 |
+| `version_conflict` | conflict | 409 | no | The document changed since the client read it; `details.current_version` ([ADR-0009](../adr/0009-document-lifecycle.md) rule 10) |
 | `concurrent_update` | conflict | 409 | yes | Lock timeout, deadlock or serialization failure |
 | `request_too_large` | too_large | 413 | no | The body exceeds the size limit (DS-18) |
 | `validation_failed` | validation | 422 | no | A field is missing, of the wrong type or out of range; one item per field |
@@ -125,6 +126,9 @@ Module-specific codes are added by the DS item that owns the module, in the regi
 | `schema_version_unsupported` | validation | 422 | no | ADR-0008 rule 23; `details.served` lists the versions |
 | `batch_too_large` | validation | 422 | no | More items than the installation's limit |
 | `approval_required` | precondition | 422 | no | The policy engine requires an approval first (DS-28) |
+| `invalid_state_transition` | precondition | 422 | no | The command is not allowed in the document's state; `details` lists the allowed commands ([ADR-0009](../adr/0009-document-lifecycle.md) rule 5) |
+| `posting_date_mismatch` | validation | 422 | no | `Post` carries a `posting_date` different from the document's ([ADR-0009](../adr/0009-document-lifecycle.md) rule 9) |
+| `document_referenced` | precondition | 422 | no | Delete or cancel of a document that other documents refer to ([ADR-0009](../adr/0009-document-lifecycle.md) rule 7) |
 | `rate_limited` | rate_limited | 429 | yes | `details.retry_after_seconds` says when to retry |
 | `internal_error` | internal | 500 | no | Anything unexpected; the response carries only a reference for the logs |
 | `timeout` | unavailable | 503 | yes | `transaction_timeout` reached (ADR-0008 rule 11) |
