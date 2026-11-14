@@ -42,7 +42,7 @@ The hard floor on what a tainted run may read stays the literal spec 03 rule 1 u
    - **Approval.** `draft → pending_approval` by `Submit` (a policy point). `Approve` or `Reject` by a human. `Reject` returns the proposal to `draft`, and `Cancel` ends it.
    - **Who may approve.** The approver must hold the target permissions and every field class the proposal changes (ADR-0017 rule 10), and sees the plan filtered by their field classes. The human for whom the originating run acted cannot approve (`segregation_of_duties`, ADR-0017 rule 16, which scans every version). Whether a human may approve a proposal they wrote stays ADR-0017 rule 17's open question.
    - **Execution.** A transactional consumer of `ChangeProposalApproved` executes the items as one command batch (ADR-0008 rule 20). It runs as actor `system`, on behalf of the approving human, with key `<consumer>:<event id>:1`, the stored `plan_hash` as `expected_plan_hash` (an exception to ADR-0013 rule 9, which otherwise runs internal calls without one), and each item's `expected_version`. The batch runs inside a savepoint of the delivery transaction.
-   - **Success.** The consumer writes an immutable `change_proposal_execution` row (proposal version, audit row of each item, `executed_at`), and runs `CloseChangeProposal`, which moves the proposal to `closed`.
+   - **Success.** The consumer writes an immutable `change_proposal_execution` row (proposal version, audit row of each item, `executed_at`), and runs `CloseChangeProposal`, which moves the proposal to `closed`. The audit record IDs come from the dispatch result ([ADR-0038](0038-audit-and-observability.md) rule 1).
    - **Failure.** A retryable error (`concurrent_update`, `timeout`) rolls back the delivery and is retried (ADR-0013 rule 8). On any non-retryable error, such as `plan_hash_mismatch` or `target_changed`, the consumer rolls back to the savepoint and runs `UpdateChangeProposal` as `system`, which commits with the delivery. That writes the next version with the error and the new plan, voids the approval (ADR-0009 rule 9), returns the proposal to `draft`, and creates a work item.
    - **Expiry.** A system job cancels proposals that are not approved within `change_proposal_ttl_days`, with reason `expired` (company setting, interim default 14).
    - **Query.** `ListChangeProposal`.
@@ -118,7 +118,7 @@ The hard floor on what a tainted run may read stays the literal spec 03 rule 1 u
 
 **Audit and checks**
 
-15. Audit rows (ADR-0027 rule 8) also record `origin_agent_run_id`, `on_behalf_of_id` and `policy_decision_id`.
+15. Audit rows (ADR-0027 rule 8) also record `origin_agent_run_id`, `on_behalf_of_id` and `policy_decision_id`. Full columns: [ADR-0038](0038-audit-and-observability.md) rule 2.
 16. Invariants:
     - **INV-84:** no policy decision with outcome `allowed` for a non-human actor concerns a document version (change proposals included) that was effectively tainted at the time of the decision.
     - **INV-85:** no audit row with actor `system` and an origin agent run has effect class `posting` or `master_data_change`. Outbound sends are covered by INV-80 and the automatic-send list (ADR-0019 rule 17). The intersection itself (rule 12) is a DS-16 hard-floor property test.

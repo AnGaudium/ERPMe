@@ -29,6 +29,7 @@ The actor, `on_behalf_of` and `agent_run_id` are never in the request; the dispa
 | `recorded_at` | `execute` and replays | Instant of the transaction (ADR-0007 rule 10) |
 | `events` | `simulate` | Event types the command would emit, in order; not part of `plan_hash` ([ADR-0013](../adr/0013-outbox-and-events.md) rule 5) |
 | `replayed` | always | `true` when the response comes from `idempotency_record` (ADR-0008 rules 16–18), otherwise `false` |
+| `audit_record_id` | always | The audit record of the executed command; null in simulate mode ([ADR-0038](../adr/0038-audit-and-observability.md) rule 1). In a batch, per item |
 
 ## Command batch
 
@@ -159,6 +160,10 @@ Module-specific codes are added by the DS item that owns the module, in the regi
 | `make_to_order_not_allowed` | validation | 422 | no | `make_to_order` needs source `production`, method `net_requirements` and lot size `exact` ([ADR-0036](../adr/0036-multi-level-mrp.md) rule 9) |
 | `movement_not_allowed_at_processor` | validation | 422 | no | Only transfers, production issues and returns, and count differences post at a processor location ([ADR-0037](../adr/0037-subcontracting.md) rule 1) |
 | `service_receipt_without_operation` | validation | 422 | no | A service receipt line needs a purchase line tied to a production order operation ([ADR-0037](../adr/0037-subcontracting.md) rule 11) |
+| `attachment_too_large` | too_large | 413 | no | The file exceeds `attachment_max_bytes` ([ADR-0038](../adr/0038-audit-and-observability.md) rule 13) |
+| `attachment_type_not_allowed` | validation | 422 | no | The media type detected from the bytes is not on the allowed list ([ADR-0038](../adr/0038-audit-and-observability.md) rule 13) |
+| `attachment_rejected` | precondition | 422 | no | The same bytes were rejected by the scanner before ([ADR-0038](../adr/0038-audit-and-observability.md) rule 14) |
+| `attachment_not_available` | precondition | 422 | no | The attachment is not `clean` (pending scan or rejected): its bytes are not served, and a document linked to it cannot be posted ([ADR-0038](../adr/0038-audit-and-observability.md) rule 14) |
 | `quantity_rounds_to_zero` | validation | 422 | no | The quantity converted to the inventory unit rounds to zero ([ADR-0018](../adr/0018-product-and-item-model.md) rule 11) |
 | `invalid_timestamp` | validation | 422 | no | ADR-0007 rule 3 |
 | `schema_version_unsupported` | validation | 422 | no | ADR-0008 rule 23; `details.served` lists the versions |
@@ -233,6 +238,8 @@ Module-specific codes are added by the DS item that owns the module, in the regi
 | `planning_parameter_missing` | check result | — | — | An item was skipped by the run: no supplier, route or lead time ([ADR-0024](../adr/0024-planning.md) rule 21) |
 | `forecast_history_insufficient` | check result | — | — | Too little history for the forecast method ([ADR-0024](../adr/0024-planning.md) rule 11) |
 | `customs_assessment_differs` | check result | — | — | Assessed import tax differs from the amount recomputed from the tax codes; the assessed amount is kept ([ADR-0021](../adr/0021-landed-cost.md) rule 10) |
+| `scan_unavailable` | check result | — | — | No scanner is deployed and scan mode is `optional`; the attachment passed unscanned ([ADR-0038](../adr/0038-audit-and-observability.md) rule 14) |
+| `audit_changes_summarized` | check result | — | — | The command changed more than 10,000 tracked rows; the audit record stores field names and hashes instead of values ([ADR-0038](../adr/0038-audit-and-observability.md) rule 3) |
 | `consent_missing` | precondition | 422 | no | The message's purpose needs consent that the data subject has not given ([ADR-0019](../adr/0019-partners-and-crm-foundation.md) rule 9) |
 | `approval_required` | precondition | 422 | no | The policy engine requires an approval first (DS-28) |
 | `invalid_state_transition` | precondition | 422 | no | The command is not allowed in the document's (including `issuing` and change states, ADR-0028) or warehouse task's state; `details` lists the allowed commands ([ADR-0009](../adr/0009-document-lifecycle.md) rule 5) |

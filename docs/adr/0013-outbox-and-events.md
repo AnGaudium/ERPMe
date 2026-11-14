@@ -29,7 +29,7 @@ A command writes its state changes, its journal and stock rows, its events and o
 **Technical queue**
 
 13. The technical queue is Procrastinate on PostgreSQL (ADR-0002). It runs the delivery workers and the system jobs, on these queues: `events` (delivery workers), `jobs` (system jobs such as costing, revaluation, close tasks and scheduled jobs; ADR-0012), `integrations` (calls to outside systems) and `pdf` (the PDF worker in its own process, ADR-0002). Scheduled jobs use Procrastinate's periodic tasks. A job's arguments are JSON in canonical forms and include the business date and the actor context it runs under (ADR-0007 rule 17); a delivery takes both from its event row. Procrastinate jobs are never enqueued on a command handler's path, so its job sequences are never touched by a simulation (ADR-0008 rule 9). Jobs are technical work, distinct from business work items. The `jobs` queue also runs long-job consumers until the author decides OPT-08 ([ADR-0031](0031-design-simplifications.md) rule 15).
-14. Delivery rows and events carry `company_id`, and row-level security and the consumer's company context follow DS-15; installation-scoped events (`company_id` null) are delivered only to installation-scoped consumers. Consumer spans in OpenTelemetry link to the event's `trace_id` (DS-36).
+14. Delivery rows and events carry `company_id`, and row-level security and the consumer's company context follow DS-15; installation-scoped events (`company_id` null) are delivered only to installation-scoped consumers. Consumer spans in OpenTelemetry link to the event's `trace_id` (DS-36). Telemetry rules: [ADR-0038](0038-audit-and-observability.md) rules 10–11.
 
 **Retention, replay and versions**
 

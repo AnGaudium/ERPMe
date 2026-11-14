@@ -52,7 +52,7 @@ Checks:
    | 5 · Interfaces | `api` (REST and MCP generated from the registry), `query` (read-only layer, DS-33), `agents` (after step 4), `sdk` (rule 4), `imports` (staged data imports, [ADR-0030](0030-commercial-seams-and-imports.md) rule 9) |
    | 4 · Commercial | `sales`, `purchasing`, `cash` (from steps 5–6), `crm`, `planning` ([ADR-0024](0024-planning.md); it reads `production.contract`'s planning function and structures ([ADR-0036](0036-multi-level-mrp.md) rule 3) and `inventory.contract`'s `demand_supply_line` and hands over through `inventory.contract.request_replenishment`) |
    | 3 · Core business | `ledger` (journal, accounts, account determination, multi-currency), `inventory` (material documents, stock, costing, landed cost, and the warehouse management tables of [ADR-0023](0023-warehouse-management.md)), `master_data` (partners, products, warehouses, units, currencies, working calendars per [ADR-0033](0033-production-master-data.md) rule 11), `tax`; `production` (Phase 1 per [ADR-0032](0032-phase-1-scope-with-production.md); master data per [ADR-0033](0033-production-master-data.md)) and `assets` (Phase 3) per [ADR-0025](0025-later-phase-seams.md) |
-   | 2 · Platform | `registry` (command registry, dispatcher, envelope, idempotency; its public entry point `erpme.registry.dispatch`), `documents` (lifecycle, versions, numbering), `periods`, `permissions`, `outbox`, `audit`, `localization` (loader), `db` (engine, session settings, RLS context, the generic lock helper and the lock-order registry, the `MetaData` naming convention), `agent_runs`, `work`, `attachments` ([ADR-0027](0027-cross-cutting-ownership.md) rule 1; `documents` and `permissions` may import the `agent_runs` contract) |
+   | 2 · Platform | `registry` (command registry, dispatcher, envelope, idempotency; its public entry point `erpme.registry.dispatch`), `documents` (lifecycle, versions, numbering), `periods`, `permissions`, `outbox`, `audit`, `localization` (loader), `db` (engine, session settings, RLS context, the generic lock helper and the lock-order registry, the `MetaData` naming convention), `agent_runs`, `work`, `attachments` ([ADR-0027](0027-cross-cutting-ownership.md) rule 1; `documents` and `permissions` may import the `agent_runs` contract; `documents` may import the `attachments` contract, [ADR-0038](0038-audit-and-observability.md) rule 14) |
    | 1 · Foundation | `numeric` (ADR-0006), `clock` (ADR-0007), `ids`, `i18n`, `errors` |
 
 3. Shape of each module:
@@ -132,7 +132,7 @@ Checks:
      - `transaction_timeout` is 30 s for commands and queries, 4 min for consumer transactions (inside ADR-0013's 5-minute lease), and 15 min for registered long jobs (period-end costing, planning and forecast runs per [ADR-0024](0024-planning.md) rule 17, close tasks, import chunks per [ADR-0030](0030-commercial-seams-and-imports.md) rule 9);
      - `idle_in_transaction_session_timeout` is 60 s;
      - `statement_timeout` is 30 s for `erpme_readonly` (DS-33 may lower it).
-   - **Timeouts and limits.** Exceeding a timeout returns `concurrent_update` or `timeout` (ADR-0008 rule 11). Request bodies are limited to 10 MiB (`request_too_large`), and batches to 1,000 items (`batch_too_large`); larger imports are staged ([ADR-0030](0030-commercial-seams-and-imports.md) rule 9). A batch that cannot finish within its timeout should be split by the caller.
+   - **Timeouts and limits.** Exceeding a timeout returns `concurrent_update` or `timeout` (ADR-0008 rule 11). Request bodies are limited to 10 MiB (`request_too_large`), and batches to 1,000 items (`batch_too_large`); larger imports are staged ([ADR-0030](0030-commercial-seams-and-imports.md) rule 9). A batch that cannot finish within its timeout should be split by the caller. Attachments use their own upload endpoint and limit ([ADR-0038](0038-audit-and-observability.md) rule 13).
    - **Rate limits.** Token buckets per actor (not per actor kind), held in memory per API process (no Redis, ADR-0002), with these defaults:
 
      | Actor kind | Requests per second | Burst |
@@ -164,7 +164,7 @@ Checks:
     - `erpme worker --queue events|integrations|jobs|pdf`.
     - Workers wake on `NOTIFY erpme_outbox`, sent by the emitting transaction, and poll every 5 s as a fallback.
     - Retry delay after attempt n is min(2ⁿ s, 1 h), up to the consumer's `max_attempts`, after which the delivery is held (ADR-0013 rule 8).
-    - A daily job creates `outbox_event` partitions 3 months ahead and drops expired ones under ADR-0013 rule 15.
+    - A daily job creates `outbox_event` partitions 3 months ahead and drops expired ones under ADR-0013 rule 15. The same job creates audit partitions 3 months ahead and drops none ([ADR-0038](0038-audit-and-observability.md) rule 6).
     - Procrastinate's stalled-job retry runs from the `jobs` worker, with a heartbeat of 30 s and stalled after 5 min.
     - Step 1 work package 6 implements this rule.
 13. `erpme_dev.checks` holds the checks no tool provides, each named after the rule it enforces. Each failure reports `file:line`, the rule ID and a one-line fix:
@@ -288,6 +288,7 @@ DS-18 is the last step 0 design item. The repo skeleton, CI and the test server 
 - ADR-0006: versions, `types`, float and rounding checks.
 - ADR-0007: ruff rules, `tzdata`, `btree_gist`, UTC, `environment`, banned database functions.
 - ADR-0008: timeouts, rate limits, CI checks for rules 4, 9 and 10, generation.
+- ADR-0038: CI guard that only the `context` write helpers write `is_change_tracked` tables (rule 3).
 - ADR-0010: the catalog loader, generated type and tags.
 - ADR-0013: workers, `NOTIFY`, backoff, retention, stalled jobs.
 - ADR-0014: trigger tests.

@@ -253,9 +253,14 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Schema version | schema\_version | Version of a command schema (semver, [07](07-shared-foundation.md#extensibility-and-upgrades)) or an event schema (DS-13); rules in DS-04 |
 | Lifecycle state column | state | Column holding a lifecycle value: document, posting period, work item and every other lifecycle. Never `status` |
 | Derivation trace | derivation\_trace (derivation\_trace\_id) | Record that explains a derived value (cost, price, tax): its source lines and the rules applied, Principle 6. Built thin for costing in step 3 (DS-09). Not OpenTelemetry's `trace_id`, which is kept for observability (DS-36); generic schema in [ADR-0027](../adr/0027-cross-cutting-ownership.md) rule 3 |
+| Audit record | audit\_record | One immutable record per executed command: actor, on whose behalf, policy decision, agent run, subject, plan hash ([ADR-0038](../adr/0038-audit-and-observability.md)) |
+| Audit change | audit\_change | Field-level before and after values of a change-tracked table, child of an audit record |
+| Change tracking | is\_change\_tracked | Table declaration that makes the write helpers record field changes: master data, settings, role assignments, period state, production structures |
+| Audit denial | audit\_denial | Coalesced record of commands or queries refused for permission, human-only, proposal, policy, outbound scope or segregation reasons |
 | Agent run, agent type | agent\_run, agent\_type | One agent execution (actor context, taint, spend, outcome); an agent kind's declared permissions and budgets; module `agent_runs`, layer 2 |
 | Work item | work\_item | Business work for a person or agent, with claim and due date; module `work`, layer 2 (DS-29) |
 | Attachment | attachment, attachment\_link | File stored once per company by SHA-256, outside the database, linked to any record; module `attachments`, layer 2 |
+| Scan state | attachment.state: pending\_scan, clean, rejected | Result of scanning an uploaded file; only `clean` attachments may be linked to a posted document |
 | Effect class | effect\_class: posting, master\_data\_change, outbound\_send, other | Registry attribute of every command, used by agent-safety checks (INV-80) |
 | Stock document types | goods\_receipt, delivery, stock\_transfer, stock\_count, internal\_consumption, other\_receipt, other\_issue, scrap, return\_to\_supplier, return\_from\_customer, opening\_balance, transfer\_order | Core documents of module `inventory` (ADR-0027 rule 7); `opening_balance` here is stock only, account opening balances have their own type (DS-21) |
 | Validity naming | start\_date, end\_date; effective\_from; \_at | Date validity uses start and end dates; dated settings use effective\_from; points in time end in \_at |

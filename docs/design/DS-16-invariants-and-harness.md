@@ -54,7 +54,7 @@ The product is `erpme` (ADR-0004 rule 7). Test tooling lives in separate top-lev
    | `keys` | The business key fields a violation reports |
    | `source`, `added_in`, `statement` | |
 
-   Codes are grouped: 01–19 ledger and platform, 20–29 inventory, 30–39 receivables and payables, 40–49 documents, 50–59 warehouse (ADR-0023), 60–69 planning (ADR-0024), 70–79 subledgers (ADR-0025), 80–89 agent safety and platform integrity (ADR-0027, ADR-0029). INV-37 (GR/IR) has area `ledger` but sits in 30–39 beside the open-item checks, and INV-48 has area `inventory` but sits in 40–49 because 20–29 is full. INV-100 to INV-199 are production, area `production`; [ADR-0033](../adr/0033-production-master-data.md) rule 16 reserves INV-100 to INV-102 and PAR-12 until the production core step is numbered; ADR-0034 and [ADR-0035](../adr/0035-production-costing.md) reserve INV-103 to INV-108 and PAR-13. The naive recomputation (rule 29) gains cost-object nodes ([ADR-0035](../adr/0035-production-costing.md) rule 20). INV-56 was restated by [ADR-0031](../adr/0031-design-simplifications.md) rule 11, which strengthens it. Version 0.1.0 has 69 invariants. A hash test ([ADR-0031](../adr/0031-design-simplifications.md) rule 4) checks that a batch creating a record with a server-generated ID and referring to it in a later item hashes equally in simulate and execute. Later items add rows with the next free code in their group.
+   Codes are grouped: 01–19 ledger and platform, 20–29 inventory, 30–39 receivables and payables, 40–49 documents, 50–59 warehouse (ADR-0023), 60–69 planning (ADR-0024), 70–79 subledgers (ADR-0025), 80–89 agent safety and platform integrity (ADR-0027, ADR-0029). INV-37 (GR/IR) has area `ledger` but sits in 30–39 beside the open-item checks, and INV-48 has area `inventory` but sits in 40–49 because 20–29 is full. INV-100 to INV-199 are production, area `production`; [ADR-0033](../adr/0033-production-master-data.md) rule 16 reserves INV-100 to INV-102 and PAR-12 until the production core step is numbered; ADR-0034 and [ADR-0035](../adr/0035-production-costing.md) reserve INV-103 to INV-108 and PAR-13. The naive recomputation (rule 29) gains cost-object nodes ([ADR-0035](../adr/0035-production-costing.md) rule 20). INV-56 was restated by [ADR-0031](../adr/0031-design-simplifications.md) rule 11, which strengthens it. Group 80–89 is full with INV-89 ([ADR-0038](../adr/0038-audit-and-observability.md) rule 8); further safety and platform invariants use INV-200 to INV-299. Version 0.1.0 has 70 invariants. A hash test ([ADR-0031](../adr/0031-design-simplifications.md) rule 4) checks that a batch creating a record with a server-generated ID and referring to it in a later item hashes equally in simulate and execute. Later items add rows with the next free code in their group.
 5. Each catalog row has exactly one check, registered with `@invariant("INV-21")` in `erpme_testkit.invariants`. A CI test compares catalog and registry:
    - a row whose `first_step` is at or below `[tool.erpme] build_step` (DS-18) and has no check fails;
    - a check without a row fails;
@@ -100,7 +100,7 @@ The product is `erpme` (ADR-0004 rule 7). Test tooling lives in separate top-lev
     - options: `--company`, `--as-of`, `--only INV-..`, `--area`, `--state <dir>`;
     - exit codes: 0 clean, 1 violations, 2 a broken check;
     - coding agents use it locally, and the test server after each replay day;
-    - whether it may run against production is decided in DS-36;
+    - it may run against production only with the read-only role, on a standby replica or with `statement_timeout`, never with write rights ([ADR-0038](../adr/0038-audit-and-observability.md) rule 9);
     - it never repairs data.
 13. The invariant report lists, for each check, its runs, failures, `not_evaluated` counts and first violation. It also lists accepted and rejected command counts per command type and the share of `may_reject` events (rule 14), so that share cannot grow unnoticed.
 
@@ -270,7 +270,7 @@ None reserved to the author beyond ADR-0005 item 3, which this specification app
 - DS-17: events carry `outcome`, `retry` and scenario-local `ref`; `docs/catalogs/business-events.schema.json`; the step 1 projection document in `docs/`.
 - DS-18: role `erpme_check`; `[tool.erpme] build_step`; the `reserved-review` label and the author-path tripwire; field classes in generated schemas; package `erpme_client` and the import contracts of section 1; CI with two installations.
 - Ledger module (step 1): query `GetTrialBalance`.
-- DS-36: whether `erpme-check` may run against production.
+- DS-36: decided, [ADR-0038](../adr/0038-audit-and-observability.md) rule 9. DS-16 also adds the property test that change capture is complete (rule 3).
 - Work package 7 creates the JSON Schemas `violation`, `scenario` and `comparison` in `docs/catalogs/` by hand, with catalogs README rows; DS-17's work package creates `business-events` (generated, CI diff).
 - The runbook README's note on replacing invariant descriptions with IDs can now be done; it is the author's document.
 

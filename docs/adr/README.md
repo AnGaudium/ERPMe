@@ -41,3 +41,4 @@ One file per decision, named `NNNN-short-title.md`, using [template.md](template
 | [ADR-0035](0035-production-costing.md) | Production costing (DS-53) | Accepted (2026-11-14) |
 | [ADR-0036](0036-multi-level-mrp.md) | Multi-level MRP (DS-54) | Accepted (2026-11-14) |
 | [ADR-0037](0037-subcontracting.md) | Subcontracting (DS-55) | Accepted (2026-11-14) |
+| [ADR-0038](0038-audit-and-observability.md) | Audit log, observability and attachment handling (DS-36) | Accepted (2026-11-14) |

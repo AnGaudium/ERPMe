@@ -31,13 +31,13 @@ Before step 1 code freezes the platform modules, every entity that several modul
    | `work` | `work_item`, claims, due dates and links (DS-29) | Work items are created from layers 3–4 (ADR-0023 rule 21; ADR-0024 rule 21; ADR-0013 rule 8) |
    | `attachments` | `attachment` and `attachment_link` (rule 2) | E-invoice XML, bank files, e-mails, customs scans, product images and print PDFs are stored once and linked from any module |
 
-   Within layer 2, `documents` and `permissions` may import the `agent_runs` contract, and `agent_runs` imports neither of them, so there is no cycle.
+   Within layer 2, `documents` and `permissions` may import the `agent_runs` contract, and `agent_runs` imports neither of them, so there is no cycle. `documents` may also import the `attachments` contract to check scan state at `Post`; `attachments` imports neither ([ADR-0038](0038-audit-and-observability.md) rule 14).
 2. Attachments:
    - **Identity and storage.** An `attachment` is unique per (`company_id`, SHA-256). It records media type, size, storage key, data label and source kind. The bytes live in an object store, never in the database (DS-37).
    - **Data labels.** A second upload of the same bytes in the same company reuses the row and keeps the stricter data label.
    - **Links.** `attachment_link` holds attachment, target table and target ID. It is checked by an invariant (INV-83), because its reference is polymorphic.
-   - **Deletion.** Erasure of a data subject (ADR-0019) removes that subject's links. Bytes are deleted only when no link remains and retention allows.
-   - **Details.** DS-36 owns retention, scanning and limits.
+   - **Deletion.** Erasure of a data subject (ADR-0019) removes that subject's links. Bytes are deleted only when no link remains and retention allows. Links to posted accounting documents stay as voucher evidence ([ADR-0038](0038-audit-and-observability.md) rule 15).
+   - **Details.** DS-36 owns retention, scanning and limits: [ADR-0038](0038-audit-and-observability.md) rules 13–15.
 
 **Derivation trace**
 
@@ -75,7 +75,7 @@ Before step 1 code freezes the platform modules, every entity that several modul
    | --- | --- |
    | `customs_declaration` and its tax rows | `purchasing`, step 5 (ADR-0021 rule 10) |
    | E-invoice records and intents | `tax` (DS-24). A sales document requests issuance through `tax.contract.request_e_invoice` synchronously, which writes the e-invoice record and its intent; the external consumer then issues it asynchronously, and the document posts on acceptance ([ADR-0028](0028-document-lifecycle-hardening.md) rule 7). Imports go downward (as ADR-0024 rule 22) | 
-   | Audit records | `audit` (layer 2, DS-36), with one row per executed command: `command_type`, `actor_kind`, `actor_id`, `agent_run_id`, `idempotency_key` (needed by INV-81); also `origin_agent_run_id`, `on_behalf_of_id` and `policy_decision_id` ([ADR-0029](0029-proposals-and-agent-safety.md) rule 15) |
+   | Audit records | `audit` (layer 2, DS-36), with one row per executed command: `command_type`, `actor_kind`, `actor_id`, `agent_run_id`, `idempotency_key` (needed by INV-81); also `origin_agent_run_id`, `on_behalf_of_id` and `policy_decision_id` ([ADR-0029](0029-proposals-and-agent-safety.md) rule 15). Full columns, changes and denials: [ADR-0038](0038-audit-and-observability.md) rules 1–8 |
    | Full data export (spec 15) | DS-21, as `ExportCompanyData`: a company package with master data, documents with all versions, journal and material lines, open items, stock, attachments and audit rows, one JSON Lines file per table plus the attachment files. It is not the import batch format |
    | Management reporting | DS-33 semantic views; statutory reports stay DS-26 |
    | Bad-debt provisions and prepaid amortization | DS-25, as close tasks |

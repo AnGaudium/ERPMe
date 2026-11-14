@@ -49,8 +49,8 @@ Every table has a single-column primary key `id` of type `uuid`, version 7; rows
 
 **Partitioning**
 
-22. Tables that ADR-0002 partitions by month (outbox, agent run logs; Procrastinate's own tables are excluded by rule 1) are partitioned by range of `id`, whose UUID version 7 prefix orders rows by recording time, so the single-column key holds.
-23. The append-only ledger tables keep the single-column `id` key and are not partitioned in Phase 1. If partitioning becomes necessary (ADR-0002 revisit condition), the scheme is decided by ADR at that point. Range of `id` is one option, with the limit that it prunes by recording time, not by posting date or fiscal year. This replaces ADR-0002's sentence that the primary key is chosen for partitioning by fiscal year, and its revisit line "partition by fiscal year".
+22. Tables that ADR-0002 partitions by month (outbox, agent run logs; Procrastinate's own tables are excluded by rule 1) are partitioned by range of `id`, whose UUID version 7 prefix orders rows by recording time, so the single-column key holds. `audit_record` and `audit_change` are append-only and partitioned the same way; `audit_denial` is not partitioned ([ADR-0038](0038-audit-and-observability.md) rule 6).
+23. The append-only ledger tables keep the single-column `id` key and are not partitioned in Phase 1. If partitioning becomes necessary (ADR-0002 revisit condition), the scheme is decided by ADR at that point. Range of `id` is one option, with the limit that it prunes by recording time, not by posting date or fiscal year. This replaces ADR-0002's sentence that the primary key is chosen for partitioning by fiscal year, and its revisit line "partition by fiscal year". Audit tables are the exception: they are partitioned by rule 22 ([ADR-0038](0038-audit-and-observability.md) rule 6).
 
 ## Context
 
