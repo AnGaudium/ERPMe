@@ -8,6 +8,7 @@ This file applies to every coding or design agent working in this repository.
 2. [docs/decisions.md](docs/decisions.md): decided items D1–D17. Do not reopen them without a new ADR.
 3. The spec file for the area you are working on (see the map in [docs/README.md](docs/README.md)).
 4. [docs/design/backlog.md](docs/design/backlog.md): which design item (DS-xx) your work belongs to and what it depends on.
+5. [docs/runbook/README.md](docs/runbook/README.md): the operating rhythm, the section for the current build step, and [docs/runbook/escalation.md](docs/runbook/escalation.md) (when to stop and ask).
 
 ## Current phase
 

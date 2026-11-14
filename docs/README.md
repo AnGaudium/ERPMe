@@ -9,7 +9,8 @@ This folder is the source of truth for the ERPMe specification (D17). Everything
 3. [spec/01-vision.md](spec/01-vision.md) and [spec/02-principles.md](spec/02-principles.md).
 4. [spec/10-roadmap.md](spec/10-roadmap.md) and [spec/11-build-order.md](spec/11-build-order.md): phases, lean scope, build steps and gates.
 5. [design/backlog.md](design/backlog.md): the design work, DS-01 to DS-40.
-6. The spec files for the area you work on.
+6. [runbook/README.md](runbook/README.md): how the build is run, step by step, to the Phase 1 gate.
+7. The spec files for the area you work on.
 
 ## Layout
 
@@ -22,6 +23,7 @@ This folder is the source of truth for the ERPMe specification (D17). Everything
 | `catalogs/` | Data the core relies on: system accounts, transaction keys, movement types, edge cases | Versioned with the design item that owns it |
 | `open-questions.md` | Questions that need the author or legal verification | Add freely; close with a link to the answer |
 | `risks.md` | Risks and mitigations | Review at each phase gate |
+| `runbook/` | Implementation runbook: operating rhythm, steps 0–11, testing operations, go-live, escalation rules, step log | Edit in place; never overrides decided items, gates, scope or build order |
 | `prompts/` | Briefs used to start AI sessions for larger tasks | Add one per task |
 | `archive/` | Frozen historical documents | Never edited |
 

@@ -22,3 +22,17 @@
 - [ ] (DS-05, DS-06) Cost of a sales return: the original issue cost or the current preliminary price? Do returns enter the period average?
 - [ ] (DS-09) At which time point is the negative-stock check made when a document is backdated?
 - [ ] (DS-06) Is a dependent unit with its own tax ID a company or a branch?
+- [ ] (DS-17, step 0) No commands exist at step 0. Does the step 0 gate "The simulator produces the small synthetic dataset" mean the business-event log only? Must that log already contain every edge case of catalog v1 at least once, including those that only steps 5–8 can execute (credit limit, replaced invoices, e-invoices)?
+- [ ] (DS-18, DS-37) Staging: Phase 0 in `10-roadmap.md` names a pipeline GitHub → test server → staging for the core, but step 0 in `11-build-order.md` lists only the test server, and deployment (DS-37) is needed only by step 10. When is staging stood up, and which design item owns it?
+- [ ] (DS-18) The GitHub organization question above blocks step 0, because CI runs on GitHub Actions (ADR-0002). Is the repository public from step 0 or only later?
+- [ ] (DS-18) Value of the core coverage threshold ([18-license-governance.md](spec/18-license-governance.md), [risks.md](risks.md)) and the step from which CI enforces it.
+- [ ] (DS-18, D3) The "policy for reviewing AI-written code" required by [18-license-governance.md](spec/18-license-governance.md): is the review stage in [runbook/README.md](runbook/README.md#the-unit-of-work) that policy, or does DS-18 write it as an ADR? Who signs off the DCO line on commits written by an agent?
+- [ ] (DS-16, DS-17, DS-32) Budgets for the nightly and post-deploy test runs: wall-clock limit and LLM spend per run for the test-scenario model. `12-testing.md` says "within a budget" without values.
+- [ ] (DS-29, steps 0–4) `12-testing.md` sends defects to the work queue, but the work queue is built in step 5. Where are defects tracked in steps 0–4 (e.g. GitHub issues), and are they moved into the work queue later?
+- [ ] (DS-34, step 10) Step 10 requires all four agents to be "done", but shadow mode needs real transactions, which exist only after go-live. What evaluation thresholds on the synthetic dataset make an agent "done" for the platform-complete milestone?
+- [ ] (DS-30, step 9) How is "no slower than MISA" measured: who is the outside accountant, how is the MISA baseline taken (same documents, same person?), which metric (time per document, keystrokes)?
+- [ ] (DS-19, step 1) Who verifies the unverified legal rules (an accountant or auditor, named), and by which step is each needed? Step 1 needs the TT99 FX rules "after legal verification" (DS-19).
+- [ ] (DS-40, D11) May the pilot go live while any localization rule it uses is still flagged unverified?
+- [ ] (DS-37, DS-40) Where do staging with the pilot's real data (step 11) and the pilot's production run, who has access, and how is pilot data deleted from staging after the rehearsal?
+- [ ] (DS-40, D11) With no parallel run, what is the fallback if the pilot must stop after go-live, e.g. before the first monthly close?
+- [ ] (step 11, support mode) How many days before and after closing days and tax deadlines does the "no feature releases" rule cover? Tax deadlines are legal dates and belong in the localization package.
