@@ -1,6 +1,6 @@
 # ADR-0012: Posting periods and closing
 
-Status: accepted (2026-11-14) under ADR-0005, reviewed by Claude Fable 5.2. Design item: DS-12. Related decisions: D2, D5, D6, D15. Principles 2, 3, 5, 6, 12. ADR-0004, ADR-0005, ADR-0007, ADR-0008, ADR-0009, ADR-0010, ADR-0011.
+Status: accepted (2026-11-14) under ADR-0005, reviewed by Claude Fable 5.2. Amended (2026-11-14): rules 5, 6 and 18 decided by the agent under the author's delegation of these three questions. Design item: DS-12. Related decisions: D2, D5, D6, D15. Principles 2, 3, 5, 6, 12. ADR-0004, ADR-0005, ADR-0007, ADR-0008, ADR-0009, ADR-0010, ADR-0011.
 
 ## Decision
 
@@ -21,8 +21,8 @@ Each company's fiscal year (ADR-0007) contains regular posting periods and up to
     - `open`: any actor with the permission;
     - `soft_locked`: a human with the chief-accountant role (DS-15), or actor `system` running a close task of that period or an earlier one (e.g. costing adjustments that reach later periods) on behalf of a human with that role; never an agent, an integration or a scheduled job outside the close;
     - `locked`: nobody.
-    Otherwise the posting is rejected with `posting_period_not_open`, naming the period, area, state and who may post. Letting close jobs post in a soft-locked period applies the spec's "close postings by actor `system` on behalf of the human who triggered the close" (07) to the soft-lock rule; the author is asked to confirm it (open question).
-6. Interim, flagged rule: new regular periods start `open`, and special periods start `soft_locked`. Whether postings dated in future periods should be allowed, and how far ahead, is an open question for the author; the policy engine (DS-28) is the place for a limit.
+    Otherwise the posting is rejected with `posting_period_not_open`, naming the period, area, state and who may post. Letting close jobs post in a soft-locked period applies the spec's "close postings by actor `system` on behalf of the human who triggered the close" (07) to the soft-lock rule; otherwise the period would have to be opened to everyone to run costing and revaluation.
+6. New regular periods start `open` and special periods start `soft_locked`. A posting whose posting date lies more than `future_posting_periods` regular periods after the period that contains the company's current business date (`clock.today`, ADR-0007 rule 15) is rejected with `posting_date_too_far_ahead`; the company setting defaults to 1, so only the current and the next period accept postings. Special periods are exempt; they are soft-locked anyway.
 7. Commands, all `human_only` (ADR-0008 rule 2; [14-agent-workflows.md](../spec/14-agent-workflows.md)), per period and area or for all areas at once:
 
 | Command | From | To | Condition |
@@ -48,7 +48,7 @@ Each company's fiscal year (ADR-0007) contains regular posting periods and up to
 
 **Closing entries and balances**
 
-18. Closing entries are posted by a closing job, actor `system`, on behalf of the human who ran it (07); their journal entries carry `is_closing_entry = true` (DS-06), so period-range reports can exclude them. Whether a regime closes profit and loss by entries (e.g. to 911 and 421) or by computation without documents (as SAP carries profit and loss to retained earnings), which accounts, how often and in which period, are rules of the accounting regime, flagged until verified (open question).
+18. Closing entries are posted by a closing job, actor `system`, on behalf of the human who ran it (07); their journal entries carry `is_closing_entry = true` (DS-06), so period-range reports can exclude them. Whether a regime closes profit and loss by entries (e.g. to 911 and 421) or by computation without documents (as SAP carries profit and loss to retained earnings), which accounts, how often and in which period, are rules of the accounting regime. The Vietnam package closes by entries at the end of every period, regular and special, within that period: income and expense accounts to the account mapped to `income_summary` (911), which has no balance after closing, and its result to `retained_earnings` (421). Source: descriptions of TT99 accounts 911 and 421 by MISA and Kế toán Lê Ánh; flagged until verified against the TT99 text.
 19. Balance-sheet balances are cumulative at all times: the balance on any date is the sum of all lines up to that date, across fiscal years, so no opening entry is posted at year start. Stored period-closing balances (07) are a cache rebuilt from journal lines (DS-06).
 
 ## Context

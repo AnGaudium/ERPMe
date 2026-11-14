@@ -55,6 +55,7 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Sequential close task | is\_sequential | A close task that must run in period order, e.g. period-end actual costing; rerunning it sets the same task of later periods back to pending |
 | Entry count at done | entry\_count\_at\_done | The number of relevant entries in a task's period and area when it was done; a larger count at lock time makes the task stale |
 | Fiscal calendar owner, lead days | fiscal\_calendar\_owner, fiscal\_year\_lead\_days | The human on whose behalf the next fiscal year is created, and how many days before year end (default 30) |
+| Future posting periods | future\_posting\_periods | Company setting, default 1: how many regular periods after the current one accept postings ([ADR-0012](../adr/0012-posting-periods-and-closing.md) rule 6) |
 | Closing entry | is\_closing\_entry | Marker on journal entries posted by the closing job, so period-range reports can exclude them |
 | Accounting regime | accounting\_regime | Rule set inside a localization package; the Vietnam package has two: TT99 and TT133 |
 | Localization package | localization\_package | e.g. l10n\_vn, l10n\_us |

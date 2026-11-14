@@ -4,6 +4,7 @@ Dated record of gate decisions, the week list and one line per Friday review ([R
 
 | Date | Step | Entry |
 | --- | --- | --- |
+| 2026-11-14 | 0 | Author delegated the three DS-12 questions; agent decided: close jobs may post in soft-locked periods; only current and next period accept postings by default; Vietnam closes P&L to 911/421 every period (TT99 text to verify) |
 | 2026-11-14 | 0 | DS-12 done: [ADR-0012](../adr/0012-posting-periods-and-closing.md) posting periods and closing accepted under ADR-0005 after two review rounds (Claude Fable 5.2). Three questions for the author (TT99 closing, close jobs in soft-locked periods, future-dated postings) |
 | 2026-11-14 | 0 | DS-10 ADR done: [ADR-0011](../adr/0011-multi-currency.md) multi-currency accepted under ADR-0005 after two review rounds (Claude Fable 5.2); logic in steps 6 and 8. Four TT99 FX questions for the author |
 | 2026-11-14 | 0 | Author confirmed the system chart classification choices (ADR-0010 rule 8, catalog 0.1.0) |
