@@ -93,7 +93,17 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Product category | product\_category | Built-in hierarchy of products that proposes defaults when a product is created |
 | Item tax group, partner tax group | item\_tax\_group, partner\_tax\_group | The two axes of the dated tax matrix (with direction) that proposes and checks a line's tax codes (DS-23) |
 | Tracking | tracking: none, lot, serial | Whether a product's stock movements carry lots or serial numbers |
-| Buyer | buyer\_id | The employee responsible for purchasing a product |
+| Partner kind | partner\_kind: organization, household\_business, individual | Decides row-conditional data labels: name, tax ID, addresses, phones, emails and bank accounts of household businesses and individuals are personal; unknown kind is treated as personal ([ADR-0019](../adr/0019-partners-and-crm-foundation.md)) |
+| Partner role, profile | partner\_role; customer\_profile, supplier\_profile, employee\_profile | Roles added to one partner over time, deactivated not deleted; each role's own data in its profile, selected by the document's role. Employees are partners with the employee role |
+| Contact | contact | A person at a partner; every field labeled personal |
+| Processing basis | processing\_basis | Lawful basis per data subject and purpose (contract, legal obligation, consent), withdrawable; checked before sending a message whose purpose needs consent |
+| Processing log | personal\_data\_processing\_log | Record of processing the law asks to log: personal fields sent to LLMs, lookups of individuals, exports, erasures |
+| Data-subject request | data\_subject\_request, EraseDataSubject | Access, correction or deletion request under the Personal Data Protection Law; a document; erasure is human only and the one command that blanks append-only content |
+| Interaction | interaction, interaction\_content | Append-only record of contact with a partner (email, note, call, meeting, chat); untrusted when from outside; the timeline adds documents by query |
+| Mailbox | mailbox | Email intake per company with an owning human; messages become untrusted interactions, matched deterministically (reply thread, then authenticated sender); outside content never chooses an agent's read scope |
+| Partner item | partner\_item | A partner's own code, name and unit for one of our items; the stored mappings of the purchase invoice agent |
+| Partner insight, interaction summary | partner\_insight, interaction\_summary | What the system learned about a partner, as visible data: computed values with their method, summaries with their agent run |
+| Buyer | buyer\_id | The employee (a partner with the employee role) responsible for purchasing a product |
 | Data translation | data\_translation | Names users enter for company data in other languages (products, variant values, company units, classification values); an item's display name is the product name plus its variant values |
 | Data label | data\_label | public, internal, personal, sensitive\_personal |
 | Routing switch | routing\_switch | Per company, off by default. In Phase 1, when on, personal-labeled fields are removed from every LLM request |

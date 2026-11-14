@@ -4,6 +4,7 @@ Dated record of gate decisions, the week list and one line per Friday review ([R
 
 | Date | Step | Entry |
 | --- | --- | --- |
+| 2026-11-14 | 0 | DS-20 partner part and DS-35 foundation done (drafted ahead of steps 2 and 5 at the author's request): [ADR-0019](../adr/0019-partners-and-crm-foundation.md) accepted under ADR-0005 after two review rounds (Claude Fable 5.2). Five questions for the author |
 | 2026-11-14 | 0 | DS-20 item part done (drafted ahead of step 2 at the author's request): [ADR-0018](../adr/0018-product-and-item-model.md) accepted under ADR-0005 after two review rounds (Claude Fable 5.2). Two questions for the author |
 | 2026-11-14 | 0 | DS-15 envelope part done: [ADR-0017](../adr/0017-permission-envelope.md) accepted under ADR-0005 after two review rounds (Claude Fable 5.2); full model at step 5. Two questions for the author |
 | 2026-11-14 | 0 | DS-14 done: [ADR-0016](../adr/0016-localization-package-structure.md) localization package structure accepted under ADR-0005 after two review rounds (Claude Fable 5.2). Two questions for the author |

@@ -22,3 +22,4 @@ One file per decision, named `NNNN-short-title.md`, using [template.md](template
 | [ADR-0016](0016-localization-package-structure.md) | Localization package structure (DS-14) | Accepted (2026-11-14) |
 | [ADR-0017](0017-permission-envelope.md) | Permission model, envelope part (DS-15) | Accepted (2026-11-14) |
 | [ADR-0018](0018-product-and-item-model.md) | Product and item model (DS-20, item part) | Accepted (2026-11-14) |
+| [ADR-0019](0019-partners-and-crm-foundation.md) | Partners, contacts and CRM foundation (DS-20 partner part, DS-35) | Accepted (2026-11-14) |
