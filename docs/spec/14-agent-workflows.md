@@ -1,0 +1,43 @@
+# First agentic workflows and guardrails
+
+The first four workflows are ordered by data availability and risk: structured, low-risk data first, so the pilot customer sees value in the first weeks.
+
+1. **Purchase invoices from e-invoices:** fetch incoming invoices through the e-invoice provider, T-VAN or the receiving mailbox, and three-way match against the PO and goods receipt. Structured data, low risk, immediate benefit for accountants.
+2. **Data migration:** map master data from Excel or MISA, detect duplicates, look up tax IDs, build opening balances as a simulated command batch. This removes the biggest adoption barrier and never touches posted books.
+3. **Request intake and quotation drafting:** email first, chat channels after Phase 1. Needs clean master data and price lists, so it follows data migration.
+4. **Bank statement matching:** start with statement-file import for 2–3 common banks, because Vietnamese bank APIs require individual partnerships.
+
+Next: repeat-sales suggestions (needs order history, so no value for a new install), replenishment suggestions, payment reminders, period-close assistant (runs the checklist, reconciles, flags anomalies).
+
+## Deterministic first, LLM last
+
+Each workflow is a sequence of steps orchestrated by code, not a free agent (Principle 13). Each step follows the order: stored rules and mappings → lookup → fuzzy matching with a deterministic score → LLM only for what remains. LLM output always passes a deterministic check before it becomes a draft.
+
+| Workflow | Deterministic functions do | LLM only does |
+| --- | --- | --- |
+| Purchase invoices from e-invoices | Parse e-invoice XML, check signature and invoice status, look up tax ID, map lines via stored supplier item mappings, three-way match with PO and goods receipt, check tax rates and totals | Suggest an item for lines with no mapping; an approved mapping is stored |
+| Data migration | Read files in known formats; normalize tax IDs, phone numbers, addresses; detect duplicates by key and similarity score; build opening balances as a simulated command batch; reconcile totals with the old books | Guess column meaning in unfamiliar files, suggest merging ambiguous duplicates |
+| Request intake and quotation | Attach email to a partner by address and domain; check stock; price from price list, discounts and FX rate; check credit limit and margin | Understand the request in the email, map item descriptions to item codes, write the quotation text |
+| Bank statement matching | Read the statement file; match by amount, date, reference, invoice number in the description; score matches by rule; one-to-many matching by a combinatorial algorithm | Read free-text transfer descriptions when rules fail, propose new matching rules |
+
+Metric: the share of steps handled by deterministic functions in each workflow. It must rise over time, and LLM cost per document must fall with it.
+
+Default policy guardrails. Customers can adjust them per action type and threshold:
+
+| Agent action type | Default |
+| --- | --- |
+| Read, query, summarize | Automatic |
+| Create document drafts (quotation, PO, purchase invoice) | Automatic; a human confirms before posting |
+| High-confidence bank match below an amount threshold | Auto-post; a human reviews afterwards |
+| Post documents above the threshold, or post directly to expense | Requires approval |
+| Send messages or emails to customers or suppliers | Draft; a human sends. Auto-send only for permitted types |
+| Change master data (partner, item, price) | Requires approval |
+| Close periods, reverse posted documents | Human only; agents may not |
+
+## Measuring agent value
+
+An agent gains permissions only with evidence, never by impression.
+
+- **Metrics per workflow:** share of drafts accepted unedited and degree of editing; auto-match accuracy, defects found later and documents reversed because of the agent; handling time per document versus the baseline measured before enabling the agent; LLM cost per document.
+- **Shadow mode:** the agent only proposes, without effect, on a set of real transactions. Only when accuracy exceeds the threshold may it auto-post below the limit.
+- **The evaluation suite** draws on reference data, anonymized pilot data and the sample company, and runs with Principle 11.
