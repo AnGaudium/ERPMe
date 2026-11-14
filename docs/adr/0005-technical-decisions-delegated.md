@@ -1,6 +1,6 @@
 # ADR-0005: Technical decisions are delegated to agents
 
-Status: proposed. Written on the author's instruction: "All technical issues are decided by the agent. The overriding goal is that the system is easy for AI to use." This ADR is on its own reserved list (item 9), so it takes effect when the author accepts it. Design items: all DS items. Related decisions: D2, D3, D12, D15. Build principles B1, B2, B3. ADR-0003 R5.
+Status: accepted (2026-11-14) by the author. Written on the author's instruction: "All technical issues are decided by the agent. The overriding goal is that the system is easy for AI to use." This ADR is on its own reserved list (item 9); the author accepted it as written, including items 2 and 11. Design items: all DS items. Related decisions: D2, D3, D12, D15. Build principles B1, B2, B3. ADR-0003 R5.
 
 ## Decision
 
