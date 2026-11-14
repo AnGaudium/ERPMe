@@ -195,7 +195,7 @@ The accounting choices are the author's (ADR-0005 item 1). Each one below is a r
       | `disassembly_receipt` | in | `preliminary_price` | `production_output` | `production_output` |
 
       ADR-0020 rule 4 gains the costing roles `production_input` (into a cost-object node, revalued; a return counts negative) and `production_output` (from one, revalued unless its value is final).
-    - **Transaction keys**, the count becoming 44:
+    - **Transaction keys**, the count becoming 44 ([ADR-0037](0037-subcontracting.md) adds two more, 46 in total):
 
       | Key | Accounts | Determinants |
       | --- | --- | --- |

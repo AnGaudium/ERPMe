@@ -62,6 +62,9 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Default bin | default\_bin\_id | The bin every warehouse gets at creation, with a default zone; the only bin of a warehouse that is not bin-managed, filled in by handlers and hidden in the UI ([ADR-0031](../adr/0031-design-simplifications.md)) |
 | Pending receipt adjustment | pending\_receipt\_adjustment | A stock-bound price difference from an invoice posted before the goods arrived, consumed by the receipt |
 | Subcontracting | subcontracting | Production by an outside processor from materials we send (in Vietnamese, gia công); designed in DS-55 ([ADR-0032](../adr/0032-phase-1-scope-with-production.md)) |
+| Processor location | processor\_partner\_id; inventory\_at\_processor\_posting | A physical warehouse standing for a processor; stock there is ours and valued ([ADR-0037](../adr/0037-subcontracting.md)) |
+| External operation | control: external; service\_item\_id, default\_supplier\_id | A routing operation done by a subcontractor, bought as a service and confirmed by a service receipt |
+| Service receipt | service\_receipt; operation\_progress\_component | Purchasing's receipt of an external operation's service: records progress, consumes components at the processor, posts the service cost |
 | Bill of materials | bill\_of\_materials, usage: production, kit | What an item is made from; its content lives in revisions ([ADR-0033](../adr/0033-production-master-data.md)) |
 | Revision | bill\_of\_materials\_revision, routing\_revision, start\_date, content\_hash | One immutable released version of a bill of materials or routing; the valid one on a date is the highest revision started on or before it |
 | Explosion date | explosion\_date | The planned start date of an order or planned order; selects production versions and revisions |

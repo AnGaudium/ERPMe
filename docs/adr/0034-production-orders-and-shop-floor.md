@@ -72,9 +72,9 @@ It adds only what production needs:
      - A backflush setting on a serial-tracked component (`serial_component_backflush`).
      - A backflush setting on any lot or serial-tracked component when the version has `is_as_built_required` (rule 16).
    - **Backflush without an operation.** A `backflush_at_operation` component without an operation number, or on an order without operations, is treated as `backflush_at_receipt`.
-   - **Backflush warehouse.** A backflush component must be issued from the production warehouse (`backflush_outside_production_warehouse`).
+   - **Backflush warehouse.** A backflush component must be issued from the production warehouse (`backflush_outside_production_warehouse`). Exception: components of an external operation are consumed at the processor location by the service receipt ([ADR-0037](0037-subcontracting.md) rule 5).
 3. Scheduling:
-   - **The rule.** Operation dates come from `setup_duration`, `run_duration` × expected quantity / base quantity, `queue_time` and `move_time`, on the work centers' calendars (ADR-0033 rules 10, 11), at infinite capacity. An order without operations uses the version's fixed lead time.
+   - **The rule.** Operation dates come from `setup_duration`, `run_duration` × expected quantity / base quantity, `queue_time` and `move_time`, on the work centers' calendars (ADR-0033 rules 10, 11), at infinite capacity. An order without operations uses the version's fixed lead time. External operations use the supplier lead time and route transit of [ADR-0037](0037-subcontracting.md) rule 3.
    - **Load view.** `ListWorkCenterLoad` (work center, day or week buckets) adds up the remaining scheduled hours of draft and approved orders that are not technically complete, against available hours. Real orders only; planned orders are added by planning's `ListCapacityLoad` ([ADR-0036](0036-multi-level-mrp.md) rule 11).
    - **Later.** Finite sequencing and levelling are DS-54's capacity check, proposed by the planning agent, never applied without approval.
 4. Rework and disassembly:
@@ -130,7 +130,7 @@ It adds only what production needs:
 **Components: reservation, staging, issue and return**
 
 9. Reservation:
-   - **Demand and supply lines.** Component lines are demand lines and output lines supply lines (`demand_supply_line`) from `Create`. This is interim and flagged, as ADR-0024 rule 8's list is. Their typed columns `production_order_component_id` and `production_order_output_id` are added to `demand_supply_line` before step 3. ADR-0028 rule 2 left these columns to the author under B3, so they are flagged too (open question). The output supply rows also carry `for_demand_supply_line_id`, flagged with these columns ([ADR-0036](0036-multi-level-mrp.md) rule 9).
+   - **Demand and supply lines.** Component lines are demand lines and output lines supply lines (`demand_supply_line`) from `Create`. This is interim and flagged, as ADR-0024 rule 8's list is. Their typed columns `production_order_component_id` and `production_order_output_id` are added to `demand_supply_line` before step 3. ADR-0028 rule 2 left these columns to the author under B3, so they are flagged too (open question). The output supply rows also carry `for_demand_supply_line_id`, flagged with these columns ([ADR-0036](0036-multi-level-mrp.md) rule 9). Components of external operations are demand lines at the processor location ([ADR-0037](0037-subcontracting.md) rule 2).
    - **Open quantity.** It never goes below 0, even after over-issue.
    - **At release.** Components are reserved through `inventory.contract.create_stock_reservation` (ADR-0023 rule 13) up to available to promise. `production` passes the reservation's `destination_bin_id` (the supply bin) and `release_sequence` (operation order), so inventory never reads production tables.
    - **Shortages.** The rest is a shortage, with the check result `component_shortage`. `ReserveProductionOrderComponent` (effect class `other`) reserves again later; humans and the production agent run it directly.
@@ -171,7 +171,7 @@ It adds only what production needs:
       - stock comes from the supply bin, with lots in the order of ADR-0023 rule 14 applied inside that bin;
       - missing stock rejects the confirmation with `negative_stock`, naming the component.
     - **Generated lines.** Backflushed lines are generated at `Post` into `operation_confirmation_component` (order component line, material document line). They appear in `plan.stock_movements`, not in approved version content.
-    - **Progress interface.** Confirmations write progress through `production.contract.record_operation_progress`. DS-55's service receipts for external operations use the same interface.
+    - **Progress interface.** Confirmations write progress through `production.contract.record_operation_progress`. DS-55's service receipts for external operations use the same interface. Their backflush lines go to the production-owned `operation_progress_component`, keyed by the calling document ([ADR-0037](0037-subcontracting.md) rule 5).
     - **Agents.** The capture agent drafts confirmations from messages, photos or voice. Its runs are tainted, so a human posts them (ADR-0029 rule 11).
     - **Activities.** Recorded for costing; DS-53 values them.
 
@@ -185,7 +185,7 @@ It adds only what production needs:
     - **Value.** The receipt's value is DS-53's (a provisional value settled by the period solve).
     - **Tolerance.** Cumulative net receipts of the main output above G × (1 + `overdelivery_tolerance_percent` / 100) are rejected (`receipt_above_tolerance`). By-products and co-products are not capped. The tolerance is business behavior, flagged, default 0.
     - **Backflush at receipt.** `backflush_at_receipt` components are backflushed as in rule 12, with G as the denominator and cumulative net main-output receipts as the progress, generated into `production_receipt_component`.
-    - **Automatic receipt.** When the version sets `is_receipt_on_final_confirmation`, the final confirmation of the last internal operation also creates and posts the receipt of that operation's cumulative yield minus the net receipts so far, for untracked or lot-tracked output:
+    - **Automatic receipt.** When the version sets `is_receipt_on_final_confirmation`, the final progress record of the order's last operation (a confirmation when it is internal, a service receipt when it is external, [ADR-0037](0037-subcontracting.md) rule 5) also creates and posts the receipt of that operation's cumulative yield minus the net receipts so far, for untracked or lot-tracked output:
       - the confirmation names the lot;
       - the confirmation's policy decision covers both documents;
       - reversing the confirmation reverses its receipt first, in the same command;

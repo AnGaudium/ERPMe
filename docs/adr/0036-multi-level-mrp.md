@@ -29,7 +29,7 @@ That last check failed until make-to-order supply carried its demand line, a req
    - **The edge.** From a made node (item, production warehouse) to each component node (component, issue warehouse; in planning this is the production warehouse), for each planned production order, through the version and revisions rule 3's function selects.
    - **Phantoms.** They are collapsed: their components become edges of the parent at the phantom line's operation.
    - **Co-products and by-products.** They are supply edges.
-   - **Exceptions.** A component node without an `item_warehouse_planning` row raises `planning_parameter_missing` with the demand that hit it (ADR-0024 rule 21), and so does a phantom item with sales demand or a planning row.
+   - **Exceptions.** A component node without an `item_warehouse_planning` row raises `planning_parameter_missing` with the demand that hit it (ADR-0024 rule 21), and so does a phantom item with sales demand or a planning row. Components at a processor location are supplied through a transfer route from the production warehouse ([ADR-0037](0037-subcontracting.md) rule 2).
 2. Acyclic by construction:
    - **No new check needed.** Transfer edges keep the item. Bill of materials edges strictly raise the item's low-level code, which ADR-0033 rule 8 computes over all released revisions, outputs included. So a cycle of the combined network can only be a transfer cycle, which ADR-0024 rule 3 already rejects.
    - **Planning order.** The run plans nodes sorted by (`item_low_level_code` ascending, 0 for items without a row, transfer depth within the item with destinations first, item code, warehouse code). That order is unique and puts every consumer, co-product producers included, before the nodes it feeds.
@@ -40,6 +40,8 @@ That last check failed until make-to-order supply carried its demand line, a req
    - **`backward`** (item, warehouse, good quantity, `required_date`, `earliest_start`), for new proposals. It selects the version valid on `required_date` for the quantity (ADR-0033 rule 13), as ADR-0034 rule 2 does, and schedules backward. When the start would fall before `earliest_start`, it schedules forward from `earliest_start` and reports the lateness.
    - **`forward`** (item, warehouse, good quantity, start). It selects the version valid on the start, for rule 10 and after `UpdatePlannedOrder` sets a start.
    - **`fixed`** (`production_version_id`, good quantity, start), for firmed and updated orders, conversion and INV-109. It keeps the version and the start.
+
+   **External operations** take their lead times from `supplier_item` and the routes ([ADR-0037](0037-subcontracting.md) rule 3).
 
    **Explosion.** In every mode it explodes at the resulting start (ADR-0033 rules 5, 6) and returns:
      - the version and revisions;

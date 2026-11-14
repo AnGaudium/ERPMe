@@ -109,6 +109,7 @@ Agents read the structures through deterministic queries. They draft revisions f
       - `work_center_id`;
       - `description`;
       - `control`: `internal` (run at the work center, which is then required) or `external` (done by a subcontractor, DS-55: `service_item_id` and `default_supplier_id`, work center optional; the purchase may choose another supplier, so a revision does not depend on one processor);
+      - **Subcontracting** of `external` operations: [ADR-0037](0037-subcontracting.md) rules 2–6.
       - `is_milestone`: confirming it confirms the earlier non-milestone operations;
       - `setup_duration` (hours per order) and `run_duration` (hours per base quantity): the elapsed time used for scheduling, lead times and the load view;
       - `operation_scrap_percent`: not used in requirements; DS-52 uses it for expected yield per operation and DS-53 for the scrap variance;

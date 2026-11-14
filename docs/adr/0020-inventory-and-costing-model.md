@@ -10,7 +10,7 @@ Quantities move in material documents; values move in journal entries; both belo
 
 **Warehouses and valuation areas**
 
-1. A `warehouse` belongs to one company: `code`, `name`, `kind` (`physical`; `transit` for goods the company owns on the way; `goods_sent` for goods delivered to customers or agents and still owned), `branch_id`, address, `is_active`, and for `transit` and `goods_sent`, `valuation_warehouse_id`: the physical warehouse whose valuation area it belongs to. The inventory key of a stock line follows the warehouse kind: `inventory_posting`, `inventory_in_transit_posting`, `inventory_goods_sent_posting` (ADR-0015).
+1. A `warehouse` belongs to one company: `code`, `name`, `kind` (`physical`; `transit` for goods the company owns on the way; `goods_sent` for goods delivered to customers or agents and still owned), `branch_id`, address, `is_active`, and for `transit` and `goods_sent`, `valuation_warehouse_id`: the physical warehouse whose valuation area it belongs to. The inventory key of a stock line follows the warehouse kind: `inventory_posting`, `inventory_in_transit_posting`, `inventory_goods_sent_posting` (ADR-0015). A `physical` warehouse may carry `processor_partner_id`; its stock uses the key `inventory_at_processor_posting` ([ADR-0037](0037-subcontracting.md) rule 1).
 2. With `valuation_area_level` `company`, all warehouses of the company form one valuation area. With `warehouse`, each physical warehouse is a valuation area, together with the transit and goods-sent warehouses attached to it. A line records its area as `valuation_warehouse_id` (null for company level).
 
 **Material documents and movement types**

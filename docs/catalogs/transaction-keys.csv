@@ -43,3 +43,5 @@ production_wip_transfer,Production WIP transfer,valuation_class,inventory_work_i
 production_abnormal_cost,Abnormal production cost,,cost_of_goods_sold,,false,0.1.0,Consumption above norm plus tolerance at order completion (VAS 02 para 11; ADR-0035).
 production_unabsorbed_overhead,Unabsorbed fixed overhead,,cost_of_goods_sold,,false,0.1.0,Fixed production overhead above normal-capacity absorption or of an idle pool (VAS 02 para 08; ADR-0035).
 production_residual_cost,Residual production cost,,cost_of_goods_sold,,false,0.1.0,"Cost of a completed order with no output in the period, or a negative output value (ADR-0035)."
+production_external_service,Production external service,,production_cost_other,cost_object,false,0.1.0,"External operation service cost charged to a production order, and invoice differences while the order is open (ADR-0037)."
+inventory_at_processor_posting,Inventory at processor,valuation_class;warehouse,inventory_raw_material;inventory_tools_supplies;inventory_finished_goods;inventory_merchandise;inventory_other,inventory,false,0.1.0,"Stock we own held at a processor location; lets a regime show it on its own account (ADR-0037)."

@@ -157,6 +157,8 @@ Module-specific codes are added by the DS item that owns the module, in the regi
 | `planning_run_in_progress` | conflict | 409 | yes | A planning run of the company is already running ([ADR-0024](../adr/0024-planning.md) rule 17) |
 | `planned_order_not_convertible` | precondition | 422 | no | The planned order is converted or canceled, lacks a supplier or route, or its production version is missing or inactive ([ADR-0024](../adr/0024-planning.md) rule 22; [ADR-0036](../adr/0036-multi-level-mrp.md) rule 8) |
 | `make_to_order_not_allowed` | validation | 422 | no | `make_to_order` needs source `production`, method `net_requirements` and lot size `exact` ([ADR-0036](../adr/0036-multi-level-mrp.md) rule 9) |
+| `movement_not_allowed_at_processor` | validation | 422 | no | Only transfers, production issues and returns, and count differences post at a processor location ([ADR-0037](../adr/0037-subcontracting.md) rule 1) |
+| `service_receipt_without_operation` | validation | 422 | no | A service receipt line needs a purchase line tied to a production order operation ([ADR-0037](../adr/0037-subcontracting.md) rule 11) |
 | `quantity_rounds_to_zero` | validation | 422 | no | The quantity converted to the inventory unit rounds to zero ([ADR-0018](../adr/0018-product-and-item-model.md) rule 11) |
 | `invalid_timestamp` | validation | 422 | no | ADR-0007 rule 3 |
 | `schema_version_unsupported` | validation | 422 | no | ADR-0008 rule 23; `details.served` lists the versions |
