@@ -1,0 +1,180 @@
+# ADR-0021: Landed cost
+
+Status: accepted (2026-11-14) under ADR-0005, reviewed by Claude Fable 5.2 (builder Claude Opus 5.5). Design item: DS-11 (ADR part for step 0; formulas and layouts specified for step 3). Related decisions: D5, D6, D10. Principles 5, 6, 13. Build principle B3. ADR-0004, ADR-0005, ADR-0006, ADR-0008, ADR-0009, ADR-0010, ADR-0011, ADR-0012, ADR-0014, ADR-0015, ADR-0016, ADR-0018, ADR-0020.
+
+## Decision
+
+Step 3 delivers one core mechanism, the `landed_cost` document: a receipt value adjustment. It takes amounts already posted to `purchase_cost_clearing`, allocates them to receipt lines (by value, quantity, weight or manual amounts, exactly and deterministically), and moves them from clearing into stock.
+
+What happens depends on the state of the receipt's inventory period (ADR-0012):
+- **Same period:** the allocated cost is added to the receipt's value before period-end costing.
+- **Earlier period, still not locked:** the document must be dated in the receipt's period (interim, flagged).
+- **Locked period:** the cost goes to whoever took the goods. The core recomputes the locked periods' actual costing with the cost added, and posts in the first unlocked period the difference per consumer, plus the share still on hand as stock.
+
+The customs declaration, supplier cost invoices and invoice price differences to stock are step 5 documents (B3). Each posts its amounts to `purchase_cost_clearing` and proposes a `landed_cost` document. Accounting choices stay with the author, as flagged regime settings and open questions:
+- the closed-period method;
+- the earlier-unlocked case;
+- the treatment of import taxes;
+- returns after landed cost.
+
+### Rules
+
+**The core mechanism (step 3)**
+
+1. A `landed_cost` is a posting document in company currency with three tables:
+   - `landed_cost_line`: one cost with `line_number`, `cost_type`, `amount`, `allocation_method`, `source_journal_line_id` (the journal line on `purchase_cost_clearing` that holds the cost), and nullable `item_id` and `tax_code_id`.
+   - `landed_cost_target`: the receipt material document lines (ADR-0020) a cost line is allocated to, with `manual_amount` for the `manual` method.
+   - `landed_cost_allocation`: one row per target with the snapshot of its basis, its exact share, its amount, its mode (`open` or `closed`) and `derivation_trace_id`.
+
+   Each cost line has its own targets; a cost line with `item_id` may target only receipts of that item (`landed_cost_target_invalid`). `cost_type` values: `capitalized_tax` (with the tax code), `freight`, `insurance`, `handling`, `price_difference`, `other`.
+
+   The document type declares `inventory_value_role` `receipt_addition` (ADR-0020 rule 12). It adds no transaction key: it posts to the inventory keys and credits the source line's account.
+2. Sources:
+   - The amount comes from the source journal line in company currency. It is never reconverted, so the clearing account nets to zero.
+   - One source may be allocated in parts.
+   - What has been allocated is computed from the landed cost lines that refer to the source (ADR-0009 rule 7). A line that would take more than the unallocated rest is rejected with `landed_cost_source_exceeded`.
+   - The credit posts to the source line's operational account, not to a newly determined one.
+   - A source must be a posted, unreversed line of the same company on an account mapped to `purchase_cost_clearing`, otherwise `landed_cost_source_invalid`.
+   - In step 3 and 4 tests, sources are general journal entries on `purchase_cost_clearing` (a `none` control kind account; ADR-0010).
+   - A source that is a credit (a freight credit note, a duty refund) gives a negative cost line.
+3. Eligible targets are lines of movement types `purchase_receipt` and `other_receipt` (ADR-0020 rule 4) that are not reversed. Any other target is rejected with `landed_cost_target_invalid`. The basis is the line as posted. How purchase returns of the receipt affect landed cost already allocated is an open question (rule 16).
+   - Customs or freight assessed before the goods receipt simply wait in clearing.
+   - Goods received into a `transit` warehouse take the cost there. The inventory key follows the target's warehouse kind (`inventory_posting`, `inventory_in_transit_posting` or `inventory_goods_sent_posting`, ADR-0020 rule 1), and transfers carry it onward through costing.
+
+**Allocation**
+
+4. Methods:
+
+   | Method | Basis | Condition |
+   | --- | --- | --- |
+   | `value` | The target's own receipt value, without landed costs already added | Independent of the order in which landed cost documents post |
+   | `quantity` | Inventory quantity converted to one unit | All targets' units have the same `quantity_kind` (ADR-0018 rule 8); company units convert through `product_uom` |
+   | `weight` | Quantity × the item's `gross_weight` per inventory unit, converted to kilograms | Gross weight, because freight and insurance are charged on shipping weight (ADR-0018 rule 4) |
+   | `manual` | Amounts entered per target | Their sum must equal the cost line, otherwise `allocation_manual_sum_mismatch` |
+
+   A missing basis or a zero total basis is rejected with `allocation_basis_missing`, which names the targets and the fix (set the weight, or choose another method). The basis values are snapshotted in the allocation rows, because master data may change later.
+5. Shares are exact rationals. Amounts are rounded with the largest-remainder method to the company currency's minor unit; ties go to the earlier target by material document number, then `line_number`. The amounts sum exactly to the cost line, and the trace records which targets received the remainder units (ADR-0006 rule 21). Negative cost lines are allocated the same way.
+
+**Periods**
+
+6. Each target's mode is fixed by the `inventory` area state (ADR-0012) of its receipt's posting period, compared with the landed cost document's posting period:
+
+   | Case | Rule |
+   | --- | --- |
+   | Same period | `open`: a value-only line per target, debiting the inventory key of the target's warehouse and crediting the source account, through the stock lock helper (ADR-0020 rules 9, 15). Period-end costing then includes it in the actual average (ADR-0020 rule 12) |
+   | Receipt period earlier, not `locked` | Rejected with `landed_cost_period_mismatch`, naming the receipt's period and its valid posting date range. The cost is then posted into that period, whose costing reruns (ADR-0020 rule 14); if the source is dated later, clearing shows a credit at that period's end until the source's date, an accrual effect. Interim, flagged: the spec does not state this case (open question) |
+   | Landed cost posting period earlier than the receipt's period | Rejected with `landed_cost_period_mismatch`: stock cannot take value before it exists; the cost waits in clearing |
+   | Receipt period `locked` | `closed`: rule 7. The posting date must lie in the first unlocked inventory period, otherwise `landed_cost_period_mismatch` names it |
+
+   Targets of one document must fall into one case and one receipt period. Otherwise `landed_cost_period_mismatch` lists the groups to split into separate documents. The plan shows each target's mode.
+7. Closed mode, method `consumer_split`, the interim seed:
+   - The core reruns ADR-0020 rule 12's exact solve for the item over every locked period from the receipt's period on, once as posted and once with the allocated amount added to the receipt. It takes the difference per movement type offset key, item and warehouse.
+   - The quantity on hand at the end of the last locked period takes the rest, per warehouse that holds it, as a `receipt_addition` value-only line in the posting period.
+   - Consumers are not a fixed list. Every revalued movement in those periods gets its share through its own offset key: sales from any warehouse, consumption, scrap, other issues, count shortages, and later production. Transfers carry value to receiving warehouses, and returns enter as the regime sets them (ADR-0020 rule 5). Degenerate cases follow ADR-0020 rule 13.
+   - Consumer lines carry item and warehouse, with no partner, and leave `material_document_line_id` null.
+   - The allocation row and its trace name the contributing periods and movements (Principle 6).
+   - The lines are rounded by largest remainder so they sum exactly to the allocated amount.
+8. The closed-period method is the regime setting `landed_cost.closed_period_method`, with options `consumer_split` (rule 7) and `stock_coverage`. Under `stock_coverage`, the stock share of a target is min(1, quantity of the item on hand in the receipt's valuation area at the end of the last locked period ÷ the target's receipt quantity); that share goes to stock as a `receipt_addition`, split over the warehouses holding the quantity in proportion to it, and the rest to the `price_difference` key. If the regime maps `price_difference` to an inventory account, the rest also goes to stock, to the same warehouses.
+   - The setting's date basis is the posting date (ADR-0016 rule 10).
+   - The Vietnam package seeds `consumer_split` with basis `unverified`. In production it is refused until verified (ADR-0016 rule 12).
+   - Whether either method is acceptable under VAS is the existing open question, now with these two alternatives.
+
+**Correction and reversal**
+
+9. Corrections and reversals:
+   - A landed cost is corrected by the correction type `landed_cost_correction` (`correction_of_id`, ADR-0009 rule 23; its `Post` command is registered like other correction types, ADR-0008 rule 1). It holds signed differences per cost line and target, and follows the same period rules.
+   - Whether `landed_cost` is an internal document that may be reversed (ADR-0009 rules 18–20) is an open question. Interim, flagged: `is_reversible` true, with the extra precondition that no `stock_value` it touched becomes negative.
+   - A landed cost targeting a receipt refers to it, so the receipt cannot be reversed while it stands (`document_referenced`, ADR-0009 rule 19).
+   - A value-only inventory line that would make a warehouse's `stock_value` negative is rejected with `negative_stock_value`; values left at zero quantity are handled by costing (ADR-0020 rule 13).
+
+**Source documents (step 5)**
+
+10. A `customs_declaration` posts what customs assessed for an import.
+    - Header: declaration number and date, supplier, the purchase orders or receipts it covers. `transaction_currency` is the currency customs assesses in.
+    - Lines: item, quantity, unit; `hs_code`; `country_of_origin` (ISO 3166-1 alpha-2); customs value in the declared currency, and the customs exchange rate. The customs rate is document rate type `customs` (ADR-0011 rule 12) and converts customs value only to compute tax bases, never a journal amount.
+    - Taxes: each line has rows in `customs_declaration_tax` (tax code, base, assessed amount, recomputed amount). Import duty, excise, environmental protection tax, anti-dumping or safeguard duty and import VAT are all tax codes (DS-23), not fixed columns.
+    - Amounts are recorded as assessed. The core recomputes them from the tax codes and reports differences as the check result `customs_assessment_differs`, never changing the assessed amount.
+    - Journal conversion follows ADR-0011.
+11. Posting a customs declaration:
+    - credits each tax's payable account through its tax code's key (`import_export_duty`, `special_consumption_tax`, `import_tax`; DS-23 adds keys for other import taxes);
+    - debits either `purchase_cost_clearing`, when the tax code's `import_treatment` is `capitalize`, or the recoverable tax account through `input_tax`, when it is `recoverable` (e.g. deductible import VAT to 1331, [08](../spec/08-l10n-vn.md#imports-and-purchase-costs)).
+
+    `import_treatment`, including when import VAT is not deductible and is capitalized, is a package rule with a basis, flagged until verified (open question; DS-19, DS-23).
+    - The declaration proposes a `landed_cost` with one cost line per declaration line and capitalized tax. Each cost line targets only receipt lines of that item, prorated by received over declared quantity, less what is already allocated (one declaration, receipts of 600 and then 400 units).
+    - A customs amendment is the correction type `customs_declaration_amendment` (`correction_of_id`), posting differences.
+    - `customs_declaration` is not reversible, deliberately stricter than ADR-0009 rule 19's interim: it records an outside party's document, and the amendment type corrects it.
+12. Other sources and the GR/IR link:
+    - A supplier's freight, insurance or handling invoice posts its cost to `purchase_cost_clearing` (DS-22).
+    - A goods receipt credits `gr_ir_clearing`, and the goods invoice debits it.
+    - Invoice-versus-receipt differences keep one mechanism, the regime's determination of the `price_difference` key (ADR-0015 rule 4). When it determines a price difference account, the invoice posts there. When it determines an inventory account, the invoice posts the difference to `purchase_cost_clearing` instead, and emits in the same batch a `landed_cost` with `cost_type` `price_difference` targeting the matched receipt line, so receipts in locked periods get the same treatment (rules 6–8) and nothing waits in clearing for a person.
+    - Landed costs never pass through GR/IR.
+    - Which TT99 account holds GR/IR clearing, which rate values an import receipt and where rate differences go are existing open questions, read as regime settings by DS-22.
+13. Products get `hs_code` and `country_of_origin` (ADR-0018, "deliberately elsewhere"). They are proposed on declaration lines. The code's length and format are country data. `hs` (Harmonized System) is added to the allowed abbreviations.
+
+**Checks**
+
+14. DS-16 invariants:
+    - allocations sum to each cost line;
+    - no source is allocated beyond its amount;
+    - per source line, the `purchase_cost_clearing` balance equals its unallocated rest.
+
+    A close task (ADR-0012) lists sources still unallocated at period end. `purchase_cost_clearing` is a liability in the system chart but carries a debit while costs wait; its presentation is DS-19's.
+15. DS-17 edge cases: landed cost after partial sale and after period close (existing); one declaration covering several receipts; customs assessed before the goods receipt.
+16. Open questions for the author:
+    - the earlier-unlocked case (rule 6);
+    - the closed-period method and its alternatives (rule 8, extending the existing question);
+    - import tax treatment and non-deductible import VAT (rule 11);
+    - the value of a purchase return after landed cost was allocated to the receipt;
+    - whether `landed_cost` is an internal, reversible document (rule 9).
+
+## Context
+
+DS-11's ADR part is needed by ADR-0020 (receipt values and costing), DS-22 (purchase documents) and the step 3 gate. The logic is specified for step 3. Constraints:
+
+- Customs declaration as its own document with its own customs rate. Duty and excise capitalized; import VAT to 33312 and 1331. Later costs allocated by value, quantity or weight. Same open period: added to the receipt value before costing. Earlier closed period: posted now and allocated by the quantity each consumer took ([08](../spec/08-l10n-vn.md#imports-and-purchase-costs), [05](../spec/05-accounting-inventory-core.md), [11](../spec/11-build-order.md)).
+- Step 3 gets landed cost; customs declarations and purchase cost documents come at step 5 and emit only step 1 and step 3 commands (B3; [11](../spec/11-build-order.md)).
+- Golden scenarios: landed cost after partial sale and after period close; a USD import with duty at a different rate ([12](../spec/12-testing.md)). Multi-currency and landed cost are in Phase 1 (D10).
+- SAP practice (D5): planned and unplanned delivery costs and subsequent debits, with stock coverage. The material ledger distributes price differences to ending stock and consumption. Rule 7 applies that idea across locked periods without reopening them. ADR-0005: accounting choices are regime settings.
+
+## Options considered
+
+| Option | For | Against |
+| --- | --- | --- |
+| Closed-period split as the difference of two exact costing runs (chosen as interim seed) | Covers every movement type, transfers and period chains; order-independent; equals a naive recomputation | One costing rerun per item over locked periods |
+| Fixed consumer list with quantity proportions | Simple to state | Misses scrap, counts and goods-sent sales; transfers need recursion; periodic average has no receipt identity |
+| `stock_coverage` (SAP subsequent debit) | Simplest | Consumption share sits in price difference, not COGS; offered as a regime option |
+| Fixed duty, excise and VAT columns on the declaration | Matches the Vietnamese form | Other import taxes need schema changes; country shape in the core |
+| Reconvert cost lines at their own rate | Self-contained | Leaves residues on the clearing account |
+| Rounding difference to the last line | Simple | Depends on line order |
+
+## Constraints that come with the decision
+
+- DS-04:
+  - errors `allocation_basis_missing` (precondition), `allocation_manual_sum_mismatch`, `landed_cost_source_invalid`, `landed_cost_source_exceeded`, `landed_cost_target_invalid`, `landed_cost_period_mismatch`, `negative_stock_value`;
+  - check result `customs_assessment_differs`.
+- ADR-0020: value-only `receipt_addition` lines, the costing rerun used by rule 7.
+- DS-16: invariants of rule 14. DS-17: edge cases of rule 15.
+- DS-18: catalog and `inventory_value_role` checks.
+- DS-19: `landed_cost.closed_period_method`; `import_treatment` rules; presentation of `purchase_cost_clearing`.
+- DS-22: cost invoices, GR/IR, price differences to stock through `landed_cost` in the invoice's batch.
+- DS-23: tax codes for import taxes with `import_treatment`.
+- Step 3 spec: rerun formula, layout of consumer lines, performance for many locked periods.
+
+## Revisit when
+
+- Planned delivery costs on purchase orders are needed (accruing freight at receipt).
+- Customs declarations arrive electronically from the customs system.
+- The rerun over locked periods is measurably slow for long histories.
+
+## Documents updated
+
+- [docs/adr/0018-product-and-item-model.md](0018-product-and-item-model.md), [docs/adr/0020-inventory-and-costing-model.md](0020-inventory-and-costing-model.md), [docs/adr/0015-account-determination.md](0015-account-determination.md) (rules 1, 4): links and notes.
+- [docs/catalogs/transaction-keys.csv](../catalogs/transaction-keys.csv): meaning of `price_difference`.
+- [docs/spec/00-reading-guide.md](../spec/00-reading-guide.md):
+  - glossary rows for landed cost (updated), landed cost correction, customs declaration and amendment, landed cost line, target and allocation (with mode), allocation method, cost type, closed-period method, import treatment;
+  - `hs` in the allowed abbreviations.
+- [docs/design/DS-04-command-envelope.md](../design/DS-04-command-envelope.md): error and check result codes.
+- [docs/design/backlog.md](../design/backlog.md): DS-11 row links here.
+- [docs/adr/README.md](README.md): index row.
+- [docs/open-questions.md](../open-questions.md): the questions of rule 16.
+- [docs/runbook/step-log.md](../runbook/step-log.md): entry at acceptance.

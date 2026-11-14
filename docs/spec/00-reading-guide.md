@@ -64,7 +64,14 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Transaction, company, group currency | transaction\_currency, company\_currency, group\_currency |  |
 | Preliminary price | preliminary\_price | Valuation price used during the period: the previous costed period's actual average price, or the latest receipt price for a new item or when the previous period is not yet costed |
 | Period-end actual costing | period\_end\_actual\_costing | Periodic weighted average |
-| Landed cost | landed\_cost | Purchase costs incurred after receipt. Same open period: added to the receipt value before period-end costing. Earlier, closed period: posted in the current period and allocated by consumer (see [05](05-accounting-inventory-core.md)) |
+| Landed cost | landed\_cost | Receipt value adjustment: allocates amounts held on `purchase_cost_clearing` (duty, freight, price differences) to receipt lines. Same period: added to the receipt value before costing. Locked period: posted in the first unlocked period, split by consumer ([ADR-0021](../adr/0021-landed-cost.md)) |
+| Landed cost line, target, allocation | landed\_cost\_line, landed\_cost\_target, landed\_cost\_allocation (mode: open, closed) | A cost with its source journal line; the receipt lines it goes to; the computed share per target with its basis snapshot and mode (open: added to the receipt's period; closed: split for a locked period) |
+| Landed cost correction | landed\_cost\_correction | Correction type of a landed cost: signed differences per cost line and target |
+| Closed-period method | landed\_cost.closed\_period\_method: consumer\_split, stock\_coverage | Regime setting: how landed cost for a locked receipt period is split between consumers and stock |
+| Cost type | cost\_type: capitalized\_tax, freight, insurance, handling, price\_difference, other | Kind of a landed cost line |
+| Allocation method | allocation\_method: value, quantity, weight, manual | How a landed cost line is divided among its targets, exactly, by largest remainder |
+| Customs declaration | customs\_declaration | Step 5 posting document of what customs assessed for an import; taxes as tax-code rows (`customs_declaration_tax`); proposes a landed cost; corrected by `customs_declaration_amendment` |
+| Import treatment | import\_treatment: capitalize, recoverable | Tax code attribute: whether an import tax is added to the goods' cost or recovered as input tax; a package rule |
 | Posting period | posting\_period | Regular or special period of a fiscal year; states open, soft\_locked, locked per posting area ([ADR-0012](../adr/0012-posting-periods-and-closing.md)) |
 | Posting area | area: general, inventory, receivable, payable | Part of a regular period opened and closed on its own; a line's area is its system account's control kind; special periods have general only |
 | Special period | kind: special | Up to four periods for year-end adjustments, dated the fiscal year's last day, chosen explicitly |
@@ -206,6 +213,7 @@ Work items get the verbs Claim and Release from DS-29, because Lock belongs to p
 | fx | foreign exchange |
 | vat | value-added tax |
 | gr\_ir | goods received / invoice received |
+| hs | Harmonized System (customs commodity codes) |
 | l10n, i18n | localization, internationalization |
 | llm, ui | large language model, user interface |
 | api, rest, mcp, url, http, oidc | the standard interface and protocol terms |

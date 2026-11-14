@@ -13,7 +13,7 @@ Goods and services are modeled at two levels: a `product` holds everything that 
 1. A `product` belongs to one company and has a `code` unique in the company, a `product_type` (`stock`: kept and valued in stock; `non_stock`: bought or sold but not kept in stock; `service`), `is_active`, `is_sellable` and `is_purchasable`.
 2. An `item` belongs to one product (`product_id`, never changed) and company, and has a `code` unique in the company (the SKU) and `is_active`. An item can be used on a document only if both it and its product are active. A product without variants has one item, created with it and coded like it. Documents, stock movements, journal lines (ADR-0014) and prices refer to `item_id`, never to `product_id`.
 3. Fields on the product (the same for every variant): `product_category_id`, `buyer_id` (the employee responsible for purchasing it; employees are defined in DS-20), `item_group_id` (ADR-0015), `valuation_class_id` (required for `stock`, empty otherwise; ADR-0015), `inventory_uom_id`, `purchase_uom_id`, `sales_uom_id` (rules 9–13), `tracking` (`none`, `lot`, `serial`), `item_tax_group_id` (rule 16), `price_control` (`periodic_average`, the only value in Phase 1, D6). `catch_weight_uom_id` is reserved for catch weight after Phase 1 ([07](../spec/07-shared-foundation.md#units-of-measure)) and stays out of command schemas until then.
-4. Fields on the item (may differ between variants): variant values (rule 7), barcodes (rule 14), and `length`, `width`, `height` with `dimension_uom_id`, `net_weight`, `gross_weight` with `weight_uom_id`, all optional and all for one inventory unit of the item, so landed cost can be allocated by weight (DS-11). Volume is computed. Dimensions of packaging units (a carton's size) are not modeled in Phase 1.
+4. Fields on the item (may differ between variants): variant values (rule 7), barcodes (rule 14), and `length`, `width`, `height` with `dimension_uom_id`, `net_weight`, `gross_weight` with `weight_uom_id`, all optional and all for one inventory unit of the item, so landed cost can be allocated by weight ([ADR-0021](0021-landed-cost.md) rule 4). Volume is computed. Dimensions of packaging units (a carton's size) are not modeled in Phase 1.
 5. An item's display name is its product's name followed by its variant values' names, in the language required (rule 17); items have no name of their own, so a name is kept in one place. A product's name in the company's language is its `name`; other languages are in `data_translation`.
 
 **Variants**
@@ -48,7 +48,7 @@ Goods and services are modeled at two levels: a `product` holds everything that 
 
 | Data | Where |
 | --- | --- |
-| HS code, country of origin | Product fields added with DS-11 (customs and landed cost) |
+| HS code, country of origin | Product fields `hs_code`, `country_of_origin` ([ADR-0021](0021-landed-cost.md) rule 13) |
 | Shelf life, lot expiry dates | DS-09 (lots) |
 | Supplier's and customer's own item codes, names and units (`partner_item`; needed by the purchase invoice agent's stored mappings, [14](../spec/14-agent-workflows.md)) | DS-20 partner part |
 | Prices | DS-20 price lists, per item |
