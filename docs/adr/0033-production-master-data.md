@@ -85,7 +85,7 @@ Agents read the structures through deterministic queries. They draft revisions f
 7. `bill_of_materials_output` rows of a revision list outputs besides the main one:
    - **Fields.** `output_item_id`, `quantity` per base quantity with its unit, `output_type` (`co_product` or `by_product`) and `cost_coefficient` (co-products).
    - **Coefficients are data only.** `cost_coefficient` and `main_output_cost_coefficient` hold equivalence coefficients. Whether the coefficient method applies, and how by-products are valued, are the author's through DS-53. VAS 02 para 09 values by-products at net realisable value (unverified, ADR-0016).
-   - **What is rejected.** An item may not be both a component and an output of one revision (`item_both_component_and_output`); recycling loops are not modeled in Phase 1. A phantom's bill of materials may not have outputs (`phantom_with_outputs`). This is checked when `is_phantom` is set (rule 14), and at release and production version save for an item that is a phantom in the version's warehouse.
+   - **What is rejected.** An item may not be both a component and an output of one revision (`item_both_component_and_output`; rework orders are the exception, [ADR-0034](0034-production-orders-and-shop-floor.md) rule 2); recycling loops are not modeled in Phase 1. A phantom's bill of materials may not have outputs (`phantom_with_outputs`). This is checked when `is_phantom` is set (rule 14), and at release and production version save for an item that is a phantom in the version's warehouse.
 8. Releasing a revision checks, deterministically:
    - **Items.** Components and outputs are active items of `stock` products, distinct from the main output.
    - **Units and quantities.** Units are convertible; quantities and the base quantity are positive; scrap percentages are in [0, 100).
@@ -123,7 +123,7 @@ Agents read the structures through deterministic queries. They draft revisions f
     - **Identity:** `code` and `name`, unique per company, and the `production_warehouse_id` it belongs to (a `physical` warehouse).
     - **Calendar and capacity:** `working_calendar_id`, `capacity_units` (parallel machines or people), `hours_per_day` per working day, `efficiency_percent` and `is_capacity_relevant`.
     - **Cost center:** `cost_center_id` (ADR-0027 rule 6), where its overhead is collected (DS-53).
-    - **Bins:** nullable `supply_bin_id` and `output_bin_id` in its warehouse, as destinations and sources for the warehouse tasks of DS-52 (ADR-0023).
+    - **Bins:** nullable `supply_bin_id` and `output_bin_id` in its warehouse, of bin type `production` ([ADR-0034](0034-production-orders-and-shop-floor.md) rule 10), as destinations and sources for the warehouse tasks of DS-52 (ADR-0023).
     - **Lifetime:** `is_active`.
 
     **Deactivation.** Deactivating a work center that a valid routing revision uses is rejected with `in_use_by_production_version`.
@@ -139,6 +139,7 @@ Agents read the structures through deterministic queries. They draft revisions f
     - **Identity:** `item_id`, `production_warehouse_id` (a `physical` warehouse, where components are staged and output is received by default), and `code`, unique per item and warehouse.
     - **Recipe:** `bill_of_materials_id` (usage `production`) and `routing_id` (optional).
     - **Selection:** `minimum_lot_quantity` and `maximum_lot_quantity`, `start_date` and `end_date` (open-ended allowed), `priority` and `is_active`.
+    - **Execution settings** ([ADR-0034](0034-production-orders-and-shop-floor.md)): `overdelivery_tolerance_percent` (default 0), `is_receipt_on_final_confirmation`, `is_complete_on_full_receipt`, `is_as_built_required`.
     - **Lead time:** `production_lead_time_method`, either `fixed` with `production_lead_time_days` (working days on the production warehouse's calendar), or `routing` (computed by DS-54).
     - **Selection order.** On the `explosion_date`, among active versions whose dates cover it and whose lot range covers the quantity: the lowest `priority`, then the lowest `code`. If none fits, the error is `production_version_missing`.
     - **Save checks.**

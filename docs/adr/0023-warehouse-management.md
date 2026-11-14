@@ -71,7 +71,7 @@ A small shop and a managed distribution warehouse run on the same model.
      | `warehouse_id`, `zone_id` | Where it is |
      | `code` | Unique in the warehouse; its segments are informational |
      | `barcode` | Unique in the company, so a scan resolves without the warehouse; default: the code |
-     | `bin_type` | `receiving`, `storage`, `picking`, `shipping`, `quality`, `returns`, `damage`; `staging` and `packing` in the second slice |
+     | `bin_type` | `receiving`, `storage`, `picking`, `shipping`, `quality`, `returns`, `damage`; `production` (work-center supply and output bins, never read by pick removal, [ADR-0034](0034-production-orders-and-shop-floor.md) rule 10); `staging` and `packing` in the second slice |
      | `pick_sequence` | |
      | Capacity | Optional `maximum_weight` (kg, gross), `maximum_volume` (m³), `maximum_handling_units` |
      | Booleans | `is_mixed_item_allowed`, `is_mixed_lot_allowed`, `is_blocked_for_putaway`, `is_blocked_for_picking` (manual blocks only), `is_active` |
@@ -114,7 +114,7 @@ A small shop and a managed distribution warehouse run on the same model.
 
 **Movements**
 
-7. Inventory-level movements are material documents (ADR-0020), with `bin_id`, `stock_status` and `handling_unit_id` filled in on their lines where managed. Per movement type:
+7. Inventory-level movements are material documents (ADR-0020), with `bin_id`, `stock_status` and `handling_unit_id` filled in on their lines where managed. Per movement type (the production types: [ADR-0034](0034-production-orders-and-shop-floor.md) rules 11 and 13):
 
    | Movement types | Source or target bin | Allowed statuses | Task created |
    | --- | --- | --- | --- |
@@ -191,12 +191,12 @@ A small shop and a managed distribution warehouse run on the same model.
     - **Physical facts.** Count shortages and blocking found damage always post, then cancel reservations deterministically, by the demand document's date, number and `line_number` descending, until the limit holds, and raise an exception.
     - **Author questions.** Which reservation loses, whether overbooking is allowed, and the priority among demands are open questions. Interim, flagged: newest loses, no overbooking, first come first served.
     - **Lots.** Availability is not lot-aware. A reservation whose lots fail shelf-life rules at pick time gives a short pick. Planning ignores reservations in netting and counts demand in full ([ADR-0024](0024-planning.md) rule 9).
-    - **Build step.** Reservations, the check and the posting interfaces are step 3 core; documents call them at step 5. Picked and fulfilled quantities stay stored here, checked by INV-58; the open quantity of the demand line is stored in `demand_supply_line` ([ADR-0031](0031-design-simplifications.md) rules 5, 6).
+    - **Build step.** Reservations, the check and the posting interfaces are step 3 core; documents call them at step 5. Production orders reserve components at release, passing `destination_bin_id` and `release_sequence` ([ADR-0034](0034-production-orders-and-shop-floor.md) rule 9). Picked and fulfilled quantities stay stored here, checked by INV-58; the open quantity of the demand line is stored in `demand_supply_line` ([ADR-0031](0031-design-simplifications.md) rules 5, 6).
 
 **Picking and outbound**
 
 14. Pick tasks:
-    - **Creation.** Pick tasks serve demand lines, not deliveries. `RunPickRelease` (a deterministic job, per demand document, step 3) turns reservations into pick tasks. Each task carries the demand line's unit and the inventory quantity (ADR-0018 rule 11); the client derives a breakdown such as "2 cartons and 3 bottles" from `product_uom`. Tasks refer to `demand_supply_line_id` ([ADR-0028](0028-document-lifecycle-hardening.md) rule 2). Creation takes the `stock_value` lock of each item and warehouse before reading available bin stock ([ADR-0030](0030-commercial-seams-and-imports.md) rule 12).
+    - **Creation.** Pick tasks serve demand lines, not deliveries. `RunPickRelease` (a deterministic job, per demand document, step 3) turns reservations into pick tasks. Each task carries the demand line's unit and the inventory quantity (ADR-0018 rule 11); the client derives a breakdown such as "2 cartons and 3 bottles" from `product_uom`. Tasks refer to `demand_supply_line_id` ([ADR-0028](0028-document-lifecycle-hardening.md) rule 2). `RunPickRelease` also serves production orders, moving components to the reservation's destination bin ([ADR-0034](0034-production-orders-and-shop-floor.md) rule 10). Creation takes the `stock_value` lock of each item and warehouse before reading available bin stock ([ADR-0030](0030-commercial-seams-and-imports.md) rule 12).
     - **Serial items.** Tasks name the bin, not the serial. The serials are scanned at confirmation and checked against bin and status (`serial_not_in_bin`).
     - **Removal order.** Removal reads only `storage` and `picking` bins with status `available`, minus the quantity of open tasks leaving each key. It orders by:
       1. lot: `fefo` by `expiry_date` (lots without one last), skipping lots below the customer's minimum remaining shelf life, with the planned delivery date as reference, or the business date when the line has none; `fifo` by the lot's earliest receipt posting date (FIFO needs lot tracking; untracked items use bin order);

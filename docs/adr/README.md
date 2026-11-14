@@ -37,3 +37,4 @@ One file per decision, named `NNNN-short-title.md`, using [template.md](template
 | [ADR-0031](0031-design-simplifications.md) | Design simplifications (DS-49) | Accepted (2026-11-14) |
 | [ADR-0032](0032-phase-1-scope-with-production.md) | Phase 1 scope: the complete core, with production (DS-50) | Accepted (2026-11-14) |
 | [ADR-0033](0033-production-master-data.md) | Production master data (DS-51) | Accepted (2026-11-14) |
+| [ADR-0034](0034-production-orders-and-shop-floor.md) | Production orders and shop floor (DS-52) | Accepted (2026-11-14) |

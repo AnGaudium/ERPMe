@@ -36,7 +36,7 @@ The other optimizer findings are either decided elsewhere (OPT-02 in the adjudic
 5. The open delivery or receipt quantity of a stock line is stored once, in `demand_supply_line` (ADR-0024 rule 8). Posting interfaces write it in the referring document's transaction (ADR-0028 rule 3), and DS-22's delivery and receipt progress queries read it.
    - **What stays computed.** Invoiced progress (which counts documents in `issuing`, ADR-0028 rule 9), fulfilled quantities (which `quantity_below_fulfilled` needs, ADR-0028 rule 3) and lines without a `demand_supply_line` row are computed from referring documents, as before.
    - **ADR-0009 rule 7** is narrowed to match. INV-63 checks the stored open quantity.
-6. `stock_reservation` keeps `picked_quantity` and `fulfilled_quantity` (ADR-0023 rule 13). Available to promise reads them under the `stock_value` lock for every reservation and pick release, so it must not join tasks and deliveries. INV-58 is new: per demand line, the reservations' picked quantities equal the confirmed pick-task quantities, and their fulfilled quantities equal the posted delivery quantities for that line.
+6. `stock_reservation` keeps `picked_quantity` and `fulfilled_quantity` (ADR-0023 rule 13). Available to promise reads them under the `stock_value` lock for every reservation and pick release, so it must not join tasks and deliveries. INV-58 is new: per demand line, the reservations' picked quantities equal the confirmed pick-task quantities, and their fulfilled quantities equal the posted delivery quantities for that line. Production issues and backflush fulfil reservations too, so INV-58 counts them ([ADR-0034](0034-production-orders-and-shop-floor.md) rule 11).
 
 **One stock-key mode** (OPT-05)
 

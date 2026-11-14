@@ -83,6 +83,7 @@ Planning answers, per item and warehouse: what to buy or move, how much, and by 
    - **What counts.** Which document types and states count as demand and supply is business behavior (open question). Interim, flagged:
      - **demand:** sales order lines in states after `draft` (confirmed orders, not quotations), and transfer order lines at the source;
      - **supply:** purchase order lines in any state but `canceled`, drafts included; purchase request lines; transfer order lines at the destination, including goods in a `transit` warehouse;
+     - **production orders** count from `Create`: components as demand, outputs as supply, through typed columns `production_order_component_id` and `production_order_output_id`; reopening an order clears `closed_reason` and restores open quantity ([ADR-0034](0034-production-orders-and-shop-floor.md) rules 6, 9);
      - **converted planned orders** count as supply for the quantity not yet matched by open supply lines carrying their `origin_planned_order_id`;
      - **firmed planned orders**, and proposed ones frozen inside the firm fence, count as supply at their `need_date`. For `reorder_point` and `min_max` they are part of the inventory position.
    - **Overdue lines.** Demand or supply dated before the planning date counts at the planning date (interim, flagged).

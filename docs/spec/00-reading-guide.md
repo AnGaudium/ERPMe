@@ -72,6 +72,14 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Routing, operation | routing, routing\_operation, routing\_operation\_activity, control: internal, external; is\_milestone | The sequence of operations that makes an item, with activity quantities per work center |
 | Work center | work\_center, activity\_type, work\_center\_activity | Where operations run: capacity, calendar, activities, cost center and bins |
 | Production version | production\_version | The one explicit way to make an item in a production warehouse: bill of materials, routing, lot range, dates |
+| Production order | production\_order, order\_type: standard, rework, disassembly; good\_quantity, planned\_output\_quantity, scheduling\_direction | An order to make a good quantity of an item by a production version from a start date; non-posting; "released" means approved, with no Release command ([ADR-0034](../adr/0034-production-orders-and-shop-floor.md)) |
+| Production order lines | production\_order\_component, production\_order\_output, production\_order\_operation, production\_order\_output\_serial | Components, outputs, operations and assigned output serials of an order |
+| Execution state | execution\_state: not\_started, in\_progress, technically\_complete | How far a released order has run; technical completion ends logistics; a job closes it after settlement |
+| Production issue | production\_issue, is\_return | Internal posting document issuing components to, or returning them from, an order's cost object |
+| Operation confirmation | operation\_confirmation, yield\_quantity, scrap\_quantity | Internal posting document recording yield, scrap and activities of an operation, with its backflush |
+| Production receipt | production\_receipt | Internal posting document receiving an order's outputs |
+| Backflush | backflush\_at\_operation, backflush\_at\_receipt | Automatic issue of components on confirmation or receipt, by cumulative progress |
+| As built | output\_serial\_number\_id, is\_as\_built\_required | The link from a component lot or serial to the assigned output serial it went into |
 | Low-level code | low\_level\_code | The longest path from a top item to an item in released bills of materials; MRP plans in that order |
 | Where-used | where\_used | The parents that use an item as a component or output (`ListWhereUsed`) |
 | Production structure | production\_structure | One row per company, locked by releases and version saves so structure checks see a stable graph |
@@ -286,13 +294,14 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Issue | Request legal issuance of a document; it posts when the issue is accepted (e.g. `IssueSalesInvoice`) | IssueRequested |
 | Record | Store an outcome reported by an outside system, e.g. an e-invoice outcome | Recorded |
 | Recall | Take back a request sent to an outside system before it took effect | Recalled |
-| Complete | Finish a held step by a human, e.g. a posting after acceptance | Completed |
-| Reopen | Return a document to draft after an outside step failed | Reopened |
+| Complete | Finish a held step by a human, e.g. a posting after acceptance; or end the logistics of a production order (technical completion) | Completed |
+| Reopen | Return a document to draft after an outside step failed; or return a technically complete production order to in progress | Reopened |
 | Erase | Remove a data subject's personal data irreversibly | Erased |
 | Request | Hand work to another module for execution, e.g. replenishment or an e-invoice | Requested |
 | Pack, Unpack | Put stock into or take it out of a handling unit | Packed, Unpacked |
 | Firm | Fix a proposal so later runs keep it, e.g. a planned order | Firmed |
 | Activate | Start enforcing something once, irreversibly, e.g. a subledger | Activated |
+| Reserve | Hold stock for a demand line, e.g. components of a production order | Reserved |
 | Release | Make a draft revision of master data effective from its start date, e.g. a bill of materials revision | Released |
 | Convert | Turn a record into another form once, e.g. a planned order into draft documents | Converted |
 | Match, Unmatch | Link or unlink bank lines or documents; open items are settled against each other by an `open_item_matching` document | Matched, Unmatched |
@@ -300,7 +309,7 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Allocate | Distribute an amount or quantity over targets | Allocated |
 | Import | Read an external file into the system | Imported |
 | Run | Start a deterministic system job, e.g. period-end actual costing | Completed (`<job noun>Completed`) |
-| Assign | Set the owner of a work item or a warehouse task | Assigned |
+| Assign | Set the owner of a work item or a warehouse task; or attach output serials to a production order | Assigned |
 | Start | A person begins work on an assigned warehouse task | Started |
 | Close | End further activity on an approved record that has had some, e.g. an order, or a change proposal once executed | Closed |
 | Restrict | Narrow who may post in a posting period (open to soft-locked) | Restricted |

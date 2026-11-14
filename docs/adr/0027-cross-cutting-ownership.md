@@ -60,7 +60,7 @@ Before step 1 code freezes the platform modules, every entity that several modul
 
 **Stock documents and other owners**
 
-7. The step 3 stock document types are owned by `inventory`. Their fields, reversibility flags (ADR-0009 rule 19) and the link from `transfer_order` to `stock_transfer` (one step, or two through transit) go in a DS-09 "stock documents" deliverable, written before step 3.
+7. The step 3 stock document types are owned by `inventory`. Their fields, reversibility flags (ADR-0009 rule 19) and the link from `transfer_order` to `stock_transfer` (one step, or two through transit) go in a DS-09 "stock documents" deliverable, written before step 3. The production documents are owned by `production` ([ADR-0034](0034-production-orders-and-shop-floor.md)).
    - **Posting types:**
      - `goods_receipt`, `delivery`, `stock_transfer`, `stock_count`;
      - `internal_consumption`, `other_receipt`, `other_issue`, `scrap`;
@@ -100,7 +100,7 @@ Before step 1 code freezes the platform modules, every entity that several modul
 **Locks**
 
 10. The complete lock order, per command, supersedes the lists in ADR-0022 rule 10, ADR-0023 rule 10 and ADR-0026 rule 14. Within each class, rows are locked in ascending ID unless stated.
-    1. Documents: the command's own, and the documents it refers to (the order a delivery fulfills, the receipt a landed cost targets, the original of a reversal or correction).
+    1. Documents: the command's own, and the documents it refers to (the order a delivery fulfills, the receipt a landed cost targets, the original of a reversal or correction, the production order of a shop-floor document; [ADR-0034](0034-production-orders-and-shop-floor.md) rule 19).
     2. Period area state rows, share lock.
     3. The planning state row (planning runs only), or the company's `production_structure` row (releases of bills of materials and routings, production version and production setting saves, deactivations; [ADR-0033](0033-production-master-data.md) rule 8).
     4. Warehouse task rows.

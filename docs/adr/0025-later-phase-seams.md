@@ -27,8 +27,8 @@ Everything else for these phases is additive: new tables, movement types, transa
 1. `journal_line` gets two nullable dimensions (ADR-0014 rule 9: a new dimension is a nullable column added by ADR): `cost_object_id` and `fixed_asset_id`. `material_document_line` gets nullable `cost_object_id`, for consumption into a cost collector and output from it. These columns stay empty and out of command schemas until their phase.
 2. Stub tables:
    - `cost_object` and `fixed_asset` are created now with only `id`, `company_id`, `code` and `name`, unique on (`company_id`, `code`), with RLS. The foreign keys therefore exist from the first migration.
-   - `cost_object` is a cost collector. Its kinds and lifecycle (by order, product, process or period) are designed in Phase 2. How Vietnamese regimes collect production cost and value WIP at period end is an author question. `fixed_asset` is designed in Phase 3.
-   - Both are owned by `ledger` until their phase modules exist: `production` (layer 3, Phase 2) and `assets` (layer 3, Phase 3; ADR-0022 rule 2).
+   - `cost_object` is a cost collector, owned by `production` now that production is in Phase 1; production orders get one of kind `production_order` ([ADR-0034](0034-production-orders-and-shop-floor.md) rule 15). Its kinds and lifecycle (by order, product, process or period) are designed in Phase 2. How Vietnamese regimes collect production cost and value WIP at period end is an author question. `fixed_asset` is designed in Phase 3.
+   - Both are owned by `ledger` until their phase modules exist: `production` (layer 3, Phase 2) and `assets` (layer 3, Phase 3; ADR-0022 rule 2). Note: `cost_object` is now owned by `production` ([ADR-0034](0034-production-orders-and-shop-floor.md) rule 15).
 
 **Subledger control kinds**
 
