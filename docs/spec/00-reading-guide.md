@@ -27,7 +27,12 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Reversal document | reversal\_of | Points to the document it reverses; passes the same period checks as any document; for internal document types, and, as a flagged interim rule, for outside-party documents nothing refers to yet ([ADR-0009](../adr/0009-document-lifecycle.md) rule 19). Column `reversal_of_id` ([ADR-0004](../adr/0004-naming-conventions.md) rule 12) |
 | Correction document | correction\_of | A return, credit note, debit note, adjustment or replacement invoice that corrects a posted document, created from it. Column `correction_of_id` ([ADR-0009](../adr/0009-document-lifecycle.md) rule 23) |
 | Journal entry, journal line | journal\_entry, journal\_line |  |
-| Universal journal | journal\_line | One table carrying all analytical dimensions; canonical list in [05](05-accounting-inventory-core.md) |
+| Universal journal | journal\_line | One table carrying all analytical dimensions; canonical list in [05](05-accounting-inventory-core.md); final columns in [ADR-0014](../adr/0014-universal-journal.md) |
+| Side | side | debit or credit: the turnover column a journal line belongs to; amounts are signed, debit positive and credit negative |
+| Storno line | is\_storno | A journal line flagged as storno: its amounts have the sign opposite to its side and reduce that side's turnover (SAP's negative posting) |
+| General journal, balance transfer | document types general\_journal, balance\_transfer | Document types for manual journal entries and for moving a balance between operational accounts |
+| Database transaction number | database\_transaction\_number | The PostgreSQL transaction that created a journal entry, set by a trigger; a posted entry never gains lines |
+| Account period balance | account\_period\_balance | Cache of turnover and cumulative balance per account, period, transaction currency and closing-entry flag, written when a period is locked |
 | Material document | material\_document | Quantities. Zero or one accounting document per material document; value-only accounting documents (e.g. revaluations) have no material document |
 | System account | system\_account | Fixed in the core; catalog [system-accounts.csv](../catalogs/system-accounts.csv), which is the word list for system account codes; a tree whose leaves are postable ([ADR-0010](../adr/0010-system-chart-of-accounts.md)) |
 | Account type | account\_type | asset, liability, equity, income, expense; inherited by an operational account from its system account |
