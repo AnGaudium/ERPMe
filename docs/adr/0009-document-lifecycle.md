@@ -1,17 +1,17 @@
 # ADR-0009: Document lifecycle
 
-Status: accepted (2026-11-14) under ADR-0005, reviewed by Claude Fable 5.2. Design item: DS-05. Related decisions: D4, D5. Principles 1, 3, 5, 6, 8, 9. ADR-0004, ADR-0005, ADR-0006, ADR-0007, ADR-0008.
+Status: accepted (2026-11-14) under ADR-0005, reviewed by Claude Fable 5.2. Design item: DS-05. Related decisions: D4, D5. Principles 1, 3, 5, 6, 8, 9. ADR-0004, ADR-0005, ADR-0006, ADR-0007, ADR-0008. Amended before its first merge (2026-11-14) by the author's decision on corrections (rules 1, 2, 19, 20, 23), reviewed by Claude Fable 5.2: a posted document is corrected by a correction document; internal document types can be reversed; whether unreferenced outside-party documents may be reversed is flagged.
 
 ## Decision
 
-Every document has one row in a shared `document` table (type, company, state, version, number) plus its own typed header and line tables sharing that `id`. Each document type declares whether it posts. Posting types move `draft → (pending_approval →) approved → posted → reversed`, or `draft → posted` when the policy needs no approval; non-posting types (orders, quotations, requests) share the states `draft`, `pending_approval`, `approved`, `closed` and `canceled`, and their further behavior belongs to DS-22. Every change to an unposted document creates a new version with a hash; an approval binds to that version, and a new version voids it. Posting assigns the official number from a gapless series in the same transaction and makes the document immutable; it is undone only by posting a reversal document. Points that are business or legal rules (when orders are numbered, what happens when a document that may not wait for approval needs one, number format and order, which types may be reversed, how a reversal posts) are flagged configuration with open questions for the author.
+Every document has one row in a shared `document` table (type, company, state, version, number) plus its own typed header and line tables sharing that `id`. Each document type declares whether it posts. Posting types move `draft → (pending_approval →) approved → posted → reversed`, or `draft → posted` when the policy needs no approval; non-posting types (orders, quotations, requests) share the states `draft`, `pending_approval`, `approved`, `closed` and `canceled`, and their further behavior belongs to DS-22. Every change to an unposted document creates a new version with a hash; an approval binds to that version, and a new version voids it. Posting assigns the official number from a gapless series in the same transaction and makes the document immutable. A posted document is corrected by a correction document that refers to it (a return, a credit note, an adjustment or replacement invoice); internal document types, which no outside party holds, can instead be reversed by a reversal document. Points that are business or legal rules (when orders are numbered, what happens when a document that may not wait for approval needs one, number format and order, how a reversal posts, whether outside-party documents nothing refers to yet may be reversed, who posts corrections) are flagged configuration with open questions for the author.
 
 ### Rules
 
 **Documents and types**
 
-1. Every document has a row in `document` with `id`, `company_id`, `document_type`, `state`, `version`, `number` (null until numbered), `branch_id` (nullable) and `reversal_of_id` (nullable). Its typed header table (e.g. `goods_receipt`) has the same `id` as primary key and foreign key to `document`; its lines are in `<header>_line` (ADR-0004 rule 10), each with a `line_number` unique within the document. Versions, approvals, numbering, reversals, work items and audit records refer to `document.id`.
-2. Each document type is registered once with: `document_type` (a glossary noun, `snake_case`), `is_posting` (it posts to the journal or stock), `is_approval_hold_allowed` (rule 12), `is_reversible` (rule 19) and its numbering (rule 15). The registry generates its commands from the verb list: `Create`, `Update`, `Delete`, `Submit`, `Approve`, `Reject`, `Cancel`; `Post` and, if reversible, `Reverse` for posting types; `Close` for non-posting types. `Submit`, `Approve` and `Reject` are not generated for types with `is_approval_hold_allowed: false`.
+1. Every document has a row in `document` with `id`, `company_id`, `document_type`, `state`, `version`, `number` (null until numbered), `branch_id` (nullable), `reversal_of_id` (nullable) and `correction_of_id` (nullable, rule 23). Its typed header table (e.g. `goods_receipt`) has the same `id` as primary key and foreign key to `document`; its lines are in `<header>_line` (ADR-0004 rule 10), each with a `line_number` unique within the document. Versions, approvals, numbering, reversals, work items and audit records refer to `document.id`.
+2. Each document type is registered once with: `document_type` (a glossary noun, `snake_case`), `is_posting` (it posts to the journal or stock), `is_approval_hold_allowed` (rule 12), `is_reversible` (rule 19, default false) and its numbering (rule 15). The registry generates its commands from the verb list: `Create`, `Update`, `Delete`, `Submit`, `Approve`, `Reject`, `Cancel`; `Post` and, if reversible, `Reverse` for posting types; `Close` for non-posting types. `Submit`, `Approve` and `Reject` are not generated for types with `is_approval_hold_allowed: false`.
 3. Which document types exist and their fields are decided by the DS items that own them (DS-06, DS-09, DS-22, DS-25). Documents created by system jobs (costing adjustments, FX revaluation, closing entries; DS-09, DS-10, DS-12) are ordinary documents created and posted through the same commands by actor `system` (ADR-0008 rule 2). Attachments (DS-36), the supplier's own number on incoming documents (DS-22, DS-24), field permissions and personal data inside version content (DS-15), and documents between companies (after Phase 1) are outside this ADR.
 
 **States of posting types**
@@ -58,20 +58,36 @@ Every document has one row in a shared `document` table (type, company, state, v
 **Reversal**
 
 18. `Reverse<Type>` is `human_only` (ADR-0008 rule 2). It carries the original's `version` and an explicit `posting_date`, creates a reversal document of the same type and company with `reversal_of_id` pointing to the original (unique, so a document is reversed at most once, in full), posts it with its own number through the same period checks as any document, and sets the original to `reversed`, in one transaction. It emits `<Type>Posted` for the reversal document and `<Type>Reversed` for the original. Preconditions when later documents depend on the original (a matched invoice, an allocated payment, consumed stock) are set by DS-09, DS-22 and DS-25.
-19. Which posting types are reversible, and which are corrected only by adjustment or replacement documents (e.g. e-invoices, [08](../spec/08-l10n-vn.md#e-invoicing-and-tax)), is an open question for the author. Interim, flagged rule: every posting type is reversible unless DS-24 marks it otherwise (`is_reversible`).
-20. Whether the reversal posts negative amounts (storno) or swapped debit and credit, which posting date it defaults to when the original period is locked, the value of a reversed material document and the cost of a sales return are accounting rules: configuration of the localization package, flagged until the author decides (existing open questions). The core provides both reversal methods.
+19. `is_reversible` is set per document type (default false) by the DS item that owns the type, within these rules. Author's decision, 2026-11-14: a posted document is corrected by correction documents (rule 23); only internal document types can be reversed.
+    - Internal types, reversible: manual journal entries and stock documents between the company's own warehouses (transfers, stock counts). A transfer accompanied by an internal transport e-document cannot be reversed until that legal point is answered (open question); DS-24 adds this as a `Reverse` precondition.
+    - Documents the company records from or issues to an outside party (goods receipts, deliveries, payments, purchase invoices): whether they may be reversed while nothing refers to them, as SAP and Business One allow, or only corrected, is an open question for the author. Interim, flagged rule: reversible while no document that is not reversed or canceled refers to them.
+    - Sales invoices and every document issued as an e-invoice: never reversible; corrected by adjustment or replacement invoices ([08](../spec/08-l10n-vn.md#e-invoicing-and-tax)).
+    - Documents created by system jobs (costing adjustments, FX revaluation, closing entries): reversibility is decided by DS-09, DS-10 and DS-12.
+    - For every reversible type, `Reverse` is rejected with `document_referenced` while a document that is not reversed or canceled refers to the document.
+20. Whether the reversal posts negative amounts (storno) or swapped debit and credit, which posting date it defaults to when the original period is locked, and the value of a reversed material document are accounting rules: configuration of the localization package, flagged until the author decides (existing open questions). The core provides both reversal methods.
 21. A reversal document cannot itself be reversed; to restore a transaction, a new document is created. Interim rule, listed as an open question for the author.
 
 **Events**
 
 22. Every transition emits an event `<Type><event form>` through the outbox (`GoodsReceiptPosted`, `SalesOrderClosed`; ADR-0004 rule 22, DS-13).
 
+**Correction documents**
+
+23. A correction document is an ordinary posting document of a correction type (`sales_return`, `purchase_return`, `credit_note`, `debit_note`, adjustment or replacement invoice) whose `correction_of_id` points to the posted, not reversed, original of the same company. A reversal document cannot be the original of a correction.
+    - It is created from the original in one command: `Create<CorrectionType>` takes `correction_of_id` and the lines to correct and copies their data from the original, so the user or agent changes only what differs.
+    - `correction_of_id` is set at `Create`, never changed, and part of the version content (rule 9), so an approval binds to it.
+    - An original may have several correction documents, each correcting part of it (some lines, a quantity, a price). Limits on the cumulative correction (e.g. returns never above the quantity delivered) are set by DS-22 and checked by a DS-16 invariant.
+    - A correction document is itself a posted document and may be corrected the same way.
+    - It goes through the same states, approval, period checks and numbering as any document; it posts in an open period even when the original's period is locked.
+    - A correction that fully offsets its original undoes a posted document, which the spec reserves to humans ([14-agent-workflows.md](../spec/14-agent-workflows.md)). Who may post correction documents is an open question for the author. Interim, flagged rule: agents may create and submit correction drafts; only a human may post them (`Post<CorrectionType>` is registered `human_only`, ADR-0008 rule 2).
+    - Which correction types each document type allows, their fields and their accounting and stock effect (including the cost of a sales return, an existing open question) are decided by DS-09, DS-22 and DS-24.
+
 ## Context
 
 DS-05 is needed by DS-06 (journal), DS-09 (inventory), DS-12 (periods), DS-22 (commercial documents) and DS-28 (approval). Constraints:
 
 - States draft → pending approval → approved → posted (immutable) → reversed; numbering at posting from a gapless series per document type, fiscal year of the posting date and branch ([07-shared-foundation.md](../spec/07-shared-foundation.md#document-lifecycle-numbering-and-posting-periods)).
-- Only posted documents are immutable; cancelling a posted document means posting a reversal document; open commercial documents can be edited and every edit creates a new version (Principle 5). Approvals are immutable, carry a reason and bind to the hash of the document version (07, approval engine). The policy engine returns allow, deny, an approval procedure, or human only (Principle 3).
+- Posted documents are immutable; a posted document is corrected by a correction document, or, for internal documents, reversed by a reversal document; open commercial documents can be edited and every edit creates a new version (Principle 5). Approvals are immutable, carry a reason and bind to the hash of the document version (07, approval engine). The policy engine returns allow, deny, an approval procedure, or human only (Principle 3).
 - Orders do not post; e-invoice issuance is never delayed by approval (backlog DS-05; [08-l10n-vn.md](../spec/08-l10n-vn.md)). DS-22 owns the state machines of commercial documents (backlog).
 - Closing periods and reversing posted documents are human only ([14-agent-workflows.md](../spec/14-agent-workflows.md)).
 - ADR-0005: business and legal rules go to the author; among correct technical options, the one easiest for AI agents wins.
@@ -98,7 +114,7 @@ DS-05 is needed by DS-06 (journal), DS-09 (inventory), DS-12 (periods), DS-22 (c
 - DS-13: one event per transition.
 - DS-15, DS-28: who may submit, approve and post; segregation of duties; policy outcome per document type.
 - DS-16: invariant that version content matches the typed rows.
-- DS-24: e-invoice numbers in their own tables; `is_approval_hold_allowed` and `is_reversible` for invoice types.
+- DS-22, DS-24: correction document types (return, credit note, debit note, adjustment and replacement invoices), their `Create…` commands from an original and their accounting effect; e-invoice numbers in their own tables; `is_approval_hold_allowed` for invoice types.
 - Glossary: states `canceled` and `closed`, verb `Close`, the registry flags.
 
 ## Revisit when
@@ -112,5 +128,9 @@ DS-05 is needed by DS-06 (journal), DS-09 (inventory), DS-12 (periods), DS-22 (c
 - [docs/design/DS-04-command-envelope.md](../design/DS-04-command-envelope.md): three error codes.
 - [docs/design/backlog.md](../design/backlog.md): DS-05 row links here.
 - [docs/adr/README.md](README.md): index row.
-- [docs/open-questions.md](../open-questions.md): numbering of non-posting documents; approval for documents that may not wait; number format and order; reversible types; reversing a reversal; the four reversal questions linked to rule 20.
+- [docs/open-questions.md](../open-questions.md): numbering of non-posting documents; approval for documents that may not wait; number format and order; reversing outside-party documents; internal transport e-documents; who posts corrections; reversing a reversal; the three reversal questions linked to rule 20.
+- [docs/spec/02-principles.md](../spec/02-principles.md): Principle 5 wording on corrections.
+- [docs/spec/08-l10n-vn.md](../spec/08-l10n-vn.md), [docs/spec/14-agent-workflows.md](../spec/14-agent-workflows.md): wording on corrections.
+- Glossary rows for reversal document and correction document; the note on Cancel.
+- [docs/spec/05-accounting-inventory-core.md](../spec/05-accounting-inventory-core.md): document principle row.
 - [docs/runbook/step-log.md](../runbook/step-log.md): entry.

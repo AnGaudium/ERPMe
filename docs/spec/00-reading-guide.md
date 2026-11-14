@@ -24,7 +24,8 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Document | document | Header and lines |
 | Document state | draft, pending\_approval, approved, posted, reversed, canceled, closed | Documents in a final state (posted, reversed, canceled, closed) are immutable; `closed` ends an approved non-posting document that has had activity, `canceled` one that has had none; column `document.state` ([ADR-0009](../adr/0009-document-lifecycle.md)) |
 | Document type | document\_type; is\_posting, is\_approval\_hold\_allowed, is\_reversible | Registered once per type; the flags say whether it posts, whether its posting may wait for approval, and whether it can be reversed ([ADR-0009](../adr/0009-document-lifecycle.md) rule 2) |
-| Reversal document | reversal\_of | Points to the document it reverses; passes the same period checks as any document. Column `reversal_of_id` ([ADR-0004](../adr/0004-naming-conventions.md) rule 12) |
+| Reversal document | reversal\_of | Points to the document it reverses; passes the same period checks as any document; for internal document types, and, as a flagged interim rule, for outside-party documents nothing refers to yet ([ADR-0009](../adr/0009-document-lifecycle.md) rule 19). Column `reversal_of_id` ([ADR-0004](../adr/0004-naming-conventions.md) rule 12) |
+| Correction document | correction\_of | A return, credit note, debit note, adjustment or replacement invoice that corrects a posted document, created from it. Column `correction_of_id` ([ADR-0009](../adr/0009-document-lifecycle.md) rule 23) |
 | Journal entry, journal line | journal\_entry, journal\_line |  |
 | Universal journal | journal\_line | One table carrying all analytical dimensions; canonical list in [05](05-accounting-inventory-core.md) |
 | Material document | material\_document | Quantities. Zero or one accounting document per material document; value-only accounting documents (e.g. revaluations) have no material document |
@@ -112,7 +113,7 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Assign | Set the owner of a work item | Assigned |
 | Close | End further activity on an approved record that has had some, e.g. an order | Closed |
 
-Verbs for posting period states and work item locking are added by DS-12 and DS-29; a command batch needs no verb ([ADR-0008](../adr/0008-command-envelope-and-registry.md) rule 20). A posted document is never canceled: it is reversed (Principle 5), so Cancel never applies to posted documents.
+Verbs for posting period states and work item locking are added by DS-12 and DS-29; a command batch needs no verb ([ADR-0008](../adr/0008-command-envelope-and-registry.md) rule 20). A posted document is never canceled: it is corrected by a correction document or, if its type is internal, reversed (Principle 5, [ADR-0009](../adr/0009-document-lifecycle.md) rules 19, 23), so Cancel never applies to posted documents.
 
 **Allowed abbreviations** ([ADR-0004](../adr/0004-naming-conventions.md) rule 2). No other abbreviation is used in an identifier. Terms not listed are written in full: `cost_of_goods_sold`, `receivable`, `payable`, `general_ledger`, `bill_of_materials`.
 

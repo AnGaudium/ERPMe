@@ -38,6 +38,6 @@ Default policy guardrails. Customers can adjust them per action type and thresho
 
 An agent gains permissions only with evidence, never by impression.
 
-- **Metrics per workflow:** share of drafts accepted unedited and degree of editing; auto-match accuracy, defects found later and documents reversed because of the agent; handling time per document versus the baseline measured before enabling the agent; LLM cost per document.
+- **Metrics per workflow:** share of drafts accepted unedited and degree of editing; auto-match accuracy, defects found later and documents reversed or corrected because of the agent; handling time per document versus the baseline measured before enabling the agent; LLM cost per document.
 - **Shadow mode:** the agent only proposes, without effect, on a set of real transactions. Only when accuracy exceeds the threshold may the workflow auto-post below the limit, within the rules of [03-agent-safety.md](03-agent-safety.md).
 - **The evaluation suite** draws on the synthetic dataset. Anonymized pilot data is used only outside the repository; pilot data never enters the repository. The suite runs as set in [Principle 11](02-principles.md).

@@ -128,7 +128,7 @@ Module-specific codes are added by the DS item that owns the module, in the regi
 | `approval_required` | precondition | 422 | no | The policy engine requires an approval first (DS-28) |
 | `invalid_state_transition` | precondition | 422 | no | The command is not allowed in the document's state; `details` lists the allowed commands ([ADR-0009](../adr/0009-document-lifecycle.md) rule 5) |
 | `posting_date_mismatch` | validation | 422 | no | `Post` carries a `posting_date` different from the document's ([ADR-0009](../adr/0009-document-lifecycle.md) rule 9) |
-| `document_referenced` | precondition | 422 | no | Delete or cancel of a document that other documents refer to ([ADR-0009](../adr/0009-document-lifecycle.md) rule 7) |
+| `document_referenced` | precondition | 422 | no | Delete, cancel or reverse of a document that other documents refer to ([ADR-0009](../adr/0009-document-lifecycle.md) rules 7, 19) |
 | `rate_limited` | rate_limited | 429 | yes | `details.retry_after_seconds` says when to retry |
 | `internal_error` | internal | 500 | no | Anything unexpected; the response carries only a reference for the logs |
 | `timeout` | unavailable | 503 | yes | `transaction_timeout` reached (ADR-0008 rule 11) |
