@@ -67,7 +67,11 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Future posting periods | future\_posting\_periods | Company setting, default 1: how many regular periods after the current one accept postings ([ADR-0012](../adr/0012-posting-periods-and-closing.md) rule 6) |
 | Closing entry | is\_closing\_entry | Marker on journal entries posted by the closing job, so period-range reports can exclude them |
 | Accounting regime | accounting\_regime | Rule set inside a localization package; the Vietnam package has two: TT99 and TT133 |
-| Localization package | localization\_package | e.g. l10n\_vn, l10n\_us |
+| Localization package | localization\_package | e.g. l10n\_vn, l10n\_us; a directory with a manifest, data files and interface code ([ADR-0016](../adr/0016-localization-package-structure.md)) |
+| Package template | package\_template | Package content copied into a company at setup and then owned by it: chart, determination, valuation classes, item groups, checklist, numbering, print templates |
+| Package rule | package\_rule | Package content read live and dated: regime settings, tax rates, statutory reports, data labels |
+| Basis | basis: legal\_source, author\_decision, unverified, company\_decision | What every package template entry and package rule rests on; only the author sets verification and decisions (ADR-0003 R10) |
+| Regime setting | regime\_setting | One dated rule of an accounting regime, read through `regime_setting(company, key, date)`; keys, schemas, date basis and company options registered by the core; a used row's value never changes |
 | Work queue item | work\_item | Business work; distinct from technical jobs (job) |
 | Policy, approval | policy, approval | An approval row binds to a document version and its `version_hash`; a new version voids it ([ADR-0009](../adr/0009-document-lifecycle.md) rule 11) |
 | Document version, version hash | document\_version, version\_hash | Every change to an unposted document writes a new version; its canonical content is hashed with SHA-256 |
