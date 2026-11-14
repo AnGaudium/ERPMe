@@ -12,7 +12,7 @@ Applies to every step below:
 
 ## Step 0 · Preparation (month 1)
 
-**Entry criteria:** specification committed (D17); ADR-0001 and ADR-0002 accepted. The open question on the GitHub organization is answered, because CI runs on GitHub Actions (ADR-0002).
+**Entry criteria:** specification committed (D17); ADR-0001 and ADR-0002 accepted. The public GitHub organization exists, because CI runs on GitHub Actions (ADR-0002); creating it is the author's first task ([ADR-0003](../adr/0003-build-operating-rules.md) R3). The legal verifier is engaged before step 1 starts (R10).
 
 **Design items first:** DS-01 to DS-18 (DS-09 ADR only; DS-10 and DS-11 ADR only; DS-15 envelope part only). These cover every ADR in "Decide by ADR before writing code" in [11-build-order.md](../spec/11-build-order.md). No production code before they are accepted ([AGENTS.md](../../AGENTS.md)).
 
@@ -21,7 +21,7 @@ Applies to every step below:
 1. DS-01 glossary and naming, then DS-02 ID and numeric model and DS-03 time model.
 2. DS-04 command envelope and registry; DS-05 document lifecycle; DS-07 system chart (catalog); DS-10 multi-currency ADR; DS-12 posting periods; DS-13 outbox.
 3. DS-06 universal journal data model (depends on DS-02, 03, 05, 07, 10, 12); DS-08 account determination; DS-09 inventory and costing ADR; DS-11 landed cost ADR; DS-14 localization package structure; DS-15 permission envelope.
-4. DS-16 invariant catalog and harness spec; DS-17 synthetic dataset spec and edge-case catalog v1; DS-18 repo conventions.
+4. DS-16 invariant catalog and harness spec; DS-17 synthetic dataset spec and edge-case catalog v1, each edge case with its first executable step; DS-18 repo conventions, including the DCO check, the 15-minute CI limit and coverage enforcement ([ADR-0003](../adr/0003-build-operating-rules.md) R1, R4–R6).
 5. Repo skeleton per DS-18: monorepo layout, import-linter contracts, CLAUDE.md and coding-agent skills, CI with pyright strict.
 6. Test server per DS-18 ([testing-operations.md](testing-operations.md#environments)).
 7. Invariant-checking harness per DS-16: the INV-xx catalog as code, Hypothesis state-machine skeleton, golden-scenario file reader, reference comparison report.
@@ -30,7 +30,7 @@ Applies to every step below:
 
 **How agents are used:** builder agents draft each DS file from the spec; a reviewer agent checks each draft for contradictions with D1–D17 and the build order; the author accepts. Builder agents write the skeleton, harness and simulator. Golden expected values are built by the author, never by an agent.
 
-**Verification:** each DS file meets the "done" rule in [design/README.md](../design/README.md); CI green on the empty skeleton; the simulator, run twice with the same seed and dataset version, produces an identical event log; the edge-case coverage report runs on the small dataset.
+**Verification:** each DS file meets the "done" rule in [design/README.md](../design/README.md); CI green on the empty skeleton; the simulator, run twice with the same seed and dataset version, produces an identical event log; the small dataset at this step is the event log plus input files and contains every EC v1 edge case at least once as events ([ADR-0003](../adr/0003-build-operating-rules.md) R1).
 
 **Exit gate (verbatim):**
 
@@ -63,7 +63,7 @@ Applies to every step below:
 
 **How agents are used:** builders implement each package; the reviewer checks every change touching posting, triggers or idempotency, and the author reviews those line by line. The recomputation writer starts the naive trial-balance recomputation from the spec.
 
-**Verification:** Hypothesis state machine posts random transaction sequences in VND and foreign currencies; after each step every ledger invariant holds: each entry balances per transaction currency, company currency and group currency; trial balance sums to zero; rounding lands on the defined system account; no number gaps; posted documents never change; reversal nets to zero; retry with the same idempotency key returns the identical result; executed result equals the simulated `plan_hash`. Small dataset (journal-level events) replays in CI. Concurrency test for numbering and idempotency.
+**Verification:** branch coverage of 90% or more on the core packages is enforced from this step ([ADR-0003](../adr/0003-build-operating-rules.md) R4). Hypothesis state machine posts random transaction sequences in VND and foreign currencies; after each step every ledger invariant holds: each entry balances per transaction currency, company currency and group currency; trial balance sums to zero; rounding lands on the defined system account; no number gaps; posted documents never change; reversal nets to zero; retry with the same idempotency key returns the identical result; executed result equals the simulated `plan_hash`. Small dataset (journal-level events) replays in CI. Concurrency test for numbering and idempotency.
 
 **Exit gate (verbatim):**
 
@@ -73,7 +73,7 @@ Applies to every step below:
 
 **Risks:** TT99 FX rules still unverified (open question); `plan_hash` canonical form unstable across runs; triggers and RLS weaker than intended.
 
-**Fallback:** if Hypothesis finds a failing sequence, shrink it, freeze it as a regression scenario, fix, rerun. If FX rules remain unverified, keep them as flagged configuration and mark the affected golden scenarios "pending verification"; the gate is not declared on unverified FX rules without the author's explicit note in the step log.
+**Fallback:** if Hypothesis finds a failing sequence, shrink it, freeze it as a regression scenario, fix, rerun. The TT99 FX rules and the reversal questions are verified before this gate ([ADR-0003](../adr/0003-build-operating-rules.md) R10); until then they are flagged configuration and the affected golden scenarios are marked "pending verification".
 
 ---
 
@@ -111,7 +111,7 @@ Applies to every step below:
 
 **Entry criteria:** step 2 gate passed.
 
-**Design items first:** DS-09 algorithm spec (warehouses only; BOM levels left for Phase 2); DS-11 landed cost logic; movement type catalog. The open questions on negative-stock time point, import receipt rate and GR/IR account must be answered or held as flagged configuration.
+**Design items first:** DS-09 algorithm spec (warehouses only; BOM levels left for Phase 2); DS-11 landed cost logic; movement type catalog. The negative-stock time point (a design question for DS-09) is answered; the legal items for step 3 in the [ADR-0003](../adr/0003-build-operating-rules.md) R10 schedule are verified before the gate.
 
 **Work packages, in order:**
 
@@ -157,7 +157,7 @@ Applies to every step below:
 
 **How agents are used:** builders write the driver and reports; the test-scenario model proposes extra situations; every defect becomes a regression scenario. Periodic independent review of stock posting, outbox and idempotency by a reviewer agent from a different provider ([risks.md](../risks.md)).
 
-**Verification:** the full medium replay nightly; every invariant after every simulated day; costing, FX and balances against golden scenarios and naive recomputation; both REST and MCP paths exercised.
+**Verification:** the full medium replay nightly, within 4 hours ([ADR-0003](../adr/0003-build-operating-rules.md) R6); every invariant after every simulated day; costing, FX and balances against golden scenarios and naive recomputation; both REST and MCP paths exercised.
 
 **Exit gate (verbatim):**
 

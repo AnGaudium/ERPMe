@@ -40,6 +40,8 @@ A **work package** is the smallest piece that can be merged on its own and keeps
 
 A work package is done when it is merged, the documents it affects are updated, the next nightly run is green, and any new open question is recorded.
 
+This six-stage flow is the project's policy for reviewing AI-written code required by [18-license-governance.md](../spec/18-license-governance.md) ([ADR-0003](../adr/0003-build-operating-rules.md) R5).
+
 ### Branches, commits and pull requests
 
 - `main` is always green on CI. Nobody commits to `main` directly; every change arrives by a pull request merged by the author.
@@ -48,7 +50,9 @@ A work package is done when it is merged, the documents it affects are updated, 
 - Commit messages and pull-request descriptions cite the reference IDs they act on (Principle n, Dn, step n, Bn, DS-xx, INV-xx, EC-xx, ADR-nnnn), as [AGENTS.md](../../AGENTS.md) requires.
 - The pull-request description has five lines: IDs; what changed; documents updated; reference results added (INV, EC, golden, regression); open questions added or closed.
 - A defect fix always includes the regression scenario that reproduces it ([testing-operations.md](testing-operations.md#defects-to-regression-scenarios)).
-- Contributions use DCO, not a CLA (D3). Until the public GitHub repository exists (see the open question on the GitHub organization), work happens on local branches and review is done on the local diff.
+- Contributions use DCO, not a CLA (D3). Every commit carries `Signed-off-by:` from the human who submits it; an agent appears only as `Co-Authored-By:`. CI rejects unsigned commits from the first push ([ADR-0003](../adr/0003-build-operating-rules.md) R5).
+- The repository is public from the first push ([ADR-0003](../adr/0003-build-operating-rules.md) R3). Until then, work happens on local branches and review is done on the local diff.
+- Defects are GitHub issues labelled `defect`, titled with their dedupe key ([ADR-0003](../adr/0003-build-operating-rules.md) R7).
 
 ### Who does what
 

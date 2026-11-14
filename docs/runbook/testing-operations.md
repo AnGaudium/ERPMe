@@ -9,7 +9,7 @@ How the testing described in [12-testing.md](../spec/12-testing.md) is run day t
 | Local / agent workspace | Unit tests, testcontainers PostgreSQL, small dataset | Synthetic only | Step 0 |
 | CI (GitHub Actions) | Every commit; must be green to merge | Small dataset | Step 0 |
 | Test server | Nightly and after every deploy: medium replay, long Hypothesis runs, test-scenario model, concurrency tests, coverage and comparison reports | Synthetic only (medium; large from step 10) | Step 0 |
-| Staging | Release candidates; step 11 rehearsal with the pilot's real data | Synthetic; pilot data only during step 11 and later | See the open question on when staging is stood up |
+| Staging | Release candidates; step 11 rehearsal; migration tests after go-live | Synthetic; real data only during a rehearsal or migration test, deleted within 7 days after it | Step 10 ([ADR-0003](../adr/0003-build-operating-rules.md) R2, R12) |
 | Production | The pilot | Pilot data | Go-live |
 
 Pilot data never enters the repository, CI or the test server.
@@ -53,11 +53,11 @@ Pilot data never enters the repository, CI or the test server.
 6. Run the test-scenario model: it proposes unusual but realistic situations as business events; the same adapters execute them; invariants and recomputation judge them.
 7. Publish the nightly report: run ID, simulator triple, invariants (pass, fail with first failing day), reference differences, edge-case coverage, replay time per simulated day, LLM spend, new defects.
 
-The same run, shortened, follows every deploy to the test server. A failing nightly blocks merges until the author has triaged it.
+Before go-live the test server is deployed only by the nightly run, so the after-deploy run is the nightly run ([ADR-0003](../adr/0003-build-operating-rules.md) R6). A failing nightly blocks merges until the author has triaged it.
 
 ## Budgets
 
-Each nightly run has a wall-clock limit and an LLM spend limit for the test-scenario model; a circuit breaker stops the model when the limit is reached and the deterministic part of the run continues. Agent budgets (per agent, per company, per day) follow [03-agent-safety.md](../spec/03-agent-safety.md), rule 8. The values are not set in the specification; they are an open question (DS-16, DS-17, DS-32). The Friday review checks spend against the limits.
+Limits ([ADR-0003](../adr/0003-build-operating-rules.md) R6): CI on a commit 15 minutes or less (slower checks move to the nightly run); nightly run 6 hours or less; medium replay inside it 4 hours or less, otherwise slowness is a defect; test-scenario model USD 5 or less per night, stopped by a circuit breaker while the deterministic part continues. Agent budgets (per agent, per company, per day) follow [03-agent-safety.md](../spec/03-agent-safety.md), rule 8, with values set in DS-32. The Friday review checks spend against the limits.
 
 ## Defects to regression scenarios
 
@@ -68,14 +68,14 @@ Each nightly run has a wall-clock limit and an LLM spend limit for the test-scen
 5. **Classify:** core defect (fix in the lowest layer it belongs to); reference error (the author corrects the golden scenario or the recomputation and records why); spec gap (open question; the author decides).
 6. **Fix and close:** the regression scenario turns green and stays in CI permanently.
 
-The spec says defects go to the work queue, which is built in step 5 (DS-29). Where defects are tracked before then is an open question.
+Defects live in the GitHub issue tracker, label `defect`, titled with the dedupe key, before and after step 5. The work queue (DS-29) holds business work only ([ADR-0003](../adr/0003-build-operating-rules.md) R7).
 
 ## Coverage reports
 
-- **Edge-case coverage:** per run, each EC-xx with its injection frequency target and actual count, and whether the scenario exercising it passed. Gate views: edge cases for steps 1–3 (step 4 gate), every edge case (step 10 gate). Each edge case therefore needs a build-step attribute in the DS-17 catalog.
+- **Edge-case coverage:** per run, each EC-xx with its injection frequency target and actual count, and whether the scenario exercising it passed. An edge case counts as exercised only when its events ran through commands at or after its first executable step (DS-17 catalog column, [ADR-0003](../adr/0003-build-operating-rules.md) R1). Gate views: edge cases for steps 1–3 (step 4 gate), every edge case (step 10 gate).
 - **Invariant report:** each INV-xx with checks run and failures.
 - **Reference comparison report:** per company and period, differences between core, naive recomputation and golden results.
-- **Code coverage:** the core coverage threshold required by [18-license-governance.md](../spec/18-license-governance.md); the value is an open question (DS-18).
+- **Code coverage:** 90% branch coverage on the core packages, enforced from step 1; other packages reported only ([ADR-0003](../adr/0003-build-operating-rules.md) R4).
 - **Agent metrics** (from the first agent): drafts accepted unedited, share of deterministic steps, LLM cost per document ([14-agent-workflows.md](../spec/14-agent-workflows.md)).
 
 ## Outside this approach's reach

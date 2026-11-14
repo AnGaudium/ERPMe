@@ -36,7 +36,7 @@ Applies to every step below:
 
 **Artifacts:** sales, purchasing, imports, CRM, work queue and policy modules; DS-22 state machines; step 5 adapter; book-comparison report against step 4.
 
-**Risks:** a document needs a core change (B3 is broken); unanswered open questions on GR/IR account and receipt-versus-invoice rate difference.
+**Risks:** a document needs a core change (B3 is broken).
 
 **Fallback:** if a document seems to need a core change, stop: the author decides whether the core contract changes for a measured reason (ADR, B2, rerun of steps 1–4 verification) or the document is redesigned. Books that differ from step 4 are investigated as defects, never accepted as a new baseline without the author's decision.
 
@@ -46,7 +46,7 @@ Applies to every step below:
 
 **Entry criteria:** step 5 gate passed.
 
-**Design items first:** DS-25 cash, bank and AR/AP; DS-10 realized FX logic. The open questions on FX revaluation method and book rate after revaluation must be answered or held as flagged configuration.
+**Design items first:** DS-25 cash, bank and AR/AP; DS-10 realized FX logic. The book rate for realized FX after a revaluation is verified before this gate ([ADR-0003](../adr/0003-build-operating-rules.md) R10).
 
 **Work packages, in order:**
 
@@ -77,7 +77,7 @@ Applies to every step below:
 
 **Entry criteria:** step 6 gate passed.
 
-**Design items first:** DS-23 tax engine logic; DS-24 e-invoice adapter and BKAV adapter. Decree 70/2025 and VAT Law 48/2024 rules listed in the open questions are verified or held as flagged configuration.
+**Design items first:** DS-23 tax engine logic; DS-24 e-invoice adapter and BKAV adapter. Decree 70/2025 and the VAT deduction rule for invoices of VND 5 million or more are verified before this gate ([ADR-0003](../adr/0003-build-operating-rules.md) R10).
 
 **Work packages, in order:**
 
@@ -109,7 +109,7 @@ Applies to every step below:
 
 **Entry criteria:** step 7 gate passed.
 
-**Design items first:** DS-26 statutory reporting framework; DS-27 print templates and PDF worker; DS-10 FX revaluation logic; DS-12 close checklist.
+**Design items first:** DS-26 statutory reporting framework; DS-27 print templates and PDF worker; DS-10 FX revaluation logic (the revaluation method is verified before this gate, [ADR-0003](../adr/0003-build-operating-rules.md) R10); DS-12 close checklist.
 
 **Work packages, in order:**
 
@@ -145,7 +145,7 @@ Applies to every step below:
 
 1. The 6 hand-built entry screens: sales invoice, goods receipt, goods issue, cash receipt, cash payment, journal entry, keyboard-first (DS-30).
 2. Warehouse PWA: receipt, issue, transfer and count; barcode per packaging unit (DS-31).
-3. Measurement session with an outside accountant (see the open question on how speed is measured).
+3. Measurement session with an outside accountant who uses MISA daily: one simulated day of at least 50 documents over the 6 screen types, entered in ERPMe first, then in MISA; pass when ERPMe's elapsed time is no longer ([ADR-0003](../adr/0003-build-operating-rules.md) R9).
 
 **How agents are used:** builders implement screens against the UX spec; the reviewer checks that screens call only existing commands.
 
@@ -176,6 +176,6 @@ Agents are not a separate step ([11-build-order.md](../spec/11-build-order.md)).
 
 **Work packages per agent:** the workflow as a code-orchestrated cascade (stored rules and mappings → lookup → fuzzy matching with a deterministic score → LLM only for what remains, Principle 13); fixed tool list; untrusted-content tainting; budgets with circuit breaker; run records; replay evaluation in CI; a real-LLM evaluation run whenever a model or prompt changes (Principle 11); metric for the share of steps handled deterministically ([14-agent-workflows.md](../spec/14-agent-workflows.md)).
 
-**Verification:** the evaluation suite draws on the synthetic dataset and the input files the simulator writes (e-invoice XML, bank statements, emails, migration files). The hard floors in [03-agent-safety.md](../spec/03-agent-safety.md) have their own tests: a run that read untrusted content cannot send, change master data or post; the trigger of an agent cannot approve its drafts. Shadow mode needs real transactions and therefore runs after go-live ([go-live.md](go-live.md#first-three-monthly-closes)). What counts as "done" for each agent before step 10 is an open question.
+**Verification:** the evaluation suite draws on the synthetic dataset and the input files the simulator writes (e-invoice XML, bank statements, emails, migration files). The hard floors in [03-agent-safety.md](../spec/03-agent-safety.md) have their own tests: a run that read untrusted content cannot send, change master data or post; the trigger of an agent cannot approve its drafts. Shadow mode needs real transactions and therefore runs after go-live ([go-live.md](go-live.md#first-three-monthly-closes)). **Done for step 10** ([ADR-0003](../adr/0003-build-operating-rules.md) R8): draft-only mode; replay evaluation green; hard-floor tests green; at least 90% of synthetic cases produce a draft equal to the simulator's known answer, or the higher threshold DS-34 sets. The eval judge scores only free text.
 
 **Fallback:** an agent that does not reach its threshold stays in draft-only mode; every operation still works without an LLM (Principle 12), so no gate depends on an agent's accuracy.

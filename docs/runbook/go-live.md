@@ -8,7 +8,7 @@ No parallel run with the old software; the pilot goes live fully on ERPMe, tax b
 
 **Entry criteria:** step 9 gate passed; all four agents built ([steps-5-9.md](steps-5-9.md#agents)).
 
-**Design items first:** DS-36 operations dashboard; DS-37 deployment and operations; DS-38 localization skill and basic US package; DS-39 TT133 regime. The open question on TT133 status and B03 is answered or held as flagged configuration.
+**Design items first:** DS-36 operations dashboard; DS-37 deployment and operations; DS-38 localization skill and basic US package; DS-39 TT133 regime. TT133 status and B03 are verified before this gate ([ADR-0003](../adr/0003-build-operating-rules.md) R10).
 
 **Work packages, in order:**
 
@@ -16,7 +16,7 @@ No parallel run with the old software; the pilot goes live fully on ERPMe, tax b
 2. Replay of the large dataset through commercial documents, not only core commands; fix every difference.
 3. TT133 regime in the Vietnam package (DS-39).
 4. AI skill for localization packages; the basic US package built with it (no state tax returns) (DS-38).
-5. Deployment documentation: Docker Compose, backup and restore with pgBackRest, upgrade and migration policy (DS-37); a restore is tested, not only written.
+5. Deployment documentation: Docker Compose, backup and restore with pgBackRest, upgrade and migration policy (DS-37); a restore is tested, not only written. Staging is built from this documentation, which tests it ([ADR-0003](../adr/0003-build-operating-rules.md) R2).
 6. Operations dashboard: dead tuples, autovacuum lag, queue lag (DS-36, ADR-0002).
 7. Load test on the large dataset against the step 4 performance baseline.
 8. Independent review of stock posting, outbox and idempotency by a reviewer agent from a different provider.
@@ -24,7 +24,7 @@ No parallel run with the old software; the pilot goes live fully on ERPMe, tax b
 **Platform-complete review (before the gate is declared):** the author walks through, with evidence:
 
 - every DS item DS-01 to DS-39 is done by the [design/README.md](../design/README.md) rule;
-- every open question needed by steps 0–10 is closed, or the rule it concerns is flagged configuration and listed;
+- every open question needed by steps 0–10 is closed; a rule still flagged is listed and is not one the pilot will use ([ADR-0003](../adr/0003-build-operating-rules.md) R11);
 - every Phase 1 item of the Lean scope in [10-roadmap.md](../spec/10-roadmap.md#lean-scope-for-phases-0-and-1) exists, and nothing from "After Phase 1" was built beyond reserved schema room;
 - the four agents pass their evaluation suites; every operation works with LLMs off (Principle 12);
 - [risks.md](../risks.md) reviewed.
@@ -52,13 +52,15 @@ No parallel run with the old software; the pilot goes live fully on ERPMe, tax b
 1. **Pilot selection** by the [pilot selection criteria](../spec/10-roadmap.md): trading business of 10–50 people, imports and foreign-currency transactions allowed, chief accountant willing to switch fully, owner who commits time, regular incoming e-invoices, agreement to share anonymized data for agent evaluation outside the repository. The author selects; written commitment only now.
 2. **Go-live date:** the start of an accounting period, preferably a quarter.
 3. **Reader** for the pilot's current system if none exists (e.g. MISA), using the data migration agent and the DS-21 batch format (D16).
-4. **Load real data on staging:** master data, opening balances, AR/AP open items per invoice, inventory per warehouse, lots and serials with opening cost, each as a simulated command batch, never an SQL script ([15-migration-ux-docs.md](../spec/15-migration-ux-docs.md)).
+4. **Load real data on staging** (author-operated servers in Vietnam, author-only access; real data deleted within 7 days after the rehearsal, [ADR-0003](../adr/0003-build-operating-rules.md) R12): master data, opening balances, AR/AP open items per invoice, inventory per warehouse, lots and serials with opening cost, each as a simulated command batch, never an SQL script ([15-migration-ux-docs.md](../spec/15-migration-ux-docs.md)).
 5. **Rehearsal:** replay the pilot's latest month on staging; compare with their books in the current system; classify every difference (reader mapping, ERPMe defect, error in the old books) and resolve it.
 6. **Schema freeze** 4 weeks before go-live (B8). After the freeze, a schema change needs the author's approval and a tested migration.
 7. User accounts, roles and segregation of duties for the pilot's team; the customer decides the routing switch (D12) and who is recorded as accountable.
 8. Training with the shipped Vietnamese UI and user guides.
 
 **How agents are used:** the data migration agent proposes mappings and duplicate merges; drafts only, the batch is simulated and checked against the old books' totals before execution. Agents never see pilot data in the repository or in CI.
+
+Before the gate, every localization rule the pilot's transactions use is verified; rules it does not use stay flagged and are disabled for its company ([ADR-0003](../adr/0003-build-operating-rules.md) R11).
 
 **Exit gate (verbatim):**
 
@@ -83,7 +85,7 @@ DS-40 turns this outline into the checklist. Order on cut-over:
 5. AR/AP open items per invoice reconciled to the old subledgers; inventory per warehouse reconciled to a physical count; bank balances to statements.
 6. Posting period opened; first documents entered on the first day; first e-invoice issued and checked.
 7. Full data export works ("what if we want to leave", [15-migration-ux-docs.md](../spec/15-migration-ux-docs.md)).
-8. What happens if the pilot must stop after go-live is an open question (DS-40).
+8. Fallback ([ADR-0003](../adr/0003-build-operating-rules.md) R13): fix forward by default. Abort is the owner's and chief accountant's decision: the open period is re-entered in the old system from ERPMe's export. The old system stays installed and licensed, closed for entry, until the Phase 1 gate. The last clean abort point is before the first VAT return is filed from ERPMe.
 
 ---
 
@@ -98,7 +100,7 @@ DS-40 turns this outline into the checklist. Order on cut-over:
 
 From go-live, 30–50% of the author's time is reserved for the pilot ([10-roadmap.md](../spec/10-roadmap.md)).
 
-- No feature releases on closing days or near tax deadlines. How many days counts as "near" is an open question.
+- No feature releases on closing days or near tax deadlines, applied as a window ([ADR-0003](../adr/0003-build-operating-rules.md) R14): it opens when the previous period is locked and its tax return, if due, is filed, and closes 5 working days before month end. Hotfixes for defects that block operation may ship at any time.
 - A release requires CI green, the latest medium and large nightly runs green, and a tested migration for any schema change (B8).
 - Hotfixes follow the same six stages in [README.md](README.md#the-unit-of-work), with the regression scenario first.
 - Development of Phase 2 and Phase 3 does not start before the Phase 1 gate ([10-roadmap.md](../spec/10-roadmap.md)).

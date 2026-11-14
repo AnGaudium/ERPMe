@@ -4,4 +4,5 @@ Dated record of gate decisions, the week list and one line per Friday review ([R
 
 | Date | Step | Entry |
 | --- | --- | --- |
+| 2026-11-14 | 0 | ADR-0003 answers the 14 runbook questions (R1–R14). Next: author creates the GitHub organization and engages the legal verifier |
 | 2026-11-14 | 0 | Runbook added. Step 0 in progress: DS-01 to DS-18 not started |
