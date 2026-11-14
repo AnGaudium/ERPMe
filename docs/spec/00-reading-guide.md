@@ -20,7 +20,7 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Command batch | command\_batch | A set of commands simulated and executed together; every data import is one |
 | Simulation | simulate, plan\_hash | Principle 2 |
 | Actor, principal acted for | actor, on\_behalf\_of | Actor kinds: human, agent, integration, system. A system actor is a deterministic job (costing, FX revaluation, closing entries, scheduled matching); its on\_behalf\_of is always the accountable human: the policy owner or the human who triggered the job Actor rows: `user_account`, `agent_type` with `agent_run`, `integration_client`, registered system job ([ADR-0017](../adr/0017-permission-envelope.md)). |
-| Company, branch | company (company\_id), branch | Branch is an analytical dimension |
+| Company, branch | company (company\_id), branch | The legal entity with its currency, time zone, package, regime, costing scope and fiscal calendar owner; a branch or dependent unit of it, also an analytical dimension ([ADR-0027](../adr/0027-cross-cutting-ownership.md) rule 5) |
 | Document | document | Header and lines |
 | Document state | draft, pending\_approval, approved, posted, reversed, canceled, closed | Documents in a final state (posted, reversed, canceled, closed) are immutable; `closed` ends an approved non-posting document that has had activity, `canceled` one that has had none; column `document.state` ([ADR-0009](../adr/0009-document-lifecycle.md)) |
 | Document type | document\_type; is\_posting, is\_approval\_hold\_allowed, is\_reversible | Registered once per type; the flags say whether it posts, whether its posting may wait for approval, and whether it can be reversed ([ADR-0009](../adr/0009-document-lifecycle.md) rule 2) |
@@ -69,7 +69,7 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Preliminary price | preliminary\_price | Deterministic price per item, valuation area and period that issues use until period-end costing; error `preliminary_price_missing` when none can be found |
 | Warehouse kind | kind: physical, transit, goods\_sent | Goods on the way and goods sent but still owned are warehouses of their own kinds, attached to a physical warehouse's valuation area; the kind picks the inventory key |
 | Material document line | material\_document\_line | One stock movement: item, warehouse, movement type, quantity in the inventory unit, lot or serial, value |
-| Stock quantity, stock value | stock\_quantity, stock\_value | Quantity per item, warehouse and lot or serial; value per item and warehouse; changed only through the stock lock helper |
+| Stock quantity, stock value | stock\_quantity, stock\_value | Quantity per item, warehouse, bin, lot or serial, stock status and handling unit (ADR-0023); value per item and warehouse; changed only through the stock lock helper |
 | Lot, serial number | lot, serial\_number | Tracking of stock movements, with no cost of their own; lots may carry expiry dates |
 | Stock count | stock\_count | Counted quantities; differences post as count shortage and surplus movements |
 | Bin management | is\_bin\_managed, outbound\_flow: direct, staged | Warehouse settings: every stock row has a bin; outbound picks go to the default shipping bin (direct) or through staging and packing (staged) ([ADR-0023](../adr/0023-warehouse-management.md)) |
@@ -104,7 +104,6 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Price difference | price\_difference |  |
 | Price control | price\_control | Per product, read through its items ([ADR-0018](../adr/0018-product-and-item-model.md)). Phase 1: periodic weighted average with a preliminary price. Standard price and moving average after Phase 1 |
 | Transaction, company, group currency | transaction\_currency, company\_currency, group\_currency |  |
-| Preliminary price | preliminary\_price | Valuation price used during the period: the previous costed period's actual average price, or the latest receipt price for a new item or when the previous period is not yet costed |
 | Period-end actual costing | period\_end\_actual\_costing | Periodic weighted average |
 | Landed cost | landed\_cost | Receipt value adjustment: allocates amounts held on `purchase_cost_clearing` (duty, freight, price differences) to receipt lines. Same period: added to the receipt value before costing. Locked period: posted in the first unlocked period, split by consumer ([ADR-0021](../adr/0021-landed-cost.md)) |
 | Landed cost line, target, allocation | landed\_cost\_line, landed\_cost\_target, landed\_cost\_allocation (mode: open, closed) | A cost with its source journal line; the receipt lines it goes to; the computed share per target with its basis snapshot and mode (open: added to the receipt's period; closed: split for a locked period) |
@@ -200,7 +199,13 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Idempotency key | idempotency\_key | Per (actor, command type), Principle 9; retention and rules in DS-04 |
 | Schema version | schema\_version | Version of a command schema (semver, [07](07-shared-foundation.md#extensibility-and-upgrades)) or an event schema (DS-13); rules in DS-04 |
 | Lifecycle state column | state | Column holding a lifecycle value: document, posting period, work item and every other lifecycle. Never `status` |
-| Derivation trace | derivation\_trace (derivation\_trace\_id) | Record that explains a derived value (cost, price, tax): its source lines and the rules applied, Principle 6. Built thin for costing in step 3 (DS-09). Not OpenTelemetry's `trace_id`, which is kept for observability (DS-36) |
+| Derivation trace | derivation\_trace (derivation\_trace\_id) | Record that explains a derived value (cost, price, tax): its source lines and the rules applied, Principle 6. Built thin for costing in step 3 (DS-09). Not OpenTelemetry's `trace_id`, which is kept for observability (DS-36); generic schema in [ADR-0027](../adr/0027-cross-cutting-ownership.md) rule 3 |
+| Agent run, agent type | agent\_run, agent\_type | One agent execution (actor context, taint, spend, outcome); an agent kind's declared permissions and budgets; module `agent_runs`, layer 2 |
+| Work item | work\_item | Business work for a person or agent, with claim and due date; module `work`, layer 2 (DS-29) |
+| Attachment | attachment, attachment\_link | File stored once per company by SHA-256, outside the database, linked to any record; module `attachments`, layer 2 |
+| Effect class | effect\_class: posting, master\_data\_change, outbound\_send, other | Registry attribute of every command, used by agent-safety checks (INV-80) |
+| Stock document types | goods\_receipt, delivery, stock\_transfer, stock\_count, internal\_consumption, other\_receipt, other\_issue, scrap, return\_to\_supplier, return\_from\_customer, opening\_balance, transfer\_order | Core documents of module `inventory` (ADR-0027 rule 7); `opening_balance` here is stock only, account opening balances have their own type (DS-21) |
+| Validity naming | start\_date, end\_date; effective\_from; \_at | Date validity uses start and end dates; dated settings use effective\_from; points in time end in \_at |
 | Amount | amount | Money in any currency: domain `types.amount` (`numeric(24, 4)`), Python type `Amount`; stored at the currency's minor unit; a string in JSON ([ADR-0006](../adr/0006-id-and-numeric-model.md)) |
 | Quantity | quantity | Quantity in any unit: domain `types.quantity` (`numeric(24, 6)`), Python type `Quantity`; at the unit's decimal places |
 | Unit price | unit\_price | Price or cost per unit: domain `types.unit_price` (`numeric(28, 10)`), Python type `UnitPrice` |
@@ -231,7 +236,7 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Command registry | command\_registry | The one place where command types and queries are registered; REST, MCP, JSON Schema and TypeScript are generated from it |
 | Error code | code (in `errors`) | Stable `snake_case` identifier of an error, with category, HTTP status, rule, fix and retryable flag |
 | Idempotency record | idempotency\_record | Stored response of a successful execution under (actor, command type or `command_batch`, idempotency key), kept at least 90 days |
-| Human only | human\_only | Registry flag on commands agents may not execute (closing periods, reversing posted documents); agents may simulate them |
+| Human only | human\_only | Registry flag on commands an agent never executes (closing periods, reversing posted documents), and an integration neither while ADR-0008 rule 2's open question stands; agents may simulate them; a system job may run one on behalf of a human only where an ADR says so ([ADR-0027](../adr/0027-cross-cutting-ownership.md) rule 12) |
 | Command scope | scope: company, installation | Whether a command or query acts in one company (`company_id` required) or on the whole installation |
 
 **Command verbs** ([ADR-0004](../adr/0004-naming-conventions.md) rules 17–22). A command type starts with one of these verbs; its event, if any, ends with the event form. The intent column says what the verb is for, nothing more: which states and preconditions allow a command is decided by DS-05 and the DS item that owns the noun. A new verb is added here, with its intent and event form, in the same change as the first command that needs it; a verb never takes a second meaning.
@@ -247,6 +252,8 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Post | Make a document part of the books or the stock records | Posted |
 | Reverse | Post a reversal document for a posted document | Reversed |
 | Cancel | End an open document that is not posted, or an open warehouse task or reservation | Canceled |
+| Erase | Remove a data subject's personal data irreversibly | Erased |
+| Request | Hand work to another module for execution, e.g. replenishment or an e-invoice | Requested |
 | Pack, Unpack | Put stock into or take it out of a handling unit | Packed, Unpacked |
 | Firm | Fix a proposal so later runs keep it, e.g. a planned order | Firmed |
 | Activate | Start enforcing something once, irreversibly, e.g. a subledger | Activated |

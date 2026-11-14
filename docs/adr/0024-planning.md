@@ -93,7 +93,7 @@ Planning answers, per item and warehouse: what to buy or move, how much, and by 
 
 **Forecast**
 
-10. Demand history:
+10. Demand history (history of goods sold from `goods_sent` warehouses is attributed to their valuation warehouse, [ADR-0027](0027-cross-cutting-ownership.md) rule 15):
     - **Source.** Weekly buckets per item and warehouse of posted `sales_issue` quantities, minus `sales_return_receipt` quantities of the same week. For weeks before the company's first posting, rows of `sales_history` (item, warehouse, ISO week, quantity) are used instead; they are written by `ImportSalesHistory`, an import batch in the DS-21 format. Transfers are dependent demand and are excluded. Stock-outs are not inferred in Phase 1.
     - **Events.** `demand_event` is company data: a code (such as `tet`) and its window of dates per year, so a moving holiday stays aligned.
     - **Seasonal index** of ISO week w: the mean, over the years of history, of (demand in week w ÷ that year's mean weekly demand), computed without event weeks and normalized so the 52 indices average 1. Week 53 uses week 52's index.
@@ -149,7 +149,7 @@ Planning answers, per item and warehouse: what to buy or move, how much, and by 
     - **Costing.** Costing uses the same item and warehouse identities over the period's actual flows, with its own solver graph ([ADR-0025](0025-later-phase-seams.md) rule 6).
 17. `RunPlanning` and `RunForecast` are long jobs:
     - **Triggers.** A daily schedule, or a human's `RunPlanning` command, which records the request; the job is enqueued after commit (ADR-0013 rule 13) and runs as the same command type, on behalf of the requester (the `planning_owner_id` for scheduled runs).
-    - **Running.** They run on the `jobs` queue as internal callers (ADR-0013 rule 9), on behalf of the company's `planning_owner_id`, with an explicit `planning_date` (ADR-0007 rule 17). Their `transaction_timeout` is the long-job 15 minutes (ADR-0022 rule 9).
+    - **Running.** They run on the `jobs` queue as internal callers (ADR-0013 rule 9), on behalf of the requester, or of the company's `planning_owner_id` for scheduled runs ([ADR-0027](0027-cross-cutting-ownership.md) rule 15), with an explicit `planning_date` (ADR-0007 rule 17). Their `transaction_timeout` is the long-job 15 minutes (ADR-0022 rule 9).
     - **Concurrency.** One run per company at a time: a second run is rejected with `planning_run_in_progress`, through a lock on the company's planning state row.
     - **Mode.** Phase 1 runs regeneratively only.
     - **Result.** Counts per output kind, `input_hash` (canonical JSON of every input row, ADR-0008 rule 12 forms) and `output_hash`. These and the planned orders, messages and exceptions are listed like events and excluded from `plan_hash` (as ADR-0023 rule 11), so a run never fails on `plan_hash_mismatch`.

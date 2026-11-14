@@ -52,7 +52,7 @@ Checks:
    | 5 · Interfaces | `api` (REST and MCP generated from the registry), `query` (read-only layer, DS-33), `agents` (after step 4), `sdk` (rule 4) |
    | 4 · Commercial | `sales`, `purchasing`, `cash` (from steps 5–6), `crm`, `planning` ([ADR-0024](0024-planning.md); it reads `inventory.contract`'s `demand_supply_line` and hands over through `inventory.contract.request_replenishment`) |
    | 3 · Core business | `ledger` (journal, accounts, account determination, multi-currency), `inventory` (material documents, stock, costing, landed cost, and the warehouse management tables of [ADR-0023](0023-warehouse-management.md)), `master_data` (partners, products, warehouses, units, currencies), `tax`; `production` (Phase 2) and `assets` (Phase 3) per [ADR-0025](0025-later-phase-seams.md) |
-   | 2 · Platform | `registry` (command registry, dispatcher, envelope, idempotency; its public entry point `erpme.registry.dispatch`), `documents` (lifecycle, versions, numbering), `periods`, `permissions`, `outbox`, `audit`, `localization` (loader), `db` (engine, session settings, RLS context, the generic lock helper and the lock-order registry, the `MetaData` naming convention) |
+   | 2 · Platform | `registry` (command registry, dispatcher, envelope, idempotency; its public entry point `erpme.registry.dispatch`), `documents` (lifecycle, versions, numbering), `periods`, `permissions`, `outbox`, `audit`, `localization` (loader), `db` (engine, session settings, RLS context, the generic lock helper and the lock-order registry, the `MetaData` naming convention), `agent_runs`, `work`, `attachments` ([ADR-0027](0027-cross-cutting-ownership.md) rule 1; `documents` and `permissions` may import the `agent_runs` contract) |
    | 1 · Foundation | `numeric` (ADR-0006), `clock` (ADR-0007), `ids`, `i18n`, `errors` |
 
 3. Shape of each module:
@@ -143,7 +143,7 @@ Checks:
 
      `system` actors are exempt. Exceeding the limit returns `rate_limited`.
    - **`environment`.** The installation setting `environment` (`production`, `test`, `simulation`; ADR-0007 rule 15) is required at startup from `ERPME_ENVIRONMENT`. It is stored on first start and can never change away from `production`. In `test` and `simulation`, every external lookup and gateway (tax ID lookup, e-invoice, bank, exchange-rate fetchers, e-mail) is replaced by a recording stub (DS-17 rule 19; DS-24, DS-25).
-10. Locks. The lock-order registry in `db` holds the one global order, asserted per command (each batch item and each consumer command separately):
+10. Locks. The lock-order registry in `db` holds the one global order, asserted per command (each batch item and each consumer command separately) (superseded by the complete order of [ADR-0027](0027-cross-cutting-ownership.md) rule 10):
     1. period area state rows, share lock (ADR-0012 rule 9);
     2. `stock_value` rows ascending by item and warehouse ID, then lot and serial quantity rows (ADR-0020 rule 9);
     3. numbering counters (ADR-0009);

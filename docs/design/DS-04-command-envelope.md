@@ -4,6 +4,8 @@ Field-level specification for [ADR-0008](../adr/0008-command-envelope-and-regist
 
 ## Command request
 
+Every registered command type also declares its `effect_class` (`posting`, `master_data_change`, `outbound_send`, `other`; ADR-0008 rule 1; [ADR-0027](../adr/0027-cross-cutting-ownership.md) rule 17).
+
 | Field | Type | Required | Meaning |
 | --- | --- | --- | --- |
 | `command_type` | string | yes | Registered command type, e.g. `PostGoodsReceipt` |

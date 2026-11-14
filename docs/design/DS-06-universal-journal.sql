@@ -3,9 +3,9 @@
 -- Tables live in schema `erpme` (ADR-0022 rule 7); domains live in schema `types` (ADR-0006 rule 8).
 -- Primary and foreign keys are shown inline; in migrations they get names from the
 -- MetaData naming convention (ADR-0004 rule 15).
--- Referenced tables (company, document, account, system_account, posting_period, fiscal_year,
--- applied_rate, transaction_key, branch, partner, item, warehouse, cost_center, project,
--- employee, tax_code, open_item, payment_term and payment_term_line (below, ADR-0026), cost_object and fixed_asset (stubs below, ADR-0025), material_document, material_document_line, derivation_trace,
+-- Referenced tables (document, account, system_account, posting_period, fiscal_year,
+-- applied_rate, transaction_key, partner, item, warehouse,
+-- tax_code, open_item, payment_term and payment_term_line (below, ADR-0026), cost_object and fixed_asset (stubs below, ADR-0025), material_document, material_document_line,
 -- close_task, posting_period_area_state, currency) are defined by their own design items.
 -- IDs of journal rows come from context.new_id (ADR-0014 rule 14), so there are no ID defaults.
 
@@ -46,6 +46,55 @@ CREATE TABLE fixed_asset (
     UNIQUE (company_id, code)
 );
 -- Both get FORCE ROW LEVEL SECURITY and the generated company policy (ADR-0022 rule 8).
+
+-- ADR-0027 rules 3 and 5: company, branch and stubs of cost_center and project are owned by master_data
+-- (DS-20) and listed here because step 1 needs them; derivation_trace is owned by ledger.
+-- All carry FORCE ROW LEVEL SECURITY and the generated company policy (ADR-0022 rule 8), except company,
+-- whose policy compares its own id.
+CREATE TABLE company (
+    id                        uuid PRIMARY KEY,
+    code                      text NOT NULL UNIQUE,
+    legal_name                text NOT NULL,
+    tax_id                    text,
+    company_currency          text NOT NULL REFERENCES currency (code),
+    time_zone                 text NOT NULL,
+    localization_package      text NOT NULL,
+    accounting_regime         text NOT NULL,
+    valuation_area_level      text NOT NULL CONSTRAINT ck_company_valuation_area_level CHECK (valuation_area_level IN ('company', 'warehouse')),
+    fiscal_calendar_owner_id  uuid NOT NULL REFERENCES user_account (id),   -- a human user (ADR-0012 rule 3)
+    fiscal_year_lead_days     integer NOT NULL DEFAULT 30,
+    is_active                 boolean NOT NULL DEFAULT true
+);
+CREATE TABLE branch (
+    id          uuid PRIMARY KEY,
+    company_id  uuid NOT NULL REFERENCES company (id),
+    code        text NOT NULL,
+    name        text NOT NULL,
+    tax_id      text,
+    address     jsonb,
+    is_active   boolean NOT NULL DEFAULT true,
+    UNIQUE (company_id, code)
+);
+CREATE TABLE cost_center (
+    id uuid PRIMARY KEY, company_id uuid NOT NULL REFERENCES company (id),
+    code text NOT NULL, name text NOT NULL, UNIQUE (company_id, code)
+);
+CREATE TABLE project (
+    id uuid PRIMARY KEY, company_id uuid NOT NULL REFERENCES company (id),
+    code text NOT NULL, name text NOT NULL, UNIQUE (company_id, code)
+);
+CREATE TABLE derivation_trace (
+    id            uuid PRIMARY KEY,
+    company_id    uuid NOT NULL REFERENCES company (id),
+    rule_code     text NOT NULL,
+    rule_version  text NOT NULL,
+    inputs        jsonb NOT NULL,   -- typed references: {kind, table, id or key, effective_from}
+    steps         jsonb NOT NULL,   -- ordered intermediate values as exact decimal or rational strings
+    result        jsonb NOT NULL,
+    recorded_at   timestamptz NOT NULL,
+    command_id    uuid NOT NULL     -- the command request id (ADR-0008)
+);
+CREATE INDEX ix_derivation_trace_company_id_rule_code ON derivation_trace (company_id, rule_code);
 
 -- ADR-0026: open-item core, owned by ledger. RLS: FORCE ROW LEVEL SECURITY and the generated company policy.
 CREATE TABLE payment_term (
@@ -133,7 +182,7 @@ CREATE TABLE journal_line (
     project_id                 uuid          REFERENCES project (id),
     cost_object_id             uuid          REFERENCES cost_object (id),   -- ADR-0025, empty until Phase 2
     fixed_asset_id             uuid          REFERENCES fixed_asset (id),   -- ADR-0025, empty until Phase 3
-    salesperson_id             uuid          REFERENCES employee (id),
+    salesperson_id             uuid          REFERENCES partner (id),   -- partner with the employee role (ADR-0027 rule 6)
     tax_code_id                uuid          REFERENCES tax_code (id),
     material_document_line_id  uuid          REFERENCES material_document_line (id),
     open_item_id               uuid          REFERENCES open_item (id),

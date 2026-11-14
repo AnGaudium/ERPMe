@@ -70,7 +70,7 @@ DS-25 keeps payments, bank statements, matching UX, netting, payment allocation 
 
 **Locks, queries, general journal**
 
-14. Lock order: partner rows (for the credit check, DS-22), then open item rows ascending ID, after bin rows and before numbering counters (notes in ADR-0022 rule 10 and ADR-0023 rule 10). Two settlements of one item are serialized (PAR-10).
+14. Lock order: partner rows (for the credit check, DS-22), then open item rows ascending ID, after bin rows and before numbering counters (notes in ADR-0022 rule 10 and ADR-0023 rule 10). Two settlements of one item are serialized (PAR-10). The complete order is [ADR-0027](0027-cross-cutting-ownership.md) rule 10.
 15. Queries:
     - `ListOpenItem`: by partner, account, kind, due date, currency, state, and `as_of` (an item is open on a date when `posting_date <= as_of` and it is not settled or reversed by lines dated on or before it);
     - `GetPartnerExposure` (a computed result, like `GetExchangeRate`): open receivable and payable amounts per partner and currency by kind and due bucket. Open order value is added by DS-22's own query; `ledger` never reads a higher layer.

@@ -139,7 +139,7 @@ A small shop and a managed distribution warehouse run on the same model.
    - It cancels the original's open tasks in the same transaction.
    - It is refused with `invalid_state_transition` while a task of the original is `in_progress`.
    - A reversal that takes stock out counts as a voluntary issue for `stock_reserved` (rule 13).
-10. Lock order. This extends ADR-0022 rule 10 (its full order with warehouse management), per command: Partner rows and open item rows follow bin rows ([ADR-0026](0026-open-item-core.md) rule 14).
+10. Lock order (superseded by the complete order of [ADR-0027](0027-cross-cutting-ownership.md) rule 10; partner and open item rows follow bin rows, [ADR-0026](0026-open-item-core.md) rule 14). This extends ADR-0022 rule 10 (its full order with warehouse management), per command:
     1. period area state rows, share lock;
     2. the warehouse task row;
     3. handling unit rows, parent first, ascending ID;
