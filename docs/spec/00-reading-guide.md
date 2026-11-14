@@ -61,14 +61,15 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Owner partner | owner\_partner\_id | Reserved stock axis naming who owns stock we hold; null for own stock; non-owned stock has quantity and no value |
 | Default bin | default\_bin\_id | The bin every warehouse gets at creation, with a default zone; the only bin of a warehouse that is not bin-managed, filled in by handlers and hidden in the UI ([ADR-0031](../adr/0031-design-simplifications.md)) |
 | Pending receipt adjustment | pending\_receipt\_adjustment | A stock-bound price difference from an invoice posted before the goods arrived, consumed by the receipt |
+| Subcontracting | subcontracting | Production by an outside processor from materials we send (in Vietnamese, gia công); designed in DS-55 ([ADR-0032](../adr/0032-phase-1-scope-with-production.md)) |
 | Has posting | has\_posting | Set on an operational account by its first journal line; freezes its code, mapping, postable flag and currency ([ADR-0010](../adr/0010-system-chart-of-accounts.md) rule 12) |
 | Control kind | control\_kind | inventory, receivable, payable, gr\_ir, cost\_object, fixed\_asset, loan or none: which core module owns postings to a system account and which invariant checks it |
 | Effective control kind | effective control kind | The control kind a rule applies to a line: a gated kind (`cost_object`, `fixed_asset`, `loan`) counts as `none` before the company's subledger activation ([ADR-0025](../adr/0025-later-phase-seams.md)) |
 | Subledger reclassification | subledger\_reclassification | Document type created only by `ActivateSubledger`: moves an account's undimensioned balance into its subledger dimensions at the activation date |
 | Subledger activation | subledger\_activation | Irreversible start of a gated subledger for a company, at a period start after earlier periods are locked, with a reclassification of the balance |
-| Cost object | cost\_object | A cost collector carrying work in process; also a control kind; kinds and lifecycle designed in Phase 2 |
+| Cost object | cost\_object | A cost collector carrying work in process; also a control kind; kinds and lifecycle designed in DS-53 ([ADR-0032](../adr/0032-phase-1-scope-with-production.md)) |
 | Fixed asset | fixed\_asset | An asset record (stub until Phase 3); also a system account node and a control kind |
-| Costing graph | costing\_graph | Stock nodes (item, valuation area) and, from Phase 2, cost-object nodes, linked by the period's value flows; solved per strongly connected component |
+| Costing graph | costing\_graph | Stock nodes (item, valuation area) and cost-object nodes (DS-53), linked by the period's value flows; solved per strongly connected component |
 | Operational account | account | Where postings land; points to exactly one system\_account |
 | Transaction key | transaction\_key | Drives account determination: transaction key × valuation class × valuation area → operational account; catalog [transaction-keys.csv](../catalogs/transaction-keys.csv) ([ADR-0015](../adr/0015-account-determination.md)) |
 | Account determination | account\_determination | Company table mapping a transaction key and determinant values to an operational account; the row that matches on the most significant determinants wins (key order); cross-checked against the key's required system accounts |
@@ -109,7 +110,7 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Demand and supply line | demand\_supply\_line | Read model of open demand and supply per item, warehouse and date, written by documents |
 | Forecast, forecast run, forecast adjustment | forecast, forecast\_run, forecast\_adjustment | Weekly statistical demand spread to days; the job that computes it; a recorded change with a reason |
 | Planning run | planning\_run | The deterministic netting job; stores input and output hashes |
-| Planned order | planned\_order | A proposal to buy, move or (Phase 2) produce, with a stable business key; states proposed, firmed, converted, canceled |
+| Planned order | planned\_order | A proposal to buy, move or produce (DS-54), with a stable business key; states proposed, firmed, converted, canceled |
 | Pegging | pegging (pegging\_target\_kind: demand\_line, forecast, safety\_stock, stock\_level, lot\_size\_excess) | What a planned order covers; sums exactly to its quantity |
 | Action message | action\_message: expedite, cancel, postpone, reduce | Advice on existing supply |
 | Planning exception | planning\_exception\_kind | A condition a buyer must look at, e.g. shortage inside lead time |

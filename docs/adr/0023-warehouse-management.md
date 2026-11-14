@@ -2,6 +2,8 @@
 
 Status: accepted (2026-11-14) under ADR-0005, reviewed by Claude Fable 5.2 (builder Claude Opus 5.5). Design item: DS-42 (new). Related decisions: D2, D5, D14. Principles 2, 5, 6, 8, 9, 10, 12, 13. Build principles B1, B3, B7. ADR-0004, ADR-0005, ADR-0006, ADR-0007, ADR-0008, ADR-0009, ADR-0013, ADR-0016, ADR-0017, ADR-0018, ADR-0019, ADR-0020, ADR-0022, DS-16, DS-17, DS-29.
 
+Note: the author keeps the full warehouse list in Phase 1, with no cut ([ADR-0032](0032-phase-1-scope-with-production.md)).
+
 ## Decision
 
 On 2026-11-14 the author decided that warehouse management is part of Phase 1: for a trading business it decides whether orders ship on time and stock can be trusted. Earlier scope had bins after Phase 1. The feature list below is the agent's proposal, pending the author's confirmation (open question).
@@ -36,7 +38,7 @@ A small shop and a managed distribution warehouse run on the same model.
 - cross-docking;
 - dock and yard appointments;
 - labor management;
-- value-added services and kitting (Phase 2);
+- value-added services and kitting (Phase 2; kits as bills of materials are now Phase 1 in DS-51, [ADR-0032](0032-phase-1-scope-with-production.md));
 - SSCC labels with carrier integration;
 - deeper nesting of handling units.
 

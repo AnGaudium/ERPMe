@@ -2,6 +2,8 @@
 
 Status: accepted (2026-11-14) under ADR-0005, reviewed by Claude Fable 5.2 (builder Claude Opus 5.5). Design item: DS-41 (new). Related decisions: D5, D6. Principles 5, 6, 13. Build principles B1, B7, B8. ADR-0004, ADR-0005, ADR-0010, ADR-0012, ADR-0014, ADR-0015, ADR-0018, ADR-0020, ADR-0021, ADR-0022, ADR-0023, ADR-0024.
 
+Note: superseded in part by [ADR-0032](0032-phase-1-scope-with-production.md) rule 4. Superseded: the opening sentence, rule 2's "designed in Phase 2", rule 8's "Phase 2 production adds" and the revisit trigger on an assembly customer. Every "Phase 2" label for production now reads Phase 1. Production is designed in full now, on these seams. Fixed assets and loans are unchanged.
+
 ## Decision
 
 Production and production costing (Phase 2), and fixed assets and loans (Phase 3), are designed in detail only when they are built (B7). They start after Phase 1 has gone live with real data (roadmap). Four things would then be costly or impossible to change:

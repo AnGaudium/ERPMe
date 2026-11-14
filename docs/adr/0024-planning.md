@@ -2,6 +2,8 @@
 
 Status: accepted (2026-11-14) under ADR-0005, reviewed by Claude Fable 5.2 (builder Claude Opus 5.5). Design item: DS-43 (new). Related decisions: D2, D5. Principles 2, 6, 8, 9, 12, 13. Build principles B1, B3, B7. ADR-0004, ADR-0005, ADR-0006, ADR-0007, ADR-0008, ADR-0012, ADR-0013, ADR-0016, ADR-0017, ADR-0018, ADR-0019, ADR-0020, ADR-0022, ADR-0023, DS-16, DS-17, DS-29.
 
+Note: planning is in Phase 1, which answers the phase question of the opening. Multi-level MRP is designed in DS-54. Every "Phase 2" label in this ADR (production, planned production orders, phantoms, scrap factors, co-products) now reads Phase 1, designed in DS-51 and DS-54 ([ADR-0032](0032-phase-1-scope-with-production.md)).
+
 ## Decision
 
 On 2026-11-14 the author asked for planning to be designed now, after warehouse management. Two things are the author's decision, both open questions: which phase builds it, and the feature list proposed here.
