@@ -21,7 +21,7 @@ Stand up the test server as each part is built, with a model running scenarios c
 
 - The model generates unusual but realistic business situations. Add random transaction sequences generated with Hypothesis, which are cheaper and cover more ground.
 - Every defect found is frozen into a regression scenario in CI.
-- Run nightly and after every deploy, within a budget. Defects go to the work queue, deduplicated.
+- Run nightly and after every deploy, within a budget ([ADR-0003](../adr/0003-build-operating-rules.md) R6). Defects go to the issue tracker, deduplicated (R7); the work queue holds business work only.
 
 **Outside this approach's reach, handled separately:**
 

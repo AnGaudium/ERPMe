@@ -9,7 +9,7 @@
 
 - Contributions: DCO instead of a CLA. A trademark policy for the project name.
 - Governance: state clearly that in the early phase one person has final say (BDFL). Write down the conditions for inviting co-maintainers, e.g. a partner who has deployed successfully. Later, every repo has at least two people with merge rights.
-- Transparency: public architecture decision records (ADRs), a public roadmap, a policy for reviewing AI-written code, a coverage threshold for the core.
+- Transparency: public architecture decision records (ADRs), a public roadmap, a policy for reviewing AI-written code, a coverage threshold for the core (both in [ADR-0003](../adr/0003-build-operating-rules.md) R4, R5).
 
 **Fully open commitment:**
 
