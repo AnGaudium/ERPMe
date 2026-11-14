@@ -45,6 +45,7 @@ The simulator runs fictional companies day by day. It writes what happened in bu
    | --- | --- | --- |
    | Setup | `company_founded`, `exchange_rate_published` | 1 |
    | Setup | `partner_registered`, `product_registered`, `warehouse_opened`, `price_list_published` | 2 |
+   | Setup | `partner_account_changed` (a partner's reconciliation account changes) | 5 |
    | Periods | `period_restricted`, `period_locked` (by a human, with area; ADR-0012 rule 7) | 1 |
    | Periods | `period_closed`, `year_closed` | 8 |
    | Journal | `journal_recorded`: balanced test entries for transactions without a document, and accountants' manual entries | 1 |
@@ -55,7 +56,7 @@ The simulator runs fictional companies day by day. It writes what happened in bu
    | Landed cost | `purchase_cost_invoice_received`: as a cost-source journal (rule 10) from step 3; as the purchase cost invoice from step 5 | 3 |
    | Opening | `opening_balances_recorded` (DS-21) | 4 |
    | Purchasing | `purchase_requested`, `purchase_ordered`, `purchase_invoice_received`, `customs_declared` | 5 |
-   | Sales | `quotation_requested` (e-mail), `sales_ordered`, `sales_invoice_issued` | 5 |
+   | Sales | `quotation_requested` (e-mail), `sales_ordered`, `sales_invoice_issued` (with installments from the payment term), `credit_note_issued` | 5 |
    | Cash | `payment_received`, `payment_made`, `bank_statement_received`, `netting_agreed`, `advance_paid` | 6 |
    | Tax | `tax_rate_changed`, `invoice_replaced`, `invoice_adjusted` | 7 |
 
@@ -188,7 +189,7 @@ The simulator runs fictional companies day by day. It writes what happened in bu
     | `added_in` | |
     | `description` | |
 
-    Version 0.1.0 has 45 edge cases, EC-32 to EC-40 for warehouse management (ADR-0023) and EC-41 to EC-45 for planning (ADR-0024):
+    Version 0.1.0 has 52 edge cases (EC-46 to EC-52 for open items, ADR-0026), EC-32 to EC-40 for warehouse management (ADR-0023) and EC-41 to EC-45 for planning (ADR-0024):
     - 23 from [12-testing.md](../spec/12-testing.md#synthetic-dataset), counting landed cost after partial sale and after period lock separately;
     - eight that ADRs require: foreign-currency journal, reversal of an internal document, transfer through transit, preliminary price missing, degenerate costing, one cost source over several receipts, cost before receipt, import VAT on customs.
 

@@ -30,7 +30,7 @@ Everything else for these phases is additive: new tables, movement types, transa
 
 **Subledger control kinds**
 
-3. ADR-0010 gets three gated control kinds. Lines on these accounts must carry the listed dimensions once the kind is active:
+3. ADR-0010 gets three gated control kinds. Lines on these accounts must carry the listed dimensions once the kind is active: Refined by [ADR-0026](0026-open-item-core.md) rule 13: one `loan` item per drawdown, grouped by the contract's `reference`.
 
    | Control kind | System accounts | Lines must carry |
    | --- | --- | --- |

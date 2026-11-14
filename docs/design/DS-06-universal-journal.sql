@@ -5,7 +5,7 @@
 -- MetaData naming convention (ADR-0004 rule 15).
 -- Referenced tables (company, document, account, system_account, posting_period, fiscal_year,
 -- applied_rate, transaction_key, branch, partner, item, warehouse, cost_center, project,
--- employee, tax_code, open_item, cost_object and fixed_asset (stubs below, ADR-0025), material_document, material_document_line, derivation_trace,
+-- employee, tax_code, open_item, payment_term and payment_term_line (below, ADR-0026), cost_object and fixed_asset (stubs below, ADR-0025), material_document, material_document_line, derivation_trace,
 -- close_task, posting_period_area_state, currency) are defined by their own design items.
 -- IDs of journal rows come from context.new_id (ADR-0014 rule 14), so there are no ID defaults.
 
@@ -46,6 +46,65 @@ CREATE TABLE fixed_asset (
     UNIQUE (company_id, code)
 );
 -- Both get FORCE ROW LEVEL SECURITY and the generated company policy (ADR-0022 rule 8).
+
+-- ADR-0026: open-item core, owned by ledger. RLS: FORCE ROW LEVEL SECURITY and the generated company policy.
+CREATE TABLE payment_term (
+    id          uuid PRIMARY KEY,
+    company_id  uuid NOT NULL REFERENCES company (id),
+    code        text NOT NULL,
+    name        text NOT NULL,
+    is_active   boolean NOT NULL DEFAULT true,
+    UNIQUE (company_id, code)
+);
+CREATE TABLE payment_term_line (
+    id               uuid PRIMARY KEY,
+    company_id       uuid NOT NULL REFERENCES company (id),
+    payment_term_id  uuid NOT NULL REFERENCES payment_term (id),
+    line_number      integer NOT NULL,
+    amount_percent   types.percent NOT NULL,
+    due_days         integer NOT NULL,
+    due_date_base    text NOT NULL CONSTRAINT ck_payment_term_line_due_date_base CHECK (due_date_base IN ('document_date', 'end_of_month')),
+    discount_percent types.percent,
+    discount_days    integer,
+    UNIQUE (payment_term_id, line_number)
+);
+CREATE TABLE open_item (
+    id                          uuid PRIMARY KEY,
+    company_id                  uuid NOT NULL REFERENCES company (id),
+    partner_id                  uuid NOT NULL REFERENCES partner (id),
+    account_id                  uuid NOT NULL REFERENCES account (id),
+    open_item_kind              text NOT NULL CONSTRAINT ck_open_item_open_item_kind CHECK (open_item_kind IN ('invoice', 'credit', 'advance', 'payment_on_account', 'loan', 'other')),
+    natural_side                text NOT NULL CONSTRAINT ck_open_item_natural_side CHECK (natural_side IN ('debit', 'credit')),
+    transaction_currency        text NOT NULL REFERENCES currency (code),
+    origin_document_id          uuid NOT NULL REFERENCES document (id),
+    origin_journal_line_id      uuid NOT NULL UNIQUE,   -- FK below, deferred: the item is inserted before its line
+    installment_number          integer NOT NULL DEFAULT 1,
+    payment_term_id             uuid REFERENCES payment_term (id),
+    document_date               date NOT NULL,
+    posting_date                date NOT NULL,
+    due_date                    date,
+    discount_due_date           date,
+    discount_percent            types.percent,
+    reference                   text,
+    partner_reference           text,
+    original_transaction_amount types.amount NOT NULL,
+    original_company_amount     types.amount NOT NULL,
+    original_group_amount       types.amount,
+    open_transaction_amount     types.amount NOT NULL,
+    open_company_amount         types.amount NOT NULL,
+    open_group_amount           types.amount,
+    revaluation_company_amount  types.amount NOT NULL DEFAULT 0,
+    revaluation_group_amount    types.amount,
+    is_settled                  boolean NOT NULL DEFAULT false,
+    is_reversed                 boolean NOT NULL DEFAULT false,
+    last_settlement_date        date,
+    predecessor_open_item_id    uuid REFERENCES open_item (id),
+    CONSTRAINT ck_open_item_due_date CHECK (due_date IS NOT NULL OR open_item_kind IN ('advance', 'payment_on_account', 'loan', 'other'))
+);
+CREATE INDEX ix_open_item_company_id_partner_id ON open_item (company_id, partner_id) WHERE NOT is_settled AND NOT is_reversed;
+CREATE INDEX ix_open_item_company_id_account_id ON open_item (company_id, account_id) WHERE NOT is_settled AND NOT is_reversed;
+CREATE INDEX ix_open_item_company_id_due_date ON open_item (company_id, due_date) WHERE NOT is_settled AND NOT is_reversed;
+CREATE INDEX ix_open_item_origin_document_id ON open_item (origin_document_id);
 
 CREATE TABLE journal_line (
     id                         uuid          PRIMARY KEY,
@@ -296,3 +355,37 @@ CREATE TABLE account_period_balance (
     CONSTRAINT uq_account_period_balance_key
         UNIQUE (company_id, account_id, posting_period_id, transaction_currency, is_closing_entry)
 );
+
+-- ADR-0026 rule 3: the cycle open_item <-> journal_line is closed by a deferred foreign key.
+ALTER TABLE open_item ADD CONSTRAINT fk_open_item_origin_journal_line_id_journal_line
+    FOREIGN KEY (origin_journal_line_id) REFERENCES journal_line (id) DEFERRABLE INITIALLY DEFERRED;
+
+-- ADR-0026 rules 1 and 4: identity of an open item is immutable; a referring line matches its item.
+CREATE FUNCTION open_item_identity_immutable() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF (NEW.company_id, NEW.partner_id, NEW.account_id, NEW.open_item_kind, NEW.natural_side,
+        NEW.transaction_currency, NEW.origin_document_id, NEW.origin_journal_line_id)
+       IS DISTINCT FROM
+       (OLD.company_id, OLD.partner_id, OLD.account_id, OLD.open_item_kind, OLD.natural_side,
+        OLD.transaction_currency, OLD.origin_document_id, OLD.origin_journal_line_id) THEN
+        RAISE EXCEPTION 'open item identity is immutable (ADR-0026 rule 1)' USING ERRCODE = 'restrict_violation';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER trg_open_item_identity_immutable
+    BEFORE UPDATE ON open_item FOR EACH ROW EXECUTE FUNCTION open_item_identity_immutable();
+
+CREATE FUNCTION journal_line_check_open_item() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE v open_item%ROWTYPE;
+BEGIN
+    IF NEW.open_item_id IS NOT NULL THEN
+        SELECT * INTO v FROM open_item WHERE id = NEW.open_item_id;
+        IF v.company_id <> NEW.company_id OR v.partner_id IS DISTINCT FROM NEW.partner_id
+           OR v.account_id <> NEW.account_id OR v.transaction_currency <> NEW.transaction_currency THEN
+            RAISE EXCEPTION 'line does not match its open item (ADR-0026 rule 4)' USING ERRCODE = 'check_violation';
+        END IF;
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER trg_journal_line_check_open_item
+    BEFORE INSERT ON journal_line FOR EACH ROW EXECUTE FUNCTION journal_line_check_open_item();

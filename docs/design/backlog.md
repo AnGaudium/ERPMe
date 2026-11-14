@@ -1,6 +1,6 @@
 # Design backlog
 
-Forty-three design items, in the order they are needed. Items DS-01 to DS-18 must be decided before the first line of code (Build step 0); every other item must be finished before the step listed in "Needed by". Each item produces a file in the repo: an ADR in `docs/adr/` for decisions, a specification in `docs/design/` for models and algorithms, or a catalog file for data such as account and movement-type lists. A design item is done when its file exists, it cites the decided items it depends on, and its open points are listed as open questions.
+Forty-four design items, in the order they are needed. Items DS-01 to DS-18 must be decided before the first line of code (Build step 0); every other item must be finished before the step listed in "Needed by". Each item produces a file in the repo: an ADR in `docs/adr/` for decisions, a specification in `docs/design/` for models and algorithms, or a catalog file for data such as account and movement-type lists. A design item is done when its file exists, it cites the decided items it depends on, and its open points are listed as open questions.
 
 ## Before the first line of code (step 0)
 
@@ -35,7 +35,7 @@ Forty-three design items, in the order they are needed. Items DS-01 to DS-18 mus
 | DS-22 | Commercial documents: sales and purchase flows, state machines, partial fulfillment, returns, discounts and promotions, credit limit, three-way match tolerances, GR/IR and price-difference postings | Spec | DS-05, 09, 11 | Step 5 |
 | DS-23 | Tax engine: tax codes, date-effective rates, tax determination, line versus document rounding, VAT return mapping | Spec | DS-14 | Data model step 2; logic step 7 |
 | DS-24 | E-invoice adapter interface, BKAV adapter, incoming invoice intake | Spec | DS-23 | Step 7 |
-| DS-25 | Cash, bank and AR/AP: open items, matching and netting, payment allocation, advances, bank statement formats | Spec | DS-06, 10 | Step 6 |
+| DS-25 | Cash, bank and AR/AP processes on the open-item core of DS-44: payments and receipts, bank statement formats and matching, netting, advances, payment allocation rules, write-offs and discounts, dunning | Spec | DS-06, 10, 44 | Step 6 |
 | DS-26 | Statutory reporting framework: report definition format inside localization packages (B01, B02, B03, books), report engine | Spec | DS-14 | Step 8 |
 | DS-27 | Print template data contracts and PDF worker | Spec | DS-22 | Step 8 |
 | DS-28 | Policy table and one-level approval: action types, thresholds, binding to document version | Spec | DS-05, 15 | Step 5 |
@@ -54,3 +54,4 @@ Forty-three design items, in the order they are needed. Items DS-01 to DS-18 mus
 | DS-41 | Seams for production and asset subledgers: cost object and fixed asset dimensions and stubs, gated control kinds (cost object, fixed asset, loan) with activation, production cost accounts, costing solver over typed nodes, price control change path | ADR. ADR done: [ADR-0025](../adr/0025-later-phase-seams.md) | DS-06, 07, 09, 43 | Before the step 0 gate (system chart frozen at 1.0.0) |
 | DS-42 | Warehouse management: bins, zones, stock statuses, handling units, warehouse tasks and movements, putaway and removal strategies, reservations and available to promise, picking from demand lines, deliveries from picks, packing, replenishment, counts, returns (author's decision 2026-11-14: Phase 1) | ADR. ADR done: [ADR-0023](../adr/0023-warehouse-management.md) | DS-09, 20, 21, 22, 27, 29, 31, 33 | ADR now; data step 2, core step 3, documents step 5, PWA step 9 |
 | DS-43 | Planning: parameters, supplier terms, transfer routes, calendars, demand and supply read model, weekly forecast, planning run over the (item, warehouse) graph, planned orders with pegging, action messages, exceptions per buyer, conversion through events, planning agent (author's request 2026-11-14) | ADR. ADR done: [ADR-0024](../adr/0024-planning.md) | DS-09, 16, 17, 20, 22, 28, 29, 33, 34, 42 | ADR now; building phase pending the author's decision |
+| DS-44 | Open-item core: open items, kinds, installments, payment terms, one posting path for create, settle and adjust, carrying amounts and realized FX, matching, moves, exposure query (split from DS-25; assessment finding F2) | ADR. ADR done: [ADR-0026](../adr/0026-open-item-core.md) | DS-05, 06, 07, 10, 20 | Step 1 (build placement pending the author) |

@@ -39,6 +39,14 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Normal balance | normal\_balance | debit or credit; the side a balance usually sits on; contra accounts have the opposite of their type |
 | Contra account | is\_contra | An account that reduces another of the same type, e.g. accumulated depreciation, revenue deductions |
 | Bilateral account | is\_bilateral | A receivable or payable account whose open items may sit on either side, e.g. trade receivables holding customer advances; presented split by open item kind |
+| Open item | open\_item (open\_item\_kind: invoice, credit, advance, payment\_on\_account, loan, other) | One obligation with a partner on one account, created by one journal line; its amounts are the sum of the lines that refer to it ([ADR-0026](../adr/0026-open-item-core.md)) |
+| Natural side | natural\_side: debit, credit | Which side an open item sits on: debit when the partner owes, credit when the company owes |
+| Settlement | settle (state is\_settled) | A line that reduces an open item, partly or fully; matching is settlement of two items against each other |
+| Carrying amount | carrying amount | An open item's open company or group amount as of a date, including or excluding revaluation per the regime |
+| Installment | installment\_number | One due part of a document under its payment term; each is its own control line and open item |
+| Payment term | payment\_term, payment\_term\_line | Installments of a document: percent, due days, base date and optional early-payment discount |
+| Open item matching | open\_item\_matching | Internal document that settles two items of one partner and account against each other |
+| Partner exposure | partner\_exposure | Open receivable and payable amounts of a partner by kind and due bucket |
 | Has posting | has\_posting | Set on an operational account by its first journal line; freezes its code, mapping, postable flag and currency ([ADR-0010](../adr/0010-system-chart-of-accounts.md) rule 12) |
 | Control kind | control\_kind | inventory, receivable, payable, gr\_ir, cost\_object, fixed\_asset, loan or none: which core module owns postings to a system account and which invariant checks it |
 | Effective control kind | effective control kind | The control kind a rule applies to a line: a gated kind (`cost_object`, `fixed_asset`, `loan`) counts as `none` before the company's subledger activation ([ADR-0025](../adr/0025-later-phase-seams.md)) |
@@ -243,7 +251,8 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Firm | Fix a proposal so later runs keep it, e.g. a planned order | Firmed |
 | Activate | Start enforcing something once, irreversibly, e.g. a subledger | Activated |
 | Convert | Turn a record into another mode or form once: a warehouse to bin management, a planned order into draft documents | Converted |
-| Match, Unmatch | Link or unlink open items, bank lines or documents | Matched, Unmatched |
+| Match, Unmatch | Link or unlink bank lines or documents; open items are settled against each other by an `open_item_matching` document | Matched, Unmatched |
+| Transfer | Move records to another account or owner, e.g. a partner's open items | Transferred |
 | Allocate | Distribute an amount or quantity over targets | Allocated |
 | Import | Read an external file into the system | Imported |
 | Run | Start a deterministic system job, e.g. period-end actual costing | Completed (`<job noun>Completed`) |

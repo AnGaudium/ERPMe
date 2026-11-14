@@ -149,7 +149,7 @@ Checks:
     3. numbering counters (ADR-0009);
     4. `event_subject` rows, taken when the dispatcher writes the command's events after the handler returns (ADR-0013 rules 3, 4).
 
-    With warehouse management the full order is [ADR-0023](0023-warehouse-management.md) rule 10: period rows, the warehouse task row, handling unit rows, `stock_value` rows, `stock_quantity` rows, bin rows, numbering counters, `event_subject` rows.
+    With warehouse management the full order is [ADR-0023](0023-warehouse-management.md) rule 10: period rows, the warehouse task row, handling unit rows, `stock_value` rows, `stock_quantity` rows, bin rows, partner rows and open item rows ([ADR-0026](0026-open-item-core.md) rule 14), numbering counters, `event_subject` rows.
 
     The owning modules (`periods`, `inventory`, `documents`, `outbox`) implement their helpers on the generic helper and register them with their position; the helper raises in tests when one command takes locks out of order. A deadlock across items of one batch is detected by PostgreSQL and returned as `concurrent_update` (ADR-0008 rule 11).
 

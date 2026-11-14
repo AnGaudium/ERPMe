@@ -4,6 +4,7 @@ Dated record of gate decisions, the week list and one line per Friday review ([R
 
 | Date | Step | Entry |
 | --- | --- | --- |
+| 2026-11-14 | 0 | Hardening batch (design assessment 1): DS-44 added and done: [ADR-0026](../adr/0026-open-item-core.md) open-item core accepted under ADR-0005 after three review rounds (Claude Fable 5.2); answers finding F2. Questions for the author: build placement at step 1, specific-only book rate on open-item accounts, interim accounting choices, INV-32 overlap |
 | 2026-11-14 | 0 | DS-41 added with the author's agreement and done: [ADR-0025](../adr/0025-later-phase-seams.md) seams for production and asset subledgers accepted under ADR-0005 after three review rounds (Claude Fable 5.2); system chart 0.1.0 now 116 accounts. Four questions for the author |
 | 2026-11-14 | 0 | DS-43 added at the author's request and done: [ADR-0024](../adr/0024-planning.md) planning accepted under ADR-0005 after three review rounds (Claude Fable 5.2). Four questions for the author (phase and feature list, demand and supply documents, short-source allocation, adjustments, conversion and service levels) |
 | 2026-11-14 | 0 | Author's decision: warehouse management in Phase 1. DS-42 added and done: [ADR-0023](../adr/0023-warehouse-management.md) accepted under ADR-0005 after three review rounds (Claude Fable 5.2). Six questions for the author (feature list and gates, overbooking and priority, short pick, count netting, shelf life, presentation); runbook lines steps-0-4:104 and steps-5-9:147 need the author's update |

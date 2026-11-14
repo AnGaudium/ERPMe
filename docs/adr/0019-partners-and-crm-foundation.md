@@ -16,8 +16,8 @@ A partner is one record per company for every party the company deals with — c
 
 | Profile | Fields (Phase 1) | Owner of the rules |
 | --- | --- | --- |
-| `customer_profile` | `receivable_account_id` (ADR-0015 rule 11), `payment_term_id`, `credit_limit` and its currency, `price_list_id`, `salesperson_id`, default `currency`, `minimum_remaining_shelf_life_days` ([ADR-0023](0023-warehouse-management.md) rule 3) | DS-22 (credit limit), DS-25 (terms) |
-| `supplier_profile` | `payable_account_id`, `payment_term_id`, `buyer_id`, default `currency` | DS-22, DS-25 |
+| `customer_profile` | `receivable_account_id` (ADR-0015 rule 11), `payment_term_id` ([ADR-0026](0026-open-item-core.md) rule 5), `credit_limit` and its currency, `price_list_id`, `salesperson_id`, default `currency`, `minimum_remaining_shelf_life_days` ([ADR-0023](0023-warehouse-management.md) rule 3) | DS-22 (credit limit), DS-25 (terms) |
+| `supplier_profile` | `payable_account_id`, `payment_term_id` ([ADR-0026](0026-open-item-core.md) rule 5), `buyer_id`, default `currency` | DS-22, DS-25 |
 | `employee_profile` | `user_account_id` (optional), `receivable_account_id` for advances (`receivable_employee_advance`) | DS-25 |
 
 Employees are partners so that advances to them are open items per person (141 in TT99), and so that `salesperson_id` and `buyer_id` (ADR-0014, ADR-0018) refer to partners with the `employee` role. Payroll is not in scope ([09](../spec/09-mvp-scope.md)); whether salaries payable are tracked per employee is an open question.

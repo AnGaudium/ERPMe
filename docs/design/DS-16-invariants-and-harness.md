@@ -54,7 +54,7 @@ The product is `erpme` (ADR-0004 rule 7). Test tooling lives in separate top-lev
    | `keys` | The business key fields a violation reports |
    | `source`, `added_in`, `statement` | |
 
-   Codes are grouped: 01–19 ledger and platform, 20–29 inventory, 30–39 receivables and payables, 40–49 documents, 50–59 warehouse (ADR-0023), 60–69 planning (ADR-0024), 70–79 subledgers (ADR-0025). Version 0.1.0 has 44 invariants. Later items add rows with the next free code in their group.
+   Codes are grouped: 01–19 ledger and platform, 20–29 inventory, 30–39 receivables and payables, 40–49 documents, 50–59 warehouse (ADR-0023), 60–69 planning (ADR-0024), 70–79 subledgers (ADR-0025). Version 0.1.0 has 48 invariants. Later items add rows with the next free code in their group.
 5. Each catalog row has exactly one check, registered with `@invariant("INV-21")` in `erpme_testkit.invariants`. A CI test compares catalog and registry:
    - a row whose `first_step` is at or below `[tool.erpme] build_step` (DS-18) and has no check fails;
    - a check without a row fails;
@@ -219,7 +219,8 @@ The product is `erpme` (ADR-0004 rule 7). Test tooling lives in separate top-lev
     | --- | --- |
     | 1 | Trial balance per account and period, in transaction and company currency, and in group currency where the installation sets one (journal-level events and the step 1 projection documented by DS-17) |
     | 3 | Stock quantity and value per item, warehouse and date; periodic average per item, valuation area and period, with transfers solved; cost of goods sold; landed cost allocations and the locked-period split (ADR-0020 rules 11–13; ADR-0021) |
-    | 6 | Open items and their carrying amounts; realized FX |
+    | 4 | Open items and their open amounts, from opening balances on (ADR-0026) |
+    | 6 | Carrying amounts on settlement; realized FX |
     | 7 | VAT per tax code and return line |
     | 8 | Unrealized FX revaluation; closing entries |
 
@@ -246,6 +247,7 @@ The product is `erpme` (ADR-0004 rule 7). Test tooling lives in separate top-lev
     | PAR-07 | 3 | A handling-unit move against a pick from that unit |
     | PAR-08 | 3 | Two confirmations of one warehouse task |
     | PAR-09 | 3 | Long profile only: 8 concurrent confirmations of one item in different bins; p95 above 1 s triggers ADR-0023's revisit line |
+    | PAR-10 | 1 | Two settlements of one open item at once (ADR-0026 rule 14) |
 
     Each test asserts the outcome: exactly one wins where one must, and the others fail with their codes. Then it runs every `day` check. CI runs a short profile; the test server runs a long one.
 

@@ -44,3 +44,10 @@ EC-42,intermittent_item,planning,5,sales_ordered;replenishment_planned,1,per_dat
 EC-43,supplier_minimum_excess,planning,5,purchase_ordered;replenishment_planned,1,per_quarter,1,must_succeed,ADR-0024,0.1.0,A supplier minimum forces a quantity above the maximum; the excess is shown with an exception.
 EC-44,transfer_network,planning,5,stock_transferred;replenishment_planned,1,per_month,2,must_succeed,ADR-0024,0.1.0,"A destination warehouse replenished by transfer from a central warehouse, with dependent demand at the source."
 EC-45,promotion_adjustment,planning,5,forecast_adjusted;replenishment_planned,1,per_dataset,1,must_succeed,ADR-0024,0.1.0,"A forecast adjustment for a promotion, approved by a human, raises planned quantities."
+EC-46,invoice_with_installments,receivables_payables,5,sales_invoice_issued,1,per_month,2,must_succeed,ADR-0026,0.1.0,An invoice with a two-installment term posts two receivable lines and two open items.
+EC-47,partial_payment,receivables_payables,6,payment_received,1,per_month,3,must_succeed,ADR-0026,0.1.0,A payment settles part of an open item; the carrying amount leaving is its proportional share.
+EC-48,overpayment,receivables_payables,6,payment_received,1,per_quarter,1,must_succeed,ADR-0026,0.1.0,"A payment above the named items leaves a payment on account (interim, flagged)."
+EC-49,credit_note_matched,receivables_payables,5,credit_note_issued,1,per_month,2,must_succeed,ADR-0026,0.1.0,A credit note creates a credit item and is matched with the invoice in the same command.
+EC-50,opening_open_items,receivables_payables,4,opening_balances_recorded,1,per_dataset,1,must_succeed,ADR-0026,0.1.0,"Opening balances create one open item per old invoice, in several currencies."
+EC-51,partner_account_change,receivables_payables,5,partner_account_changed,1,per_dataset,1,must_succeed,ADR-0026,0.1.0,A partner's reconciliation account changes; its open items move by balance transfers.
+EC-52,settlement_reversed,receivables_payables,6,document_reversed,1,per_quarter,1,must_succeed,ADR-0026,0.1.0,A payment is reversed after settling an item; the item reopens with the exact original amounts.
