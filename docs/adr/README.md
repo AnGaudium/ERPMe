@@ -28,3 +28,4 @@ One file per decision, named `NNNN-short-title.md`, using [template.md](template
 | [ADR-0022](0022-repository-and-engineering-conventions.md) | Repository and engineering conventions (DS-18) | Accepted (2026-11-14) |
 | [ADR-0023](0023-warehouse-management.md) | Warehouse management (DS-42) | Accepted (2026-11-14) |
 | [ADR-0024](0024-planning.md) | Planning (DS-43) | Accepted (2026-11-14) |
+| [ADR-0025](0025-later-phase-seams.md) | Seams for production and asset subledgers (DS-41) | Accepted (2026-11-14) |

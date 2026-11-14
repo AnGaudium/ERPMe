@@ -146,7 +146,7 @@ Planning answers, per item and warehouse: what to buy or move, how much, and by 
     - **Order.** The run plans nodes in topological order, downstream first. Ties are broken by item code, then warehouse code, never by IDs (ADR-0006 rule 6).
     - **Dependent demand.** A planned transfer creates demand at the source on its release date, pegged to the transfer.
     - **Short source.** When a source cannot cover all destinations, which destination goes first is business behavior (open question). Interim, flagged: by `need_date`, then destination warehouse code.
-    - **Costing.** A later seams item (DS-41, being drafted) is expected to align period-end costing with this graph.
+    - **Costing.** Costing uses the same item and warehouse identities over the period's actual flows, with its own solver graph ([ADR-0025](0025-later-phase-seams.md) rule 6).
 17. `RunPlanning` and `RunForecast` are long jobs:
     - **Triggers.** A daily schedule, or a human's `RunPlanning` command, which records the request; the job is enqueued after commit (ADR-0013 rule 13) and runs as the same command type, on behalf of the requester (the `planning_owner_id` for scheduled runs).
     - **Running.** They run on the `jobs` queue as internal callers (ADR-0013 rule 9), on behalf of the company's `planning_owner_id`, with an explicit `planning_date` (ADR-0007 rule 17). Their `transaction_timeout` is the long-job 15 minutes (ADR-0022 rule 9).

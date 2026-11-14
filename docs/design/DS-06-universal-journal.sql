@@ -5,7 +5,7 @@
 -- MetaData naming convention (ADR-0004 rule 15).
 -- Referenced tables (company, document, account, system_account, posting_period, fiscal_year,
 -- applied_rate, transaction_key, branch, partner, item, warehouse, cost_center, project,
--- employee, tax_code, open_item, material_document, material_document_line, derivation_trace,
+-- employee, tax_code, open_item, cost_object and fixed_asset (stubs below, ADR-0025), material_document, material_document_line, derivation_trace,
 -- close_task, posting_period_area_state, currency) are defined by their own design items.
 -- IDs of journal rows come from context.new_id (ADR-0014 rule 14), so there are no ID defaults.
 
@@ -29,6 +29,23 @@ CREATE INDEX ix_journal_entry_company_id_posting_date
     ON journal_entry (company_id, posting_date);
 CREATE INDEX ix_journal_entry_posting_period_id_close_task_id
     ON journal_entry (posting_period_id, close_task_id);
+
+-- ADR-0025 rule 2: stubs, owned by ledger until the production (Phase 2) and assets (Phase 3) modules exist.
+CREATE TABLE cost_object (
+    id          uuid PRIMARY KEY,
+    company_id  uuid NOT NULL REFERENCES company (id),
+    code        text NOT NULL,
+    name        text NOT NULL,
+    UNIQUE (company_id, code)
+);
+CREATE TABLE fixed_asset (
+    id          uuid PRIMARY KEY,
+    company_id  uuid NOT NULL REFERENCES company (id),
+    code        text NOT NULL,
+    name        text NOT NULL,
+    UNIQUE (company_id, code)
+);
+-- Both get FORCE ROW LEVEL SECURITY and the generated company policy (ADR-0022 rule 8).
 
 CREATE TABLE journal_line (
     id                         uuid          PRIMARY KEY,
@@ -55,6 +72,8 @@ CREATE TABLE journal_line (
     warehouse_id               uuid          REFERENCES warehouse (id),
     cost_center_id             uuid          REFERENCES cost_center (id),
     project_id                 uuid          REFERENCES project (id),
+    cost_object_id             uuid          REFERENCES cost_object (id),   -- ADR-0025, empty until Phase 2
+    fixed_asset_id             uuid          REFERENCES fixed_asset (id),   -- ADR-0025, empty until Phase 3
     salesperson_id             uuid          REFERENCES employee (id),
     tax_code_id                uuid          REFERENCES tax_code (id),
     material_document_line_id  uuid          REFERENCES material_document_line (id),

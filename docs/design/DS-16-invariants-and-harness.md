@@ -47,14 +47,14 @@ The product is `erpme` (ADR-0004 rule 7). Test tooling lives in separate top-lev
    | --- | --- |
    | `code` | `INV-nn`, never reused |
    | `name` | snake_case |
-   | `area` | `ledger`, `platform`, `inventory`, `receivables_payables`, `documents`, `warehouse` or `planning` |
+   | `area` | `ledger`, `platform`, `inventory`, `receivables_payables`, `documents`, `warehouse`, `planning` or `subledger` |
    | `check_point` | rule 10 |
    | `first_step` | The first build step at which the data it checks can exist; from then on it must have code and pass |
    | `flagged` | The open question it depends on, if its statement restates an interim rule |
    | `keys` | The business key fields a violation reports |
    | `source`, `added_in`, `statement` | |
 
-   Codes are grouped: 01–19 ledger and platform, 20–29 inventory, 30–39 receivables and payables, 40–49 documents, 50–59 warehouse (ADR-0023), 60–69 planning (ADR-0024). Version 0.1.0 has 43 invariants. Later items add rows with the next free code in their group.
+   Codes are grouped: 01–19 ledger and platform, 20–29 inventory, 30–39 receivables and payables, 40–49 documents, 50–59 warehouse (ADR-0023), 60–69 planning (ADR-0024), 70–79 subledgers (ADR-0025). Version 0.1.0 has 44 invariants. Later items add rows with the next free code in their group.
 5. Each catalog row has exactly one check, registered with `@invariant("INV-21")` in `erpme_testkit.invariants`. A CI test compares catalog and registry:
    - a row whose `first_step` is at or below `[tool.erpme] build_step` (DS-18) and has no check fails;
    - a check without a row fails;

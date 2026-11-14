@@ -40,7 +40,13 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Contra account | is\_contra | An account that reduces another of the same type, e.g. accumulated depreciation, revenue deductions |
 | Bilateral account | is\_bilateral | A receivable or payable account whose open items may sit on either side, e.g. trade receivables holding customer advances; presented split by open item kind |
 | Has posting | has\_posting | Set on an operational account by its first journal line; freezes its code, mapping, postable flag and currency ([ADR-0010](../adr/0010-system-chart-of-accounts.md) rule 12) |
-| Control kind | control\_kind | inventory, receivable, payable, gr\_ir or none: which core module owns postings to a system account and which invariant checks it |
+| Control kind | control\_kind | inventory, receivable, payable, gr\_ir, cost\_object, fixed\_asset, loan or none: which core module owns postings to a system account and which invariant checks it |
+| Effective control kind | effective control kind | The control kind a rule applies to a line: a gated kind (`cost_object`, `fixed_asset`, `loan`) counts as `none` before the company's subledger activation ([ADR-0025](../adr/0025-later-phase-seams.md)) |
+| Subledger reclassification | subledger\_reclassification | Document type created only by `ActivateSubledger`: moves an account's undimensioned balance into its subledger dimensions at the activation date |
+| Subledger activation | subledger\_activation | Irreversible start of a gated subledger for a company, at a period start after earlier periods are locked, with a reclassification of the balance |
+| Cost object | cost\_object | A cost collector carrying work in process; also a control kind; kinds and lifecycle designed in Phase 2 |
+| Fixed asset | fixed\_asset | An asset record (stub until Phase 3); also a system account node and a control kind |
+| Costing graph | costing\_graph | Stock nodes (item, valuation area) and, from Phase 2, cost-object nodes, linked by the period's value flows; solved per strongly connected component |
 | Operational account | account | Where postings land; points to exactly one system\_account |
 | Transaction key | transaction\_key | Drives account determination: transaction key × valuation class × valuation area → operational account; catalog [transaction-keys.csv](../catalogs/transaction-keys.csv) ([ADR-0015](../adr/0015-account-determination.md)) |
 | Account determination | account\_determination | Company table mapping a transaction key and determinant values to an operational account; the row that matches on the most significant determinants wins (key order); cross-checked against the key's required system accounts |
@@ -235,6 +241,7 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Cancel | End an open document that is not posted, or an open warehouse task or reservation | Canceled |
 | Pack, Unpack | Put stock into or take it out of a handling unit | Packed, Unpacked |
 | Firm | Fix a proposal so later runs keep it, e.g. a planned order | Firmed |
+| Activate | Start enforcing something once, irreversibly, e.g. a subledger | Activated |
 | Convert | Turn a record into another mode or form once: a warehouse to bin management, a planned order into draft documents | Converted |
 | Match, Unmatch | Link or unlink open items, bank lines or documents | Matched, Unmatched |
 | Allocate | Distribute an amount or quantity over targets | Allocated |
