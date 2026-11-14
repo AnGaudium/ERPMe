@@ -137,6 +137,8 @@ It loads together with the DS-06 journal in the design lab, and the earlier jour
     - **Code.** The item's code is the product's code, a hyphen and the next number of `product.last_item_number`, incremented under the product row's lock (gaps allowed; it is not a legal series).
     - **What it lacks.** The new item has no price entry, preliminary price, planning parameters or production version. `find_price` returns none, so the line's price is entered (outside the list, `price_missing`) or comes from DS-56's configured price, and a made item cannot be released (ADR-0033 rule 16) until DS-56 supplies its production version.
     - Every item still exists before stock or cost touches it. This is Odoo's "dynamic" mode, with ERPMe's agent safety.
+
+    Only document types with the registry flag `is_item_creating` (sales orders, and production orders by ADR-0046) create items when they leave draft; quotations never do ([ADR-0047](0047-commercial-documents-and-pricing.md) rule 1).
 17. Option prices. `price_list_option_extra` (list, optional product, option value, dates, `unit_price_extra` per inventory unit, which may be negative) adds to the price of rule 4:
     - **Which extra.** For each chosen value, the extra valid on the date for that product wins; else the extra for all products. Extras of one list, product (or all products) and value never overlap in dates (an exclusion constraint).
     - **The amount.** The extras of all chosen values are summed per inventory unit, multiplied by the factor of rule 4, rounded half up once to the unit-price scale, and added to the base price.

@@ -24,6 +24,8 @@ This ADR amends the document lifecycle (ADR-0009) in five places, before step 3 
    - **Execution tables** refer to `demand_supply_line_id` only: `stock_reservation`, `warehouse_task` and pegging (ADR-0023 rules 13–14; ADR-0024 rule 20). This replaces "a demand line" in those rules and cuts the line-reference pairs from about four per line table to one.
    - **Step 3.** As in ADR-0027 rule 7, `demand_supply_line` has from step 3 the nullable columns for every Phase 1 line table (`transfer_order_line_id`, the stock document lines, and `sales_order_line_id`, `purchase_order_line_id`, `purchase_request_line_id`); the foreign key constraints for step 5 tables are added at step 5, so the table does not change. Later line tables (production) are the author's decision under B3.
    - **Lifecycle.** `demand_supply_line` rows are never deleted or rebuilt, are unique per source line and direction, are created before the first reservation, and are closed with `closed_reason` when a line is removed when a change takes force.
+
+   A draft purchase request or order line whose supply row carries `origin_planned_order_id` or pegging cannot be removed (its quantity goes to zero, or the document is canceled, closing the row as `canceled`). Other draft lines removed in draft delete their rows. Rows are never deleted once their document has left draft ([ADR-0047](0047-commercial-documents-and-pricing.md) rule 10).
 3. Once another document refers to a line:
    - the line cannot be deleted (`document_line_referenced`);
    - its item, unit and warehouse cannot change (`referenced_line_immutable`);

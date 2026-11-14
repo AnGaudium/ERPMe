@@ -19,3 +19,4 @@ co_product_receipt,Co-product receipt,in,preliminary_price,production_output,pro
 by_product_receipt,By-product receipt,in,regime,production_output,production_output,true,531,0.1.0,"By-product received from a production order. Set by regime; interim seed (unverified): the by_product_price list, final at once (ADR-0035)."
 disassembly_issue,Disassembly issue,out,preliminary_price,production_input,production_consumption,true,261,0.1.0,"Item issued to a disassembly order (ADR-0034, ADR-0035)."
 disassembly_receipt,Disassembly receipt,in,preliminary_price,production_output,production_output,true,101,0.1.0,"Component received from a disassembly order, revalued at period end (ADR-0035)."
+free_goods_issue,Free goods issue,out,preliminary_price,revalued_issue,free_goods_cost,true,601,0.1.0,"Free goods delivered with a sale under a promotion; offset as the regime chooses (ADR-0047 rule 17)."

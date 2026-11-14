@@ -129,6 +129,8 @@ Numbers join lists: a characteristic may take a number in a range with a step, s
       - an `item_warehouse_planning` row for each production warehouse of the product's product-level versions, with source `production`, method `net_requirements`, lot size `exact` and strategy `make_to_order` (ADR-0036 rule 9);
       - an event `ConfiguredItemCreated`.
     - **The cost estimate.** A system consumer of `ConfiguredItemCreated` computes and releases the item's cost estimate (rule 14).
+
+    Sales and production orders carry the registry flag `is_item_creating` ([ADR-0047](0047-commercial-documents-and-pricing.md) rule 1).
 12. Production structures of a configurable product:
     - **Product-level versions.** `production_version` gains `product_id`, exclusive with `item_id`: a version of a configurable product applies to every configured item of it. Version selection for a configured item looks for an item-level version first, then a product-level one (ADR-0033 rule 13).
     - **The super bill of materials.** `bill_of_materials` gains `product_id`, exclusive with `item_id`, for the product-level bill of materials, whose main output at explosion is the configured item.

@@ -49,3 +49,4 @@ input_tax_non_deductible,Non-deductible input tax,tax_code,expense,,false,0.1.0,
 environmental_protection_tax,Environmental protection tax,tax_code,tax_payable_other,,false,0.1.0,"Environmental protection tax owed, by tax code (ADR-0041)."
 trade_remedy_duty,Trade remedy duty,tax_code,tax_payable_import_export_duty;tax_payable_other,,false,0.1.0,"Anti-dumping, countervailing and safeguard duties owed on imports, by tax code (ADR-0041)."
 opening_group_translation,Opening group translation,,fx_difference_equity,,false,0.1.0,"Group-currency difference of the opening balance clearing account at migration completion, posted as group-only lines (ADR-0044)."
+free_goods_cost,Free goods cost,valuation_class;warehouse;item_group,cost_of_goods_sold;selling_expense,,true,0.1.0,"Cost of free goods delivered under a promotion; the regime chooses cost of goods sold or a selling expense (ADR-0047 rule 17)."

@@ -50,6 +50,8 @@ Before step 1 code freezes the platform modules, every entity that several modul
    A line refers to it by `derivation_trace_id` (ADR-0014 rule 5). It is not OpenTelemetry's `trace_id`.
 4. Writers follow spec 10's lean scope ("cost trace only for costing"): costing (ADR-0020) and landed cost (ADR-0021) write traces. Whether FX conversion, pricing (DS-22) and tax (DS-23) also write traces in Phase 1 is the author's decision, because it is a scope question (ADR-0005 item 2; open question). The generic schema lets them be added without change.
 
+   Interim, with the open question on trace scope: prices are explained by the `document_line_price_step` rows on each line, part of its content, and pricing writes no `derivation_trace` rows ([ADR-0047](0047-commercial-documents-and-pricing.md) rule 16).
+
 **Master records**
 
 5. Master records needed by step 1, owned by `master_data` (DS-20):
@@ -116,6 +118,8 @@ Before step 1 code freezes the platform modules, every entity that several modul
     12. `event_subject` rows.
 
     The idempotency record is taken first (ADR-0008 rule 16) and held to commit. Account rows locked by the first-posting trigger (ADR-0014 rule 12) are taken in line order after the open items and before numbering counters. They are outside the helper's assertion, because they are locked once per account in its life. Work item claims run in their own transactions. For a command of an agent run bound to a work item, that item row follows `FOR KEY SHARE` (claims, assignments and lease expiry take it `FOR UPDATE`); work item rows raised by a command are the last class, in (`kind`, `open_key`) order ([ADR-0042](0042-work-queue.md) rules 5, 9).
+
+    Exception: credit hold updates on other orders' demand rows, made inside a `sales` command that holds the partner lock, take no class 1 lock of those orders; a hold is a single flag that does not conflict with their other changes ([ADR-0047](0047-commercial-documents-and-pricing.md) rule 18).
 
 **Catalog and glossary consistency**
 

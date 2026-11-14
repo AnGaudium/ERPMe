@@ -193,11 +193,11 @@ The simulator runs fictional companies day by day. It writes what happened in bu
     | `added_in` | |
     | `description` | |
 
-    Version 0.1.0 has 64 edge cases (EC-46 to EC-52 for open items, ADR-0026; EC-53 to EC-55, EC-59, EC-60 for the document lifecycle, ADR-0028; EC-56 to EC-58 for agent safety, ADR-0029; EC-61 to EC-64 for commercial seams, ADR-0030), EC-32 to EC-40 for warehouse management (ADR-0023) and EC-41 to EC-45 for planning (ADR-0024):
+    Version 0.1.0 has 71 edge cases (EC-46 to EC-52 for open items, ADR-0026; EC-65 and EC-66 for tax, ADR-0041; EC-67 and EC-68 for imports, ADR-0030 and ADR-0044; EC-69 to EC-71 for commercial documents, ADR-0047; EC-53 to EC-55, EC-59, EC-60 for the document lifecycle, ADR-0028; EC-56 to EC-58 for agent safety, ADR-0029; EC-61 to EC-64 for commercial seams, ADR-0030), EC-32 to EC-40 for warehouse management (ADR-0023) and EC-41 to EC-45 for planning (ADR-0024):
     - 23 from [12-testing.md](../spec/12-testing.md#synthetic-dataset), counting landed cost after partial sale and after period lock separately;
     - eight that ADRs require: foreign-currency journal, reversal of an internal document, transfer through transit, preliminary price missing, degenerate costing, one cost source over several receipts, cost before receipt, import VAT on customs.
 
-    `undecided` outcomes (EC-20, EC-21, EC-22, EC-63) are business behavior the spec does not state (ADR-0005 item 11). They are open questions and must be answered before their first executable step.
+    Outcomes of EC-20, EC-21, EC-22 and EC-63 are business behavior the spec does not state (ADR-0005 item 11). ADR-0047 gives them interim, flagged outcomes (rules 18, 20, 22); the author confirms them before their first executable step.
 23. Each edge case has one injector in `erpme_simulator/edge_cases/`, registered by code. A CI test compares catalog and registry (as DS-16 rule 5 does for invariants) and validates `business_event_types` against the schema. Injectors add or modify events only through the generators, and never write anything a real business could not produce.
 24. EC-26 changes a fictional, date-effective test tax code in a test setting. It is not a claim about any law; DS-23 provides such test codes.
 
@@ -236,7 +236,7 @@ The simulator runs fictional companies day by day. It writes what happened in bu
 ## Open points
 
 Questions for the author:
-- Outcomes of EC-20 (return of partly invoiced goods), EC-21 (credit limit exceeded) and EC-22 (price below cost): reject, accept with a warning or work item, or require approval? Needed before step 5; DS-22.
+- Outcomes of EC-20 (return of partly invoiced goods), EC-21 (credit limit exceeded) and EC-22 (price below cost): interim, flagged outcomes in ADR-0047 rules 18, 20 and 22; the author confirms them before step 5.
 - Is the tax ID prefix the simulator uses unassigned, and which phone number range is safe for fictional data?
 
 Requirements this item places on others:

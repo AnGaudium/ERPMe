@@ -10,7 +10,7 @@ This ADR settles seven seams before the stock key (step 3), imports (DS-21, step
 | --- | --- |
 | Price differences sent to stock | A posting interface writes them in the invoice's transaction and splits them by receipt period. A receipt period that is not open is treated as closed, whoever posts |
 | GR/IR | GR/IR always carries the order price and the order line, so it clears per line when quantities match. Differences go elsewhere, and a difference for goods not yet received waits in an inventory table until the receipt |
-| Credit check | One exposure that includes submitted orders, read under the partner lock at order `Submit` and at `PostDelivery` |
+| Credit check | One exposure that includes submitted orders, read under the partner lock at order `Submit`; deliveries respect a credit hold instead of a check at `PostDelivery` ([ADR-0047](0047-commercial-documents-and-pricing.md) rule 18) |
 | Ownership axis | `owner_partner_id` is reserved now on every stock row and movement, so goods sold but held, and consignment later, need no migration |
 | Imports | Up to 1,000 rows: one command batch, unchanged. Larger: a staged `import_batch` posted as a sequence of command batches with per-row state |
 | External documents | Deduplicated by business keys that include the company. The e-invoice key is a localization package declaration |
@@ -50,6 +50,8 @@ Accounting and business choices stay with the author, as flagged interims: close
      - **Rows never consumed.** A credit note or correction of the invoice reduces its row through the same interface. When the order line closes with quantity still to receive, DS-22 releases the remaining amount from `purchase_cost_clearing` to the price difference account. Interim, flagged with the invoice-first open question. That release carries no valuation class, so it reaches the regime's generic price difference account ([ADR-0039](0039-vietnam-package-tt99.md) rule 8).
      - The table is designed now and stays empty until step 5, so the step 3 handler needs no change later (B3).
    - **Status.** Interim, flagged: the regime might instead value an invoice-first receipt at the invoice price (open question). The company-currency difference between receipt and invoice rates stays with the existing FX open question.
+
+   Matching is by unit positions per order line, each priced once at first posting; postings are differences of rounded cumulative values, so the balance is zero whenever received equals invoiced; returns and quantity credits take the latest positions, which equals the receipt's or invoice's price when the order price never changed; reversals are allowed only for the latest postings of a side ([ADR-0047](0047-commercial-documents-and-pricing.md) rule 13).
 5. INV-37 has two parts:
    - every journal line on a `gr_ir` account whose document line refers to a purchase order line has `purchase_order_line_id`;
    - per purchase order line whose received quantity equals its invoiced quantity, net of returns and credit notes, the GR/IR balance in transaction currency is zero.
@@ -70,6 +72,8 @@ Accounting and business choices stay with the author, as flagged interims: close
    - **How.** The handler locks classes 1–8 of ADR-0027 rule 10, then the partner row (class 9), then reads the exposure. It passes the result to the policy hook through `context.evaluate_policy(input)`, the dispatcher's one hook (ADR-0029 rule 6), called at that point so that inputs read under locks are current. Such commands are registered `is_policy_in_handler` (ADR-0008 rule 1). For them the dispatcher skips its own evaluation and asserts that the hook ran exactly once.
    - **Concurrency.** Two concurrent orders of one partner therefore see each other's exposure.
    - **When the limit is exceeded.** The outcome is the author's (EC-21).
+
+   The check at `PostDelivery` becomes a credit hold on demand rows, set by `sales` in the commands that raise exposure and respected by `inventory` at pick release and delivery (`demand_on_hold`); `PostDelivery` is no longer `is_policy_in_handler` ([ADR-0047](0047-commercial-documents-and-pricing.md) rule 18).
 
 **Ownership axis** (F13)
 

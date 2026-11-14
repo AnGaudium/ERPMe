@@ -89,6 +89,8 @@ Planning answers, per item and warehouse: what to buy or move, how much, and by 
      - **converted planned orders** count as supply for the quantity not yet matched by open supply lines carrying their `origin_planned_order_id`; Converted production planned orders count nothing ([ADR-0036](0036-multi-level-mrp.md) rule 8).
      - **firmed planned orders**, and proposed ones frozen inside the firm fence, count as supply at their `need_date`. For `reorder_point` and `min_max` they are part of the inventory position.
    - **Overdue lines.** Demand or supply dated before the planning date counts at the planning date (interim, flagged).
+
+   Supply rows of draft purchase lines without `origin_planned_order_id` or pegging are deleted with the line; all others are closed, never deleted ([ADR-0047](0047-commercial-documents-and-pricing.md) rule 10).
 9. Stock on hand:
    - **Counted:** stock in status `available` in the warehouse, in any bin. `quality_inspection` and `blocked` stock do not count (interim, flagged).
    - **Never counted:** stock in `goods_sent` warehouses.

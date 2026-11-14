@@ -20,6 +20,7 @@ inventory_goods_sent_posting,,,,,,,157,unverified,(DS-19) TT99 default account d
 gr_ir_clearing,,,,,,,33881,unverified,(DS-19) TT99 default account determination,,,,,
 purchase_cost_clearing,,,,,,,33882,unverified,(DS-19) TT99 default account determination,,,,,
 cost_of_goods_sold,,,,,,,6321,unverified,(DS-19) TT99 default account determination,,,,,
+free_goods_cost,,,,,,,6321,unverified,(DS-19) TT99 default account determination,,,,,"Interim: cost of goods sold, like other goods sold (ADR-0047 rule 17); the alternative is a selling expense (641)."
 consumption,,,,,,,6422,unverified,(DS-19) TT99 default account determination,,,,,Interim: administrative materials; 641 or 627 by a row the company adds (open question on purpose)
 consumption,tools_supplies,,,,,,6423,unverified,(DS-19) TT99 default account determination,,,,,Interim: office tools and supplies
 inventory_count_shortage,,,,,,,1381,unverified,(DS-19) TT99 default account determination,,,,,Interim: pending decision; alternative 6323
