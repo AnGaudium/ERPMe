@@ -1,16 +1,16 @@
 # Escalation and stop rules
 
-Every agent session reads this file. When a rule here applies, the agent stops the affected work package, records why, and asks the author. Stopping early is always cheaper than building on a guess (Build principles, [11-build-order.md](../spec/11-build-order.md)).
+Every agent session reads this file. When a stop rule below applies, the agent stops the affected work package, records why, and asks the author. Rules 1, 3, 4, 6 and 7 also say which part the agent decides itself under [ADR-0005](../adr/0005-technical-decisions-delegated.md). Stopping early is always cheaper than building on a guess (Build principles, [11-build-order.md](../spec/11-build-order.md)).
 
 ## An agent stops and asks when
 
-1. The documents are silent or contradict each other on something the work needs ([00-reading-guide.md](../spec/00-reading-guide.md), rule 5). Small technical decisions consistent with ADR-0002 are the exception: choose the simplest option and record it.
+1. The documents are silent or contradict each other on something the work needs ([00-reading-guide.md](../spec/00-reading-guide.md), rule 5), and the point is on the reserved list of [ADR-0005](../adr/0005-technical-decisions-delegated.md). A technical point is decided by the agent and recorded.
 2. The work needs an accounting, tax or legal rule that is not written in the spec, a DS file or a localization package.
-3. The work would change a decided item (D1–D17), an accepted ADR, scope, a gate, the build order or a glossary term.
-4. The work would change the contract of a layer that has passed its gate (B2), or a commercial document would need a core change (B3).
+3. The work would change a decided item (D1–D17), scope, a gate, the build order, the governance (ADR-0003, ADR-0005, the review, merge, escalation and gate rules of this runbook), or an ADR that sets a reserved decision. An accepted technical ADR or a glossary term is changed by the agent with a new ADR.
+4. A commercial document would need a core change (B3). A layer's contract after its gate (B2) may be changed by the agent for a measured reason that no commercial document triggered, by ADR, with the affected verification rerun; the author re-confirms the gate.
 5. A fix would change an invariant, a golden-scenario expected value or the naive recomputation, rather than the code under test.
-6. The work touches posted-row protection, DB triggers, RLS, permission intersection, segregation of duties or the routing switch, beyond what its DS file specifies.
-7. The work needs a dependency not listed in ADR-0002, or a framework before a concrete need (B7).
+6. The work touches permission intersection, segregation of duties or the routing switch beyond what its DS file specifies. For posted-row protection, DB triggers and RLS beyond the DS file, the agent updates the DS file first and the author reviews the change line by line (stage 5).
+7. The work would replace a tool chosen in ADR-0002 (D14), add one on its "deliberately not used" list, or build a framework before a concrete need (B7). Any other library is added by the agent with a recorded reason; one that opens a category ADR-0002 does not cover needs an ADR.
 8. The work would build an "After Phase 1" feature or a hand-built screen or agent before its manual path passed its gate (B6).
 9. The schema is frozen (4 weeks before go-live, B8) and the work changes it.
 10. The work needs real company or personal data, or pilot data would enter the repository, CI or the test server.
@@ -22,10 +22,10 @@ Every agent session reads this file. When a rule here applies, the agent stops t
 ## Never decided by an agent
 
 - Accounting, tax and legal rules, including their verification status.
-- Decided items D1–D17 and accepted ADRs; ADRs and DS files are drafted by agents and accepted by the author.
-- Golden-scenario expected values; which reference is right when core, recomputation and golden disagree.
+- Decided items D1–D17, scope, gates, the build order and the governance (reserved list in [ADR-0005](../adr/0005-technical-decisions-delegated.md)). ADRs and DS files that contain a reserved decision are accepted by the author; technical ADRs and DS files are accepted by agents after an independent review.
+- Golden-scenario expected values; which reference is right when core, recomputation and golden disagree; removing or weakening an invariant, or changing the naive recomputation to make a failure pass.
 - Whether a gate has passed.
-- Merges to `main`; releases and their timing after go-live.
+- Merges to `main`; pushing to the public repository and opening pull requests (on the author's request only); releases and their timing after go-live.
 - Pilot selection, go-live, and anything said to the pilot customer.
 - Closing periods and reversing posted documents (Human only, [14-agent-workflows.md](../spec/14-agent-workflows.md)).
 - Relaxing a hard floor or a policy threshold.

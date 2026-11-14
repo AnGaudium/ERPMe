@@ -1,6 +1,6 @@
 # ADR-NNNN: Title
 
-Status: proposed | accepted (YYYY-MM-DD) | superseded by ADR-NNNN.
+Status: proposed | accepted (YYYY-MM-DD) | accepted (YYYY-MM-DD) under ADR-0005, reviewed by <reviewer model> | superseded by ADR-NNNN.
 Design item: DS-xx. Related decisions: Dn.
 
 ## Decision

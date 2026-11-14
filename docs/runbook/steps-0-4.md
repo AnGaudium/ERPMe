@@ -28,7 +28,7 @@ Applies to every step below:
 8. Business simulator v1 per DS-17: fictional Vietnamese company, seeded, writing the versioned business-event log; edge-case injection with coverage report.
 9. First golden scenarios (spreadsheets built by the author) for the cases listed in [12-testing.md](../spec/12-testing.md): average cost with transfers, returns, backdated documents, landed cost after partial sale, USD import with duty at a different rate, FX revaluation, discounts, rounding.
 
-**How agents are used:** builder agents draft each DS file from the spec; a reviewer agent checks each draft for contradictions with D1–D17 and the build order; the author accepts. Builder agents write the skeleton, harness and simulator. Golden expected values are built by the author, never by an agent.
+**How agents are used:** builder agents draft each DS file from the spec; a reviewer agent on a different model checks each draft for contradictions with D1–D17 and the build order; technical items are accepted when the review leaves no blocking or should-fix finding, and reserved decisions inside an item go to the author ([ADR-0005](../adr/0005-technical-decisions-delegated.md)). Builder agents write the skeleton, harness and simulator. Golden expected values are built by the author, never by an agent.
 
 **Verification:** each DS file meets the "done" rule in [design/README.md](../design/README.md); CI green on the empty skeleton; the simulator, run twice with the same seed and dataset version, produces an identical event log; the small dataset at this step is the event log plus input files and contains every EC v1 edge case at least once as events ([ADR-0003](../adr/0003-build-operating-rules.md) R1).
 

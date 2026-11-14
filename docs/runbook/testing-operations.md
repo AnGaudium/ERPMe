@@ -65,7 +65,7 @@ Limits ([ADR-0003](../adr/0003-build-operating-rules.md) R6): CI on a commit 15 
 2. **Deduplicate:** a defect is keyed by the failing check and the first failing command type; a repeat adds an occurrence to the existing defect, not a new one ([12-testing.md](../spec/12-testing.md)).
 3. **Reproduce:** from the simulator triple and the day, or from the Hypothesis seed; shrink to the shortest failing sequence.
 4. **Freeze:** the shortest sequence becomes a regression scenario in CI, failing, before the fix (stage 2 in [README.md](README.md#the-unit-of-work)).
-5. **Classify:** core defect (fix in the lowest layer it belongs to); reference error (the author corrects the golden scenario or the recomputation and records why); spec gap (open question; the author decides).
+5. **Classify:** core defect (fix in the lowest layer it belongs to); reference error (the author corrects the golden scenario or the recomputation and records why); spec gap (open question; the agent decides a technical gap under [ADR-0005](../adr/0005-technical-decisions-delegated.md), the author decides the rest).
 6. **Fix and close:** the regression scenario turns green and stays in CI permanently.
 
 Defects live in the GitHub issue tracker, label `defect`, titled with the dedupe key, before and after step 5. The work queue (DS-29) holds business work only ([ADR-0003](../adr/0003-build-operating-rules.md) R7).

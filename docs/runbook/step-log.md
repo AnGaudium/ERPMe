@@ -4,6 +4,7 @@ Dated record of gate decisions, the week list and one line per Friday review ([R
 
 | Date | Step | Entry |
 | --- | --- | --- |
+| 2026-11-14 | 0 | [ADR-0005](../adr/0005-technical-decisions-delegated.md) proposed: agents decide technical questions and accept technical ADRs and DS files after an independent review; the author keeps the reserved list. Takes effect when the author accepts it |
 | 2026-11-14 | 0 | DS-01 done: [ADR-0004](../adr/0004-naming-conventions.md) naming conventions accepted. The author delegated technical decisions to the agents; overriding goal: easy for AI agents to use. Accounting, tax and legal rules, golden values, gates and merges stay with the author |
 | 2026-11-14 | 0 | ADR-0003 amended: R3 uses the existing repository AnGaudium/ERPMe, made public; R10 the author verifies Vietnam rules, no contracted verifier |
 | 2026-11-14 | 0 | ADR-0003 answers the 14 runbook questions (R1–R14). Next: author creates the GitHub organization and engages the legal verifier |

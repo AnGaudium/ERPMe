@@ -31,7 +31,7 @@ A **work package** is the smallest piece that can be merged on its own and keeps
 
 | Stage | What happens | Who | Output |
 | --- | --- | --- | --- |
-| 1 · Design | If the DS-xx item is not done, it is done first: ADR in `docs/adr/`, spec in `docs/design/`, or catalog in `docs/catalogs/`. Open points go to [open-questions.md](../open-questions.md) | Builder agent drafts; author accepts | DS file, backlog row linked |
+| 1 · Design | If the DS-xx item is not done, it is done first: ADR in `docs/adr/`, spec in `docs/design/`, or catalog in `docs/catalogs/`. Open points go to [open-questions.md](../open-questions.md) | Builder agent drafts; a reviewer agent on a different model reviews; technical items are accepted under [ADR-0005](../adr/0005-technical-decisions-delegated.md), items on its reserved list by the author | DS file, backlog row linked |
 | 2 · Reference results (B4) | Invariants, golden scenarios, edge cases and simulator events that the package must satisfy exist before or with the code: new INV-xx in the DS-16 catalog, new EC-xx in the DS-17 catalog, simulator event types and the adapter for this step, golden spreadsheets | Builder agent drafts invariants, events and adapters; the author builds golden expected values by hand | Catalog rows, golden files, adapter |
 | 3 · Implementation | Code and tests on a branch, inside the module boundaries of DS-18 | Builder agent | Branch with commits |
 | 4 · Tests and invariants | CI on every commit: ruff, pyright strict, import-linter contracts, pytest on real PostgreSQL, Hypothesis short profile, small synthetic dataset replay with every invariant, all regression scenarios, agent replay evaluation where agents exist | CI | Green CI run |
@@ -66,9 +66,9 @@ The author is one person with final say (BDFL, [18-license-governance.md](../spe
 | Test-scenario model | Proposes unusual but realistic business situations on the test server | Compute expected results or judge pass/fail; deterministic code judges | Configured in the test server, within the nightly budget |
 | Eval judge (from the first agent) | Scores the agent evaluation suite | Score a model of its own kind | The Eval judge seat |
 
-**The author always decides:** accepting every ADR and DS file; every accounting, tax and legal rule; golden-scenario expected values; whether a gate has passed; every merge; any change to decided items, scope, gates or build order (only by a new ADR); pilot selection and go-live; release timing after go-live. The full list is in [escalation.md](escalation.md).
+**The author always decides** (the reserved list in [ADR-0005](../adr/0005-technical-decisions-delegated.md)): every accounting, tax and legal rule; golden-scenario expected values; whether a gate has passed; every merge and push; any change to decided items, scope, gates, build order or governance (only by a new ADR); pilot selection and go-live; release timing after go-live. Agents decide everything technical and accept technical ADRs and DS files after an independent review. The stop rules are in [escalation.md](escalation.md).
 
-**Split of time before go-live (guidance, not a rule):** the author spends most time on stages 1, 2 and 5 (design acceptance, golden scenarios, review of money and books) and on legal verification; agents carry stages 3 and 4. From go-live the support reservation applies ([go-live.md](go-live.md#support-mode)).
+**Split of time before go-live (guidance, not a rule):** the author spends most time on stages 1, 2 and 5 (decisions on the reserved list, golden scenarios, review of money and books) and on legal verification; agents carry stages 3 and 4. From go-live the support reservation applies ([go-live.md](go-live.md#support-mode)).
 
 ### Weekly cadence
 

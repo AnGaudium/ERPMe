@@ -16,7 +16,8 @@ Design, Build step 0. Do not write production code until the step 0 design items
 
 ## Rules
 
-- The documents in `docs/` are the source of truth. If something you need is missing or contradictory, record it in [docs/open-questions.md](docs/open-questions.md) and ask the author instead of guessing.
+- The documents in `docs/` are the source of truth. If something you need is missing or contradictory, record it in [docs/open-questions.md](docs/open-questions.md); decide it yourself if it is technical, otherwise ask the author instead of guessing.
+- Technical decisions are yours once [ADR-0005](docs/adr/0005-technical-decisions-delegated.md) is accepted (check its status line; until then the author accepts every ADR and DS file): decide, record the choice, and have a reviewer agent on a different model review it. When options compete, pick the one that is easiest for AI agents to use. The author keeps the reserved list in ADR-0005: accounting, tax and legal rules, decided items, scope, gates, golden values and invariants, merges and pushes, hard floors, real data, governance, and business behavior the spec does not state.
 - Never infer accounting, tax or legal rules. A rule marked "unverified" must not be hard-coded; it belongs in a localization package as flagged configuration.
 - Code identifiers, file names and documents are in English. The glossary in [docs/spec/00-reading-guide.md](docs/spec/00-reading-guide.md) is authoritative; DS-01 extends it in place, in that file; the naming rules are in [ADR-0004](docs/adr/0004-naming-conventions.md). Never use transliterated Vietnamese identifiers.
 - The core contains no country-specific rules; those belong in localization packages.
