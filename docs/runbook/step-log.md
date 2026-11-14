@@ -4,6 +4,7 @@ Dated record of gate decisions, the week list and one line per Friday review ([R
 
 | Date | Step | Entry |
 | --- | --- | --- |
+| 2026-11-14 | 0 | DS-07 done: [ADR-0010](../adr/0010-system-chart-of-accounts.md) and [system-accounts.csv](../catalogs/system-accounts.csv) 0.1.0 accepted under ADR-0005 after two review rounds (Claude Fable 5.2); released as 1.0.0 at the step 0 gate. One question for the author on classification choices |
 | 2026-11-14 | 0 | Author's decision on corrections recorded (ADR-0009 amended, Principle 5 reworded): posted documents are corrected by correction documents; internal documents can be reversed; reversal of unreferenced outside-party documents and who posts corrections are flagged interim rules with open questions |
 | 2026-11-14 | 0 | Author's instruction recorded in AGENTS.md: the AI is the chief architect; agents cross-check and challenge the author's input; SAP is the reference when unsure (D5) |
 | 2026-11-14 | 0 | DS-05 done: [ADR-0009](../adr/0009-document-lifecycle.md) document lifecycle accepted under ADR-0005 after two review rounds (Claude Fable 5.2). Five questions for the author, each with a flagged interim rule |

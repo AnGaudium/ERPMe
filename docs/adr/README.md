@@ -13,3 +13,4 @@ One file per decision, named `NNNN-short-title.md`, using [template.md](template
 | [ADR-0007](0007-time-model.md) | Time model (DS-03) | Accepted (2026-11-14) |
 | [ADR-0008](0008-command-envelope-and-registry.md) | Command envelope and registry (DS-04) | Accepted (2026-11-14) |
 | [ADR-0009](0009-document-lifecycle.md) | Document lifecycle (DS-05) | Accepted (2026-11-14) |
+| [ADR-0010](0010-system-chart-of-accounts.md) | System chart of accounts (DS-07) | Accepted (2026-11-14) |

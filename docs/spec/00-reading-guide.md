@@ -29,7 +29,13 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Journal entry, journal line | journal\_entry, journal\_line |  |
 | Universal journal | journal\_line | One table carrying all analytical dimensions; canonical list in [05](05-accounting-inventory-core.md) |
 | Material document | material\_document | Quantities. Zero or one accounting document per material document; value-only accounting documents (e.g. revaluations) have no material document |
-| System account | system\_account | Fixed in the core |
+| System account | system\_account | Fixed in the core; catalog [system-accounts.csv](../catalogs/system-accounts.csv), which is the word list for system account codes; a tree whose leaves are postable ([ADR-0010](../adr/0010-system-chart-of-accounts.md)) |
+| Account type | account\_type | asset, liability, equity, income, expense; inherited by an operational account from its system account |
+| Normal balance | normal\_balance | debit or credit; the side a balance usually sits on; contra accounts have the opposite of their type |
+| Contra account | is\_contra | An account that reduces another of the same type, e.g. accumulated depreciation, revenue deductions |
+| Bilateral account | is\_bilateral | A receivable or payable account whose open items may sit on either side, e.g. trade receivables holding customer advances; presented split by open item kind |
+| Has posting | has\_posting | Set on an operational account by its first journal line; freezes its code, mapping, postable flag and currency ([ADR-0010](../adr/0010-system-chart-of-accounts.md) rule 12) |
+| Control kind | control\_kind | inventory, receivable, payable, gr\_ir or none: which core module owns postings to a system account and which invariant checks it |
 | Operational account | account | Where postings land; points to exactly one system\_account |
 | Transaction key | transaction\_key | Drives account determination: transaction key × valuation class × valuation area → operational account |
 | Valuation class | valuation\_class | Attribute of an item |

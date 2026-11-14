@@ -1,0 +1,111 @@
+code,parent_code,account_type,normal_balance,is_contra,is_bilateral,control_kind,is_postable,added_in,name,meaning
+asset,,asset,debit,false,false,none,false,0.1.0,Assets,Root of everything the company owns or controls.
+cash,asset,asset,debit,false,false,none,false,0.1.0,Cash and cash equivalents,Money on hand and in banks.
+cash_on_hand,cash,asset,debit,false,false,none,true,0.1.0,Cash on hand,Notes and coins held by the company.
+cash_in_bank,cash,asset,debit,false,false,none,true,0.1.0,Cash in bank,Balances on demand bank accounts.
+cash_in_transit,cash,asset,debit,false,false,none,true,0.1.0,Cash in transit,Money sent but not yet credited to the receiving account.
+receivable,asset,asset,debit,false,false,none,false,0.1.0,Receivables,Amounts others owe the company.
+receivable_trade,receivable,asset,debit,false,true,receivable,true,0.1.0,Trade receivables,"Amounts customers owe for goods and services, by open item; customer advances are open items on the credit side."
+receivable_intercompany,receivable,asset,debit,false,true,receivable,true,0.1.0,Intercompany receivables,"Amounts owed by other companies or dependent units of the same group, by open item."
+receivable_employee_advance,receivable,asset,debit,false,false,receivable,true,0.1.0,Employee advances,"Money advanced to employees and not yet settled, by open item."
+receivable_other,receivable,asset,debit,false,false,none,true,0.1.0,Other receivables,"Receivables from partners that are not trade, intercompany or employee advances."
+receivable_allowance,receivable,asset,credit,true,false,none,true,0.1.0,Allowance for doubtful receivables,Reduces receivables to the amount expected to be collected.
+asset_shortage_pending,asset,asset,debit,false,false,none,true,0.1.0,Shortages pending decision,Assets found missing whose treatment is not yet decided.
+tax_receivable,asset,asset,debit,false,false,none,false,0.1.0,Tax receivables,Taxes the company may deduct or reclaim.
+tax_receivable_input,tax_receivable,asset,debit,false,false,none,true,0.1.0,Input tax,Value-added or sales tax paid on purchases that may be deducted.
+tax_receivable_other,tax_receivable,asset,debit,false,false,none,true,0.1.0,Other tax receivables,Taxes paid in advance or reclaimable other than input tax.
+inventory,asset,asset,debit,false,false,none,false,0.1.0,Inventory,Goods and materials the company owns.
+inventory_goods_in_transit,inventory,asset,debit,false,false,inventory,true,0.1.0,Goods in transit,Goods the company owns that have not yet arrived.
+inventory_raw_material,inventory,asset,debit,false,false,inventory,true,0.1.0,Raw materials,Materials to be used in production.
+inventory_tools_supplies,inventory,asset,debit,false,false,inventory,true,0.1.0,Tools and supplies,Tools and supplies held in stock.
+inventory_finished_goods,inventory,asset,debit,false,false,inventory,true,0.1.0,Finished goods,Products the company made and holds for sale.
+inventory_merchandise,inventory,asset,debit,false,false,inventory,true,0.1.0,Merchandise,Goods bought for resale.
+inventory_goods_sent,inventory,asset,debit,false,false,inventory,true,0.1.0,Goods sent,Goods delivered to customers or agents and still owned by the company.
+inventory_other,inventory,asset,debit,false,false,inventory,true,0.1.0,Other inventory,Stock the company owns that no other inventory account covers.
+inventory_work_in_process,inventory,asset,debit,false,false,none,true,0.1.0,Work in process,Cost of unfinished production.
+inventory_write_down_allowance,inventory,asset,credit,true,false,none,true,0.1.0,Inventory write-down allowance,Reduces inventory to its net realizable value.
+prepaid_expense,asset,asset,debit,false,false,none,true,0.1.0,Prepaid expenses,Costs paid for later periods and spread over them.
+deposit_paid,asset,asset,debit,false,false,none,true,0.1.0,Deposits paid,Deposits and collateral the company has placed with others.
+financial_investment,asset,asset,debit,false,false,none,false,0.1.0,Financial investments,"Securities, term deposits and investments in other entities."
+financial_investment_group_company,financial_investment,asset,debit,false,false,none,true,0.1.0,Investments in group companies,"Investments in subsidiaries, joint ventures and associates."
+financial_investment_other,financial_investment,asset,debit,false,false,none,true,0.1.0,Other financial investments,"Securities, term deposits and other investments."
+financial_investment_allowance,financial_investment,asset,credit,true,false,none,true,0.1.0,Investment loss allowance,Reduces financial investments for expected losses.
+fixed_asset,asset,asset,debit,false,false,none,false,0.1.0,Fixed assets,Long-lived assets used in the business.
+fixed_asset_tangible,fixed_asset,asset,debit,false,false,none,true,0.1.0,Tangible fixed assets,"Cost of buildings, machines, vehicles and equipment."
+fixed_asset_intangible,fixed_asset,asset,debit,false,false,none,true,0.1.0,Intangible fixed assets,"Cost of land use rights, software, licenses and similar rights."
+fixed_asset_investment_property,fixed_asset,asset,debit,false,false,none,true,0.1.0,Investment property,Property held to earn rent or for capital gain.
+fixed_asset_other,fixed_asset,asset,debit,false,false,none,true,0.1.0,Other fixed assets,Long-lived assets no other fixed asset account covers.
+fixed_asset_accumulated_depreciation,fixed_asset,asset,credit,true,false,none,true,0.1.0,Accumulated depreciation,Total depreciation and amortization of fixed assets.
+construction_in_progress,asset,asset,debit,false,false,none,true,0.1.0,Construction in progress,Cost of assets being built or acquired and not yet in use.
+deferred_tax_asset,asset,asset,debit,false,false,none,true,0.1.0,Deferred tax assets,Income tax recoverable in later periods.
+asset_other,asset,asset,debit,false,false,none,true,0.1.0,Other assets,Assets not covered by another system account.
+liability,,liability,credit,false,false,none,false,0.1.0,Liabilities,Root of everything the company owes.
+payable,liability,liability,credit,false,false,none,false,0.1.0,Payables,Amounts the company owes others.
+payable_trade,payable,liability,credit,false,true,payable,true,0.1.0,Trade payables,"Amounts owed to suppliers for goods and services, by open item; advances to suppliers are open items on the debit side."
+payable_intercompany,payable,liability,credit,false,true,payable,true,0.1.0,Intercompany payables,"Amounts owed to other companies or dependent units of the same group, by open item."
+payable_employee,payable,liability,credit,false,false,none,true,0.1.0,Payables to employees,Salaries and other amounts owed to employees.
+payable_social_contribution,payable,liability,credit,false,false,none,true,0.1.0,Social contributions payable,"Social insurance, health insurance, unemployment insurance and union fees owed."
+payable_deposit,payable,liability,credit,false,false,none,true,0.1.0,Deposits received,Deposits and collateral others have placed with the company.
+payable_other,payable,liability,credit,false,false,none,true,0.1.0,Other payables,Payables to partners that no other payable account covers.
+asset_surplus_pending,liability,liability,credit,false,false,none,true,0.1.0,Surpluses pending decision,Assets found in excess whose treatment is not yet decided.
+gr_ir_clearing,liability,liability,credit,false,false,gr_ir,true,0.1.0,GR/IR clearing,Goods received not yet invoiced and invoices received for goods not yet received.
+purchase_cost_clearing,liability,liability,credit,false,false,none,true,0.1.0,Purchase cost clearing,Purchase and landed costs recorded and not yet allocated to receipts or consumers (DS-11).
+tax_payable,liability,liability,credit,false,false,none,false,0.1.0,Taxes payable,Taxes and charges owed to the state.
+tax_payable_output,tax_payable,liability,credit,false,false,none,true,0.1.0,Output tax,Value-added or sales tax charged on sales.
+tax_payable_import,tax_payable,liability,credit,false,false,none,true,0.1.0,Import VAT or sales tax payable,Value-added or sales tax owed on imported goods.
+tax_payable_import_export_duty,tax_payable,liability,credit,false,false,none,true,0.1.0,Import and export duties payable,Customs duties owed on goods imported or exported.
+tax_payable_special_consumption,tax_payable,liability,credit,false,false,none,true,0.1.0,Excise tax payable,Special consumption or excise tax owed.
+tax_payable_corporate_income,tax_payable,liability,credit,false,false,none,true,0.1.0,Corporate income tax payable,Income tax the company owes.
+tax_payable_personal_income,tax_payable,liability,credit,false,false,none,true,0.1.0,Personal income tax payable,Income tax withheld from employees and others and owed to the state.
+tax_payable_other,tax_payable,liability,credit,false,false,none,true,0.1.0,Other taxes payable,"Taxes, fees and charges owed that no other tax account covers."
+accrued_expense,liability,liability,credit,false,false,none,true,0.1.0,Accrued expenses,Costs incurred but not yet invoiced or paid.
+unearned_revenue,liability,liability,credit,false,false,none,true,0.1.0,Unearned revenue,Amounts received for revenue of later periods.
+borrowing,liability,liability,credit,false,false,none,true,0.1.0,Borrowings,"Loans received, bonds issued and finance lease liabilities."
+provision,liability,liability,credit,false,false,none,true,0.1.0,Provisions,Liabilities of uncertain timing or amount.
+deferred_tax_liability,liability,liability,credit,false,false,none,true,0.1.0,Deferred tax liabilities,Income tax payable in later periods.
+liability_other,liability,liability,credit,false,false,none,true,0.1.0,Other liabilities,Liabilities not covered by another system account.
+equity,,equity,credit,false,false,none,false,0.1.0,Equity,Root of the owners' interest in the company.
+owner_capital,equity,equity,credit,false,false,none,true,0.1.0,Owner capital,Capital contributed by the owners.
+share_premium,equity,equity,credit,false,false,none,true,0.1.0,Share premium,Amounts received from owners above the par value of shares.
+treasury_stock,equity,equity,debit,true,false,none,true,0.1.0,Treasury stock,Cost of the company's own shares bought back.
+fx_difference_equity,equity,equity,credit,false,false,none,true,0.1.0,Exchange differences in equity,Exchange differences the accounting regime holds in equity before they reach profit or loss.
+retained_earnings,equity,equity,credit,false,false,none,true,0.1.0,Retained earnings,Accumulated profit or loss not distributed.
+income_summary,equity,equity,credit,false,false,none,true,0.1.0,Income summary,Technical closing account that collects income and expenses at period end and is zero after closing (DS-12).
+opening_balance_clearing,equity,equity,credit,false,false,none,true,0.1.0,Opening balance clearing,Technical account that balances opening entries during migration and is zero after it (DS-21).
+equity_other,equity,equity,credit,false,false,none,true,0.1.0,Other equity,"Reserves, funds and other equity items not covered by another system account."
+income,,income,credit,false,false,none,false,0.1.0,Income,Root of all income.
+revenue,income,income,credit,false,false,none,false,0.1.0,Revenue,Income from selling goods and services.
+revenue_goods,revenue,income,credit,false,false,none,true,0.1.0,Revenue from goods,Income from selling goods.
+revenue_services,revenue,income,credit,false,false,none,true,0.1.0,Revenue from services,Income from providing services.
+revenue_other,revenue,income,credit,false,false,none,true,0.1.0,Other revenue,Operating revenue not from goods or services sold.
+revenue_deduction,revenue,income,debit,true,false,none,false,0.1.0,Revenue deductions,Amounts deducted from revenue.
+revenue_deduction_trade_discount,revenue_deduction,income,debit,true,false,none,true,0.1.0,Trade discounts,Discounts granted to customers on the sales price.
+revenue_deduction_return,revenue_deduction,income,debit,true,false,none,true,0.1.0,Sales returns,Revenue of goods customers returned.
+revenue_deduction_allowance,revenue_deduction,income,debit,true,false,none,true,0.1.0,Sales allowances,Price reductions granted after sale for defects or other reasons.
+revenue_deduction_other,revenue_deduction,income,debit,true,false,none,true,0.1.0,Other revenue deductions,Deductions from revenue no other account covers.
+financial_income,income,income,credit,false,false,none,false,0.1.0,Financial income,Income from financial activities.
+interest_income,financial_income,income,credit,false,false,none,true,0.1.0,Interest income,Interest earned.
+fx_gain_realized,financial_income,income,credit,false,false,none,true,0.1.0,Realized exchange gains,Exchange gains on settled foreign-currency items.
+fx_gain_unrealized,financial_income,income,credit,false,false,none,true,0.1.0,Unrealized exchange gains,Exchange gains from revaluing open foreign-currency items.
+financial_income_other,financial_income,income,credit,false,false,none,true,0.1.0,Other financial income,Financial income not covered by another account.
+rounding_gain,income,income,credit,false,false,none,true,0.1.0,Rounding gains,Conversion rounding differences that increase profit (ADR-0006 rule 20).
+payment_discount_received,income,income,credit,false,false,none,true,0.1.0,Payment discounts received,Discounts suppliers grant for early payment.
+non_operating_income,income,income,credit,false,false,none,true,0.1.0,Non-operating income,"Income outside ordinary activities, such as gains on disposal of assets."
+income_other,income,income,credit,false,false,none,true,0.1.0,Other income,Income not covered by another system account.
+expense,,expense,debit,false,false,none,false,0.1.0,Expenses,Root of all expenses.
+cost_of_goods_sold,expense,expense,debit,false,false,none,true,0.1.0,Cost of goods sold,Cost of goods and services sold.
+inventory_write_down_expense,expense,expense,debit,false,false,none,true,0.1.0,Inventory write-down expense,Expense from reducing inventory to net realizable value.
+inventory_difference,expense,expense,debit,false,false,none,true,0.1.0,Inventory differences,Stock count and revaluation differences recognized in profit or loss (DS-09).
+price_difference,expense,expense,debit,false,false,none,true,0.1.0,Price differences,Differences between invoice and receipt value not added to inventory.
+financial_expense,expense,expense,debit,false,false,none,false,0.1.0,Financial expenses,Expenses of financial activities.
+interest_expense,financial_expense,expense,debit,false,false,none,true,0.1.0,Interest expense,Interest owed on borrowings.
+fx_loss_realized,financial_expense,expense,debit,false,false,none,true,0.1.0,Realized exchange losses,Exchange losses on settled foreign-currency items.
+fx_loss_unrealized,financial_expense,expense,debit,false,false,none,true,0.1.0,Unrealized exchange losses,Exchange losses from revaluing open foreign-currency items.
+financial_expense_other,financial_expense,expense,debit,false,false,none,true,0.1.0,Other financial expenses,Financial expenses not covered by another account.
+rounding_loss,expense,expense,debit,false,false,none,true,0.1.0,Rounding losses,Conversion rounding differences that reduce profit (ADR-0006 rule 20).
+payment_discount_given,expense,expense,debit,false,false,none,true,0.1.0,Payment discounts given,Discounts granted to customers for early payment.
+selling_expense,expense,expense,debit,false,false,none,true,0.1.0,Selling expenses,Costs of selling and distributing goods and services.
+administrative_expense,expense,expense,debit,false,false,none,true,0.1.0,Administrative expenses,Costs of managing the company.
+non_operating_expense,expense,expense,debit,false,false,none,true,0.1.0,Non-operating expenses,"Expenses outside ordinary activities, such as losses on disposal of assets."
+income_tax_expense,expense,expense,debit,false,false,none,true,0.1.0,Income tax expense,Current and deferred corporate income tax.
+expense_other,expense,expense,debit,false,false,none,true,0.1.0,Other expenses,"Expenses not covered by another system account, including production costs until Phase 2 adds them."
