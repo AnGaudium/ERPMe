@@ -19,6 +19,10 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Command | command | Pydantic schema; see Principle 1 |
 | Command batch | command\_batch | A set of commands simulated and executed together; every data import is posted through command batches, and large ones are staged in an import batch |
 | Import batch | import\_batch, import\_row | A staged data import above 1,000 rows: a stored file, rows with their own state, validated and posted in chunks of command batches, resumable ([ADR-0030](../adr/0030-commercial-seams-and-imports.md)) |
+| Migration | migration | A company's move from its old system: phased import batches, opening documents in a one-day migration fiscal year, reconciliation, completion ([ADR-0044](../adr/0044-data-migration-and-export.md)) |
+| Opening balance entry | opening\_balance\_entry, opening\_open\_item\_entry | Opening documents per currency for account balances and for open items per old invoice, offset to the opening balance clearing account |
+| Import key map | import\_key\_map | Map from a migrated record's external code to its ID, so corrected re-runs update instead of duplicating |
+| Opening turnover | opening\_turnover | Non-posting year-to-date debit and credit turnover per account before a mid-year cut-over, read by statutory reports |
 | Simulation | simulate, plan\_hash | Principle 2 |
 | Actor, principal acted for | actor, on\_behalf\_of | Actor kinds: human, agent, integration, system. A system actor is a deterministic job (costing, FX revaluation, closing entries, scheduled matching); its on\_behalf\_of is always the accountable human: the policy owner or the human who triggered the job Actor rows: `user_account`, `agent_type` with `agent_run`, `integration_client`, registered system job ([ADR-0017](../adr/0017-permission-envelope.md)). |
 | Company, branch | company (company\_id), branch | The legal entity with its currency, time zone, package, regime, costing scope and fiscal calendar owner; a branch or dependent unit of it, also an analytical dimension ([ADR-0027](../adr/0027-cross-cutting-ownership.md) rule 5) |
@@ -335,7 +339,7 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Issue | Request legal issuance of a document; it posts when the issue is accepted (e.g. `IssueSalesInvoice`) | IssueRequested |
 | Record | Store an outcome reported by an outside system, e.g. an e-invoice outcome | Recorded |
 | Recall | Take back a request sent to an outside system before it took effect | Recalled |
-| Complete | Finish a held step by a human, e.g. a posting after acceptance; or end the logistics of a production order (technical completion) | Completed |
+| Complete | Finish a held step by a human, e.g. a posting after acceptance; or end the logistics of a production order (technical completion); or finish a migration | Completed |
 | Reopen | Return a document to draft after an outside step failed; or return a technically complete production order to in progress | Reopened |
 | Erase | Remove a data subject's personal data irreversibly | Erased |
 | Request | Hand work to another module for execution, e.g. replenishment or an e-invoice | Requested |
@@ -343,6 +347,9 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Firm | Fix a proposal so later runs keep it, e.g. a planned order | Firmed |
 | Activate | Start enforcing something once, irreversibly, e.g. a subledger | Activated |
 | Claim | A person or agent run takes a work item as its only worker | Claimed |
+| Accept | Record that a difference found by a check stands, with a reason, e.g. a migration difference | Accepted |
+| Validate | Simulate a staged batch or file without posting and record its errors | Validated |
+| Export | Produce a company's full data as files | Exported |
 | Unclaim | Give up the claim of a work item | Unclaimed |
 | Resolve | Close a work item whose exception a person has dealt with | Resolved |
 | Enable | Put a policy rule version in force; reversible, unlike Activate | Enabled |
@@ -356,7 +363,7 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Import | Read an external file into the system | Imported |
 | Run | Start a deterministic system job, e.g. period-end actual costing | Completed (`<job noun>Completed`) |
 | Assign | Set the owner of a work item or a warehouse task; or attach output serials to a production order | Assigned |
-| Start | A person begins work on an assigned warehouse task | Started |
+| Start | A person begins work on an assigned warehouse task; or start a migration's loading or reconciliation | Started |
 | Close | End further activity on an approved record that has had some, e.g. an order, or a change proposal once executed | Closed |
 | Restrict | Narrow who may post in a posting period (open to soft-locked) | Restricted |
 | Open | Let a restricted posting period accept postings from everyone with permission again (soft-locked to open) | Opened |

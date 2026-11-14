@@ -68,7 +68,7 @@ Tax codes, dated rates and a dated tax matrix are package rules, read live. The 
    - **The tax date** is read from `tax.rate_date_basis`: the invoice date for sales, the supplier's invoice date for purchases, the declaration date for imports (flagged).
    - **Overrides.** A line may differ from the matrix only as ADR-0018 rule 16 allows, with the check result `tax_code_differs_from_matrix`.
    - **Errors:** `tax_matrix_missing`, `tax_rate_missing`.
-8. Corrections and reversals:
+8. Corrections and reversals: A correction of an invoice from before a migration carries its original tax date and rate as entered fields ([ADR-0044](0044-data-migration-and-export.md) rule 13).
    - **Corrections.** A correction document (`correction_of_id`: a return, a credit note, an adjustment or replacement invoice, ADR-0009 rule 23) takes each corrected line's tax date, codes and rates from the original line, so a January 2027 credit note for a December 2026 sale at 8% stays at 8% (flagged). Its declaration date is its own.
    - **Reversals.** A reversal copies the original's tax rows negated and never recomputes; its declaration date is its posting date.
 9. Computation is one pure function, `tax.contract.compute_taxes(lines, currency, rounding_level, prices_include_tax)`. Each line carries its amount and its codes, already resolved with `rate_percent`, `calculation`, `sequence` and `base_includes`. The function reads nothing else.
@@ -126,7 +126,7 @@ Tax codes, dated rates and a dated tax matrix are package rules, read live. The 
     | `deductible_until_due` | matched against an advance | as the advance's method gives | as that row | as that row |
     | `deductible_until_due` | matched against a credit note | the evidence-requiring amount drops by the credit | yes | none |
 
-15. Payment evidence travels by event, so `ledger` never imports `tax` (ADR-0022 rule 2):
+15. Payment evidence travels by event, so `ledger` never imports `tax` (ADR-0022 rule 2): Settlements of opening open items, which have no tax rows, are skipped ([ADR-0044](0044-data-migration-and-export.md) rule 13).
     - **The method.** Every settlement of an open item (ADR-0026 rule 6) records `evidence_method`: `cash`, `bank_transfer`, `card`, `offset` or `third_party`. It is recorded on the settlement because offsets have no payment document.
     - **The event.** `ledger` emits `OpenItemSettled` (item, amount, date, method, `reversal_of`) through the outbox.
     - **The consumer.** The transactional `tax` consumer `tax_payment_evidence` calls `tax.contract.record_payment_evidence` and, when a share becomes non-deductible, posts the `tax_adjustment` through the `ledger` contract (ADR-0013 rule 9). So the adjustment follows the payment; it is not in the payment's plan. `tax` may import the `ledger` contract (a note on ADR-0022 rule 2).
@@ -150,7 +150,7 @@ Tax codes, dated rates and a dated tax matrix are package rules, read live. The 
     - **After filing.** For a filed period, `GetTaxReturn` returns the snapshot and the difference from a fresh computation, which is what a supplementary return declares.
     - **Prior-period adjustments.** Adjustments declared in a period for rows of an earlier filed period feed that period's prior-period boxes (in Vietnam [37] and [38]), not the current deduction.
     - **Exporting** a return file is step 7 work on these queries (DS-26).
-19. A return form is package data, `tax/returns/<form>.csv`: `box`, labels, `source`, basis. Sources are separated by `;` and summed:
+19. A return form is package data, `tax/returns/<form>.csv`: `box`, labels, `source`, basis. Sources are separated by `;` and summed: With no earlier filed return, `carry:` reads the migration's `opening_vat_carry_forward` ([ADR-0044](0044-data-migration-and-export.md) rule 13).
     - `base:<code>` and `tax:<code>`;
     - `deductible:<code>`, the deductible tax of rows of the period after their adjustments;
     - `prior_decrease` and `prior_increase`, the prior-period adjustments of rule 18;

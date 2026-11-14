@@ -174,6 +174,11 @@ Module-specific codes are added by the DS item that owns the module, in the regi
 | `invalid_timestamp` | validation | 422 | no | ADR-0007 rule 3 |
 | `schema_version_unsupported` | validation | 422 | no | ADR-0008 rule 23; `details.served` lists the versions |
 | `batch_too_large` | validation | 422 | no | More items than the installation's limit |
+| `opening_control_account` | validation | 422 | no | An account opening line is on a receivable, payable or inventory account; those come from opening open items or opening stock ([ADR-0044](../adr/0044-data-migration-and-export.md) rule 7) |
+| `opening_unit_value_differs` | validation | 422 | no | Opening stock lines of an item and valuation area have no total value to spread ([ADR-0044](../adr/0044-data-migration-and-export.md) rule 9) |
+| `migration_not_open` | precondition | 422 | no | Opening documents post only while their migration is loading or reconciling, in its migration period ([ADR-0044](../adr/0044-data-migration-and-export.md) rule 2) |
+| `migration_period_locked` | precondition | 422 | no | The migration period cannot be unlocked ([ADR-0044](../adr/0044-data-migration-and-export.md) rule 2) |
+| `migration_incomplete` | precondition | 422 | no | `CompleteMigration` found an unposted batch, a company-currency clearing balance, an unaccepted difference or a failing invariant, before its group step and lock; `details` lists them ([ADR-0044](../adr/0044-data-migration-and-export.md) rule 12) |
 | `exchange_rate_missing` | precondition | 422 | no | No quote for the source, pair, kind and date, or the quote is too old; `details` names them and the commands that add a quote ([ADR-0011](../adr/0011-multi-currency.md) rule 10) |
 | `document_rate_out_of_tolerance` | precondition | 422 | no | A rate entered on the document differs from the lookup rate by more than the regime allows ([ADR-0011](../adr/0011-multi-currency.md) rule 12) |
 | `regime_configuration_missing` | precondition | 422 | no | The accounting regime does not declare a value the posting needs; `details` names the key, regime, date and fix ([ADR-0011](../adr/0011-multi-currency.md) rule 13, [ADR-0016](../adr/0016-localization-package-structure.md) rule 10) |

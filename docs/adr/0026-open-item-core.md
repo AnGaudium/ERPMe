@@ -18,7 +18,7 @@ DS-25 keeps payments, bank statements, matching UX, netting, payment allocation 
 
 **The table**
 
-1. An `open_item` holds:
+1. An `open_item` holds: Opening items keep the old posting date in `original_posting_date` ([ADR-0044](0044-data-migration-and-export.md) rule 8).
 
    | Group | Fields |
    | --- | --- |
@@ -80,7 +80,7 @@ DS-25 keeps payments, bank statements, matching UX, netting, payment allocation 
 
 **Placement**
 
-17. Design now; proposed build: step 1 (table, catalog, payment terms, the posting path, matching, queries); step 4 (opening items per invoice, DS-21); step 5 (invoices, credit notes); step 6 (DS-25 processes). The step change is the author's decision.
+17. Design now; proposed build: step 1 (table, catalog, payment terms, the posting path, matching, queries); step 4 (opening items per invoice, DS-21); step 5 (invoices, credit notes); step 6 (DS-25 processes). The step change is the author's decision. Opening items per old invoice: `opening_open_item_entry` ([ADR-0044](0044-data-migration-and-export.md) rule 8).
 
 ## Context
 

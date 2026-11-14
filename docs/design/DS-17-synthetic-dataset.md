@@ -86,7 +86,7 @@ The simulator runs fictional companies day by day. It writes what happened in bu
    | `warehouse_opened` | Code, kind, `valuation_warehouse` for transit and goods-sent kinds |
    | Stock types | Item, warehouse(s), quantity in the inventory unit, lot or serial, unit price for receipts, the movement's business reason |
    | `landed_cost_allocated` | `ref` of the cost source, target receipt `ref`s, allocation method, manual amounts |
-   | `opening_balances_recorded` | Account balances per currency and rate; stock per item, warehouse and lot with value; open items |
+   | `opening_balances_recorded` | Account balances per currency at book company amounts; open items per old invoice; stock per item, warehouse, bin, lot or serial with one unit value per item and valuation area; year-to-date turnover at a mid-year cut-over ([ADR-0044](../adr/0044-data-migration-and-export.md) rules 7–10) |
 
    Later types get their table when their step's adapter is designed (B4).
 

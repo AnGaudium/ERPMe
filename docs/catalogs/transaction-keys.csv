@@ -48,3 +48,4 @@ inventory_at_processor_posting,Inventory at processor,valuation_class;warehouse,
 input_tax_non_deductible,Non-deductible input tax,tax_code,expense,,false,0.1.0,"Input VAT that is or becomes non-deductible (cash payment above the threshold, a lapsed due date, apportionment), moved from input tax to an expense (ADR-0041)."
 environmental_protection_tax,Environmental protection tax,tax_code,tax_payable_other,,false,0.1.0,"Environmental protection tax owed, by tax code (ADR-0041)."
 trade_remedy_duty,Trade remedy duty,tax_code,tax_payable_import_export_duty;tax_payable_other,,false,0.1.0,"Anti-dumping, countervailing and safeguard duties owed on imports, by tax code (ADR-0041)."
+opening_group_translation,Opening group translation,,fx_difference_equity,,false,0.1.0,"Group-currency difference of the opening balance clearing account at migration completion, posted as group-only lines (ADR-0044)."

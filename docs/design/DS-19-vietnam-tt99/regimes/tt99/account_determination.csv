@@ -28,6 +28,7 @@ inventory_revaluation_offset,,,,,,,6323,unverified,(DS-19) TT99 default account 
 inventory_write_down,,,,,,,6322,unverified,(DS-19) TT99 default account determination,,,,,
 inventory_write_down_allowance,,,,,,,2294,unverified,(DS-19) TT99 default account determination,,,,,
 opening_balance,,,,,,,999,unverified,(DS-19) TT99 default account determination,,,,,
+opening_group_translation,,,,,,,413,unverified,(DS-19) TT99 default account determination,,,,,Interim: group translation difference of the opening to exchange differences in equity (ADR-0044 rule 12)
 receivable_reconciliation,,,,,,,131,unverified,(DS-19) TT99 default account determination,,,,,
 receivable_reconciliation,,,,dependent_unit,,,1368,unverified,(DS-19) TT99 default account determination,,,,,Only dependent units without legal status; group companies use 131 (VAS)
 receivable_reconciliation,,,,employee,,,141,unverified,(DS-19) TT99 default account determination,,,,,

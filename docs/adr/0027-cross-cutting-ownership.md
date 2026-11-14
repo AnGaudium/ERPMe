@@ -60,7 +60,7 @@ Before step 1 code freezes the platform modules, every entity that several modul
 
 **Stock documents and other owners**
 
-7. The step 3 stock document types are owned by `inventory`. Their fields, reversibility flags (ADR-0009 rule 19) and the link from `transfer_order` to `stock_transfer` (one step, or two through transit) go in a DS-09 "stock documents" deliverable, written before step 3. The production documents are owned by `production` ([ADR-0034](0034-production-orders-and-shop-floor.md)).
+7. The step 3 stock document types are owned by `inventory`. Their fields, reversibility flags (ADR-0009 rule 19) and the link from `transfer_order` to `stock_transfer` (one step, or two through transit) go in a DS-09 "stock documents" deliverable, written before step 3. The production documents are owned by `production` ([ADR-0034](0034-production-orders-and-shop-floor.md)). Account opening balances use `opening_balance_entry` and open items `opening_open_item_entry`, owned by `imports` ([ADR-0044](0044-data-migration-and-export.md) rules 7, 8).
    - **Posting types:**
      - `goods_receipt`, `delivery`, `stock_transfer`, `stock_count`;
      - `internal_consumption`, `other_receipt`, `other_issue`, `scrap`;
@@ -76,7 +76,7 @@ Before step 1 code freezes the platform modules, every entity that several modul
    | `customs_declaration` and its tax rows | `purchasing`, step 5 (ADR-0021 rule 10) |
    | E-invoice records and intents | `tax` (DS-24); `tax` also owns `document_line_tax` computation, the subledger `tax_line` with its adjustments, and filed `tax_return` snapshots ([ADR-0041](0041-tax-engine.md)). A sales document requests issuance through `tax.contract.request_e_invoice` synchronously, which writes the e-invoice record and its intent; the external consumer then issues it asynchronously, and the document posts on acceptance ([ADR-0028](0028-document-lifecycle-hardening.md) rule 7). Imports go downward (as ADR-0024 rule 22) | 
    | Audit records | `audit` (layer 2, DS-36), with one row per executed command: `command_type`, `actor_kind`, `actor_id`, `agent_run_id`, `idempotency_key` (needed by INV-81); also `origin_agent_run_id`, `on_behalf_of_id` and `policy_decision_id` ([ADR-0029](0029-proposals-and-agent-safety.md) rule 15). Full columns, changes and denials: [ADR-0038](0038-audit-and-observability.md) rules 1–8 |
-   | Full data export (spec 15) | DS-21, as `ExportCompanyData`: a company package with master data, documents with all versions, journal and material lines, open items, stock, attachments and audit rows, one JSON Lines file per table plus the attachment files. It is not the import batch format |
+   | Full data export (spec 15) | DS-21, as `ExportCompanyData`: a company package with master data, documents with all versions, journal and material lines, open items, stock, attachments and audit rows, one JSON Lines file per table plus the attachment files. It is not the import batch format; contents, exclusions and download: [ADR-0044](0044-data-migration-and-export.md) rule 17 |
    | Management reporting | DS-33 semantic views; statutory reports stay DS-26 |
    | Bad-debt provisions and prepaid amortization | DS-25, as close tasks |
    | Inventory write-down to net realizable value | DS-09, as a close task |
