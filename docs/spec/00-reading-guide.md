@@ -78,6 +78,14 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Quantity | quantity | Quantity in any unit: domain `types.quantity` (`numeric(24, 6)`), Python type `Quantity`; at the unit's decimal places |
 | Unit price | unit\_price | Price or cost per unit: domain `types.unit_price` (`numeric(28, 10)`), Python type `UnitPrice` |
 | Exchange rate | exchange\_rate | A rate as its source publishes it, with the two currencies that give its direction: domain `types.exchange_rate` (`numeric(30, 15)`), Python type `ExchangeRate`; amounts are converted only by `convert_amount` |
+| Exchange rate source | exchange\_rate\_source | A publisher of quotes with a reference currency; public (fetched by a job) or a company's own manual source ([ADR-0011](../adr/0011-multi-currency.md)) |
+| Quote kind | quote\_kind | buy\_cash, buy\_transfer, sell\_cash, sell\_transfer, average, central: the published quote an `exchange_rate` row holds; SAP's exchange rate type |
+| Rate type | rate\_type | A use of a rate. Lookup: transaction, revaluation, group\_translation (configured quote kind, selection date, `max_rate_age_days`). Document: document, invoice, customs, settlement |
+| Applied rate | applied\_rate | The rate one conversion used, with its origin, selection date and the one or two quotes behind it; referenced by journal lines |
+| Rate origin | origin (of an applied rate) | lookup, document, invoice, customs, settlement or book |
+| Book rate method | book\_rate\_method | specific (per open item) or moving\_average (per account and currency), declared by the regime |
+| Realized FX basis | realized\_fx\_basis | original or revalued: which carrying amount realized FX starts from after a revaluation |
+| Revaluation | revaluation | Period-end job that restates foreign-currency open items and balances in company and group currency; method reverse\_and\_repost or delta, declared by the regime |
 | Percent | percent | A percentage written as percent (8 means 8%): domain `types.percent` (`numeric(9, 6)`), Python type `Percent`; columns end in `_percent` |
 | Minor unit | minor\_unit | Decimal places of a currency from ISO 4217 (VND 0, USD 2); amounts are stored at this precision |
 | Unit conversion factor | numerator, denominator (columns) | One alternative unit = numerator / denominator stock units, two positive integers; model in DS-20 |
