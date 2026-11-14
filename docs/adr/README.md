@@ -10,3 +10,4 @@ One file per decision, named `NNNN-short-title.md`, using [template.md](template
 | [ADR-0004](0004-naming-conventions.md) | Naming conventions (DS-01) | Accepted (2026-11-14) |
 | [ADR-0005](0005-technical-decisions-delegated.md) | Technical decisions are delegated to agents | Accepted (2026-11-14) |
 | [ADR-0006](0006-id-and-numeric-model.md) | ID and numeric model (DS-02) | Accepted (2026-11-14) |
+| [ADR-0007](0007-time-model.md) | Time model (DS-03) | Accepted (2026-11-14) |

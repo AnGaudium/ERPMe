@@ -71,6 +71,12 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Minor unit | minor\_unit | Decimal places of a currency from ISO 4217 (VND 0, USD 2); amounts are stored at this precision |
 | Unit conversion factor | numerator, denominator (columns) | One alternative unit = numerator / denominator stock units, two positive integers; model in DS-20 |
 | Rounding line, rounding difference | rounding\_difference (system account) | The one journal line of an entry that takes its conversion rounding differences, posted to the system account `rounding_difference` ([ADR-0006](../adr/0006-id-and-numeric-model.md) rule 20) |
+| Document date | document\_date | Date printed on the document; taken as given from an external source ([ADR-0007](../adr/0007-time-model.md)) |
+| Posting date | posting\_date | On documents that post: decides the posting period, fiscal year, numbering series and balances as of a date (Principle 5); required at posting, no core default |
+| Recording timestamp | recorded\_at | Instant (transaction start) of the command that wrote the row or row version; set by the system, never by a client; never an ordering key |
+| Company time zone | time\_zone | IANA name per company (e.g. `Asia/Ho_Chi_Minh`); used only to turn an instant into the company's date |
+| Fiscal year | fiscal\_year | Row per company with `start_date`, `end_date`, `code`; contiguous; contains regular posting periods; found by date lookup; ranges immutable once used |
+| Clock | erpme.clock | The only source of the current instant and business date: `now()` is always the real transaction time; `today(company)` can be set per company in test and simulation environments (`business_date_override`). Also defines the types `BusinessDate` and `Instant` |
 
 **Command verbs** ([ADR-0004](../adr/0004-naming-conventions.md) rules 17–22). A command type starts with one of these verbs; its event, if any, ends with the event form. The intent column says what the verb is for, nothing more: which states and preconditions allow a command is decided by DS-05 and the DS item that owns the noun. A new verb is added here, with its intent and event form, in the same change as the first command that needs it; a verb never takes a second meaning.
 
