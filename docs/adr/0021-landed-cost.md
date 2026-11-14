@@ -67,7 +67,7 @@ The customs declaration, supplier cost invoices and invoice price differences to
    | Receipt period `locked` | `closed`: rule 7. The posting date must lie in the first unlocked inventory period, otherwise `landed_cost_period_mismatch` names it |
 
    Price-difference documents written by `inventory.contract.adjust_receipt_value` use the postable period, dates and split range of [ADR-0030](0030-commercial-seams-and-imports.md) rule 2 instead. Targets of one document must fall into one case and one receipt period. Otherwise `landed_cost_period_mismatch` lists the groups to split into separate documents. The plan shows each target's mode.
-7. Closed mode, method `consumer_split`, the interim seed:
+7. Closed mode, method `consumer_split`, the interim seed (shares landing on production consumption go to the order's material pool, [ADR-0035](0035-production-costing.md) rule 8):
    - The core reruns ADR-0020 rule 12's exact solve for the item over every locked period from the receipt's period on, once as posted and once with the allocated amount added to the receipt. It takes the difference per movement type offset key, item and warehouse.
    - The quantity on hand at the end of the last locked period takes the rest, per warehouse that holds it, as a `receipt_addition` value-only line in the posting period.
    - Consumers are not a fixed list. Every revalued movement in those periods gets its share through its own offset key: sales from any warehouse, consumption, scrap, other issues, count shortages, and later production. Transfers carry value to receiving warehouses, and returns enter as the regime sets them (ADR-0020 rule 5). Degenerate cases follow ADR-0020 rule 13.

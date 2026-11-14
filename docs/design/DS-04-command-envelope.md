@@ -202,6 +202,11 @@ Module-specific codes are added by the DS item that owns the module, in the regi
 | `operation_not_confirmable` | validation | 422 | no | The operation is not an internal operation of the order ([ADR-0034](../adr/0034-production-orders-and-shop-floor.md) rule 12) |
 | `return_above_issued` | validation | 422 | no | A return exceeds the net issued quantity of the component line and lot or serial ([ADR-0034](../adr/0034-production-orders-and-shop-floor.md) rule 11) |
 | `backflush_outside_production_warehouse` | validation | 422 | no | A backflush component must be issued from the production warehouse ([ADR-0034](../adr/0034-production-orders-and-shop-floor.md) rule 2) |
+| `production_cost_not_balanced` | internal | 500 | no | After the costing job's postings an order's WIP differs from its recorded closing amounts; the job fails and posts nothing ([ADR-0035](../adr/0035-production-costing.md) rule 12) |
+| `by_product_price_missing` | precondition | 422 | no | A by-product receipt needs a by-product price for the item and period ([ADR-0035](../adr/0035-production-costing.md) rule 13) |
+| `co_product_weights_zero` | validation | 422 | no | The co-product coefficients of an order sum to zero ([ADR-0035](../adr/0035-production-costing.md) rule 13) |
+| `pool_allocation_rule_missing` | precondition | 422 | no | A cost pool group has cost but no allocation rule; the costing job fails ([ADR-0035](../adr/0035-production-costing.md) rule 7) |
+| `material_on_cost_pool` | validation | 422 | no | Material cost cannot be posted to a cost pool; post indirect materials to production overhead ([ADR-0035](../adr/0035-production-costing.md) rule 7) |
 | `open_item_mismatch` | validation | 422 | no | A line refers to an open item of another partner, account, currency or company ([ADR-0026](../adr/0026-open-item-core.md) rule 4) |
 | `open_item_oversettled` | precondition | 422 | no | A settlement exceeds the item's open transaction amount, or the item is settled; post the excess as a payment on account (interim, flagged) ([ADR-0026](../adr/0026-open-item-core.md) rules 6, 8) |
 | `open_item_settled` | precondition | 422 | no | The document's open items have settlements from other documents; reverse those first ([ADR-0026](../adr/0026-open-item-core.md) rule 11) |
@@ -216,6 +221,8 @@ Module-specific codes are added by the DS item that owns the module, in the regi
 | `component_shortage` | check result | — | — | Components could not be fully reserved; `details` list the missing quantities ([ADR-0034](../adr/0034-production-orders-and-shop-floor.md) rule 9) |
 | `issue_above_requirement` | check result | — | — | The issue exceeds the component line's open requirement ([ADR-0034](../adr/0034-production-orders-and-shop-floor.md) rule 11) |
 | `yield_above_previous_operation` | check result | — | — | Cumulative yield and scrap exceed the previous internal operation's cumulative yield ([ADR-0034](../adr/0034-production-orders-and-shop-floor.md) rule 12) |
+| `normal_capacity_missing` | check result | — | — | A cost center has fixed overhead but no normal capacity for the period; all of it was absorbed ([ADR-0035](../adr/0035-production-costing.md) rule 7) |
+| `planned_wip_capped` | check result | — | — | An order's planned WIP exceeded its cost; WIP was capped and its outputs valued at zero ([ADR-0035](../adr/0035-production-costing.md) rule 9) |
 | `capacity_not_checked` | check result | — | — | A bin capacity could not be checked because weight or dimensions are missing; `details` names the fields ([ADR-0023](../adr/0023-warehouse-management.md) rule 12) |
 | `bin_capacity_exceeded` | check result | — | — | A confirmed target bin exceeds its capacity; the fact is recorded ([ADR-0023](../adr/0023-warehouse-management.md) rule 12) |
 | `mixed_stock_not_allowed` | check result | — | — | A confirmed target bin breaks its mix rules; the fact is recorded ([ADR-0023](../adr/0023-warehouse-management.md) rule 12) |

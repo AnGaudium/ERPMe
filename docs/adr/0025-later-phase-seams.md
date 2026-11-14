@@ -42,17 +42,17 @@ Everything else for these phases is additive: new tables, movement types, transa
 
 4. Activation:
    - **The command.** A gated kind is enforced for a company only after `ActivateSubledger` (`human_only`). The command is unique per (company, kind) and irreversible. It writes a `subledger_activation` row (company, `control_kind`, `effective_from`, the reclassification document).
-   - **The date.** `effective_from` must be the first day of a posting period, and every earlier period must be `locked` in area `general` (ADR-0012), so no backdated line can change the balance that was reconciled.
+   - **The date.** `effective_from` must be the first day of a posting period, and every earlier period must be `locked` in area `general` (ADR-0012), so no backdated line can change the balance that was reconciled. `ActivateSubledger` takes an exclusive lock on the area-state rows of the periods from `effective_from` on: `inventory` for `cost_object`, `general` for the others, so no concurrent posting slips in undimensioned ([ADR-0035](0035-production-costing.md); DS-06).
    - **Reclassification.** Activation posts a document of type `subledger_reclassification`, which only `ActivateSubledger` creates, dated `effective_from`. For each account, it credits the undimensioned balance and debits it per asset, cost object or loan, from the opening detail the command carries. The per-dimension lines must sum to the account's balance at `effective_from`, otherwise the command is rejected. Its undimensioned lines are the single exception to the dimension rule below and to INV-70. From then on, the account equals the sum by dimension (DS-16).
    - **After activation.** Lines dated before `effective_from` on those accounts are rejected (`subledger_activation_date_not_reached`). Lines dated on or after it must carry the dimensions (`control_dimension_missing`).
    - **Before activation.** The account's **effective control kind** is `none`. The effective kind (company, system account, posting date) is read by:
      - ADR-0014 rule 10 (required columns and the flagged manual-journal rule) and its trigger;
      - ADR-0010 rule 12 (moving balances);
-     - ADR-0012 rule 4 (posting area).
+     - ADR-0012 rule 4 (posting area), for `fixed_asset` and `loan`; `cost_object` lines are in area `inventory` before and after activation ([ADR-0035](0035-production-costing.md) rule 3).
 
      The catalog value is read by account determination (ADR-0015 rules 4, 13) and INV-16.
    - **Existing kinds.** `inventory`, `receivable`, `payable` and `gr_ir` are active from company creation.
-   - **Posting area.** The three gated kinds are in area `general` (ADR-0012 rule 4), as are depreciation and WIP close tasks.
+   - **Posting area.** The three gated kinds are in area `general` (ADR-0012 rule 4), as are depreciation and WIP close tasks. Amended: `cost_object` lines are in area `inventory`, and production is settled by the inventory costing job ([ADR-0035](0035-production-costing.md) rules 3, 5).
 
 **System chart rows (changed in 0.1.0, before release 1.0.0)**
 
@@ -76,6 +76,7 @@ Everything else for these phases is additive: new tables, movement types, transa
    - **Solve order.** The solver works through the strongly connected components in topological order, each as one exact rational linear system. A singular component keeps the preliminary price for its nodes under ADR-0020 rule 13; other components are solved normally. Multi-level bills of materials, by-products and rework cycles therefore need the same solver with new node and edge kinds.
    - **Planning.** Planning (ADR-0024 rule 16) shares item and warehouse identities and, in Phase 2, the bill of materials, but not a data structure. Its graph is master-data routes and must be acyclic; the costing graph is actual flows and may have cycles.
    - **Step 3.** The step 3 algorithm spec implements this formulation, and the naive recomputation (DS-16 rule 29) uses the same nodes.
+   - **Nodes in Phase 1.** Cost-object nodes are production orders and cost pools ([ADR-0035](0035-production-costing.md) rules 1, 6).
    - **WIP offsets.** Costing adjustment lines that offset to WIP through the `consumption` key carry the original line's `cost_object_id`.
 7. Price control:
    - Enumeration values are text with a check (ADR-0004 rule 14), so further methods are cheap to add. The list of methods (standard, moving average, FIFO, specific identification) stays open and is an accounting choice for later.

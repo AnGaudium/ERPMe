@@ -112,7 +112,8 @@ It adds only what production needs:
    | `closed` | No | No | Yes, when a period is reopened and solved again |
 
 7. Closing:
-   - **When.** A daily system job with an explicit business date (ADR-0007 rule 17), also started by the period-lock event, closes, as actor `system`, every technically complete order whose last posting lies in a period whose settlement task (DS-53) is done and whose area for production cost is locked. That area is named by DS-53; `general` per ADR-0025 rule 4. A technically complete order without postings closes at the next run. Orders with a pending change are skipped. It runs the generated `CloseProductionOrder`, effect class `other`.
+   - **Settlement task.** The period-end actual costing job ([ADR-0035](0035-production-costing.md) rule 5).
+   - **When.** A daily system job with an explicit business date (ADR-0007 rule 17), also started by the period-lock event, closes, as actor `system`, every technically complete order whose last posting lies in a period whose settlement task (DS-53) is done and whose area for production cost is locked. That area is `inventory` ([ADR-0035](0035-production-costing.md) rule 3). A technically complete order without postings closes at the next run. Orders with a pending change are skipped. It runs the generated `CloseProductionOrder`, effect class `other`.
    - **Effect.** A closed order allows no logistics postings and no reversals. Close jobs may still post to its cost object.
    - **Close task.** No close task requires orders to be closed before a lock. Whether completed orders must be closed before a period lock is a question for the author (open question).
 

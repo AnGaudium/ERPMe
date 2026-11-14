@@ -78,6 +78,16 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Production issue | production\_issue, is\_return | Internal posting document issuing components to, or returning them from, an order's cost object |
 | Operation confirmation | operation\_confirmation, yield\_quantity, scrap\_quantity | Internal posting document recording yield, scrap and activities of an operation, with its backflush |
 | Production receipt | production\_receipt | Internal posting document receiving an order's outputs |
+| Cost pool | cost\_object kind cost\_pool; pool\_allocation\_rule | One cost object per factory cost center, collecting labor and overhead until period-end allocation by its rule ([ADR-0035](../adr/0035-production-costing.md)) |
+| WIP method | wip\_method: direct\_material, equivalent\_units, planned\_cost; wip\_completion\_percent | How an open order's period-end WIP is valued once it has receipts in the period |
+| Units in process | units in process | Units an open order has material for but has not received; a constant per order and period |
+| Normal capacity | normal\_capacity | The driver quantity at which fixed overhead is fully absorbed; below it the rest goes to cost of goods sold |
+| Abnormal cost, residual cost | production\_abnormal\_cost, production\_residual\_cost | Consumption above norm at completion, and cost of a completed order with no output in the period; both to cost of goods sold |
+| Cost estimate | cost\_estimate, cost\_estimate\_line, activity\_rate | Planned cost of a production version by cost component; the benchmark for target cost and variances |
+| Target cost, variance | variance categories: input price, input quantity, resource usage, scrap, lot size, remaining | The released estimate scaled to output, and the analysis of actual against it; never posted |
+| Cost behavior | cost\_behavior: variable, fixed | Whether an overhead account varies with output; drives normal-capacity absorption |
+| Production order period cost | production\_order\_period\_cost | Per order, period and cost component: opening, incurred, abnormal, to-output and closing amounts |
+| By-product price | by\_product\_price | Company price list valuing by-products (interim stand-in for net realisable value) |
 | Backflush | backflush\_at\_operation, backflush\_at\_receipt | Automatic issue of components on confirmation or receipt, by cumulative progress |
 | As built | output\_serial\_number\_id, is\_as\_built\_required | The link from a component lot or serial to the assigned output serial it went into |
 | Low-level code | low\_level\_code | The longest path from a top item to an item in released bills of materials; MRP plans in that order |
@@ -90,7 +100,7 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Subledger activation | subledger\_activation | Irreversible start of a gated subledger for a company, at a period start after earlier periods are locked, with a reclassification of the balance |
 | Cost object | cost\_object | A cost collector carrying work in process; also a control kind; kinds and lifecycle designed in DS-53 ([ADR-0032](../adr/0032-phase-1-scope-with-production.md)) |
 | Fixed asset | fixed\_asset | An asset record (stub until Phase 3); also a system account node and a control kind |
-| Costing graph | costing\_graph | Stock nodes (item, valuation area) and cost-object nodes (DS-53), linked by the period's value flows; solved per strongly connected component |
+| Costing graph | costing\_graph | Stock nodes (item, valuation area) and cost-object nodes (production orders and cost pools, [ADR-0035](../adr/0035-production-costing.md)), linked by the period's value flows; solved per strongly connected component |
 | Operational account | account | Where postings land; points to exactly one system\_account |
 | Transaction key | transaction\_key | Drives account determination: transaction key × valuation class × valuation area → operational account; catalog [transaction-keys.csv](../catalogs/transaction-keys.csv) ([ADR-0015](../adr/0015-account-determination.md)) |
 | Account determination | account\_determination | Company table mapping a transaction key and determinant values to an operational account; the row that matches on the most significant determinants wins (key order); cross-checked against the key's required system accounts |

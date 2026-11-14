@@ -1,5 +1,5 @@
 -- DS-06 universal journal: DDL draft for ADR-0014.
--- PostgreSQL 18. Draft for review; not yet executed. The ADR's rules win if this file disagrees.
+-- PostgreSQL 18. Loaded and trigger-tested in the design lab (docs/reviews/2026-11-14-design-validation). The ADRs win if this file disagrees.
 -- Tables live in schema `erpme` (ADR-0022 rule 7); domains live in schema `types` (ADR-0006 rule 8).
 -- Primary and foreign keys are shown inline; in migrations they get names from the
 -- MetaData naming convention (ADR-0004 rule 15).
@@ -8,44 +8,6 @@
 -- tax_code, open_item, payment_term and payment_term_line (below, ADR-0026), cost_object and fixed_asset (stubs below, ADR-0025), material_document, material_document_line,
 -- close_task, posting_period_area_state, currency) are defined by their own design items.
 -- IDs of journal rows come from context.new_id (ADR-0014 rule 14), so there are no ID defaults.
-
-CREATE TABLE journal_entry (
-    id                           uuid        PRIMARY KEY,
-    company_id                   uuid        NOT NULL REFERENCES company (id),
-    document_id                  uuid        NOT NULL REFERENCES document (id),
-    posting_date                 date        NOT NULL,
-    document_date                date        NOT NULL,
-    posting_period_id            uuid        NOT NULL REFERENCES posting_period (id),
-    fiscal_year_id               uuid        NOT NULL REFERENCES fiscal_year (id),
-    is_closing_entry             boolean     NOT NULL DEFAULT false,
-    close_task_id                uuid        REFERENCES close_task (id),
-    database_transaction_number  xid8        NOT NULL,
-    line_count                   integer     NOT NULL CHECK (line_count >= 2),
-    recorded_at                  timestamptz NOT NULL DEFAULT now(),
-    CONSTRAINT uq_journal_entry_document_id UNIQUE (document_id)
-);
-
-CREATE INDEX ix_journal_entry_company_id_posting_date
-    ON journal_entry (company_id, posting_date);
-CREATE INDEX ix_journal_entry_posting_period_id_close_task_id
-    ON journal_entry (posting_period_id, close_task_id);
-
--- ADR-0025 rule 2: stubs, owned by ledger until the production (Phase 2) and assets (Phase 3) modules exist.
-CREATE TABLE cost_object (
-    id          uuid PRIMARY KEY,
-    company_id  uuid NOT NULL REFERENCES company (id),
-    code        text NOT NULL,
-    name        text NOT NULL,
-    UNIQUE (company_id, code)
-);
-CREATE TABLE fixed_asset (
-    id          uuid PRIMARY KEY,
-    company_id  uuid NOT NULL REFERENCES company (id),
-    code        text NOT NULL,
-    name        text NOT NULL,
-    UNIQUE (company_id, code)
-);
--- Both get FORCE ROW LEVEL SECURITY and the generated company policy (ADR-0022 rule 8).
 
 -- ADR-0027 rules 3 and 5: company, branch and stubs of cost_center and project are owned by master_data
 -- (DS-20) and listed here because step 1 needs them; derivation_trace is owned by ledger.
@@ -95,6 +57,66 @@ CREATE TABLE derivation_trace (
     command_id    uuid NOT NULL     -- the command request id (ADR-0008)
 );
 CREATE INDEX ix_derivation_trace_company_id_rule_code ON derivation_trace (company_id, rule_code);
+
+-- ADR-0025 rule 2. cost_object is owned by production (ADR-0032; ADR-0034 rule 15) with kinds per ADR-0035 rule 1;
+-- fixed_asset stays a stub owned by ledger until the assets module (Phase 3). Placed after company and cost_center (lab finding L-01).
+CREATE TABLE cost_object (
+    id                   uuid PRIMARY KEY,
+    company_id           uuid NOT NULL REFERENCES company (id),
+    code                 text NOT NULL,
+    name                 text NOT NULL,
+    kind                 text NOT NULL CONSTRAINT ck_cost_object_kind CHECK (kind IN ('production_order', 'cost_pool')),
+    production_order_id  uuid,   -- FK to production_order (ADR-0034), added with the production module
+    cost_center_id       uuid REFERENCES cost_center (id),
+    state                text NOT NULL DEFAULT 'open' CONSTRAINT ck_cost_object_state CHECK (state IN ('open', 'closed')),
+    UNIQUE (company_id, code),
+    CONSTRAINT ck_cost_object_kind_reference CHECK ((kind = 'production_order') = (production_order_id IS NOT NULL)
+        AND (kind = 'cost_pool') = (cost_center_id IS NOT NULL))
+);
+CREATE UNIQUE INDEX uq_cost_object_cost_center_id ON cost_object (cost_center_id) WHERE cost_center_id IS NOT NULL;
+CREATE UNIQUE INDEX uq_cost_object_production_order_id ON cost_object (production_order_id) WHERE production_order_id IS NOT NULL;
+CREATE TABLE fixed_asset (
+    id          uuid PRIMARY KEY,
+    company_id  uuid NOT NULL REFERENCES company (id),
+    code        text NOT NULL,
+    name        text NOT NULL,
+    UNIQUE (company_id, code)
+);
+-- Both get FORCE ROW LEVEL SECURITY and the generated company policy (ADR-0022 rule 8).
+
+-- ADR-0025 rule 4: activation of a gated control kind, read by journal_line_check_insert (lab finding L-03).
+CREATE TABLE subledger_activation (
+    id                             uuid PRIMARY KEY,
+    company_id                     uuid NOT NULL REFERENCES company (id),
+    control_kind                   text NOT NULL CONSTRAINT ck_subledger_activation_control_kind CHECK (control_kind IN ('cost_object', 'fixed_asset', 'loan')),
+    effective_from                 date NOT NULL,
+    reclassification_document_id   uuid NOT NULL REFERENCES document (id),
+    recorded_at                    timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_subledger_activation_company_id_control_kind UNIQUE (company_id, control_kind)
+);
+-- FORCE ROW LEVEL SECURITY and the generated company policy; append-only (trigger below, after journal_reject_change).
+
+CREATE TABLE journal_entry (
+    id                           uuid        PRIMARY KEY,
+    company_id                   uuid        NOT NULL REFERENCES company (id),
+    document_id                  uuid        NOT NULL REFERENCES document (id),
+    posting_date                 date        NOT NULL,
+    document_date                date        NOT NULL,
+    posting_period_id            uuid        NOT NULL REFERENCES posting_period (id),
+    fiscal_year_id               uuid        NOT NULL REFERENCES fiscal_year (id),
+    is_closing_entry             boolean     NOT NULL DEFAULT false,
+    close_task_id                uuid        REFERENCES close_task (id),
+    database_transaction_number  xid8        NOT NULL,
+    line_count                   integer     NOT NULL CHECK (line_count >= 2),
+    recorded_at                  timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_journal_entry_document_id UNIQUE (document_id)
+);
+
+CREATE INDEX ix_journal_entry_company_id_posting_date
+    ON journal_entry (company_id, posting_date);
+CREATE INDEX ix_journal_entry_posting_period_id_close_task_id
+    ON journal_entry (posting_period_id, close_task_id);
+
 
 -- ADR-0026: open-item core, owned by ledger. RLS: FORCE ROW LEVEL SECURITY and the generated company policy.
 CREATE TABLE payment_term (
@@ -180,7 +202,7 @@ CREATE TABLE journal_line (
     warehouse_id               uuid          REFERENCES warehouse (id),
     cost_center_id             uuid          REFERENCES cost_center (id),
     project_id                 uuid          REFERENCES project (id),
-    cost_object_id             uuid          REFERENCES cost_object (id),   -- ADR-0025, empty until Phase 2
+    cost_object_id             uuid          REFERENCES cost_object (id),   -- ADR-0025; production orders and pools (ADR-0035), Phase 1
     fixed_asset_id             uuid          REFERENCES fixed_asset (id),   -- ADR-0025, empty until Phase 3
     salesperson_id             uuid          REFERENCES partner (id),   -- partner with the employee role (ADR-0027 rule 6)
     tax_code_id                uuid          REFERENCES tax_code (id),
@@ -231,6 +253,9 @@ CREATE TRIGGER trg_journal_entry_no_truncate
 CREATE TRIGGER trg_journal_line_append_only
     BEFORE UPDATE OR DELETE ON journal_line
     FOR EACH ROW EXECUTE FUNCTION journal_reject_change();
+CREATE TRIGGER trg_subledger_activation_append_only
+    BEFORE UPDATE OR DELETE ON subledger_activation
+    FOR EACH ROW EXECUTE FUNCTION journal_reject_change();
 CREATE TRIGGER trg_journal_line_no_truncate
     BEFORE TRUNCATE ON journal_line
     FOR EACH STATEMENT EXECUTE FUNCTION journal_reject_change();
@@ -258,6 +283,7 @@ DECLARE
     v_company_ccy    text;
     v_has_material   boolean;
     v_sign           int;
+    v_activation     subledger_activation%ROWTYPE;
 BEGIN
     -- ADR-0010 rule 12: mark the account first; this locks its row and freezes its mapping.
     UPDATE account SET has_posting = true WHERE id = NEW.account_id AND NOT has_posting;
@@ -333,6 +359,7 @@ BEGIN
     v_area := CASE
         WHEN v_period_kind = 'special' THEN 'general'
         WHEN v_control_kind IN ('inventory', 'receivable', 'payable') THEN v_control_kind
+        WHEN v_control_kind = 'cost_object' THEN 'inventory'   -- ADR-0035 rule 3: production cost is inventory valuation
         ELSE 'general' END;
     SELECT state INTO v_state
       FROM posting_period_area_state
@@ -341,6 +368,30 @@ BEGIN
     IF v_state IS NULL OR v_state = 'locked' THEN
         RAISE EXCEPTION 'posting period is locked or has no state in area % (ADR-0012 rule 5)', v_area
             USING ERRCODE = 'restrict_violation';
+    END IF;
+
+    -- ADR-0025 rule 4: read after the FOR SHARE area-state lock, which ActivateSubledger takes exclusively
+    -- for periods from effective_from (lab finding L-07). Gated kinds are enforced only from their activation; the reclassification document's
+    -- undimensioned lines are the single exception (lab finding L-03).
+    IF v_control_kind IN ('cost_object', 'fixed_asset', 'loan') THEN
+        SELECT * INTO v_activation FROM subledger_activation
+         WHERE company_id = NEW.company_id AND control_kind = v_control_kind;
+        IF FOUND AND v_entry.document_id IS DISTINCT FROM v_activation.reclassification_document_id THEN
+            IF v_entry.posting_date < v_activation.effective_from THEN
+                RAISE EXCEPTION 'subledger_activation_date_not_reached: % is active from % (ADR-0025 rule 4)',
+                    v_control_kind, v_activation.effective_from USING ERRCODE = 'check_violation';
+            END IF;
+            IF (v_control_kind = 'cost_object' AND NEW.cost_object_id IS NULL)
+               OR (v_control_kind = 'fixed_asset' AND NEW.fixed_asset_id IS NULL)
+               OR (v_control_kind = 'loan' AND (NEW.partner_id IS NULL OR NEW.open_item_id IS NULL)) THEN
+                RAISE EXCEPTION 'control_dimension_missing: % lines need their dimension (ADR-0025 rule 4)', v_control_kind
+                    USING ERRCODE = 'check_violation';
+            END IF;
+        END IF;
+    END IF;
+    IF NEW.cost_object_id IS NOT NULL AND NOT EXISTS (
+        SELECT 1 FROM cost_object WHERE id = NEW.cost_object_id AND company_id = NEW.company_id) THEN
+        RAISE EXCEPTION 'cost object of another company (ADR-0025 rule 1)' USING ERRCODE = 'check_violation';
     END IF;
 
     RETURN NEW;
