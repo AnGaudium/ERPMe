@@ -21,7 +21,10 @@
 - [ ] (DS-09, DS-10, DS-11, DS-19) Which rate values an import goods receipt?
 - [ ] (DS-09, DS-10, DS-11, DS-19) Does the rate difference between goods receipt and purchase invoice go to FX gain or loss, or to price difference and inventory?
 - [ ] (DS-09, DS-10, DS-11, DS-19) Which TT99 account holds GR/IR clearing, and on which B01 line is it presented? Verify.
-- [ ] (DS-12) What does period control "per account type" mean?
+- [x] (DS-12) What does period control "per account type" mean? Answered by [ADR-0012](adr/0012-posting-periods-and-closing.md) rule 4: a state per posting area (general, inventory, receivable, payable), as SAP opens periods per account type.
+- [ ] (DS-12, DS-19) Under TT99, are income and expenses closed to 911 and 421 every period or only at fiscal year end, and in the last regular period or a special period? Or is profit and loss closed by computation without documents, as SAP does? Interim, flagged in the Vietnam package ([ADR-0012](adr/0012-posting-periods-and-closing.md) rule 18).
+- [ ] (DS-12, DS-15) Spec 07 lets only the chief-accountant role post in a soft-locked period. May close jobs (costing, revaluation, closing entries), run by actor `system` on behalf of a chief accountant, post there too? Interim: yes; agents, integrations and other jobs never ([ADR-0012](adr/0012-posting-periods-and-closing.md) rule 5).
+- [ ] (DS-12, DS-28) New regular periods start open, so postings dated up to a year ahead are possible; should future-dated postings be limited (e.g. only the current and next period open)? Interim, flagged: regular periods start open, special periods start soft-locked ([ADR-0012](adr/0012-posting-periods-and-closing.md) rule 6).
 - [ ] (DS-05, DS-06) Reversal: storno (negative amounts) or swapped debit and credit? This is a localization choice, because it changes turnover in the Vietnamese trial balance.
 - [ ] (DS-05, DS-06) Posting date of a reversal when the original document's period is locked.
 - [ ] (DS-05, DS-06) Value of a reversed material document.

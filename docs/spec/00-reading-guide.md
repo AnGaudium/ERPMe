@@ -48,7 +48,14 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Preliminary price | preliminary\_price | Valuation price used during the period: the previous costed period's actual average price, or the latest receipt price for a new item or when the previous period is not yet costed |
 | Period-end actual costing | period\_end\_actual\_costing | Periodic weighted average |
 | Landed cost | landed\_cost | Purchase costs incurred after receipt. Same open period: added to the receipt value before period-end costing. Earlier, closed period: posted in the current period and allocated by consumer (see [05](05-accounting-inventory-core.md)) |
-| Posting period | posting\_period | States: open, soft\_locked, locked |
+| Posting period | posting\_period | Regular or special period of a fiscal year; states open, soft\_locked, locked per posting area ([ADR-0012](../adr/0012-posting-periods-and-closing.md)) |
+| Posting area | area: general, inventory, receivable, payable | Part of a regular period opened and closed on its own; a line's area is its system account's control kind; special periods have general only |
+| Special period | kind: special | Up to four periods for year-end adjustments, dated the fiscal year's last day, chosen explicitly |
+| Close task | close\_task | One item of a period's close checklist, per area: job, check or manual; an area locks only when its required tasks are done and still current |
+| Sequential close task | is\_sequential | A close task that must run in period order, e.g. period-end actual costing; rerunning it sets the same task of later periods back to pending |
+| Entry count at done | entry\_count\_at\_done | The number of relevant entries in a task's period and area when it was done; a larger count at lock time makes the task stale |
+| Fiscal calendar owner, lead days | fiscal\_calendar\_owner, fiscal\_year\_lead\_days | The human on whose behalf the next fiscal year is created, and how many days before year end (default 30) |
+| Closing entry | is\_closing\_entry | Marker on journal entries posted by the closing job, so period-range reports can exclude them |
 | Accounting regime | accounting\_regime | Rule set inside a localization package; the Vietnam package has two: TT99 and TT133 |
 | Localization package | localization\_package | e.g. l10n\_vn, l10n\_us |
 | Work queue item | work\_item | Business work; distinct from technical jobs (job) |
@@ -126,8 +133,14 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Run | Start a deterministic system job, e.g. period-end actual costing | Completed (`<job noun>Completed`) |
 | Assign | Set the owner of a work item | Assigned |
 | Close | End further activity on an approved record that has had some, e.g. an order | Closed |
+| Restrict | Narrow who may post in a posting period (open to soft-locked) | Restricted |
+| Open | Let a restricted posting period accept postings from everyone with permission again (soft-locked to open) | Opened |
+| Lock | Stop all postings in a posting period (soft-locked to locked) | Locked |
+| Unlock | Take a locked posting period back to soft-locked, with approval | Unlocked |
+| Confirm | A human confirms a fact the system cannot check, e.g. a manual close task | Confirmed |
+| Skip | Leave out an optional step with a reason, e.g. an optional close task | Skipped |
 
-Verbs for posting period states and work item locking are added by DS-12 and DS-29; a command batch needs no verb ([ADR-0008](../adr/0008-command-envelope-and-registry.md) rule 20). A posted document is never canceled: it is corrected by a correction document or, if its type is internal, reversed (Principle 5, [ADR-0009](../adr/0009-document-lifecycle.md) rules 19, 23), so Cancel never applies to posted documents.
+Work items get the verbs Claim and Release from DS-29, because Lock belongs to posting periods; a command batch needs no verb ([ADR-0008](../adr/0008-command-envelope-and-registry.md) rule 20). A posted document is never canceled: it is corrected by a correction document or, if its type is internal, reversed (Principle 5, [ADR-0009](../adr/0009-document-lifecycle.md) rules 19, 23), so Cancel never applies to posted documents.
 
 **Allowed abbreviations** ([ADR-0004](../adr/0004-naming-conventions.md) rule 2). No other abbreviation is used in an identifier. Terms not listed are written in full: `cost_of_goods_sold`, `receivable`, `payable`, `general_ledger`, `bill_of_materials`.
 

@@ -15,3 +15,4 @@ One file per decision, named `NNNN-short-title.md`, using [template.md](template
 | [ADR-0009](0009-document-lifecycle.md) | Document lifecycle (DS-05) | Accepted (2026-11-14) |
 | [ADR-0010](0010-system-chart-of-accounts.md) | System chart of accounts (DS-07) | Accepted (2026-11-14) |
 | [ADR-0011](0011-multi-currency.md) | Multi-currency (DS-10) | Accepted (2026-11-14) |
+| [ADR-0012](0012-posting-periods-and-closing.md) | Posting periods and closing (DS-12) | Accepted (2026-11-14) |
