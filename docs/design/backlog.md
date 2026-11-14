@@ -30,7 +30,7 @@ Forty design items, in the order they are needed. Items DS-01 to DS-18 must be d
 | ID | Design item | Output | Depends on | Needed by |
 | --- | --- | --- | --- | --- |
 | DS-19 | Vietnam package, TT99: operational chart template with mapping, default account determination, tax codes, FX rules (after legal verification) | Package spec, catalog files | DS-07, 08, 14 | Step 1 |
-| DS-20 | Master data model: partner and roles, contacts, item (UoM group, valuation class, lot and serial flags), warehouses, bins (reserved, after Phase 1), price lists | Spec, DDL draft | DS-06 | Step 2 |
+| DS-20 | Master data model: partner and roles, contacts, item (UoM group, valuation class, lot and serial flags), warehouses, bins (reserved, after Phase 1), price lists | Spec, DDL draft. Item part: [ADR-0018](../adr/0018-product-and-item-model.md) | DS-06 | Step 2 |
 | DS-21 | Import batch format for data migration: mapping external data to commands, opening balances in several currencies | Spec | DS-04, 20 | Step 4 |
 | DS-22 | Commercial documents: sales and purchase flows, state machines, partial fulfillment, returns, discounts and promotions, credit limit, three-way match tolerances, GR/IR and price-difference postings | Spec | DS-05, 09, 11 | Step 5 |
 | DS-23 | Tax engine: tax codes, date-effective rates, tax determination, line versus document rounding, VAT return mapping | Spec | DS-14 | Data model step 2; logic step 7 |

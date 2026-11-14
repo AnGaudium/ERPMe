@@ -30,7 +30,7 @@ An accounting regime (`accounting_regime`) is part of a localization package (se
 
 ## Units of measure
 
-- (Phase 1) **UoM group per item**, in the style of Business One: stock unit, purchase unit, sales unit, with fixed item-specific factors (a carton is 24 bottles for one item and 12 for another).
+- (Phase 1) **UoM group per item** ([ADR-0018](../adr/0018-product-and-item-model.md): inventory unit and product units per product), in the style of Business One: stock unit, purchase unit, sales unit, with fixed item-specific factors (a carton is 24 bottles for one item and 12 for another).
 - (After Phase 1) **Independent second unit (catch weight):** record the actual quantity in the second unit (e.g. kg) per movement, with no fixed conversion; price may be per second unit.
 - **Convention:** stock and cost are always in the stock unit. Conversion happens in the command layer on document intake, so the costing engine never knows other units.
 - **Barcode per packaging unit:** scanning a carton barcode converts to the stock unit.

@@ -52,7 +52,7 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Movement type | movement\_type | Configuration table |
 | Goods received / invoice received clearing | gr\_ir\_clearing |  |
 | Price difference | price\_difference |  |
-| Price control | price\_control | Per item. Phase 1: periodic weighted average with a preliminary price. Standard price and moving average after Phase 1 |
+| Price control | price\_control | Per product, read through its items ([ADR-0018](../adr/0018-product-and-item-model.md)). Phase 1: periodic weighted average with a preliminary price. Standard price and moving average after Phase 1 |
 | Transaction, company, group currency | transaction\_currency, company\_currency, group\_currency |  |
 | Preliminary price | preliminary\_price | Valuation price used during the period: the previous costed period's actual average price, or the latest receipt price for a new item or when the previous period is not yet costed |
 | Period-end actual costing | period\_end\_actual\_costing | Periodic weighted average |
@@ -81,7 +81,20 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Document version, version hash | document\_version, version\_hash | Every change to an unposted document writes a new version; its canonical content is hashed with SHA-256 |
 | Numbering series | numbering\_series | Gapless counter per company, document type, fiscal year and optional branch; posting documents are numbered at posting, by the fiscal year of the posting date ([ADR-0009](../adr/0009-document-lifecycle.md) rules 8, 15) |
 | Policy decision | policy\_decision | The policy engine's outcome (allow, deny, approval required, human only) stored against a document version ([ADR-0009](../adr/0009-document-lifecycle.md) rule 11) |
-| Partner, item, warehouse | partner, item, warehouse | One partner, many roles |
+| Partner, item, warehouse | partner, item, warehouse | One partner, many roles. An item is one sellable, stockable variant of a product; documents, stock and journal lines refer to items ([ADR-0018](../adr/0018-product-and-item-model.md)) |
+| Product | product | What all variants share: product category, buyer, item group, valuation class, units, tracking, item tax group, price control; a product without variants has one item |
+| Product type | product\_type: stock, non\_stock, service | Whether a product is kept and valued in stock |
+| Variant attribute | variant\_attribute, variant\_attribute\_value, item\_variant\_value | Company-defined dimension such as color or size; any number per product; each item has one value per attribute, unique combination (`variant_key`) |
+| Unit of measure, inventory unit | uom, inventory\_uom\_id | Core catalog of units (companies may add their own) with quantity kind and decimal places; stock and cost are always in the product's inventory unit (the spec's stock unit) |
+| Unit conversion | uom\_conversion | Exact global conversion between two units of one kind: one from-unit = numerator / denominator to-units |
+| Product unit | product\_uom | Another unit a product may use, with its exact conversion to the inventory unit; with the inventory unit, the spec's UoM group |
+| Item barcode | item\_barcode | Barcode of an item in one unit (e.g. a carton) |
+| Classification scheme | classification\_scheme, classification\_value, product\_classification | Company-defined grouping of products for analysis; `product_line` is seeded and protected; one value per scheme per product |
+| Product category | product\_category | Built-in hierarchy of products that proposes defaults when a product is created |
+| Item tax group, partner tax group | item\_tax\_group, partner\_tax\_group | The two axes of the dated tax matrix (with direction) that proposes and checks a line's tax codes (DS-23) |
+| Tracking | tracking: none, lot, serial | Whether a product's stock movements carry lots or serial numbers |
+| Buyer | buyer\_id | The employee responsible for purchasing a product |
+| Data translation | data\_translation | Names users enter for company data in other languages (products, variant values, company units, classification values); an item's display name is the product name plus its variant values |
 | Data label | data\_label | public, internal, personal, sensitive\_personal |
 | Routing switch | routing\_switch | Per company, off by default. In Phase 1, when on, personal-labeled fields are removed from every LLM request |
 | Model seat | seat | Declared in seatmap.yaml |
@@ -117,7 +130,7 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Revaluation | revaluation | Period-end job that restates foreign-currency open items and balances in company and group currency; method reverse\_and\_repost or delta, declared by the regime |
 | Percent | percent | A percentage written as percent (8 means 8%): domain `types.percent` (`numeric(9, 6)`), Python type `Percent`; columns end in `_percent` |
 | Minor unit | minor\_unit | Decimal places of a currency from ISO 4217 (VND 0, USD 2); amounts are stored at this precision |
-| Unit conversion factor | numerator, denominator (columns) | One alternative unit = numerator / denominator stock units, two positive integers; model in DS-20 |
+| Unit conversion factor | numerator, denominator (columns) | One alternative unit = numerator / denominator stock units, two positive integers; model in [ADR-0018](../adr/0018-product-and-item-model.md) |
 | Rounding line, rounding gain, rounding loss | rounding\_gain, rounding\_loss (system accounts) | The one journal line of an entry that takes its conversion rounding differences, on `rounding_gain` or `rounding_loss` by sign; operational accounts declared per company ([ADR-0006](../adr/0006-id-and-numeric-model.md) rule 20) |
 | Rounding mode | rounding\_mode | Per currency: `half_up` (default), `half_even`, `down`, `up` ([ADR-0006](../adr/0006-id-and-numeric-model.md) rule 17) |
 | Document date | document\_date | Date printed on the document; taken as given from an external source ([ADR-0007](../adr/0007-time-model.md)) |

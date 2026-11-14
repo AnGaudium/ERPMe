@@ -1,6 +1,6 @@
 # ADR-0015: Account determination
 
-Status: accepted (2026-11-14) under ADR-0005, reviewed by Claude Fable 5.2. Design item: DS-08. Related decisions: D5, D6, D7. Principles 6, 7, 13. Chart-of-accounts rule 5. ADR-0004, ADR-0005, ADR-0006, ADR-0010, ADR-0011, ADR-0012, ADR-0014.
+Status: accepted (2026-11-14) under ADR-0005, reviewed by Claude Fable 5.2. [ADR-0018](0018-product-and-item-model.md): valuation class and item group are product fields, read through the item. Design item: DS-08. Related decisions: D5, D6, D7. Principles 6, 7, 13. Chart-of-accounts rule 5. ADR-0004, ADR-0005, ADR-0006, ADR-0010, ADR-0011, ADR-0012, ADR-0014.
 
 ## Decision
 
