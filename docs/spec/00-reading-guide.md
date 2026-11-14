@@ -19,7 +19,7 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Command | command | Pydantic schema; see Principle 1 |
 | Command batch | command\_batch | A set of commands simulated and executed together; every data import is one |
 | Simulation | simulate, plan\_hash | Principle 2 |
-| Actor, principal acted for | actor, on\_behalf\_of | Actor kinds: human, agent, integration, system. A system actor is a deterministic job (costing, FX revaluation, closing entries, scheduled matching); its on\_behalf\_of is always the accountable human: the policy owner or the human who triggered the job |
+| Actor, principal acted for | actor, on\_behalf\_of | Actor kinds: human, agent, integration, system. A system actor is a deterministic job (costing, FX revaluation, closing entries, scheduled matching); its on\_behalf\_of is always the accountable human: the policy owner or the human who triggered the job Actor rows: `user_account`, `agent_type` with `agent_run`, `integration_client`, registered system job ([ADR-0017](../adr/0017-permission-envelope.md)). |
 | Company, branch | company (company\_id), branch | Branch is an analytical dimension |
 | Document | document | Header and lines |
 | Document state | draft, pending\_approval, approved, posted, reversed, canceled, closed | Documents in a final state (posted, reversed, canceled, closed) are immutable; `closed` ends an approved non-posting document that has had activity, `canceled` one that has had none; column `document.state` ([ADR-0009](../adr/0009-document-lifecycle.md)) |
@@ -73,6 +73,10 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Basis | basis: legal\_source, author\_decision, unverified, company\_decision | What every package template entry and package rule rests on; only the author sets verification and decisions (ADR-0003 R10) |
 | Regime setting | regime\_setting | One dated rule of an accounting regime, read through `regime_setting(company, key, date)`; keys, schemas, date basis and company options registered by the core; a used row's value never changes |
 | Work queue item | work\_item | Business work; distinct from technical jobs (job) |
+| Permission, capability | permission | The name of a command type or query, or a registered capability such as `post_in_soft_locked_period` or `start_agent:<agent_type>`; generated, never hand-maintained ([ADR-0017](../adr/0017-permission-envelope.md)) |
+| Role, role assignment | role, role\_assignment | A company's named set of permissions, and its grant to a user with optional record and field scope; templates owner, chief\_accountant, accountant, warehouse\_keeper, sales, purchasing, viewer; installation role operator |
+| Record scope | record scope | Branches or warehouses an assignment is limited to (document headers and master data); rows outside are reported as not found; filtered results say `is_scope_filtered` |
+| Field class | field\_class: cost, margin | Closed list of labels on schema fields that an assignment grants; fields of other classes are omitted from responses |
 | Policy, approval | policy, approval | An approval row binds to a document version and its `version_hash`; a new version voids it ([ADR-0009](../adr/0009-document-lifecycle.md) rule 11) |
 | Document version, version hash | document\_version, version\_hash | Every change to an unposted document writes a new version; its canonical content is hashed with SHA-256 |
 | Numbering series | numbering\_series | Gapless counter per company, document type, fiscal year and optional branch; posting documents are numbered at posting, by the fiscal year of the posting date ([ADR-0009](../adr/0009-document-lifecycle.md) rules 8, 15) |

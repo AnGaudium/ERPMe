@@ -4,6 +4,7 @@ Dated record of gate decisions, the week list and one line per Friday review ([R
 
 | Date | Step | Entry |
 | --- | --- | --- |
+| 2026-11-14 | 0 | DS-15 envelope part done: [ADR-0017](../adr/0017-permission-envelope.md) accepted under ADR-0005 after two review rounds (Claude Fable 5.2); full model at step 5. Two questions for the author |
 | 2026-11-14 | 0 | DS-14 done: [ADR-0016](../adr/0016-localization-package-structure.md) localization package structure accepted under ADR-0005 after two review rounds (Claude Fable 5.2). Two questions for the author |
 | 2026-11-14 | 0 | DS-08 done: [ADR-0015](../adr/0015-account-determination.md) and [transaction-keys.csv](../catalogs/transaction-keys.csv) 0.1.0 accepted under ADR-0005 after two review rounds (Claude Fable 5.2). Four questions for the author |
 | 2026-11-14 | 0 | DS-06 done: [ADR-0014](../adr/0014-universal-journal.md) universal journal and DDL draft accepted under ADR-0005 after two review rounds (Claude Fable 5.2). One question for the author (manual entries to control accounts) |

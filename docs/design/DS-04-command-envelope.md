@@ -40,7 +40,7 @@ Errors name the item: `field` is `items[<n>].payload.<field>`. All items are val
 
 Request: `schema_version`, `company_id` (for company-scoped queries) and `payload` (the filters, plus `limit` and `cursor` for `List<Noun>`). No `idempotency_key`, `mode` or `expected_plan_hash`.
 
-Response for `Get<Noun>`: `result`. For `List<Noun>`: `results` (at most `limit`, default 100, maximum 1,000, ordered by `id` unless the query defines another stable order) and `next_cursor` (null on the last page). Results are filtered by the actor's record and field permissions.
+Response for `Get<Noun>`: `result`. For `List<Noun>`: `results` (at most `limit`, default 100, maximum 1,000, ordered by `id` unless the query defines another stable order) `next_cursor` (null on the last page) and `is_scope_filtered` (true when record scope left rows out, [ADR-0017](../adr/0017-permission-envelope.md) rule 9). Results are filtered by the actor's record and field permissions.
 
 ## Handler context
 
@@ -116,6 +116,7 @@ Module-specific codes are added by the DS item that owns the module, in the regi
 | `unauthenticated` | unauthenticated | 401 | no | No valid credential |
 | `permission_denied` | permission | 403 | no | DS-15 check failed |
 | `human_only` | permission | 403 | no | ADR-0008 rule 2 |
+| `segregation_of_duties` | permission | 403 | no | The approver, or the human it acts for, triggered an agent run that wrote a version of the draft, directly or through a consumer ([ADR-0017](../adr/0017-permission-envelope.md) rule 16) |
 | `policy_denied` | permission | 403 | no | The policy engine denied the action (DS-28) |
 | `unknown_command_type` | not_found | 404 | no | No such command type or query; `details` lists close matches |
 | `record_not_found` | not_found | 404 | no | A referenced `id` does not exist or is not visible to the actor; `details` names the table and the `List<Noun>` query (ADR-0006 rule 5) |

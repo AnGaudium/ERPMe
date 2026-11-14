@@ -1,6 +1,6 @@
 # ADR-0008: Command envelope and registry
 
-Status: accepted (2026-11-14) under ADR-0005, reviewed by Claude Fable 5.2. [ADR-0013](0013-outbox-and-events.md) rule 9: internal calls from consumers and system jobs run in execute mode inside the caller's transaction without `expected_plan_hash` (an exception to rule 13). Design item: DS-04. Related decisions: D2, D4, D13, D14. Principles 1, 2, 3, 4, 9, 10, 12, 13. Build principles B3, B7. ADR-0004, ADR-0005, ADR-0006, ADR-0007.
+Status: accepted (2026-11-14) under ADR-0005, reviewed by Claude Fable 5.2. [ADR-0013](0013-outbox-and-events.md) rule 9: internal calls from consumers and system jobs run in execute mode inside the caller's transaction without `expected_plan_hash` (an exception to rule 13). [ADR-0017](0017-permission-envelope.md) rule 4: the registry also declares capabilities, permissions that are not command names. Design item: DS-04. Related decisions: D2, D4, D13, D14. Principles 1, 2, 3, 4, 9, 10, 12, 13. Build principles B3, B7. ADR-0004, ADR-0005, ADR-0006, ADR-0007.
 
 ## Decision
 
