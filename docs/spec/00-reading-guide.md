@@ -62,6 +62,19 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Default bin | default\_bin\_id | The bin every warehouse gets at creation, with a default zone; the only bin of a warehouse that is not bin-managed, filled in by handlers and hidden in the UI ([ADR-0031](../adr/0031-design-simplifications.md)) |
 | Pending receipt adjustment | pending\_receipt\_adjustment | A stock-bound price difference from an invoice posted before the goods arrived, consumed by the receipt |
 | Subcontracting | subcontracting | Production by an outside processor from materials we send (in Vietnamese, gia công); designed in DS-55 ([ADR-0032](../adr/0032-phase-1-scope-with-production.md)) |
+| Bill of materials | bill\_of\_materials, usage: production, kit | What an item is made from; its content lives in revisions ([ADR-0033](../adr/0033-production-master-data.md)) |
+| Revision | bill\_of\_materials\_revision, routing\_revision, start\_date, content\_hash | One immutable released version of a bill of materials or routing; the valid one on a date is the highest revision started on or before it |
+| Explosion date | explosion\_date | The planned start date of an order or planned order; selects production versions and revisions |
+| Base quantity | base\_quantity | The output quantity that component quantities and standard times refer to |
+| Component | bill\_of\_materials\_component, consumption\_method: manual, backflush\_at\_operation, backflush\_at\_receipt | An item consumed to make another, with its quantity, scrap rate and consuming operation |
+| Co-product, by-product | bill\_of\_materials\_output, output\_type, cost\_coefficient | Outputs besides the main one; children of the main output for cycles and low-level codes |
+| Phantom | item\_production\_setting, is\_phantom | An item never planned or made on its own; its bill of materials is exploded into its parent's |
+| Routing, operation | routing, routing\_operation, routing\_operation\_activity, control: internal, external; is\_milestone | The sequence of operations that makes an item, with activity quantities per work center |
+| Work center | work\_center, activity\_type, work\_center\_activity | Where operations run: capacity, calendar, activities, cost center and bins |
+| Production version | production\_version | The one explicit way to make an item in a production warehouse: bill of materials, routing, lot range, dates |
+| Low-level code | low\_level\_code | The longest path from a top item to an item in released bills of materials; MRP plans in that order |
+| Where-used | where\_used | The parents that use an item as a component or output (`ListWhereUsed`) |
+| Production structure | production\_structure | One row per company, locked by releases and version saves so structure checks see a stable graph |
 | Has posting | has\_posting | Set on an operational account by its first journal line; freezes its code, mapping, postable flag and currency ([ADR-0010](../adr/0010-system-chart-of-accounts.md) rule 12) |
 | Control kind | control\_kind | inventory, receivable, payable, gr\_ir, cost\_object, fixed\_asset, loan or none: which core module owns postings to a system account and which invariant checks it |
 | Effective control kind | effective control kind | The control kind a rule applies to a line: a gated kind (`cost_object`, `fixed_asset`, `loan`) counts as `none` before the company's subledger activation ([ADR-0025](../adr/0025-later-phase-seams.md)) |
@@ -280,6 +293,7 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Pack, Unpack | Put stock into or take it out of a handling unit | Packed, Unpacked |
 | Firm | Fix a proposal so later runs keep it, e.g. a planned order | Firmed |
 | Activate | Start enforcing something once, irreversibly, e.g. a subledger | Activated |
+| Release | Make a draft revision of master data effective from its start date, e.g. a bill of materials revision | Released |
 | Convert | Turn a record into another form once, e.g. a planned order into draft documents | Converted |
 | Match, Unmatch | Link or unlink bank lines or documents; open items are settled against each other by an `open_item_matching` document | Matched, Unmatched |
 | Transfer | Move records to another account or owner, e.g. a partner's open items | Transferred |

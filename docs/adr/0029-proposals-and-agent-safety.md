@@ -56,7 +56,8 @@ The hard floor on what a tainted run may read stays the literal spec 03 rule 1 u
    - tax ID differences (ADR-0019 rule 18);
    - planning parameters, lead times and forecast adjustments (ADR-0024 rules 1, 12, 23);
    - price lists (DS-20);
-   - putaway rules, pick-face levels and count plans (ADR-0023 rule 21).
+   - putaway rules, pick-face levels and count plans (ADR-0023 rule 21);
+   - releases of bills of materials and routings, production versions, work centers and production settings ([ADR-0033](0033-production-master-data.md) rule 2).
 
 **Policy hook**
 

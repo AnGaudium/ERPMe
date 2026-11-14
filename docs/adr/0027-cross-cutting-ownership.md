@@ -102,7 +102,7 @@ Before step 1 code freezes the platform modules, every entity that several modul
 10. The complete lock order, per command, supersedes the lists in ADR-0022 rule 10, ADR-0023 rule 10 and ADR-0026 rule 14. Within each class, rows are locked in ascending ID unless stated.
     1. Documents: the command's own, and the documents it refers to (the order a delivery fulfills, the receipt a landed cost targets, the original of a reversal or correction).
     2. Period area state rows, share lock.
-    3. The planning state row (planning runs only).
+    3. The planning state row (planning runs only), or the company's `production_structure` row (releases of bills of materials and routings, production version and production setting saves, deactivations; [ADR-0033](0033-production-master-data.md) rule 8).
     4. Warehouse task rows.
     5. Handling unit rows, parent first.
     6. `stock_value` rows, ascending by item and warehouse ID.

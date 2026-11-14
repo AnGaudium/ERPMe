@@ -73,7 +73,7 @@ On 2026-11-14 the author decided that every capability a customer cannot operate
      - whether the production core step belongs to Phase 0 or Phase 1;
      - whether it can come before step 5, given DS-52's use of warehouse tasks and reservations;
      - where subcontracting is built;
-     - the target date for a first manufacturing customer.
+     - the target completion date for assembly-type manufacturing.
 8. **Questions this decision answers:**
    - planning's phase (DS-43): Phase 1;
    - the proposed cuts of warehouse and first-slice planning features (OPT-12): no cut. Confirming the items left for later stays open;

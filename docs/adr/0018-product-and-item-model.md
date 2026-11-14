@@ -55,7 +55,7 @@ Goods and services are modeled at two levels: a `product` holds everything that 
 | Reorder point, minimum order quantity, lead time, default warehouse | Planning parameters per item and warehouse and supplier terms ([ADR-0024](0024-planning.md) rules 1, 2); the building phase is the author's decision |
 | Manufacturer, brand | Classification schemes |
 | Images and documents | Attachments; owner to be assigned (no backlog item yet) |
-| Kits and bills of materials | Phase 2; now Phase 1, designed in DS-51 ([ADR-0032](0032-phase-1-scope-with-production.md)) |
+| Kits and bills of materials | Phase 2; now Phase 1, designed in DS-51 ([ADR-0032](0032-phase-1-scope-with-production.md)): [ADR-0033](0033-production-master-data.md), which leaves products and items unchanged |
 
 ## Context
 

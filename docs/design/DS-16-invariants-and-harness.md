@@ -45,7 +45,7 @@ The product is `erpme` (ADR-0004 rule 7). Test tooling lives in separate top-lev
 
    | Column | Content |
    | --- | --- |
-   | `code` | `INV-nn`, never reused |
+   | `code` | `INV-nn`, or `INV-nnn` from INV-100 ([ADR-0033](../adr/0033-production-master-data.md) rule 16), never reused |
    | `name` | snake_case |
    | `area` | `ledger`, `platform`, `inventory`, `receivables_payables`, `documents`, `warehouse`, `planning`, `subledger` or `safety` |
    | `check_point` | rule 10 |
@@ -54,7 +54,7 @@ The product is `erpme` (ADR-0004 rule 7). Test tooling lives in separate top-lev
    | `keys` | The business key fields a violation reports |
    | `source`, `added_in`, `statement` | |
 
-   Codes are grouped: 01–19 ledger and platform, 20–29 inventory, 30–39 receivables and payables, 40–49 documents, 50–59 warehouse (ADR-0023), 60–69 planning (ADR-0024), 70–79 subledgers (ADR-0025), 80–89 agent safety and platform integrity (ADR-0027, ADR-0029). INV-37 (GR/IR) has area `ledger` but sits in 30–39 beside the open-item checks, and INV-48 has area `inventory` but sits in 40–49 because 20–29 is full. INV-56 was restated by [ADR-0031](../adr/0031-design-simplifications.md) rule 11, which strengthens it. Version 0.1.0 has 69 invariants. A hash test ([ADR-0031](../adr/0031-design-simplifications.md) rule 4) checks that a batch creating a record with a server-generated ID and referring to it in a later item hashes equally in simulate and execute. Later items add rows with the next free code in their group.
+   Codes are grouped: 01–19 ledger and platform, 20–29 inventory, 30–39 receivables and payables, 40–49 documents, 50–59 warehouse (ADR-0023), 60–69 planning (ADR-0024), 70–79 subledgers (ADR-0025), 80–89 agent safety and platform integrity (ADR-0027, ADR-0029). INV-37 (GR/IR) has area `ledger` but sits in 30–39 beside the open-item checks, and INV-48 has area `inventory` but sits in 40–49 because 20–29 is full. INV-100 to INV-199 are production, area `production`; [ADR-0033](../adr/0033-production-master-data.md) rule 16 reserves INV-100 to INV-102 and PAR-12 until the production core step is numbered. INV-56 was restated by [ADR-0031](../adr/0031-design-simplifications.md) rule 11, which strengthens it. Version 0.1.0 has 69 invariants. A hash test ([ADR-0031](../adr/0031-design-simplifications.md) rule 4) checks that a batch creating a record with a server-generated ID and referring to it in a later item hashes equally in simulate and execute. Later items add rows with the next free code in their group.
 5. Each catalog row has exactly one check, registered with `@invariant("INV-21")` in `erpme_testkit.invariants`. A CI test compares catalog and registry:
    - a row whose `first_step` is at or below `[tool.erpme] build_step` (DS-18) and has no check fails;
    - a check without a row fails;
@@ -88,7 +88,7 @@ The product is `erpme` (ADR-0004 rule 7). Test tooling lives in separate top-lev
 
     A check that cannot be evaluated in a given setting, such as a `command` check from `erpme-check`, reports `not_evaluated`, never pass.
 11. A violation is a JSON object (schema `docs/catalogs/violation.schema.json`) with these fields:
-    - `check`: `INV-nn`; `REF-<kind>-<pair>` for a reference difference (rule 30); or `PAR-nn` for a parallel test (rule 31).
+    - `check`: `INV-nn` or `INV-nnn`; `REF-<kind>-<pair>` for a reference difference (rule 30); or `PAR-nn` for a parallel test (rule 31).
     - `company`.
     - `keys`: business keys, per the catalog's `keys` column.
     - `expected` and `actual`: strings, either canonical decimals (ADR-0006 rule 13) or IDs and hashes.

@@ -39,7 +39,7 @@ Planning answers, per item and warehouse: what to buy or move, how much, and by 
    | Group | Fields |
    | --- | --- |
    | Method | `planning_method`: `reorder_point`, `min_max` or `net_requirements` |
-   | Source | `replenishment_source`: `purchase` or `transfer` (`production` in Phase 2) |
+   | Source | `replenishment_source`: `purchase` or `transfer` (`production` in Phase 2; now Phase 1, [ADR-0033](0033-production-master-data.md) rule 14; phantoms are a production setting, not a source) |
    | Levels | `reorder_point`, `minimum_quantity`, `maximum_quantity` |
    | Safety stock | `safety_stock_method` (`fixed`, or `service_level` in the later slice), `safety_stock_quantity`, `service_level_percent` |
    | Lot size | `lot_size_method` (`exact`, `fixed` with `fixed_lot_quantity`, `supply_period` with `supply_period_days`) |
@@ -63,7 +63,7 @@ Planning answers, per item and warehouse: what to buy or move, how much, and by 
 
    A `transfer` replenishment source names a route. Writing parameters that would form a cycle of transfer sources is rejected with `planning_network_cycle`.
 4. Working calendars:
-   - `working_calendar` is company data: working weekdays and holiday dates, assigned to warehouses and suppliers.
+   - `working_calendar` is company data: working weekdays and holiday dates, assigned to warehouses and suppliers. It moves to `master_data` so that production work centers can use it ([ADR-0033](0033-production-master-data.md) rule 11).
    - The localization package may seed public holidays as a template entry with a basis (ADR-0016). Tết dates are calendar data, not code.
 5. Lead time and dates:
    - **Lead time of a purchase:** `supplier_processing_days` on the supplier's calendar, then `transit_days` as calendar days, then `receiving_days` on the warehouse's calendar.

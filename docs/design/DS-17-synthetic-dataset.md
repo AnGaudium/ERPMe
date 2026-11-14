@@ -2,7 +2,7 @@
 
 Status: accepted (2026-11-14) under ADR-0005, reviewed by Claude Fable 5.2 (builder Claude Opus 5.5). Kind: specification and catalog. Version 0.1.0 at step 0, extended at every step; the simulator code is step 0 work package 8. Related decisions: D14, D16. Build principles B4, B5. ADR-0002, ADR-0003 (R1, R6, R10), ADR-0004, ADR-0005, ADR-0006, ADR-0007, ADR-0008, ADR-0012, ADR-0016, ADR-0020, ADR-0021, DS-16. Spec [12-testing.md](../spec/12-testing.md#synthetic-dataset); runbook [testing-operations.md](../runbook/testing-operations.md#running-the-simulator).
 
-Note: a fictional Vietnamese manufacturing company profile (`vn_manufacturing_*`) is added with the production design, due at the production core step gate ([ADR-0032](../adr/0032-phase-1-scope-with-production.md) rule 6).
+Note: a fictional Vietnamese manufacturing company profile (`vn_manufacturing_*`) is added with the production design, due at the production core step gate ([ADR-0032](../adr/0032-phase-1-scope-with-production.md) rule 6). Production edge cases reserved by [ADR-0033](../adr/0033-production-master-data.md) rule 16 are coded when the step is numbered.
 
 The simulator runs fictional companies day by day. It writes what happened in business terms, as a versioned business-event log, together with the files agents read. Per-step adapters turn business events into the commands that exist at each step. The log never holds expected balances, and the simulator decides no accounting rule.
 
