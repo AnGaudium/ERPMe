@@ -25,6 +25,7 @@ The actor, `on_behalf_of` and `agent_run_id` are never in the request; the dispa
 | `result` | always | The command's result model, e.g. the created document's `id` and, after execution, its number; also part of the hashed plan |
 | `plan_hash` | always | SHA-256 of the canonical plan and result (ADR-0008 rule 12) |
 | `recorded_at` | `execute` and replays | Instant of the transaction (ADR-0007 rule 10) |
+| `events` | `simulate` | Event types the command would emit, in order; not part of `plan_hash` ([ADR-0013](../adr/0013-outbox-and-events.md) rule 5) |
 | `replayed` | always | `true` when the response comes from `idempotency_record` (ADR-0008 rules 16–18), otherwise `false` |
 
 ## Command batch
@@ -40,6 +41,10 @@ Errors name the item: `field` is `items[<n>].payload.<field>`. All items are val
 Request: `schema_version`, `company_id` (for company-scoped queries) and `payload` (the filters, plus `limit` and `cursor` for `List<Noun>`). No `idempotency_key`, `mode` or `expected_plan_hash`.
 
 Response for `Get<Noun>`: `result`. For `List<Noun>`: `results` (at most `limit`, default 100, maximum 1,000, ordered by `id` unless the query defines another stable order) and `next_cursor` (null on the last page). Results are filtered by the actor's record and field permissions.
+
+## Handler context
+
+A handler receives `context` with: the database connection, `new_id(table)`, the clock (`now()`, `today(company)`), the lock helpers for serialized rows, and `emit(event_type, subject, payload)` for events ([ADR-0013](../adr/0013-outbox-and-events.md) rule 1). Consumers and system jobs call the dispatcher in process; their commands execute without `expected_plan_hash` (ADR-0008 rule 13).
 
 ## Transports
 

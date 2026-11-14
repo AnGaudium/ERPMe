@@ -18,7 +18,7 @@ Forty design items, in the order they are needed. Items DS-01 to DS-18 must be d
 | DS-10 | Multi-currency: currency types per line, rate types, rate source, realized and unrealized FX, open-item revaluation, localization hooks | ADR. ADR done: [ADR-0011](../adr/0011-multi-currency.md) | DS-02, DS-03 | ADR step 0; logic steps 6 and 8 |
 | DS-11 | Landed cost: customs declaration, allocation methods, split between stock and COGS, link to GR/IR | ADR, spec | DS-09, 10 | ADR step 0; logic step 3 |
 | DS-12 | Posting periods and closing: states, per account type (meaning: ADR-0012 rule 4), special periods, strict period sequence, close-checklist framework, closing entries with a closing-entry marker, close postings by actor `system` | ADR. Done: [ADR-0012](../adr/0012-posting-periods-and-closing.md) | DS-03, 05 | Step 0 |
-| DS-13 | Outbox and events: event schema and naming, delivery guarantees, technical queue usage | ADR | DS-04 | Step 0 |
+| DS-13 | Outbox and events: event schema and naming, delivery guarantees, technical queue usage | ADR. Done: [ADR-0013](../adr/0013-outbox-and-events.md) | DS-04 | Step 0 |
 | DS-14 | Localization package structure: manifest, components, loader, versioning, CI checks, terminology and i18n | ADR, spec | DS-07, 08 | Step 0 |
 | DS-15 | Permission model: roles, record and field rules, RLS policies, agent permission intersection, segregation of duties; `on_behalf_of` and segregation of duties for scheduled and email-triggered runs; rules for accounting teams of 1–2 people | ADR | DS-04 | Envelope step 0; full step 5 |
 | DS-16 | Invariant catalog and test harness: named invariants (INV-xx), Hypothesis state machine, golden scenario file format, naive recomputation, reference comparison report | Spec, harness | DS-06, 09 | Step 0 |
@@ -40,7 +40,7 @@ Forty design items, in the order they are needed. Items DS-01 to DS-18 must be d
 | DS-27 | Print template data contracts and PDF worker | Spec | DS-22 | Step 8 |
 | DS-28 | Policy table and one-level approval: action types, thresholds, binding to document version | Spec | DS-05, 15 | Step 5 |
 | DS-29 | Work queue model: work items, ownership, locking, due dates | Spec | DS-13 | Step 5 |
-| DS-30 | UI architecture: schema-driven renderer, UI metadata format, navigation, i18n, keyboard model; UX spec for the 6 hand-built entry screens | Spec, UX spec | DS-04 | Renderer step 1; screens step 9 |
+| DS-30 | UI architecture: schema-driven renderer, UI metadata format, navigation, i18n, keyboard model, live updates of open screens from events; UX spec for the 6 hand-built entry screens | Spec, UX spec | DS-04 | Renderer step 1; screens step 9 |
 | DS-31 | Warehouse PWA: receipt, issue, transfer and count flows; barcode per packaging unit | UX spec | DS-09, 30 | Step 9 |
 | DS-32 | Agent runtime: LLM gateway interface, single-provider seat config, data labels and routing switch, run records, budgets, untrusted-content tainting, fixed tool lists, replay evaluation harness | ADR, spec | DS-15 | First agent (after step 4) |
 | DS-33 | Read-only query layer: semantic views, read-only role, time limits, MCP resources | Spec | DS-06, 15 | First agent (after step 4) |

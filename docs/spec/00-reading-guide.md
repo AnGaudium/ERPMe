@@ -76,7 +76,11 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Command type | command\_type | Name of a command: `PascalCase` verb from the command verb list + glossary noun, e.g. `PostGoodsReceipt`; `snake_case` form for MCP tools and handlers |
 | Query | query | Read-only operation: `Get<Noun>` (one record), `List<Noun>` (filtered list). Not a command; no idempotency key |
 | Event, event type | event, event\_type | A fact written to the outbox: `PascalCase` noun + the verb's event form, e.g. `GoodsReceiptPosted`; schema in DS-13 |
-| Outbox | outbox | Transactional outbox written in the same transaction as the state change (D4); design in DS-13 |
+| Outbox | outbox\_event | Transactional outbox: one row per event, written in the same transaction as the state change (D4, [ADR-0013](../adr/0013-outbox-and-events.md)) |
+| Event subject, subject sequence | event\_subject, subject\_sequence | The record an event is about, and its event counter 1, 2, 3, …: the only ordering of events ([ADR-0013](../adr/0013-outbox-and-events.md)) |
+| Consumer | consumer | A registered handler of event types; changes data only through commands inside its delivery transaction |
+| Event delivery | event\_delivery | One row per (consumer, event): pending, done, held or skipped; delivered in subject order; a held delivery blocks later ones until a human retries or skips it |
+| Queue | queue (events, jobs, integrations, pdf) | Procrastinate queues of the technical queue |
 | Technical job | job | Background job on the technical queue (Procrastinate); distinct from work\_item |
 | Idempotency key | idempotency\_key | Per (actor, command type), Principle 9; retention and rules in DS-04 |
 | Schema version | schema\_version | Version of a command schema (semver, [07](07-shared-foundation.md#extensibility-and-upgrades)) or an event schema (DS-13); rules in DS-04 |
@@ -140,6 +144,8 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Unlock | Take a locked posting period back to soft-locked, with approval | Unlocked |
 | Confirm | A human confirms a fact the system cannot check, e.g. a manual close task | Confirmed |
 | Skip | Leave out an optional step with a reason, e.g. an optional close task | Skipped |
+| Retry | Try a held step again, e.g. a held event delivery | Retried |
+| Replay | Deliver retained events again to a consumer that has not handled them | Replayed |
 
 Work items get the verbs Claim and Release from DS-29, because Lock belongs to posting periods; a command batch needs no verb ([ADR-0008](../adr/0008-command-envelope-and-registry.md) rule 20). A posted document is never canceled: it is corrected by a correction document or, if its type is internal, reversed (Principle 5, [ADR-0009](../adr/0009-document-lifecycle.md) rules 19, 23), so Cancel never applies to posted documents.
 
