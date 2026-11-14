@@ -49,6 +49,12 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Change order | is\_change\_order\_allowed, pending\_version, change\_state: none, drafting, pending\_approval | A change to an approved order kept as a pending version (the version row `document.pending_version` points to) while the approved version stays in force ([ADR-0028](../adr/0028-document-lifecycle-hardening.md)) |
 | Issuing | issuing, is\_e\_invoice\_capable, posting\_intent | State of an e-invoiced document after `Issue` and before posting; the frozen plan waits on the posting intent; posted on acceptance, back to draft on rejection |
 | Policy input hash | policy\_input\_hash | Hash of the inputs a policy decision evaluated; posting asks again when it changes, and an approval stands while the required procedure does not rise |
+| Change proposal | change\_proposal, change\_proposal\_execution | Non-posting document holding exact commands for changes that are not documents, with their diff, the targets' expected versions and the simulated plan; executed by a consumer after a human approval ([ADR-0029](../adr/0029-proposals-and-agent-safety.md)) |
+| Policy point | policy\_decision | A command at which the dispatcher evaluates policy once and the handler stores the decision: `Submit`, `Post` from draft, `Issue`, and `Post` of an approved document whose policy input hash changed |
+| Tainted version | is\_tainted, derived\_from\_version\_id | A document version written by a tainted run or derived from a tainted version; immutable, inherited by later and derived versions |
+| Taint clearance | taint\_clearance | Immutable record by which a human clears a version's taint, with a reason; not a data label |
+| Untrusted field | is\_untrusted | Schema attribute of a field filled from outside content; separate from data labels; a run given such a field becomes tainted |
+| Auto-post | auto\_post\_confirmation, is\_confirmation\_required | A posting by actor `system` that a policy rule allowed with confirmation required; its rule owner confirms it before the period is locked |
 | Partner exposure | partner\_exposure | Open receivable and payable amounts of a partner by kind and due bucket |
 | Has posting | has\_posting | Set on an operational account by its first journal line; freezes its code, mapping, postable flag and currency ([ADR-0010](../adr/0010-system-chart-of-accounts.md) rule 12) |
 | Control kind | control\_kind | inventory, receivable, payable, gr\_ir, cost\_object, fixed\_asset, loan or none: which core module owns postings to a system account and which invariant checks it |
@@ -255,6 +261,7 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Post | Make a document part of the books or the stock records | Posted |
 | Reverse | Post a reversal document for a posted document | Reversed |
 | Cancel | End an open document that is not posted, or an open warehouse task or reservation | Canceled |
+| Clear | Remove a flag deliberately with a reason, e.g. a document version's taint (`ClearTaint`) | Cleared |
 | Issue | Request legal issuance of a document; it posts when the issue is accepted (e.g. `IssueSalesInvoice`) | IssueRequested |
 | Record | Store an outcome reported by an outside system, e.g. an e-invoice outcome | Recorded |
 | Recall | Take back a request sent to an outside system before it took effect | Recalled |
@@ -273,12 +280,12 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Run | Start a deterministic system job, e.g. period-end actual costing | Completed (`<job noun>Completed`) |
 | Assign | Set the owner of a work item or a warehouse task | Assigned |
 | Start | A person begins work on an assigned warehouse task | Started |
-| Close | End further activity on an approved record that has had some, e.g. an order | Closed |
+| Close | End further activity on an approved record that has had some, e.g. an order, or a change proposal once executed | Closed |
 | Restrict | Narrow who may post in a posting period (open to soft-locked) | Restricted |
 | Open | Let a restricted posting period accept postings from everyone with permission again (soft-locked to open) | Opened |
 | Lock | Stop all postings in a posting period (soft-locked to locked) | Locked |
 | Unlock | Take a locked posting period back to soft-locked, with approval | Unlocked |
-| Confirm | A human confirms a fact the system cannot check, e.g. a manual close task | Confirmed |
+| Confirm | A human confirms a fact the system cannot check, e.g. a manual close task, or accepts a result the system produced, e.g. auto-posts (`ConfirmAutoPost`) | Confirmed |
 | Skip | Leave out an optional step with a reason, e.g. an optional close task | Skipped |
 | Retry | Try a held step again, e.g. a held event delivery | Retried |
 | Replay | Deliver retained events again to a consumer that has not handled them | Replayed |

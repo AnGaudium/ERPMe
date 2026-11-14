@@ -75,7 +75,7 @@ Before step 1 code freezes the platform modules, every entity that several modul
    | --- | --- |
    | `customs_declaration` and its tax rows | `purchasing`, step 5 (ADR-0021 rule 10) |
    | E-invoice records and intents | `tax` (DS-24). A sales document requests issuance through `tax.contract.request_e_invoice` synchronously, which writes the e-invoice record and its intent; the external consumer then issues it asynchronously, and the document posts on acceptance ([ADR-0028](0028-document-lifecycle-hardening.md) rule 7). Imports go downward (as ADR-0024 rule 22) | 
-   | Audit records | `audit` (layer 2, DS-36), with one row per executed command: `command_type`, `actor_kind`, `actor_id`, `agent_run_id`, `idempotency_key` (needed by INV-81) |
+   | Audit records | `audit` (layer 2, DS-36), with one row per executed command: `command_type`, `actor_kind`, `actor_id`, `agent_run_id`, `idempotency_key` (needed by INV-81); also `origin_agent_run_id`, `on_behalf_of_id` and `policy_decision_id` ([ADR-0029](0029-proposals-and-agent-safety.md) rule 15) |
    | Full data export (spec 15) | DS-21, as `ExportCompanyData`: a company package with master data, documents with all versions, journal and material lines, open items, stock, attachments and audit rows, one JSON Lines file per table plus the attachment files. It is not the import batch format |
    | Management reporting | DS-33 semantic views; statutory reports stay DS-26 |
    | Bad-debt provisions and prepaid amortization | DS-25, as close tasks |
@@ -132,7 +132,7 @@ Before step 1 code freezes the platform modules, every entity that several modul
 17. New invariants:
     - **INV-57:** per demand line, the reserved amounts of open and picked reservations never exceed the line's open quantity. First step 3, for transfer orders.
     - **INV-63:** each `demand_supply_line` open quantity equals its source line's quantity minus fulfilled and closed quantities, recomputed from the referring documents. First step 3.
-    - **INV-80:** no outbox event that is tainted and whose command has effect class `posting`, `master_data_change` or `outbound_send` (a new registry attribute of every command, ADR-0008 rule 1) has a non-human actor. First step 5, when agents start. Taint laundered through stored drafts (F4) stays a requirement on DS-32.
+    - **INV-80:** no outbox event that is tainted and whose command has effect class `posting`, `master_data_change` or `outbound_send` (a new registry attribute of every command, ADR-0008 rule 1) has a non-human actor. First step 5, when agents start. Taint laundered through stored drafts (F4) stays a requirement on DS-32. Settled by [ADR-0029](0029-proposals-and-agent-safety.md) rules 8–11.
     - **INV-81:** no audit row of a command registered `human_only` has actor kind `agent`, or `integration` while the interim holds. First step 1, flagged.
     - **INV-82:** for every posted document whose latest policy decision on the posted version has outcome `approval_required`, an `approved` approval row exists on that version. Documents under ADR-0009 rule 12's human-only posting store the outcome `human_only` and are outside this check. First step 5, flagged with rule 12.
     - **INV-83:** every `attachment_link` points to an existing row of its target table, within the attachment's company (area `platform`).

@@ -32,7 +32,7 @@ Planning answers, per item and warehouse: what to buy or move, how much, and by 
 
 **Parameters and master data**
 
-1. `item_warehouse_planning` holds the planning parameters for one item in one warehouse. An item without a row in a warehouse is not planned there.
+1. `item_warehouse_planning` holds the planning parameters for one item in one warehouse. An item without a row in a warehouse is not planned there. Agent changes go through change proposals ([ADR-0029](0029-proposals-and-agent-safety.md) rule 5).
 
    | Group | Fields |
    | --- | --- |
@@ -109,7 +109,7 @@ Planning answers, per item and warehouse: what to buy or move, how much, and by 
       - Croston's method for intermittent items (at least 8 weeks with 2 or more non-zero).
       - Choice by the lowest mean absolute scaled error over `backtest_weeks`, with mean absolute error when the naive error is zero. Ties go to the simpler method.
     - **Inputs.** A planning run records the forecast run it used.
-12. Forecast adjustments record item, warehouse, `start_date`, `end_date`, quantity or factor, author and reason. They never overwrite the statistical forecast, so accuracy stays measurable (DS-33).
+12. Forecast adjustments record item, warehouse, `start_date`, `end_date`, quantity or factor, author and reason. They never overwrite the statistical forecast, so accuracy stays measurable (DS-33). Agent-proposed adjustments are change proposals, and taint is read from document versions ([ADR-0029](0029-proposals-and-agent-safety.md) rules 5, 11).
     - Approval is human, and an adjustment proposed by a tainted agent run is never approved by policy (spec 03 rule 1; ADR-0013 rule 11). An e-mail therefore cannot move purchase quantities.
     - Whether policy may approve untainted adjustments is an open question.
 13. Forecast consumption:
@@ -201,7 +201,7 @@ Planning answers, per item and warehouse: what to buy or move, how much, and by 
     - proposes forecast adjustments, under rule 12;
     - resolves exceptions by drafting.
 
-    It never changes approved data directly.
+    It never changes approved data directly. "Approval-bound commands" are change proposals ([ADR-0029](0029-proposals-and-agent-safety.md) rule 5).
 24. Events: `ForecastCompleted`, `PlanningCompleted`, `PlannedOrderFirmed`, `PlannedOrderConverted` (from `planning`, for live screens and the audit trail, DS-30); `ReplenishmentRequested` (from `inventory`). Queries: `GetProjectedAvailability`, `ListPlannedOrder`, `ListPegging`, `ListForecast`.
 25. Performance target: a regenerative run over 2,000 items × 4 warehouses × a 180-day horizon finishes in 2 minutes or less, using under 2 GB of memory, on the test server. The nightly report records the run time and node count (DS-16, DS-17).
 

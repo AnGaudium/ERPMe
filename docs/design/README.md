@@ -1,6 +1,6 @@
 # Design specifications
 
-[backlog.md](backlog.md) lists the design items DS-01 to DS-45, their dependencies and the build step that needs each one.
+[backlog.md](backlog.md) lists the design items DS-01 to DS-47, their dependencies and the build step that needs each one.
 
 Each design item that is not a single decision gets a file here named `DS-xx-short-title.md`. A design item is done when:
 
