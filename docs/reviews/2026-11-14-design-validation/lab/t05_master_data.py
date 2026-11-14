@@ -143,7 +143,7 @@ trial("M32 an entry with another break may share the dates", lambda cx: entry("i
 def extra(cx, value, attr="attr_finish", product="prod", start="2026-01-01", end=None, amount=500, mode="line_option"):
     cx.execute("insert into price_list_option_extra (id, company_id, price_list_id, product_id, variant_attribute_id, variant_attribute_value_id, variant_mode, start_date, end_date, unit_price_extra)"
                " values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)", (new(), I["co"], I["pl"], I[product] if product else None, I[attr], I[value], mode, start, end, amount))
-trial("M33 an option extra must name a line-option value", lambda cx: extra(cx, "v_red", attr="attr_color", mode="variant"), True, "ck_price_list_option_extra_mode")
+trial("M33 an option extra's mode must match its value's mode (variant mode only for configurable products, by command)", lambda cx: extra(cx, "v_red", attr="attr_color", mode="line_option"), True, "fk_price_list_option_extra_value")
 trial("M34 an option extra's value must belong to its attribute", lambda cx: extra(cx, "v_engr"), True, "fk_price_list_option_extra_value")
 trial("M35 option extras for one value never overlap", lambda cx: [extra(cx, "v_matte"), extra(cx, "v_matte", start="2026-06-01")], True, "ex_price_list_option_extra_overlap")
 trial("M36 a customer profile names a sale list, never a purchase list", lambda cx: cx.execute("insert into customer_profile (company_id, partner_id, receivable_account_id, price_list_id) values (%s,%s,%s,%s)", (I["co"], I["partner"], I["acct"], I["pl_buy"])), True, "fk_customer_profile_price_list")

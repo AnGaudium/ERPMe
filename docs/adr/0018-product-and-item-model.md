@@ -19,6 +19,8 @@ Goods and services are modeled at two levels: a `product` holds everything that 
 **Variants**
 
 6. A `variant_attribute` is company data (`code`, `name`, e.g. `color`, `size`) with `variant_attribute_value` rows. A product's attributes are rows of `product_variant_attribute` (`product_id`, `variant_attribute_id`, `position`); there is no limit on their number. An item's values are rows of `item_variant_value` (`item_id`, `variant_attribute_id`, `variant_attribute_value_id`), one per attribute of its product. Attributes have a mode: `variant` (this rule) or `line_option`, chosen on document lines without creating items ([ADR-0045](0045-master-data-and-price-lists.md) rule 15).
+
+   Characteristics may also be numbers in a range with a step; a number chosen for an item-defining characteristic becomes a value row at first use, so `variant_key` works unchanged ([ADR-0046](0046-product-configuration.md) rule 3).
 7. Each item stores `variant_key`, the sorted list of its value IDs, unique within its product, so two items never have the same combination. An attribute can be added to a product at any time if every existing item is given a value for it in the same command; it can be removed only while the product has one item. Items are created for the combinations the user chooses (`CreateItem`), never for every combination automatically. Stock, cost and prices are per item, so adding variants never changes how the existing item's books were kept. A product may also create an item when a document line names a new combination ([ADR-0045](0045-master-data-and-price-lists.md) rule 16).
 
 **Units of measure**

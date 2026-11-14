@@ -62,6 +62,8 @@ It adds only what production needs:
        - scheduled start and end dates.
      - **`production_order_output_serial`:** for serial-tracked output, the serials assigned to the order (rule 16). Not version content: it changes after release without a change order.
    - **Version content.** Content excludes `execution_state` and `is_content_edited` (ADR-0009 rule 9).
+
+   An order of a configured item keeps the configuration's ID and the selected, sized lines as its snapshot ([ADR-0046](0046-product-configuration.md) rule 13).
 2. Creating and editing:
    - **Explosion.** `CreateProductionOrder` selects the production version (ADR-0033 rule 13), unless the client names one, under a share lock on `production_structure` (ADR-0027 rule 10, class 3), so a revision cannot be withdrawn meanwhile. It copies the components, outputs and operations of the revisions valid on `planned_start_date`. Components are exploded through phantoms, with quantities by ADR-0033 rule 6. Conversion from a planned order uses the shared planning function ([ADR-0036](0036-multi-level-mrp.md) rule 3).
    - **Backward scheduling.** Select the version and the routing revision valid on `planned_end_date`, schedule backward to obtain `planned_start_date`, then explode at that date. If the routing revision valid there differs, schedule once more with it. The response shows both dates.
@@ -73,6 +75,8 @@ It adds only what production needs:
      - A backflush setting on any lot or serial-tracked component when the version has `is_as_built_required` (rule 16).
    - **Backflush without an operation.** A `backflush_at_operation` component without an operation number, or on an order without operations, is treated as `backflush_at_receipt`.
    - **Backflush warehouse.** A backflush component must be issued from the production warehouse (`backflush_outside_production_warehouse`). Exception: components of an external operation are consumed at the processor location by the service receipt ([ADR-0037](0037-subcontracting.md) rule 5).
+
+   For a configured item, the explosion selects and sizes the product-level structures with the item's item-defining values ([ADR-0046](0046-product-configuration.md) rule 13).
 3. Scheduling:
    - **The rule.** Operation dates come from `setup_duration`, `run_duration` × expected quantity / base quantity, `queue_time` and `move_time`, on the work centers' calendars (ADR-0033 rules 10, 11), at infinite capacity. An order without operations uses the version's fixed lead time. External operations use the supplier lead time and route transit of [ADR-0037](0037-subcontracting.md) rule 3.
    - **Load view.** `ListWorkCenterLoad` (work center, day or week buckets) adds up the remaining scheduled hours of draft and approved orders that are not technically complete, against available hours. Real orders only; planned orders are added by planning's `ListCapacityLoad` ([ADR-0036](0036-multi-level-mrp.md) rule 11).

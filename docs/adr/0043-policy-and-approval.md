@@ -53,6 +53,8 @@ Policy is a deterministic threshold table per company, as runbook B7 asks.
      - `is_enabled`.
    - **Rules that loosen.** A rule that allows a non-human actor (`allow` with `actor_kind` other than `human`, or empty) must have an owner and an `amount_company_max`, at every action. At `post` and `issue` it must also have `is_confirmation_required`. The command rejects anything else with `policy_rule_invalid`.
    - **New versions.** A new version of such a rule starts disabled, and the previous version stays in force until the new one is enabled.
+
+   For a configurable line without an item or preliminary price, the cost conditions use the configuration estimate, and an unknown cost makes the decision need human confirmation ([ADR-0046](0046-product-configuration.md) rule 14).
 4. Policy input. Each document type registers a `policy_input` function, which gives:
    - amounts in company currency at the rates applied;
    - discount and margin;

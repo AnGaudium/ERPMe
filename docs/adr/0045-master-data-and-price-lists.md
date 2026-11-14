@@ -66,6 +66,8 @@ It loads together with the DS-06 journal in the design lab, and the earlier jour
    - **"Outside the list"** (ADR-0043 rule 3): the line's unit price differs from `find_price` (with the line's options, on the document date, both on the same tax basis). When `find_price` returns none, the line is outside the list with reason `price_missing`.
    - **"Below cost":** the line's net unit price, in company currency per inventory unit, is below the item's preliminary price in its valuation area (ADR-0020 rule 11). Flagged, because the cost used is the author's choice (EC-22).
    - **Currency.** In Phase 1 a list's currency must equal the document's, else `price_list_currency_mismatch` (flagged).
+
+   For a configurable line without an item or preliminary price, "below cost" and margin use the configuration estimate; an unknown cost needs human confirmation ([ADR-0046](0046-product-configuration.md) rule 14).
 6. Production uses of prices (ADR-0035):
    - **`relative_sales_value`** reads the default sale list for the inventory unit, quantity 1 and no options, on the period's last day. From a tax-inclusive list the price is reduced to net by ADR-0041 rule 9's inclusive split. Which list is the cost-split basis is flagged.
    - **The estimate's `purchase_price`** is the preferred supplier's (ADR-0024 rule 2) purchase-list price for one purchase unit on the estimate date, converted to the inventory unit, and from a foreign currency at rate type `transaction` on that date (ADR-0011 rule 11). With none, the estimate uses the actual average and returns the check result `purchase_price_missing`. The fallback is flagged.
@@ -125,6 +127,8 @@ It loads together with the DS-06 journal in the design lab, and the earlier jour
     - **What options do not change.** They are not part of the stock key: two lines of one item with different options draw on the same stock. An option that must be kept apart in stock, costed apart or taxed apart is a variant attribute instead.
     - **Downstream.** Options travel to the delivery, the pick list and, for goods made to order, the production order.
     - **Cost and stock of options.** An option with a price extra has no cost of its own: extra material or labor averages into the item's periodic cost, and "below cost" and margin ignore it. Customized units would return to, or be received into, the same stock as standard units. Both are DS-56's: configured units that change the goods are made to order (ADR-0036 rule 9) or made into their own items (rule 16), and DS-56 decides their valuation.
+
+    A line's choices are a `product_configuration` (the `document_line_option` rows become its values; custom text stays on the line), and the cost and stock of options are settled by the split between item-defining characteristics and line options ([ADR-0046](0046-product-configuration.md) rules 9, 12, 14).
 16. Items on order. A product with `is_item_created_on_order` lets a document line name a combination of its variant values that has no item yet.
     - **On the draft.** The line holds the product and the chosen variant values, with no item. Simulation and drafts create nothing; the plan lists the item that would be created.
     - **When.** The item is created when the document leaves draft (its first `Submit`, `Issue` or `Post`), in that command's transaction, as `CreateItem` would (ADR-0018 rule 7). An abandoned draft leaves no item. An existing item with the same `variant_key` is reused.
@@ -138,6 +142,8 @@ It loads together with the DS-06 journal in the design lab, and the earlier jour
     - **The amount.** The extras of all chosen values are summed per inventory unit, multiplied by the factor of rule 4, rounded half up once to the unit-price scale, and added to the base price.
     - **A negative total** gives no price (`negative_price`).
     - The lab checks each of these, including a carton and a 7/3 unit.
+
+    For a configurable product, extras apply to values of both modes, a product-level entry gives the base price, and `price_list_characteristic_rate` prices numbers; the database's mode check on extras becomes the command check `option_extra_not_allowed`. `find_price` takes the chosen values, and an item entry of a configured item replaces its item-defining extras and rates ([ADR-0046](0046-product-configuration.md) rule 15).
 
 ## Context
 

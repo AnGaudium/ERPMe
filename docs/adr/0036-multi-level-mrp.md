@@ -101,6 +101,8 @@ That last check failed until make-to-order supply carried its demand line, a req
    - **Assemble to order.** Components follow their own nodes' strategy.
    - **Status.** The strategies and their defaults are the author's (open question).
 
+   Configured items get `make_to_order` rows when they are created ([ADR-0046](0046-product-configuration.md) rule 11).
+
 **Reorder point and min-max across levels**
 
 10. For nodes on `reorder_point` or `min_max` (ADR-0024 rule 14):

@@ -53,6 +53,8 @@ Agents read the structures through deterministic queries. They draft revisions f
    - **Base quantity.** In the main output's inventory unit, so that small per-unit quantities stay exact, e.g. glue per 1,000 pieces.
    - **Content hash.** The SHA-256 of the canonical JSON (ADR-0008 rule 12 forms) of the header fields and its components and outputs, ordered by position.
    - **Immutability.** A database trigger rejects updates of released rows (`revision_released`). A change is a new revision, created as a copy (`copy_from_revision_id`), edited in draft and released.
+
+   A configurable product has a product-level bill of materials (`product_id` instead of `item_id`) whose main output at explosion is the configured item ([ADR-0046](0046-product-configuration.md) rule 12).
 4. Validity:
    - **Which revision is valid.** The valid released revision on a date is the one with the highest `revision` whose `start_date` is on or before that date. The end of validity is derived, never stored.
    - **Releases are not retroactive.** A release's `start_date` must be on or after the company's current date (ADR-0007), except for the first released revision of a bill of materials. Otherwise the release is rejected with `revision_retroactive`.
@@ -82,6 +84,8 @@ Agents read the structures through deterministic queries. They draft revisions f
      - The planned output quantity of an order for a good quantity G is G / (1 − `assembly_scrap_percent` / 100). Co-products and by-products scale as `quantity` × Q / `base_quantity`.
      - Through phantoms, intermediate quantities stay exact rationals and are never rounded.
      - Requirements are computed as exact rationals and rounded once per order line, up (away from zero), to the component's inventory unit. `round_quantity` gains an optional mode argument taking ADR-0006 rule 17's modes. Rounding half away from zero (ADR-0018 rule 11) would under-issue.
+
+   Components of a product-level bill of materials carry a `selection_condition` and `fixed` or `linear` sizing over item-defining characteristics, applied before the requirement formula ([ADR-0046](0046-product-configuration.md) rules 12–13).
 7. `bill_of_materials_output` rows of a revision list outputs besides the main one:
    - **Fields.** `output_item_id`, `quantity` per base quantity with its unit, `output_type` (`co_product` or `by_product`) and `cost_coefficient` (co-products).
    - **Coefficients are data only.** `cost_coefficient` and `main_output_cost_coefficient` hold equivalence coefficients. Whether the coefficient method applies, and how by-products are valued, are the author's through DS-53. VAS 02 para 09 values by-products at net realisable value (unverified, ADR-0016).
@@ -103,6 +107,8 @@ Agents read the structures through deterministic queries. They draft revisions f
 9. A `routing` (`code`, `name`, `is_active`) may serve several items. Its `routing_revision` rows follow rules 3 and 4: `revision`, `state`, `start_date`, `base_quantity` of output, `content_hash`, immutability, validity, withdrawal and snapshot by orders.
    - **Release checks.** A routing release runs the operation check of rule 8 against every bill of materials paired with it by a production version, and checks that its work centers are active and belong to the production warehouse of every version that uses it (`work_center_outside_warehouse`). It takes the same lock.
    - **Deactivation.** Deactivating a bill of materials or routing is rejected while an active production version uses it (`in_use_by_production_version`).
+
+   Operations of a configurable product's routing carry a `selection_condition` and linear sizing of their durations ([ADR-0046](0046-product-configuration.md) rule 12).
 10. `routing_operation` rows of a revision form one linear sequence:
     - **Fields.**
       - `operation_number` (ascending, e.g. 10, 20, 30);
@@ -147,6 +153,8 @@ Agents read the structures through deterministic queries. They draft revisions f
       - The bill of materials and the routing are active, and each has a released revision valid at every date of the version's range, otherwise `revision_validity_gap`.
       - The routing's work centers belong to the production warehouse (`work_center_outside_warehouse`).
       - The operation check of rule 8.
+
+    A version may name a configurable product (`product_id`, exclusive with `item_id`); it applies to every configured item of the product, after any item-level version ([ADR-0046](0046-product-configuration.md) rule 12).
 14. `item_production_setting` (company, item, production warehouse) holds `is_phantom`.
     - **Explosion.** A phantom is never planned or made on its own. It is exploded through its production version in that warehouse, selected with the exploded quantity and the `explosion_date`, routing ignored. A missing version gives `production_version_missing`.
     - **Planning.** Planning reads the setting through `production.contract` and skips phantoms. A phantom needs no `item_warehouse_planning` row.

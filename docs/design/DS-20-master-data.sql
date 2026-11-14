@@ -1,5 +1,5 @@
 -- DS-20 master data: DDL draft for ADR-0018, ADR-0019, ADR-0020, ADR-0023, ADR-0024, ADR-0027 rule 5, ADR-0031,
--- ADR-0033, ADR-0037 and ADR-0045.
+-- ADR-0033, ADR-0037 and ADR-0045, with the columns ADR-0046 (product configuration) adds; its tables are in DS-56-product-configuration.sql.
 -- PostgreSQL 18. Loaded together with DS-06 and tested in the design lab (docs/reviews/2026-11-14-design-validation,
 -- t05_master_data.py). The ADRs win if this file disagrees.
 -- Tables live in schema `erpme` (ADR-0022 rule 7); domains in schema `types` (ADR-0006 rule 8). Keys are shown inline;
@@ -353,6 +353,7 @@ CREATE TABLE product (
     tracking                       text NOT NULL DEFAULT 'none' CONSTRAINT ck_product_tracking CHECK (tracking IN ('none', 'lot', 'serial')),
     item_tax_group_id              uuid NOT NULL REFERENCES item_tax_group (id),
     is_item_created_on_order       boolean NOT NULL DEFAULT false,  -- a document line may name a new combination of variant values (ADR-0045 rule 16)
+    is_configurable                boolean NOT NULL DEFAULT false,  -- sold through a configuration model; its items are configured items (ADR-0046 rule 2)
     last_item_number               integer NOT NULL DEFAULT 0,      -- counter for codes of items created on order, under the product row lock
     price_control                  text NOT NULL DEFAULT 'periodic_average' CONSTRAINT ck_product_price_control CHECK (price_control IN ('periodic_average')),
     is_inspection_required         boolean NOT NULL DEFAULT false,  -- ADR-0023 rule 3
@@ -366,7 +367,8 @@ CREATE TABLE product (
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, buyer_id) REFERENCES partner (company_id, id),
     CONSTRAINT ck_product_valuation_class CHECK ((product_type = 'stock') = (valuation_class_id IS NOT NULL)),
-    CONSTRAINT ck_product_tracking_stock CHECK (tracking = 'none' OR product_type = 'stock')
+    CONSTRAINT ck_product_tracking_stock CHECK (tracking = 'none' OR product_type = 'stock'),
+    CONSTRAINT ck_product_configurable CHECK (NOT is_configurable OR (is_item_created_on_order AND product_type = 'stock'))
 );
 CREATE TABLE product_uom (                                 -- other units of one product (ADR-0018 rule 10)
     company_id   uuid NOT NULL,
@@ -383,24 +385,40 @@ CREATE TABLE variant_attribute (                          -- ADR-0018 rule 6; va
     code          text NOT NULL,
     name          text NOT NULL,
     variant_mode  text NOT NULL DEFAULT 'variant' CONSTRAINT ck_variant_attribute_mode CHECK (variant_mode IN ('variant', 'line_option')),
+    value_type    text NOT NULL DEFAULT 'list' CONSTRAINT ck_variant_attribute_value_type CHECK (value_type IN ('list', 'number')),   -- ADR-0046 rule 3
+    uom_id          uuid REFERENCES uom (id),
+    minimum_value   types.quantity,
+    maximum_value   types.quantity,
+    step_value      types.quantity CONSTRAINT ck_variant_attribute_step CHECK (step_value > 0),
+    decimal_places  smallint CONSTRAINT ck_variant_attribute_decimal_places CHECK (decimal_places BETWEEN 0 AND 6),
     UNIQUE (company_id, code),
     UNIQUE (company_id, id),
-    UNIQUE (company_id, id, variant_mode)
+    UNIQUE (company_id, id, variant_mode),
+    UNIQUE (company_id, id, variant_mode, value_type),
+    UNIQUE (company_id, id, value_type),
+    CONSTRAINT ck_variant_attribute_number CHECK ((value_type = 'number' AND minimum_value IS NOT NULL AND maximum_value IS NOT NULL AND step_value IS NOT NULL AND decimal_places IS NOT NULL)
+                                               OR (value_type = 'list' AND uom_id IS NULL AND minimum_value IS NULL AND maximum_value IS NULL AND step_value IS NULL AND decimal_places IS NULL)),
+    CONSTRAINT ck_variant_attribute_range CHECK (maximum_value IS NULL OR maximum_value >= minimum_value)
 );
 CREATE TABLE variant_attribute_value (                    -- carries its attribute's mode, so the mode cannot change once values exist
     id                    uuid PRIMARY KEY,
     company_id            uuid NOT NULL,
     variant_attribute_id  uuid NOT NULL,
     variant_mode          text NOT NULL,
+    value_type            text NOT NULL DEFAULT 'list',
     code                  text NOT NULL,
     name                  text NOT NULL,
+    numeric_value         types.quantity,                       -- a number of an item-defining characteristic, created with the item (ADR-0046 rules 3, 11)
     position              integer NOT NULL DEFAULT 0,
     is_custom             boolean NOT NULL DEFAULT false,      -- a line choosing it also gives free text (line options only)
     UNIQUE (variant_attribute_id, code),
     UNIQUE (variant_attribute_id, id),
+    UNIQUE (variant_attribute_id, numeric_value),
     UNIQUE (company_id, variant_attribute_id, variant_mode, id),
-    CONSTRAINT fk_variant_attribute_value_attribute FOREIGN KEY (company_id, variant_attribute_id, variant_mode) REFERENCES variant_attribute (company_id, id, variant_mode),
-    CONSTRAINT ck_variant_attribute_value_custom CHECK (NOT is_custom OR variant_mode = 'line_option')
+    CONSTRAINT fk_variant_attribute_value_attribute FOREIGN KEY (company_id, variant_attribute_id, variant_mode, value_type)
+        REFERENCES variant_attribute (company_id, id, variant_mode, value_type),
+    CONSTRAINT ck_variant_attribute_value_custom CHECK (NOT is_custom OR variant_mode = 'line_option'),
+    CONSTRAINT ck_variant_attribute_value_number CHECK ((value_type = 'number') = (numeric_value IS NOT NULL) AND (value_type = 'list' OR variant_mode = 'variant'))
 );
 CREATE TABLE product_variant_attribute (                  -- the attributes of a product, of either mode
     company_id            uuid NOT NULL,
@@ -594,7 +612,8 @@ CREATE TABLE price_list_entry (
     id                uuid PRIMARY KEY,
     company_id        uuid NOT NULL,
     price_list_id     uuid NOT NULL,
-    item_id           uuid NOT NULL,
+    item_id           uuid,
+    product_id        uuid,                                          -- the base price of a configurable product's configured items (ADR-0046 rule 15)
     uom_id            uuid NOT NULL REFERENCES uom (id),
     minimum_quantity  types.quantity NOT NULL DEFAULT 0 CONSTRAINT ck_price_list_entry_minimum_quantity CHECK (minimum_quantity >= 0),
     start_date        date NOT NULL,
@@ -602,21 +621,24 @@ CREATE TABLE price_list_entry (
     unit_price        types.unit_price NOT NULL CONSTRAINT ck_price_list_entry_unit_price CHECK (unit_price >= 0),
     CONSTRAINT fk_price_list_entry_list FOREIGN KEY (company_id, price_list_id) REFERENCES price_list (company_id, id),
     CONSTRAINT fk_price_list_entry_item FOREIGN KEY (company_id, item_id) REFERENCES item (company_id, id),
+    CONSTRAINT fk_price_list_entry_product FOREIGN KEY (company_id, product_id) REFERENCES product (company_id, id),
+    CONSTRAINT ck_price_list_entry_target CHECK ((item_id IS NULL) <> (product_id IS NULL)),
     CONSTRAINT ck_price_list_entry_dates CHECK (end_date IS NULL OR end_date >= start_date),
-    -- Entries of one list, item, unit and break never overlap in dates (ADR-0045 rule 3).
+    -- Entries of one list, item (or product), unit and break never overlap in dates (ADR-0045 rule 3).
     CONSTRAINT ex_price_list_entry_overlap EXCLUDE USING gist (
-        price_list_id WITH =, item_id WITH =, uom_id WITH =, minimum_quantity WITH =,
+        price_list_id WITH =, (coalesce(item_id, product_id)) WITH =, uom_id WITH =, minimum_quantity WITH =,
         daterange(start_date, end_date, '[]') WITH &&)
 );
 CREATE INDEX ix_price_list_entry_item_id ON price_list_entry (item_id);
-CREATE TABLE price_list_option_extra (                     -- extra per inventory unit for a chosen line option value (ADR-0045 rule 17)
+CREATE INDEX ix_price_list_entry_product_id ON price_list_entry (product_id) WHERE product_id IS NOT NULL;
+CREATE TABLE price_list_option_extra (                     -- extra per inventory unit for a chosen value: a line option, or any value of a configurable product (ADR-0045 rule 17; ADR-0046 rule 15)
     id                          uuid PRIMARY KEY,
     company_id                  uuid NOT NULL,
     price_list_id               uuid NOT NULL,
     product_id                  uuid,                               -- null: every product with that option
     variant_attribute_id        uuid NOT NULL,
     variant_attribute_value_id  uuid NOT NULL,
-    variant_mode                text NOT NULL DEFAULT 'line_option' CONSTRAINT ck_price_list_option_extra_mode CHECK (variant_mode = 'line_option'),
+    variant_mode                text NOT NULL DEFAULT 'line_option',   -- must match the value's mode; variant mode only for configurable products (command, option_extra_not_allowed)
     start_date                  date NOT NULL,
     end_date                    date,
     unit_price_extra            types.unit_price NOT NULL,          -- may be negative (a cheaper option)

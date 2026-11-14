@@ -137,6 +137,8 @@ The accounting choices are the author's (ADR-0005 item 1). Each one below is a r
     - **Price basis.** `actual_average` (the last closed period's actual price; interim default, flagged), `preliminary_price` or `purchase_price`. `purchase_price` is the preferred supplier's purchase-list price ([ADR-0045](0045-master-data-and-price-lists.md) rule 6).
     - **Rates.** `activity_rate` (work center, activity type, period, rate) holds planned rates. Overhead uses a planned surcharge per cost center.
     - **Commands.** `CreateCostEstimate` computes it on the server. `ReleaseCostEstimate` freezes it as the version's benchmark. Both are effect class `other`, because estimates never value stock.
+
+    An estimate for a configured item names the item (`item_id`) with the product-level version, and is computed and released by the system when the item is created ([ADR-0046](0046-product-configuration.md) rules 11, 14).
 15. Variance analysis:
     - **Target cost.** The released estimate valid on the order's explosion date, scaled to the received quantity.
     - **Query.** `GetProductionOrderVariance` splits actual minus target into input price, input quantity, resource usage, scrap, lot size and remaining.
