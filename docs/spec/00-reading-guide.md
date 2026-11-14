@@ -292,6 +292,11 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Command envelope | envelope | The fields around every command payload: `command_type`, `schema_version`, `company_id`, `idempotency_key`, `mode`, `expected_plan_hash`, `payload`; the actor, `on_behalf_of` and `agent_run_id` come from the credential ([ADR-0008](../adr/0008-command-envelope-and-registry.md)) |
 | Mode | mode | `simulate` (run and roll back) or `execute` (run and commit); the same envelope is sent in both |
 | Plan | plan | What a command does: its journal lines and stock movements (response field `plan`) plus its result (response field `result`); `plan_hash` covers all three |
+| Check result | check\_result (response field `checks`) | A finding that does not stop a command, with code, message, rule, field and details; part of `plan_hash` by code and field ([ADR-0040](../adr/0040-ui-architecture.md)) |
+| Allowed command | allowed\_command (query `ListAllowedCommand`) | A command applicable to a record now, or the error code it would return |
+| Session context | session\_context (query `GetSessionContext`) | The signed-in user's companies, permissions, field classes, record scope, language and time zone, returned for the UI to draw itself |
+| UI metadata | ui\_metadata (`x-erpme-*` annotations) | Hints in the generated JSON Schemas from which the renderer draws screens |
+| Command palette | command\_palette | Keyboard search (`Ctrl/Cmd+K`) over the commands, queries, lists and records the user may use |
 | Expected plan hash | expected\_plan\_hash | The `plan_hash` the client reviewed; required to execute; a different hash rejects the execution |
 | Command registry | command\_registry | The one place where command types and queries are registered; REST, MCP, JSON Schema and TypeScript are generated from it |
 | Error code | code (in `errors`) | Stable `snake_case` identifier of an error, with category, HTTP status, rule, fix and retryable flag |

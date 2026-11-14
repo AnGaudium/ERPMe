@@ -271,6 +271,7 @@ None reserved to the author beyond ADR-0005 item 3, which this specification app
 - DS-18: role `erpme_check`; `[tool.erpme] build_step`; the `reserved-review` label and the author-path tripwire; field classes in generated schemas; package `erpme_client` and the import contracts of section 1; CI with two installations.
 - Ledger module (step 1): query `GetTrialBalance`.
 - DS-36: decided, [ADR-0038](../adr/0038-audit-and-observability.md) rule 9. DS-16 also adds the property test that change capture is complete (rule 3).
+- DS-30: DS-16 adds the property test that a command `ListAllowedCommand` reports as allowed never fails simulation with `invalid_state_transition`, `permission_denied`, `human_only`, `segregation_of_duties` or `change_pending` ([ADR-0040](../adr/0040-ui-architecture.md) rule 8).
 - Work package 7 creates the JSON Schemas `violation`, `scenario` and `comparison` in `docs/catalogs/` by hand, with catalogs README rows; DS-17's work package creates `business-events` (generated, CI diff).
 - The runbook README's note on replacing invariant descriptions with IDs can now be done; it is the author's document.
 

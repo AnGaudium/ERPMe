@@ -29,7 +29,7 @@ Every document has one row in a shared `document` table (type, company, state, v
 | `draft`, `pending_approval`, `approved` | `canceled` | `Cancel<Type>` |
 | `draft` (never submitted, not referenced) | row deleted | `Delete<Type>` |
 
-5. Any other transition is rejected with `invalid_state_transition`, naming the current state and the commands allowed from it. `posted`, `reversed` and `canceled` are final. `issuing` is not final; allowed commands in it: [ADR-0028](0028-document-lifecycle-hardening.md) rule 6.
+5. Any other transition is rejected with `invalid_state_transition`, naming the current state and the commands allowed from it. `posted`, `reversed` and `canceled` are final. `issuing` is not final; allowed commands in it: [ADR-0028](0028-document-lifecycle-hardening.md) rule 6. The allowed commands per state come from the registry's `allowed_states`, which `ListAllowedCommand` reads too ([ADR-0040](0040-ui-architecture.md) rule 8).
 
 **Non-posting types**
 

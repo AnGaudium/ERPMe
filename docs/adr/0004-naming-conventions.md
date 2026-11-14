@@ -56,7 +56,7 @@ Every code identifier is an English word or phrase from the glossary in [00-read
 
 **Code**
 
-23. Python follows PEP 8 naming, checked by ruff's `N` rules. File naming for TypeScript is decided in DS-18 and DS-30, because the router generates some file names.
+23. Python follows PEP 8 naming, checked by ruff's `N` rules. File naming for TypeScript is decided in DS-18 and DS-30, because the router generates some file names. Decided: kebab-case, as ADR-0022 rule 24 says ([ADR-0040](0040-ui-architecture.md) rule 18).
 
 ## Context
 

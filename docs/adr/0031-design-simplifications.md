@@ -21,7 +21,7 @@ The other optimizer findings are either decided elsewhere (OPT-02 in the adjudic
 
 **One plan hash** (OPT-01)
 
-1. The canonical plan (ADR-0008 rule 12; DS-04 "Canonical plan for hashing") becomes `{"journal_lines", "stock_movements", "document_versions", "record_versions", "result"}`.
+1. The canonical plan (ADR-0008 rule 12; DS-04 "Canonical plan for hashing") becomes `{"journal_lines", "stock_movements", "document_versions", "record_versions", "result"}`. It also gains `checks` ([ADR-0040](0040-ui-architecture.md) rule 10).
    - **`document_versions`:** one entry per document version the command writes: the document ID, `version` and the version's canonical `content` (ADR-0009 rule 9). A pending version of a change order counts (ADR-0028 rule 4).
    - **`record_versions`:** one entry per record written by an allowed-target command (ADR-0029 rule 2): table, ID and the record's canonical fields after the write.
    - **Canonical forms.** Both lists are subject to DS-04 steps 2–3: IDs created in the run become `new:<table>:<n>`, and `DocumentNumber` and `SystemInstant` values are removed. They contain content, not precomputed hashes. The stored `version_hash` and `expected_version` remain hashes of stored values and are a different thing.

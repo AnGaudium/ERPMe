@@ -32,7 +32,7 @@ The retention periods and the strictness of scanning are flagged for the author.
    - **Command:** `command_type`, `schema_version`, and `effect_class` with `is_human_only` and `is_proposal_bound` as registered at the time, so old rows are judged by the rules then in force (INV-81, INV-86). Also `idempotency_key`, `request_id`, `batch_id`, `batch_item_index`, and `reason` when the command carries one (approvals, period state changes, ADR-0012 rule 9). `reason` is free text that must not hold personal data; the command schemas say so, and erasure masks it under rule 4.
    - **Actor:** `actor_kind`, `actor_id`, `on_behalf_of_id`, `agent_run_id`, `origin_agent_run_id`, `policy_decision_id` (ADR-0029 rule 15). `policy_decision_id` is null for commands at no policy point; period commands have one only for `UnlockPostingPeriod` (DS-28).
    - **Subject:** `subject_table`, `subject_id`, `document_id` and `document_version` for documents, and the subject's scope dimensions (`branch_id`, `warehouse_id`) for record scope.
-   - **Result:** `plan_hash`, `trace_id`.
+   - **Result:** `plan_hash`, `trace_id`, and `check_codes`, the codes of the command's check results ([ADR-0040](0040-ui-architecture.md) rule 10).
 3. Field changes, in `audit_change` (`id`, `company_id`, `audit_record_id`, `subject_table`, `row_id`, `field`, `before`, `after`, `erased_at`):
    - **Which tables.** A closed set, `is_change_tracked` in each module's table declarations and checked by CI: master data, settings including enabled regime settings (ADR-0016), role assignments, period area state and production structures. Documents rely on `document_version`. Balances, counters, open items and other derived rows are not tracked.
    - **How it is captured.** Only `context`'s write helpers capture it. They read the before row and compute the diff with the canonical forms and diff code of ADR-0029 rule 1. Handlers never build changes by hand.
@@ -106,7 +106,7 @@ The retention periods and the strictness of scanning are flagged for the author.
 **Attachments**
 
 13. Upload:
-    - **Endpoint.** Files go through a dedicated upload endpoint whose limit is `attachment_max_bytes` (default 25 MiB), separate from the 10 MiB request body limit (ADR-0022). It is the one hand-written exception to ADR-0008 rule 6, which gets a note.
+    - **Endpoint.** Files go through a dedicated upload endpoint whose limit is `attachment_max_bytes` (default 25 MiB), separate from the 10 MiB request body limit (ADR-0022). It is a hand-written exception to ADR-0008 rule 6, with the session and stream endpoints of [ADR-0040](0040-ui-architecture.md) rule 12; ADR-0008 rule 6 gets a note.
     - **Flow.** The endpoint streams the bytes to the object store under a temporary key, then dispatches the registered command `CreateAttachment` (SHA-256, size, detected type, data label, source kind), which is audited and emits `AttachmentCreated`. A daily job sweeps temporary bytes that no attachment row references after 24 hours.
     - **Errors.** `attachment_too_large` (category `too_large`, HTTP 413) and `attachment_type_not_allowed`.
     - **Allowed types.** The list is installation data: PDF; PNG, JPEG and WebP (not SVG); XML; CSV; XLSX, recognised by its ZIP content types; and e-mail messages. The type is detected from the bytes.

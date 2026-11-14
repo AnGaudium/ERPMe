@@ -14,6 +14,7 @@ Every registered command type also declares its `effect_class` (`posting`, `mast
 | `idempotency_key` | string, 1–128 of `A-Z a-z 0-9 _ - . :` | yes | Unique per (actor, command type) for at least 90 days |
 | `mode` | `simulate` or `execute` | yes | Run and roll back, or run and commit |
 | `expected_plan_hash` | 64 lowercase hex characters | when `mode` is `execute` | `plan_hash` returned by the simulation the client reviewed |
+| `include_canonical_plan` | boolean | no | Also return `canonical_plan`, the plan as hashed (tokenized IDs, no numbers or system instants), filtered by field class ([ADR-0040](../adr/0040-ui-architecture.md) rule 9) |
 | `payload` | object | yes | The command's own schema; unknown fields rejected |
 
 The actor, `on_behalf_of` and `agent_run_id` are never in the request; the dispatcher takes them from the credential (ADR-0008 rule 8).
@@ -30,12 +31,14 @@ The actor, `on_behalf_of` and `agent_run_id` are never in the request; the dispa
 | `events` | `simulate` | Event types the command would emit, in order; not part of `plan_hash` ([ADR-0013](../adr/0013-outbox-and-events.md) rule 5) |
 | `replayed` | always | `true` when the response comes from `idempotency_record` (ADR-0008 rules 16–18), otherwise `false` |
 | `audit_record_id` | always | The audit record of the executed command; null in simulate mode ([ADR-0038](../adr/0038-audit-and-observability.md) rule 1). In a batch, per item |
+| `checks` | always | Check results as `{code, message, rule, field, details}`; `details` filtered by field class; the `[code, field]` pairs are part of `plan_hash` except for codes of unhashed side information (`capacity_not_checked`, `bin_capacity_exceeded`, `mixed_stock_not_allowed`, `no_pickable_stock`, `planning_parameter_missing`, `forecast_history_insufficient`); stored with the response ([ADR-0040](../adr/0040-ui-architecture.md) rule 10). In a batch, per item |
+| `canonical_plan` | when `include_canonical_plan` | The plan as hashed (tokenized IDs, no numbers or system instants, `checks` pairs), filtered by field class; per batch item when `include_plan` is also set ([ADR-0040](../adr/0040-ui-architecture.md) rule 9) |
 
 ## Command batch
 
 Request: the command request with `command_type` and `schema_version` replaced by `items` (`[{"command_type", "schema_version", "payload"}]`, at most 1,000 by default) and an optional `include_plan` (boolean, default `false`). Idempotency scope: `command_batch`.
 
-Response: `mode`, `plan_hash` (over all item plans), `replayed`, `recorded_at` (execute), and `items`: per item `index`, `command_type`, `result`, `journal_line_count`, `stock_movement_count` and `company_debit_total` (sum of its debit amounts in company currency, debit as DS-06 defines it). With `include_plan: true`, each item also carries its full `plan`.
+Response: `mode`, `plan_hash` (over all item plans), `replayed`, `recorded_at` (execute), and `items`: per item `index`, `command_type`, `result`, `journal_line_count`, `stock_movement_count`, `company_debit_total` (sum of its debit amounts in company currency, debit as DS-06 defines it) and `checks`. With `include_plan: true`, each item also carries its full `plan`.
 
 Errors name the item: `field` is `items[<n>].payload.<field>`. All items are validated before any runs; the first handler error stops the batch. A batch `plan_hash_mismatch` carries this summary in `details`, with full plans only when `include_plan` is true.
 
@@ -44,6 +47,8 @@ Errors name the item: `field` is `items[<n>].payload.<field>`. All items are val
 Request: `schema_version`, `company_id` (for company-scoped queries) and `payload` (the filters, plus `limit` and `cursor` for `List<Noun>`). No `idempotency_key`, `mode` or `expected_plan_hash`.
 
 Response for `Get<Noun>`: `result`. For `List<Noun>`: `results` (at most `limit`, default 100, maximum 1,000, ordered by `id` unless the query defines another stable order) `next_cursor` (null on the last page) and `is_scope_filtered` (true when record scope left rows out, [ADR-0017](../adr/0017-permission-envelope.md) rule 9). Results are filtered by the actor's record and field permissions.
+
+Two registry queries serve clients ([ADR-0040](../adr/0040-ui-architecture.md) rules 8, 12): `ListAllowedCommand` (subject table and ID; computed) returns `allowed_command` rows, each command applicable to the subject with `is_allowed` and, when false, the error code it would return; it writes no denial records and is on no agent tool list in Phase 1. `GetSessionContext` is installation-scoped, needs only a valid credential and is on no agent tool list; it returns the user, their companies with permissions, field classes and record scope, their language and time zone, and the environment.
 
 ## Handler context
 
@@ -85,6 +90,7 @@ Response (shortened):
   "plan": {"journal_lines": [{"account_id": "…", "company_amount": "2400000", "…": "…"}], "stock_movements": [{"item_id": "…", "quantity": "24", "…": "…"}]},
   "result": {"goods_receipt_id": "019a7c1f-0000-7abc-8def-000000000010"},
   "plan_hash": "9f2c…e1",
+  "checks": [],
   "replayed": false
 }
 ```
@@ -123,7 +129,7 @@ Module-specific codes are added by the DS item that owns the module, in the regi
 | `policy_denied` | permission | 403 | no | The policy engine denied the action (DS-28) |
 | `unknown_command_type` | not_found | 404 | no | No such command type or query; `details` lists close matches |
 | `record_not_found` | not_found | 404 | no | A referenced `id` does not exist or is not visible to the actor; `details` names the table and the `List<Noun>` query (ADR-0006 rule 5) |
-| `plan_hash_mismatch` | conflict | 409 | no | ADR-0008 rule 13; `details` has the new `plan` and `plan_hash` |
+| `plan_hash_mismatch` | conflict | 409 | no | ADR-0008 rule 13; `details` has the new `plan` and `plan_hash`, and the new `canonical_plan` when `include_canonical_plan` was set ([ADR-0040](../adr/0040-ui-architecture.md) rule 9) |
 | `idempotency_key_reused` | conflict | 409 | no | ADR-0008 rule 16 |
 | `version_conflict` | conflict | 409 | no | The document changed since the client read it; `details.current_version` ([ADR-0009](../adr/0009-document-lifecycle.md) rule 10) |
 | `concurrent_update` | conflict | 409 | yes | Lock timeout, deadlock or serialization failure |
@@ -240,6 +246,7 @@ Module-specific codes are added by the DS item that owns the module, in the regi
 | `customs_assessment_differs` | check result | — | — | Assessed import tax differs from the amount recomputed from the tax codes; the assessed amount is kept ([ADR-0021](../adr/0021-landed-cost.md) rule 10) |
 | `scan_unavailable` | check result | — | — | No scanner is deployed and scan mode is `optional`; the attachment passed unscanned ([ADR-0038](../adr/0038-audit-and-observability.md) rule 14) |
 | `audit_changes_summarized` | check result | — | — | The command changed more than 10,000 tracked rows; the audit record stores field names and hashes instead of values ([ADR-0038](../adr/0038-audit-and-observability.md) rule 3) |
+| `quantity_rounded` | check result | — | — | A quantity was rounded to its unit's precision; `details` carry the entered and the rounded value so the user sees both ([ADR-0018](../adr/0018-product-and-item-model.md) rule 11) |
 | `consent_missing` | precondition | 422 | no | The message's purpose needs consent that the data subject has not given ([ADR-0019](../adr/0019-partners-and-crm-foundation.md) rule 9) |
 | `approval_required` | precondition | 422 | no | The policy engine requires an approval first (DS-28) |
 | `invalid_state_transition` | precondition | 422 | no | The command is not allowed in the document's (including `issuing` and change states, ADR-0028) or warehouse task's state; `details` lists the allowed commands ([ADR-0009](../adr/0009-document-lifecycle.md) rule 5) |
@@ -256,5 +263,5 @@ Warehouse task proposals (target and source bins) and planning run results are l
 1. Take the full plan and result, before field filtering.
 2. Replace each ID created by `context.new_id(table)` during the run with `new:<table>:<n>`, numbering per table from 1 in creation order. Keep IDs that existed before the run, client-supplied IDs and client-supplied instants.
 3. Remove values of the types `DocumentNumber` and `SystemInstant`.
-4. Serialize `{"journal_lines": …, "stock_movements": …, "document_versions": …, "record_versions": …, "result": …}` ([ADR-0031](../adr/0031-design-simplifications.md) rule 1; the two new lists hold canonical content, tokenized by steps 2–3) as JSON with keys sorted, separators `,` and `:` without spaces, UTF-8, no escaping of non-ASCII characters. Numbers, dates and instants are already strings in canonical form.
+4. Serialize `{"journal_lines": …, "stock_movements": …, "document_versions": …, "record_versions": …, "result": …, "checks": …}` ([ADR-0031](../adr/0031-design-simplifications.md) rule 1; the two new lists hold canonical content, tokenized by steps 2–3) as JSON with keys sorted, separators `,` and `:` without spaces, UTF-8, no escaping of non-ASCII characters. Numbers, dates and instants are already strings in canonical form. `checks` is the list of `[code, field]` pairs of the check results whose code is hashed, a null field as `""`, duplicates removed, sorted by code then field ([ADR-0040](../adr/0040-ui-architecture.md) rule 10).
 5. `plan_hash` = lowercase hex SHA-256 of those bytes. A batch hashes the list of item plans in item order the same way.

@@ -200,7 +200,7 @@ Checks:
     | `dataset small` | Generate twice, compare with each other and the lock; check that the version moved when output changed; write the summary diff to the job summary and an artifact (DS-17 rules 13, 17, 26); replay through the current step's adapter with invariants | `dataset` |
     | `scenarios` | Golden scenarios in both roots, regression and kept proposed scenarios, the workbook export check (DS-16 rule 23) | `scenarios` |
     | `guards` | Lists the author-only and `reserved-review` paths a change touches (DS-16 rules 6, 22, 25, 27; `docs/design/DS-17-step-1-projection.md`) and fails when an agent-co-authored commit changes an author-only path | `guards` |
-    | `frontend` | Typecheck, lint, build; `skipped` until `frontend/` exists | `frontend` |
+    | `frontend` | Typecheck, lint, build, Vitest, UI hint checks, Vietnamese key check, size budgets ([ADR-0040](0040-ui-architecture.md) rule 18); `skipped` until `frontend/` exists | `frontend` |
     | `nightly` | The nightly run (rule 18) | — |
     | `ci` | Every CI job's subcommands, in order | — |
 
@@ -223,7 +223,7 @@ Checks:
       - `openapi.json`;
       - the MCP tool list;
       - the `SystemAccount`, `TransactionKey` and `MovementType` types (ADR-0010, ADR-0015).
-    - It writes the TypeScript types into `frontend/src/generated/`, and the business-event schema and example log into `docs/catalogs/` (DS-17 rule 2).
+    - It writes the TypeScript types, the annotated JSON Schemas (`x-erpme-*`, [ADR-0040](0040-ui-architecture.md) rule 4) and the i18n catalogs into `frontend/src/generated/`, and the business-event schema and example log into `docs/catalogs/` (DS-17 rule 2).
     - Output is sorted and stable. A merge conflict in it is resolved by rerunning the command.
     - The files are committed, and CI fails on any difference, so every public API change shows in review (ADR-0008).
 
@@ -270,7 +270,8 @@ Checks:
 24. Frontend conventions; DS-30 adds the rest:
     - file names are kebab-case, except where TanStack Router's file conventions fix them;
     - components are exported in PascalCase;
-    - generated types are never edited.
+    - generated types are never edited;
+    - layout of `frontend/src/` and tests: [ADR-0040](0040-ui-architecture.md) rule 18.
 
 **Licences**
 

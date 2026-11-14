@@ -163,7 +163,7 @@ A small shop and a managed distribution warehouse run on the same model.
 11. Receipts:
     - A receipt posts to the bin rule 7 gives.
     - Tasks are written by the posting's own transaction through `inventory.contract.create_warehouse_task` (ADR-0022 rule 4): one task per (item, lot, handling unit, source bin) with quantity N. A handling unit is one task.
-    - Every task proposal (putaway targets here, pick sources in rule 14) is listed in the plan like events, never in `plan_hash` (ADR-0013 rule 5), so concurrent warehouse work never causes `plan_hash_mismatch`.
+    - Every task proposal (putaway targets here, pick sources in rule 14) is listed in the plan like events, never in `plan_hash` (ADR-0013 rule 5), so concurrent warehouse work never causes `plan_hash_mismatch`. Check results that follow from proposals are not hashed either ([ADR-0040](0040-ui-architecture.md) rule 10).
     - Releasing from inspection is a `status_change` task to `available` or `blocked`.
 12. Putaway rules are rows per warehouse, each with a unique `position`:
     - **Match** on item, product category, storage condition, status and handling unit type.
