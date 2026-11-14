@@ -1,6 +1,6 @@
 # ADR-0007: Time model
 
-Status: accepted (2026-11-14) under ADR-0005, reviewed by Claude Fable 5.2. Design item: DS-03. Related decisions: D4, D8, D15, D16. Principles 2, 5, 6, 9. ADR-0004, ADR-0005, ADR-0006.
+Status: accepted (2026-11-14) under ADR-0005, reviewed by Claude Fable 5.2. Amended before its first merge (2026-11-14) by the author's answer on fiscal years (rule 21). Design item: DS-03. Related decisions: D4, D8, D15, D16. Principles 2, 5, 6, 9. ADR-0004, ADR-0005, ADR-0006.
 
 ## Decision
 
@@ -39,7 +39,7 @@ There are two kinds of time and they never mix: business dates are calendar date
 18. A company's fiscal calendar is data: `fiscal_year` rows with `start_date`, `end_date` and a `code` (e.g. `2026`), contiguous and non-overlapping per company, `end_date` not null, each split into regular `posting_period` rows (also with `end_date` not null) that are contiguous and non-overlapping inside it. Non-overlap is enforced by an exclusion constraint on `daterange(start_date, end_date, '[]')` per company (PostgreSQL extension `btree_gist`), and contiguity by the command that creates the rows. Special periods for year-end adjustments share dates with a regular period, are chosen explicitly, and are designed in DS-12 together with period states and closing.
 19. The fiscal year and regular posting period of a date are found by looking up the row whose range contains it, never computed from a formula, so a short or long first fiscal year and non-calendar fiscal years need no code.
 20. Once a posting exists in a fiscal year, its range and the ranges of its posting periods never change. A change of fiscal year is made by creating a new, shorter or longer, fiscal year after the last used one.
-21. Which fiscal year starts and lengths a company may choose is a legal rule set by its localization package and validated by `CreateFiscalYear`; until verified it is flagged configuration (see open questions).
+21. The default fiscal year is the calendar year; a company may declare other fiscal years when it needs to (author's decision, 2026-11-14). `CreateFiscalYear` checks only the rules of this ADR (contiguity, rule 18; immutability, rule 20).
 22. At posting, a `posting_date` outside every fiscal year of the company is rejected with an error that names `CreateFiscalYear`. Drafts and documents that never post are not checked. Who creates the next fiscal year, and when, is DS-12.
 23. Reports across companies select by date range, never by fiscal year code, because companies may have different fiscal years.
 
