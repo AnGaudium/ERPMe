@@ -4,6 +4,7 @@ Dated record of gate decisions, the week list and one line per Friday review ([R
 
 | Date | Step | Entry |
 | --- | --- | --- |
+| 2026-11-14 | 0 | DS-08 done: [ADR-0015](../adr/0015-account-determination.md) and [transaction-keys.csv](../catalogs/transaction-keys.csv) 0.1.0 accepted under ADR-0005 after two review rounds (Claude Fable 5.2). Four questions for the author |
 | 2026-11-14 | 0 | DS-06 done: [ADR-0014](../adr/0014-universal-journal.md) universal journal and DDL draft accepted under ADR-0005 after two review rounds (Claude Fable 5.2). One question for the author (manual entries to control accounts) |
 | 2026-11-14 | 0 | DS-13 done: [ADR-0013](../adr/0013-outbox-and-events.md) outbox and events accepted under ADR-0005 after two review rounds (Claude Fable 5.2). Group 2 of step 0 complete |
 | 2026-11-14 | 0 | Author delegated the three DS-12 questions; agent decided: close jobs may post in soft-locked periods; only current and next period accept postings by default; Vietnam closes P&L to 911/421 every period (TT99 text to verify) |

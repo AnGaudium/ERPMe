@@ -42,9 +42,13 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Has posting | has\_posting | Set on an operational account by its first journal line; freezes its code, mapping, postable flag and currency ([ADR-0010](../adr/0010-system-chart-of-accounts.md) rule 12) |
 | Control kind | control\_kind | inventory, receivable, payable, gr\_ir or none: which core module owns postings to a system account and which invariant checks it |
 | Operational account | account | Where postings land; points to exactly one system\_account |
-| Transaction key | transaction\_key | Drives account determination: transaction key × valuation class × valuation area → operational account |
-| Valuation class | valuation\_class | Attribute of an item |
-| Valuation area | valuation\_area | Warehouse or company, per the company's costing policy |
+| Transaction key | transaction\_key | Drives account determination: transaction key × valuation class × valuation area → operational account; catalog [transaction-keys.csv](../catalogs/transaction-keys.csv) ([ADR-0015](../adr/0015-account-determination.md)) |
+| Account determination | account\_determination | Company table mapping a transaction key and determinant values to an operational account; the row that matches on the most significant determinants wins (key order); cross-checked against the key's required system accounts |
+| Determinant | determinants | What a transaction key's account depends on, most significant first: valuation\_class, warehouse, item\_group, partner\_group, tax\_code, currency |
+| Item group | item\_group | Company grouping of items for revenue, cost of goods sold and consumption accounts |
+| Partner group | partner\_group | Company grouping of partners that gives new partners their default reconciliation accounts |
+| Valuation class | valuation\_class | Attribute of a stock item; company data seeded from the regime template; drives inventory account determination |
+| Valuation area | valuation\_area, valuation\_area\_level | Warehouse or company, per the company's costing policy (`valuation_area_level`), not changeable by command once stock is posted |
 | Movement type | movement\_type | Configuration table |
 | Goods received / invoice received clearing | gr\_ir\_clearing |  |
 | Price difference | price\_difference |  |

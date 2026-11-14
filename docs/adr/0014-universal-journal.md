@@ -1,6 +1,6 @@
 # ADR-0014: Universal journal data model
 
-Status: accepted (2026-11-14) under ADR-0005, reviewed by Claude Fable 5.2. Design item: DS-06. Related decisions: D4, D5, D7, D10. Principles 5, 6, 7. ADR-0004, ADR-0005, ADR-0006, ADR-0007, ADR-0008, ADR-0009, ADR-0010, ADR-0011, ADR-0012, ADR-0013.
+Status: accepted (2026-11-14) under ADR-0005, reviewed by Claude Fable 5.2. [ADR-0015](0015-account-determination.md) rule 5 says which lines have no transaction key; the rounding key of rule 15 is either `rounding_gain` or `rounding_loss`. Design item: DS-06. Related decisions: D4, D5, D7, D10. Principles 5, 6, 7. ADR-0004, ADR-0005, ADR-0006, ADR-0007, ADR-0008, ADR-0009, ADR-0010, ADR-0011, ADR-0012, ADR-0013.
 
 ## Decision
 
@@ -22,7 +22,7 @@ The books are two append-only tables: `journal_entry` (one per posted document t
 | Group | Columns |
 | --- | --- |
 | Keys | `id`, `journal_entry_id`, `company_id`, `line_number` (unique within the entry), `posting_period_id` (copied from the entry) |
-| Accounts | `account_id` (operational, postable; ADR-0010 rule 10), `system_account_id` (copied from the account's mapping, frozen after the first posting), `transaction_key_id` (DS-08; null for lines entered by hand) |
+| Accounts | `account_id` (operational, postable; ADR-0010 rule 10), `system_account_id` (copied from the account's mapping, frozen after the first posting), `transaction_key_id` (DS-08; null when the account comes from the document or master data, ADR-0015 rule 5) |
 | Side and amounts | `side` (`debit` or `credit`), `is_storno`; `transaction_currency`, `transaction_amount`; `company_currency`, `company_amount`; `group_currency`, `group_amount` (both null when the installation has no group currency; ADR-0011 rule 6); `company_applied_rate_id`, `group_applied_rate_id` (ADR-0011 rule 3) |
 | Dimensions | `branch_id`, `partner_id`, `item_id`, `warehouse_id`, `cost_center_id`, `project_id`, `salesperson_id`, `tax_code_id` (all nullable) |
 | Links | `material_document_line_id`, `open_item_id`, `derivation_trace_id` (Principle 6) (all nullable) |
@@ -42,7 +42,7 @@ Currency columns are foreign keys to `currency.code`, named by currency type as 
 12. A `BEFORE INSERT` trigger on each line: first sets the account's `has_posting` if it is not yet set (ADR-0010 rule 12), which locks the account row and freezes its mapping; then takes `company_id` and `posting_period_id` from its entry and `system_account_id` from its account, and rejects a line that states different values; rejects a `line_number` above the entry's `line_count`; rejects a line whose entry was created in another transaction (`database_transaction_number`), so a posted entry never gains lines; finds the line's posting area from the control kind (`general` for every line in a special period, ADR-0012 rule 4), reads that area's state row `FOR SHARE`, and rejects the line when the row is missing or `locked`; and checks rules 6 and 7 and the required columns and currencies of rule 10.
 13. `journal_entry` and `journal_line` accept only `INSERT`: triggers reject `UPDATE`, `DELETE` and `TRUNCATE`. Together with the document triggers (ADR-0009 rule 14) this is the second line of defence behind the commands (ADR-0002). Backups are restored with triggers disabled (DS-37), because `database_transaction_number` has meaning only inside its transaction. Row-level security on `company_id` follows DS-15.
 14. In a plan (ADR-0008 rule 12), journal lines appear with their IDs tokenized, and without `database_transaction_number` and `recorded_at`. Journal rows get their IDs from `context.new_id`, never from a column default.
-15. Invariants (DS-16) check that every line's `system_account_id` equals its account's mapping, that every entry balances per currency, that amounts are at their currency's minor unit (ADR-0006 rule 14), that each entry has at most one line with the rounding transaction key, and that the period balance cache equals the lines.
+15. Invariants (DS-16) check that every line's `system_account_id` equals its account's mapping, that every entry balances per currency, that amounts are at their currency's minor unit (ADR-0006 rule 14), that each entry has at most one line with a rounding transaction key (`rounding_gain` or `rounding_loss`), and that the period balance cache equals the lines.
 
 **Indexes and reads**
 

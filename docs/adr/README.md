@@ -18,3 +18,4 @@ One file per decision, named `NNNN-short-title.md`, using [template.md](template
 | [ADR-0012](0012-posting-periods-and-closing.md) | Posting periods and closing (DS-12) | Accepted (2026-11-14) |
 | [ADR-0013](0013-outbox-and-events.md) | Outbox and events (DS-13) | Accepted (2026-11-14) |
 | [ADR-0014](0014-universal-journal.md) | Universal journal data model (DS-06) | Accepted (2026-11-14) |
+| [ADR-0015](0015-account-determination.md) | Account determination (DS-08) | Accepted (2026-11-14) |
