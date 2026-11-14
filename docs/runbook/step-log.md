@@ -4,6 +4,7 @@ Dated record of gate decisions, the week list and one line per Friday review ([R
 
 | Date | Step | Entry |
 | --- | --- | --- |
+| 2026-11-14 | 0 | DS-16 done: [DS-16](../design/DS-16-invariants-and-harness.md) invariant catalog and harness spec, [invariants.csv](../catalogs/invariants.csv) 0.1.0 accepted under ADR-0005 after three review rounds (Claude Fable 5.2). No questions for the author; golden values stay his (ADR-0005 item 3) |
 | 2026-11-14 | 0 | DS-11 ADR part done: [ADR-0021](../adr/0021-landed-cost.md) accepted under ADR-0005 after three review rounds (Claude Fable 5.2). Five questions for the author, needed before the step 3 gate but not yet in the ADR-0003 R10 schedule |
 | 2026-11-14 | 0 | DS-09 ADR part done: [ADR-0020](../adr/0020-inventory-and-costing-model.md) and [movement-types.csv](../catalogs/movement-types.csv) 0.1.0 accepted under ADR-0005 after three review rounds (Claude Fable 5.2). Two questions for the author (purchase return value, count difference valuation) |
 | 2026-11-14 | 0 | DS-20 partner part and DS-35 foundation done (drafted ahead of steps 2 and 5 at the author's request): [ADR-0019](../adr/0019-partners-and-crm-foundation.md) accepted under ADR-0005 after two review rounds (Claude Fable 5.2). Five questions for the author |
