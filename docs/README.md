@@ -25,6 +25,7 @@ This folder is the source of truth for the ERPMe specification (D17). Everything
 | `risks.md` | Risks and mitigations | Review at each phase gate |
 | `runbook/` | Implementation runbook: operating rhythm, steps 0–11, testing operations, go-live, escalation rules, step log | Edit in place; never overrides decided items, gates, scope or build order |
 | `prompts/` | Briefs used to start AI sessions for larger tasks | Add one per task |
+| `research/` | Dated research notes used as design input; not decisions | Add a dated folder; cite from the ADR or design item that uses it |
 | `archive/` | Frozen historical documents | Never edited |
 
 ## Spec files
