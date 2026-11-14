@@ -40,7 +40,7 @@ Pilot data never enters the repository, CI or the test server.
 - Each build step adds an adapter that translates events into the commands that exist at that step. Adapters of earlier steps are kept, so the same log can be replayed at any step.
 - The simulator also writes the input files agents read: e-invoice XML, bank statement files, emails with quotation requests, migration files.
 - The simulator records what happened in business terms (quantities, prices, payments, rates). It never writes expected balances; those come from the naive recomputation and the golden scenarios.
-- Names, tax IDs and addresses are generated. The dataset is CC0 ([18-license-governance.md](../spec/18-license-governance.md)). Where generated logs are stored is decided in DS-17.
+- Names, tax IDs and addresses are generated. The dataset is CC0 ([18-license-governance.md](../spec/18-license-governance.md)). Where generated logs are stored is decided in [DS-17](../design/DS-17-synthetic-dataset.md) rule 26: not committed; lock files with SHA-256 in `datasets/`.
 - Extending the simulator for a step: add events and edge cases first (B4), then the adapter, then confirm the small dataset still covers every edge case at least once.
 
 ## The nightly run

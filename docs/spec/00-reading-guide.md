@@ -134,7 +134,12 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Invariant checker, scenario tool | erpme-check, erpme-scenario | CLIs: run the invariant registry read-only against a database (JSON output); export, freeze and run scenarios |
 | Test tooling packages | erpme\_events, erpme\_client, erpme\_adapters, erpme\_testkit, erpme\_reference, erpme\_simulator | Top-level packages outside `erpme` that the product never imports (DS-16, DS-17) |
 | Invariant | INV-xx | A named rule checked at its check point (around commands, after each simulated day); catalog [invariants.csv](../catalogs/invariants.csv) (DS-16) |
-| Edge case | EC-xx | A named situation the simulator injects at a known frequency; catalog in DS-17 |
+| Edge case | EC-xx | A named situation the simulator injects at a known frequency; catalog [edge-cases.csv](../catalogs/edge-cases.csv) (DS-17) |
+| Business event, business event type | business\_event, business\_event\_type | A fact of the business written by the simulator (`goods_received`): snake\_case enumerated values in the past tense, never outbox events; contrast the core event `GoodsReceiptPosted` (ADR-0004 rule 22) |
+| Business-event log | business\_event\_log | JSON Lines of business events, one per line with `ref`, outcome class and retry flag; schema `docs/catalogs/business-events.schema.json` ([DS-17](../design/DS-17-synthetic-dataset.md)) |
+| Simulator triple | (simulator version, seed, dataset version) | Identifies a run; with the package and catalog versions it yields a byte-identical log and input files |
+| Adapter | erpme\_adapters.step\_n | Translates business events mechanically into the commands that exist at build step n; decides no accounting |
+| Profile | profile | Versioned simulator parameters for a dataset size, e.g. `vn_trading_small@1` |
 | Module | module | Python package `erpme.<module>`; list and database layout in DS-18 ([ADR-0004](../adr/0004-naming-conventions.md)) |
 | Command type | command\_type | Name of a command: `PascalCase` verb from the command verb list + glossary noun, e.g. `PostGoodsReceipt`; `snake_case` form for MCP tools and handlers |
 | Query | query | Read-only operation: `Get<Noun>` (one record), `List<Noun>` (filtered list). Not a command; no idempotency key |
