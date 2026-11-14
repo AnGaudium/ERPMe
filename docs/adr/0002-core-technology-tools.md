@@ -1,6 +1,6 @@
 # ADR-0002: Core technology tools
 
-Status: accepted (2026-11-14). Design item: —. Related decisions: D14.
+Status: accepted (2026-11-14). Design item: —. Related decisions: D14. The sentence on choosing the primary key for partitioning by fiscal year, and the revisit line "partition by fiscal year", are replaced by [ADR-0006](0006-id-and-numeric-model.md) rules 22–23.
 
 ## Decision
 

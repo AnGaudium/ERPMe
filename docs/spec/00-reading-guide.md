@@ -63,6 +63,14 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Schema version | schema\_version | Version of a command schema (semver, [07](07-shared-foundation.md#extensibility-and-upgrades)) or an event schema (DS-13); rules in DS-04 |
 | Lifecycle state column | state | Column holding a lifecycle value: document, posting period, work item and every other lifecycle. Never `status` |
 | Derivation trace | derivation\_trace (derivation\_trace\_id) | Record that explains a derived value (cost, price, tax): its source lines and the rules applied, Principle 6. Built thin for costing in step 3 (DS-09). Not OpenTelemetry's `trace_id`, which is kept for observability (DS-36) |
+| Amount | amount | Money in any currency: domain `types.amount` (`numeric(24, 4)`), Python type `Amount`; stored at the currency's minor unit; a string in JSON ([ADR-0006](../adr/0006-id-and-numeric-model.md)) |
+| Quantity | quantity | Quantity in any unit: domain `types.quantity` (`numeric(24, 6)`), Python type `Quantity`; at the unit's decimal places |
+| Unit price | unit\_price | Price or cost per unit: domain `types.unit_price` (`numeric(28, 10)`), Python type `UnitPrice` |
+| Exchange rate | exchange\_rate | A rate as its source publishes it, with the two currencies that give its direction: domain `types.exchange_rate` (`numeric(30, 15)`), Python type `ExchangeRate`; amounts are converted only by `convert_amount` |
+| Percent | percent | A percentage written as percent (8 means 8%): domain `types.percent` (`numeric(9, 6)`), Python type `Percent`; columns end in `_percent` |
+| Minor unit | minor\_unit | Decimal places of a currency from ISO 4217 (VND 0, USD 2); amounts are stored at this precision |
+| Unit conversion factor | numerator, denominator (columns) | One alternative unit = numerator / denominator stock units, two positive integers; model in DS-20 |
+| Rounding line, rounding difference | rounding\_difference (system account) | The one journal line of an entry that takes its conversion rounding differences, posted to the system account `rounding_difference` ([ADR-0006](../adr/0006-id-and-numeric-model.md) rule 20) |
 
 **Command verbs** ([ADR-0004](../adr/0004-naming-conventions.md) rules 17–22). A command type starts with one of these verbs; its event, if any, ends with the event form. The intent column says what the verb is for, nothing more: which states and preconditions allow a command is decided by DS-05 and the DS item that owns the noun. A new verb is added here, with its intent and event form, in the same change as the first command that needs it; a verb never takes a second meaning.
 

@@ -1,6 +1,6 @@
 # ADR-0004: Naming conventions
 
-Status: accepted (2026-11-14). Drafted by an agent; the author delegated all technical decisions to the agent, with ease of use by AI agents as the overriding goal, and accepted by that instruction. Design item: DS-01. Related decisions: D4, D8, D13, D14. Principles 1, 2, 5, 7, 8, 9, 10.
+Status: accepted (2026-11-14). Drafted by an agent; the author delegated all technical decisions to the agent, with ease of use by AI agents as the overriding goal, and accepted by that instruction. [ADR-0006](0006-id-and-numeric-model.md) rule 9 adds the suffix `_percent` to rule 13. Design item: DS-01. Related decisions: D4, D8, D13, D14. Principles 1, 2, 5, 7, 8, 9, 10.
 
 ## Decision
 
