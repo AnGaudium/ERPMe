@@ -1,0 +1,26 @@
+# Architect decisions: ADR-0060 analysis layer and agent; ADR-0061 barcodes (2026-11-15)
+Source: research_analysis_barcode.md (Phase 1 recommendations accepted unless stated). Author approved designing these.
+
+ADR-0060 Agent-assisted reporting and analysis
+1. A declared semantic catalog in module `query`: measures (expression over a view, additivity: additive/semi-additive (balance, stock: not over time)/non-additive, unit or currency basis, grain, field class), dimensions (with hierarchies: time, partner, item, item group, warehouse, account, cost center, branch), joins with cardinality. The core catalog is code, versioned with the release (Phase 1 start: under 40 measures across sales, purchasing, open items, stock, production and system_account_turnover). Companies do not add measures in Phase 1 (they add saved analyses).
+2. A JSON analysis plan is the only analysis input (measures, dimensions, filters, time grain, sort, limit). Code validates it (names, shared dimensions, fan-out, currency mixing (no sum across currencies without a stated conversion basis), additivity, cardinality and cost ceilings, owner/record scope, field classes) and refuses with typed codes; compiles to one read-only SELECT. Queries RunAnalysisPlan and ExplainAnalysisPlan (plan, SQL text, scope note, as-of). People and agents use the same path. Principle 13: every number comes from this engine.
+3. Agent type `analysis` (untainted: may_read_untrusted false; read tools only; seats per spec 17 Data Q&A/Analysis). LLM steps: interpret question -> plan (validated, max N rounds, fed back), then explanation text with placeholders bound to result cells; a numeral check rejects stray digits. Typed abstention outcomes (ambiguous_term, out_of_coverage, not_permitted, data_not_ready, too_broad), precision-tuned.
+4. Every result cell carries a drill handle (rows -> documents -> journal lines). Invariants: a cell equals the sum of its drill rows; management totals reconcile to statutory totals for the same scope and period.
+5. Saved analyses and KPIs (definitions with targets and thresholds) are versioned company data, states draft/verified; verified ones skip the model; change through change proposals when agent-drafted. Verified question-to-plan pairs form the evaluation suite (50-100 per flow) run in CI and on model changes (shadow/promotion as ADR-0050).
+6. Variance explanation: exact additive contributions with a reconciliation row; production variances read from posted variance lines, not remodelled. Price-volume-mix, segment search, KPI alerts, small-cell suppression: after Phase 1.
+7. Cost control: verified/cached plans skip the model; cache key includes scope (user, owner scope, company); per-company budget (ADR-0050 budgets); cheap router model for classification.
+8. No external semantic engine (Cube, dbt SL) in core; export of the catalog later.
+9. Agents still never export files (ADR-0050 r54); results are shown in the UI with export by people (CreateListExport rules apply).
+
+ADR-0061 Barcodes
+1. One server-side GS1 parser (AI table generated from the GS1 Barcode Syntax Dictionary, versioned), accepting element strings (with FNC1/GS handling) and GS1 Digital Link URIs; check digits for GTIN-8/12/13/14 (stored as 14 digits) and SSCC; date AIs; 310n variable measures; required/forbidden AI pairs. Same test corpus for the PWA (WASM syntax engine).
+2. A company-wide barcode registry: one table barcode (or a view over typed tables with a shared uniqueness constraint) with barcode_type (item_unit, bin, handling_unit, lot, serial, document, internal) unique per company across types. item_barcode keeps unit binding (ADR-0056 proposes the unit).
+3. Resolution order in ResolveBarcode (query): symbology identifier -> GS1 keys -> registry -> step context; unclear or unknown scans return a typed issue (barcode_unknown, barcode_ambiguous, lot_needs_item), never a guess.
+4. Scan-to-confirm on every posting step (scan must match the expected object); scan-to-search only opens records.
+5. Multi-field GS1 capture on receipts: (01),(10),(17),(21),(30)/(37),310n mapped into scan command input schemas; variable-measure quantities enter in the AI's unit and convert per ADR-0056.
+6. Internal codes: ASCII only, start with a letter type prefix; GS1 features optional per company, switched on when it enters a GS1 company prefix (company setting).
+7. Labels rendered as PDF through ADR-0049 print templates: Code 128 for bins and documents, GS1-128 SSCC for handling units, GS1 DataMatrix for item/lot/serial; human-readable line may carry Vietnamese text, encoded data ASCII.
+8. PWA: BarcodeDetector plus WASM fallback, keyboard-wedge capture by prefix/suffix/timing, shipped scanner profiles (AIM prefix on, GS mapped, Enter suffix), a scanner check page (ADR-0040 note).
+9. Serials: per-unit scans with running count and duplicate check; a handling unit scan confirms the serials packed in it.
+10. After Phase 1: ZPL templates and print agent, GS1 GLN/GRAI/GIAI, Digital Link generation, offline scanning queue, SSCC assignment service if not needed earlier.
+11. Vietnam: Decree 37/2026 traceability codes / digital product passport outputs belong in l10n_vn (flagged, unverified; open question for DS-40); prefix 893 means issuer, not origin.
