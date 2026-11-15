@@ -612,9 +612,11 @@ trial("G10 third party only on a settle line with method third_party", lambda cx
 trial("G11 the beneficiary account must belong to the payment's partner", lambda cx: (
     cx.execute("insert into partner (id, company_id, code, name, partner_kind, country) values (%s,%s,'P9','Other','organization','VN')", (pz := new(), I["co"])),
     cx.execute("update payment set partner_id=%s where id=%s", (pz, PY))), True, "fk_payment_partner_bank_account_id")
-X("update bank_statement_line set proposed_document_id=%s, proposal_score=90, match_basis='account_amount' where id=%s", (PY, L2))
-check("G12 the cascade's proposal is recorded on the line while the payment is a draft (flows review A9)",
-      X("select match_state, proposal_score, match_basis from bank_statement_line where id=%s", (L2,)).fetchone() == ("unmatched", 90, "account_amount"))
+trial("G12a a line in state proposed names its proposed document (ADR-0048 rule 8 note; simulation review)", lambda cx: cx.execute(
+    "update bank_statement_line set match_state='proposed' where id=%s", (L2,)), True, "ck_bank_statement_line_proposed")
+X("update bank_statement_line set match_state='proposed', proposed_document_id=%s, proposal_score=90, match_basis='account_amount' where id=%s", (PY, L2))
+check("G12 the cascade's proposal is recorded on the line, in state proposed, while the payment is a draft (flows review A9; ADR-0048 rule 9 note F1)",
+      X("select match_state, proposal_score, match_basis from bank_statement_line where id=%s", (L2,)).fetchone() == ("proposed", 90, "account_amount"))
 trial("G13 an LLM suggestion never carries a score (rule 9)", lambda cx: cx.execute(
     "update bank_statement_line set proposed_document_id=%s, proposal_score=50, match_basis='llm_suggestion' where id=%s", (PY, L1)), True, "ck_bank_statement_line_proposal")
 trial("G13b ... it is a proposal without a score", lambda cx: cx.execute(

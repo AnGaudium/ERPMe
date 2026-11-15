@@ -182,6 +182,13 @@ ADR-0017 fixed the envelope: permissions are the names of registered commands, q
 
     Note (catalog review, 2026-11-15): the templates `accountant`, `sales_clerk` and `buyer` also get `change_proposal` at `edit` without the approval flag, so the people who handle agent proposals in their area (bank matching rules, customer onboarding, purchase mapping) can submit them; approval stays with the `general` pool ([ADR-0055](0055-approval-pools-and-stages.md) rule 5 note). `change_proposal` is on no side of a seeded segregation rule, so every template except `owner` stays free of conflicts.
 
+    Note (simulation review, 2026-11-15): a workflow owner must not be a planned approver of the agent's drafts, since the hard floor keeps that person from approving them. The interim seed of `start_agent:<agent_type>`, and with it the recommended workflow owner of each agent type, changes (it replaces the seed of the general-access note above):
+    - `quotation` and `customer_onboarding`: `sales_clerk` (was `sales_manager`);
+    - `purchase_invoice` and `bank_matching`: `accountant` (was `chief_accountant`);
+    - `planning`: `production_planner`, and `data_migration`: `owner`, unchanged.
+
+    `sales_manager` and `chief_accountant` no longer hold these capabilities, so the people who approve quotations, onboarding proposals and mismatched supplier invoices are not their writers through a run. `owner` and `it_administrator` keep every agent type. In [role-template-levels.csv](../catalogs/role-template-levels.csv); lab check `t12_access.py` C28. Interim, flagged with the template contents (open question).
+
 **Assignments, record scope and owner scope**
 
 12. `role_assignment` (company data, change-tracked):
@@ -267,6 +274,8 @@ ADR-0017 fixed the envelope: permissions are the names of registered commands, q
     Note: the seeded templates other than `owner` hold no both sides of these rules (rule 11 note).
 
     Note (catalog review, 2026-11-15): assignments of the `owner` template are exempt from the checks that keep mode `block` free of conflicts (rule 18: the switch to `block`, `EnableSegregationRule` and every rights path; INV-229), because that template holds every permission (rule 12) and would otherwise make `block` impossible in any company. The owner still meets rule 19's per-document check: one person cannot act on both sides of a pair on one document. A user whose other assignments hold both sides is not exempt (lab t12, E5b and E5c).
+
+    Note (simulation review, 2026-11-15): the exemption covers assignments only. It never reaches approval eligibility: [ADR-0055](0055-approval-pools-and-stages.md) rule 7, condition 7, applies to the owner on each document like anyone else, through rule 19's check for the rules with a document relation (`bank_account_vs_payment`, `purchase_order_vs_goods_receipt`, `purchase_invoice_vs_payment`). The rules with relation `none` (`price_list_vs_sales_approval`, `partner_vs_purchase_invoice`, `role_administration_vs_posting`) are checked at assignment only, for everyone, so they bar no one from approving a given document; the simulation's refusal of the owner's quotation approval under `price_list_vs_sales_approval` (trace 3.20) was not what rule 19 says.
 18. Check on every change of rights:
     - **When.** On every path that changes a person's effective rights: `CreateRoleAssignment`, `UpdateRoleAssignment`, `UpdateRole` (for every holder), `EnableUserAccount`, `CreateDelegation` of both kinds (the substitute's own rights plus what is lent), `ConfirmUserInvitation` (the pending assignments), `ConfirmRolePermissionHold` (every holder of the role), `EnableSegregationRule` (for every user), and the re-expansion on upgrade (rule 9).
     - **The test.** A rule conflicts when the union of a user's permissions from assignments and delegations in force on any common day holds at least one permission of each side.

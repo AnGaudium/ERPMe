@@ -275,6 +275,9 @@ for n, leaf in REPORTING_QUERIES.items():
 # Agent and platform commands of ADR-0054 rule 24's table note (holistic platform review).
 AGENT_TYPES = ("customer_onboarding", "quotation", "bank_matching", "purchase_invoice", "planning", "data_migration")
 REG += [(f"start_agent:{a}", f"agent_{a}", "capability", None, "edit") for a in AGENT_TYPES]
+# The lead-time update of ADR-0024 rule 23 (simulation review 2026-11-15).
+REG += [("CreateSupplierItem", "supplier_item", "command", "Create", "master_data_change"),
+        ("UpdateSupplierItem", "supplier_item", "command", "Update", "master_data_change")]
 REG += [("cancel_agent_runs", "agent", "capability", None, "full"),
         ("UpdateAgentTypeSetting", "agent", "command", "Update", "master_data_change", "full"),
         ("CreateAgentPromotionEvidence", "agent", "command", "Create", "other"), ("ListAgentRun", "agent", "query", "List", None),
@@ -463,13 +466,18 @@ ALL_ROOTS_FULL = {r: ("full", True) for r, p in PARENT.items() if p is None}
 check("C27 is_internal_only commands are in no template's expansion, owner included, nor in one with full and approve on every root",
       INTERNAL <= set(by_name) and not any(INTERNAL & EXP[t] for t in TEMPLATES) and not (INTERNAL & set(expand(ALL_ROOTS_FULL))))
 starts = lambda t: {p.split(":", 1)[1] for p in EXP[t] if p.startswith("start_agent:")}
-SEED = {"sales_manager": {"quotation", "customer_onboarding"}, "chief_accountant": {"bank_matching", "purchase_invoice"},
+# simulation review 2026-11-15: workflow owners are not the planned approvers (ADR-0054 rule 11 note)
+SEED = {"sales_clerk": {"quotation", "customer_onboarding"}, "accountant": {"bank_matching", "purchase_invoice"},
         "production_planner": {"planning"}, "owner": set(AGENT_TYPES), "it_administrator": set(AGENT_TYPES)}
 check("C28 start_agent follows the interim seed per agent type leaf; UpdateAgentTypeSetting and cancel_agent_runs need full on agent",
       all(starts(t) == SEED.get(t, set()) for t in TEMPLATES) and all(f"agent_{a}" in PARENT and PARENT[f"agent_{a}"] == "agent" for a in AGENT_TYPES)
       and {t for t in TEMPLATES if "UpdateAgentTypeSetting" in EXP[t]} == {"owner", "it_administrator"}
       and not ({"UpdateAgentTypeSetting", "cancel_agent_runs"} & set(expand({"agent": ("post", False)})))
       and "start_agent:quotation" in expand({"agent": ("edit", False)}))
+check("C28b the supplier item commands (lead-time update, ADR-0024 rule 23 note) need edit on the leaf supplier_item under Planning: buyer, purchasing manager, production planner and owner hold them; the sales clerk, accountant and auditor do not",
+      PARENT.get("supplier_item") == "planning" and KIND.get("supplier_item") == "function"
+      and {t for t in TEMPLATES if "UpdateSupplierItem" in EXP[t]} == {"buyer", "purchasing_manager", "production_planner", "owner"}
+      and {t for t in TEMPLATES if "CreateSupplierItem" in EXP[t]} == {"buyer", "purchasing_manager", "production_planner", "owner"})
 check("C29 general_access at edit for every template but the auditor (uploads, list exports, approval progress); event deliveries only owner and IT administrator; ClearTaint owner and chief accountant",
       all({"CreateAttachment", "CreateListExport", "GetApprovalProgress"} <= EXP[t] for t in TEMPLATES - {"auditor"})
       and "CreateAttachment" not in EXP["auditor"] and "GetApprovalProgress" in EXP["auditor"]

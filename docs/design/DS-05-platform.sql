@@ -999,14 +999,14 @@ CREATE TABLE bank_statement_line (
     counterparty_bank_code        text,
     counterparty_account_number   text,
     description                   text,
-    match_state                   text NOT NULL DEFAULT 'unmatched' CONSTRAINT ck_bank_statement_line_match_state CHECK (match_state IN ('unmatched', 'matched', 'ignored')),
+    match_state                   text NOT NULL DEFAULT 'unmatched' CONSTRAINT ck_bank_statement_line_match_state CHECK (match_state IN ('unmatched', 'proposed', 'matched', 'ignored')),
     ignore_reason                 text,
     matched_document_id           uuid,
     -- The cascade's proposal (flows review A9): a draft or posted document, its score and basis; matched only at Post.
     proposed_document_id          uuid,
     proposal_score                smallint CONSTRAINT ck_bank_statement_line_proposal_score CHECK (proposal_score BETWEEN 0 AND 100),
     match_basis                   text CONSTRAINT ck_bank_statement_line_match_basis CHECK (match_basis IN (
-                                      'already_posted', 'reference', 'account_amount', 'account_subset', 'matching_rule', 'llm_suggestion', 'manual')),   -- interim: values not stated in ADR-0048 (cascade steps of rule 9)
+                                      'already_posted', 'reference', 'account_amount', 'account_subset', 'company_rule', 'llm_suggestion', 'manual')),   -- interim: values not stated in ADR-0048 (cascade steps of rule 9)
     -- RecordBankLineSuggestion (ADR-0051 rule 17): tokens, name, purpose and run, all is_untrusted. interim: column names not stated in ADR-0051.
     suggested_reference_tokens    text[] CONSTRAINT ck_bank_statement_line_suggested_tokens CHECK (cardinality(suggested_reference_tokens) <= 5),
     suggested_payer_name_text     text,
@@ -1023,6 +1023,9 @@ CREATE TABLE bank_statement_line (
     FOREIGN KEY (company_id, suggestion_agent_run_id) REFERENCES agent_run (company_id, id),
     CONSTRAINT ck_bank_statement_line_matched CHECK ((match_state = 'matched') = (matched_document_id IS NOT NULL)
         AND (match_state = 'ignored') = (ignore_reason IS NOT NULL)),
+    -- A proposed line names the cascade's proposed document and becomes matched when it posts (ADR-0048 rule 8 note;
+    -- rule 9 note F1; simulation review 2026-11-15).
+    CONSTRAINT ck_bank_statement_line_proposed CHECK (match_state <> 'proposed' OR proposed_document_id IS NOT NULL),
     -- An LLM suggestion never counts in a score (rule 9).
     CONSTRAINT ck_bank_statement_line_proposal CHECK ((proposed_document_id IS NULL) = (match_basis IS NULL)
         AND (proposal_score IS NULL OR proposed_document_id IS NOT NULL)

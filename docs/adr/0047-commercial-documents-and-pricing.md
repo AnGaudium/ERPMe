@@ -118,6 +118,13 @@ The commercial documents are a thin layer over the core (B3). They hold what was
    - **Open quantity** falls by what is ordered from the line. A request closes automatically when fully ordered.
 
    Note (flow review, 2026-11-15): for a conversion executed from an approved change proposal (the planning agent's, [ADR-0051](0051-agent-workflows.md) rule 24), the converter is the approving human of [ADR-0029](0029-proposals-and-agent-safety.md) rule 3: the approver whose approval completed the proposal's plan ([ADR-0055](0055-approval-pools-and-stages.md) rule 16 note). The purchase requests are drafted on their behalf, so that person cannot approve them.
+
+   Note (simulation review, 2026-11-15): policy input of a purchase request ([ADR-0043](0043-policy-and-approval.md) rule 4; rule 22). A request carries no price, so for policy only, each line is valued at the first of:
+   1. the supplier's purchase price: `find_price` on the purchase list of the line's suggested supplier, else of the item's preferred `supplier_item` supplier (its supplier profile's list, else the company's default purchase list, as on a purchase order), for the line's item, unit, quantity and requested date;
+   2. the item's last purchase price: the net unit price of its most recent posted purchase invoice line in the company, converted to the line's unit;
+   3. zero, and the request's policy input sets `is_cost_unknown`.
+
+   Amounts are in company currency at the applied rate; the request's amount is the sum of its valued lines. The values live in the policy input and its hash, not on the request. Interim, flagged.
 10. `purchase_order`:
     - **Header:** supplier, currency, price list (the supplier's purchase list), payment term, buyer (the supplier profile's default, ADR-0027 rule 6), document discount percentage.
     - **Lines:** item, quantity and unit, receiving warehouse, requested date, price steps (rule 16, without promotions), taxes, `purchase_request_line_id`, and `origin_planned_order_id` and `production_order_operation_id` copied from the request. The supply row gets `ordered_date` at approval (ADR-0024 rule 8).
@@ -212,6 +219,8 @@ The commercial documents are a thin layer over the core (B3). They hold what was
     Note: when `sales` sets `credit_hold` on an order's rows, it raises one work item `credit_hold` (subject the sales order, owner role `accountant`). The item is resolved by `ReleaseCreditHold`, or by the system when the hold is cleared because the exposure fell under the limit.
 
     Note (catalog review, 2026-11-15): the stored states of a `credit_hold` row, `held`, `released`, `cleared` and `lapsed` (DS-22-09-42-commercial-inventory.sql), are interim: this rule does not name them.
+
+    Note (simulation review, 2026-11-15): a customer profile without `credit_limit` has no credit check: `is_credit_exceeded` is false and no `credit_hold` is set for that partner; `GetCreditExposure` still reports the exposure. `CreatePartner` leaves the limit empty unless the payload gives one ([ADR-0045](0045-master-data-and-price-lists.md) rule 13 note); a company that wants every customer checked sets a limit on each profile.
 
 **Demand, supply and progress**
 

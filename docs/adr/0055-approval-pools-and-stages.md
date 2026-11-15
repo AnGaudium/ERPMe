@@ -157,6 +157,8 @@ ADR-0043 decides whether a document needs approval and at which rank, and approv
 
     Note (flow review, 2026-11-15): "the approving human" of [ADR-0029](0029-proposals-and-agent-safety.md) rule 3, on whose behalf an approved change proposal executes, is the approver whose approval completed the plan: the counted approval that brought the last required stage to k (rule 8). That human is the converter of the drafts the execution creates ([ADR-0047](0047-commercial-documents-and-pricing.md) rule 9; [ADR-0024](0024-planning.md) rule 22), so a writer of those drafts who cannot approve them (rule 7, condition 5); approvers at earlier stages are not.
 
+    Note (simulation review, 2026-11-15): a purchasing manager who approves planning proposals (pool `general`) becomes the converter of the purchase requests the execution drafts, and cannot approve them (the note above). A company should therefore not make the purchasing manager the only member of pool `pr`'s `standard` stage; [DS-17](../design/DS-17-synthetic-dataset.md)'s `vn_*` profiles add the chief accountant (its rule 18 note).
+
 **Commands, queries and catalogs**
 
 17. Commands and queries:

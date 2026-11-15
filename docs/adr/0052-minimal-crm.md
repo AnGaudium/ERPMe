@@ -179,6 +179,8 @@ Leads, opportunities, marketing automation, appointments, chat connectors and se
     - **Upkeep and work items.** `crm`'s consumer of `PartnerCreated`, `PartnerUpdated`, `ContactCreated` and `ContactUpdated` updates the search key, then searches. Any candidate raises the existing kind `partner_duplicate_suspected`, with the candidates as evidence. Nothing is merged automatically.
     - **Nightly scan.** Two partners created at the same moment can each miss the other's key. The nightly job `RunPartnerDuplicateScan` repeats the search for partners changed since its last run and emits `PartnerDuplicateScanCompleted`.
 
+    Note (simulation review, 2026-11-15): the threshold of [ADR-0019](0019-partners-and-crm-foundation.md) rule 19 is this setting, `crm.duplicate_name_threshold`: a `pg_trgm` similarity of the normalized names, between 0 and 1, default 0.6. The simulation used a token-set ratio of 50 on a 0–100 scale as a stand-in measure; it changes no default.
+
 **Partner timeline**
 
 18. `ListPartnerTimeline`, a query of `crm`:

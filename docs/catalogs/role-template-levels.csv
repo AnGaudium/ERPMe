@@ -44,8 +44,6 @@ chief_accountant,report_finance,post,false
 chief_accountant,report_tax,post,false
 chief_accountant,agent_run_bodies,none,false
 chief_accountant,print_profile,none,false
-chief_accountant,agent_bank_matching,edit,false
-chief_accountant,agent_purchase_invoice,edit,false
 accountant,sales,read,true
 accountant,sales_invoice,post,false
 accountant,sales_return,edit,true
@@ -78,6 +76,8 @@ accountant,crm,read,false
 accountant,outbound_message,edit,false
 accountant,agent_run_bodies,none,false
 accountant,print_profile,none,false
+accountant,agent_bank_matching,edit,false
+accountant,agent_purchase_invoice,edit,false
 cashier,banking,read,false
 cashier,cash_receipt,post,false
 cashier,cash_payment,post,false
@@ -103,6 +103,8 @@ sales_clerk,partner_insight,read,false
 sales_clerk,data_protection,read,false
 sales_clerk,agent_run_bodies,none,false
 sales_clerk,print_profile,none,false
+sales_clerk,agent_quotation,edit,false
+sales_clerk,agent_customer_onboarding,edit,false
 sales_manager,sales,post,true
 sales_manager,sales_invoice,edit,false
 sales_manager,inventory,read,false
@@ -120,8 +122,6 @@ sales_manager,partner_insight,edit,false
 sales_manager,data_protection,read,false
 sales_manager,agent_run_bodies,none,false
 sales_manager,print_profile,none,false
-sales_manager,agent_quotation,edit,false
-sales_manager,agent_customer_onboarding,edit,false
 buyer,purchasing,edit,false
 buyer,customs_declaration,read,false
 buyer,landed_cost,read,false

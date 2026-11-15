@@ -375,6 +375,12 @@ X(*ins("bill_of_materials_revision", id=R2, bill_of_materials_id=I["B"], revisio
 bad("N05 component scrap of 100 percent is rejected (scrap in [0, 100))", "ck_bill_of_materials_component_scrap", bom_comp(R2, component_scrap_percent=100))
 bad("N06 linear sizing needs quantity_per_value and a numeric characteristic", "ck_bill_of_materials_component_linear", bom_comp(R2, sizing="linear", quantity=0))
 bad("N07 a zero quantity is allowed only as the base of linear sizing", "ck_bill_of_materials_component_quantity", bom_comp(R2, quantity=0))
+VA_W = new()
+good("N07b a linear base may be negative (-0.4 + 0.001 x width); the result over the width range is a release check (ADR-0046 rule 12 note)",
+     ("insert into variant_attribute (id, company_id, code, name, value_type, minimum_value, maximum_value, step_value, decimal_places) "
+      "values (%s,%s,'W_N07B','Width','number',600,2000,1,0)", (VA_W, I["co"])),
+     bom_comp(R2, position=31, sizing="linear", quantity=-0.4, quantity_per_value=0.001, sizing_attribute_id=VA_W))
+bad("N07c ... a negative quantity with fixed sizing is refused", "ck_bill_of_materials_component_quantity", bom_comp(R2, quantity=-1))
 bad("N08 a co-product output needs a cost coefficient", "ck_bill_of_materials_output_coefficient",
     ins("bill_of_materials_output", id=new(), bill_of_materials_revision_id=R2, position=1, output_item_id=I["iK"], quantity=1, uom_id=I["ea"], output_type="co_product"))
 bad("N09 an internal routing operation needs a work center and no service fields", "ck_routing_operation_control_fields",

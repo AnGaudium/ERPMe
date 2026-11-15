@@ -73,6 +73,8 @@ Policy is a deterministic threshold table per company, as runbook B7 asks.
 
    `policy_input_hash` is its canonical SHA-256 (ADR-0028 rule 14). Inputs read under locks come through `context.evaluate_policy` (ADR-0029 rule 6): the credit check is a condition of the same evaluation, not an action of its own (ADR-0030 rule 7).
 
+   Note (simulation review, 2026-11-15): a purchase request carries no price. Its `policy_input` values each line at the supplier's purchase list price (`find_price`), else the item's last purchase price, else zero with `is_cost_unknown` ([ADR-0047](0047-commercial-documents-and-pricing.md) rule 9 note).
+
 **Evaluation**
 
 5. Which actor is evaluated:

@@ -47,6 +47,7 @@ service_receipt,purchasing,document_type,purchasing,Service receipt,0.1.0,ADR-00
 planning_run,planning,function,planning,Planning runs,0.1.0,ADR-0024; ADR-0036.
 planned_order,planning,function,planning,Planned orders,0.1.0,"Firm, update and convert planned orders (ADR-0024; ADR-0036 rule 12)."
 forecast,planning,function,planning,Forecasts,0.1.0,ADR-0024 rule 12.
+supplier_item,planning,function,planning,Supplier items,0.1.0,"CreateSupplierItem and UpdateSupplierItem at edit: supplier minimums, multiples, preference and lead times, the planning agent's lead-time proposals (ADR-0024 rules 2, 23)."
 general_journal,finance,document_type,ledger,General journal entry,0.1.0,ADR-0014 rule 3; ADR-0048 rule 15.
 open_item_matching,finance,document_type,ledger,Open item matching,0.1.0,ADR-0026 rule 9.
 balance_transfer,finance,document_type,ledger,Balance transfer,0.1.0,ADR-0026; ADR-0048 rule 18.

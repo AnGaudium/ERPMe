@@ -443,8 +443,10 @@ CREATE TABLE bill_of_materials_component (                 -- ADR-0033 rule 6; s
     FOREIGN KEY (company_id, bill_of_materials_revision_id) REFERENCES bill_of_materials_revision (company_id, id),
     FOREIGN KEY (company_id, component_item_id) REFERENCES item (company_id, id),
     CONSTRAINT fk_bill_of_materials_component_sizing FOREIGN KEY (company_id, sizing_attribute_id, sizing_value_type) REFERENCES variant_attribute (company_id, id, value_type),
-    -- fixed sizing needs a positive quantity; a linear base may be zero (a zero result drops the line)
-    CONSTRAINT ck_bill_of_materials_component_quantity CHECK (quantity > 0 OR (sizing = 'linear' AND quantity >= 0)),
+    -- fixed sizing needs a positive quantity; a linear base may be zero or negative (e.g. -0.4 + 0.001 * width): the
+    -- result at the characteristic's minimum and maximum is a release check (configured_quantity_negative, ADR-0046
+    -- rule 12 and its note), and a zero result drops the line
+    CONSTRAINT ck_bill_of_materials_component_quantity CHECK (quantity > 0 OR sizing = 'linear'),
     CONSTRAINT ck_bill_of_materials_component_linear CHECK ((sizing = 'linear') = (quantity_per_value IS NOT NULL AND sizing_attribute_id IS NOT NULL))
 );
 CREATE TABLE bill_of_materials_output (                    -- co-products and by-products besides the main output (ADR-0033 rule 7)
