@@ -236,6 +236,15 @@ CREATE TABLE data_processing_permission (                  -- company data, chan
     assessment_attachment_id uuid,                         -- the recorded assessment, where the regime policy requires one
     assessed_on              date,
     approved_by_user_id      uuid NOT NULL REFERENCES user_account (id),
+    -- ADR-0063 rule 14: optional purposes; the provider's terms and retention the permission was approved under, copied from
+    -- the registry by the handler (null only where the registry declares no terms reference); suspended when the registry
+    -- changes the endpoint's region or terms (RunDataProcessingProviderCheck).
+    purposes                 text[] CONSTRAINT ck_data_processing_permission_purposes CHECK (purposes IS NULL OR (cardinality(purposes) >= 1
+                                 AND purposes <@ ARRAY['supplier_invoice', 'contact_card', 'inquiry_lines', 'product_source'])),
+    provider_terms_ref       text,
+    provider_retention_days  integer CONSTRAINT ck_data_processing_permission_retention CHECK (provider_retention_days IS NULL OR provider_retention_days >= 0),
+    suspended_at             timestamptz,
+    suspension_reason        text CONSTRAINT ck_data_processing_permission_suspension_reason CHECK (suspension_reason IN ('provider_region_changed', 'provider_terms_changed')),
     effective_from           date NOT NULL,
     effective_to             date,                         -- inclusive; null = open
     recorded_at              timestamptz NOT NULL,
@@ -243,6 +252,7 @@ CREATE TABLE data_processing_permission (                  -- company data, chan
     FOREIGN KEY (company_id, assessment_attachment_id) REFERENCES attachment (company_id, id),
     CONSTRAINT ck_data_processing_permission_assessment CHECK ((assessment_attachment_id IS NULL) = (assessed_on IS NULL)),
     CONSTRAINT ck_data_processing_permission_dates CHECK (effective_to IS NULL OR effective_to >= effective_from),
+    CONSTRAINT ck_data_processing_permission_suspended CHECK ((suspended_at IS NULL) = (suspension_reason IS NULL)),
     -- one permission per class, seat class, provider and region on any date
     CONSTRAINT ex_data_processing_permission_overlap EXCLUDE USING gist (
         company_id WITH =, data_class WITH =, seat_class WITH =, provider WITH =, processing_region WITH =,

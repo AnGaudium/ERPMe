@@ -57,6 +57,8 @@ A capability check (2026-11-15) found that only approvals are configurable: the 
    - **Configurable means configured.** `agent_wake_up` skips a kind declared `configurable`. A company starts the agent on it, or on a configurable trigger, only by an automation rule whose action is `start_agent`, with its own conditions. Without such a rule the item stays with people (Principle 12).
    - **Interim, flagged for the author.** Every kind the six agent types of ADR-0051 declare stays `always` in their current versions, and none declares a configurable trigger, so behavior does not change. Which triggers become configurable is the author's (open question); making one configurable is a new agent type version (ADR-0050 rule 12).
 
+   Note ([ADR-0063](0063-configurable-policy-settings.md), proposed 2026-11-15): "configurable" now means that the company chooses the wake-up mode, `always` by default; "configurable means configured" applies under the mode `by_rule` (rule 11).
+
 **Automation rules**
 
 8. Shape (company data; DDL `automation_rule`, `automation_rule_version`):
@@ -123,6 +125,8 @@ A capability check (2026-11-15) found that only approvals are configurable: the 
     - **Trip.** The consumer runs `DisableAutomationRule` with reason `circuit_breaker` when a rule's live executions record, among outcomes `refused`, `failed` or `partial`, either `automation.breaker_failures` within `automation.breaker_window_minutes` (company settings, defaults 5 and 60, flagged), or 20 in a row at any rate. Skips by design and outcomes `skipped_same_target` and `depth_exceeded` do not count. The window is counted on the executions' business date and recorded instant, declared a technical timer of the breaker (ADR-0007 rule 10, as ADR-0013 rule 7 declares the delivery timers); the count in a row needs no clock.
     - **Who.** `DisableAutomationRule` runs under the consumer's registered permission, not the owner's, because the owner may be the one who lost a right. It raises `automation_rule_disabled` for the owner, or for `company_owner` when the owner can no longer open the company.
     - **Back.** A person runs `EnableAutomationRule`, which re-enables the same current version after the checks of rule 15; it never changes the version.
+
+    Note ([ADR-0063](0063-configurable-policy-settings.md), proposed 2026-11-15): the three thresholds are the settings `automation.breaker_failures` (1 to 50), `automation.breaker_window_minutes` (5 to 1,440) and `automation.breaker_consecutive` (3 to 200, at least the failures), each with an override in a rule version's content; the flood guard `automation.max_executions_per_rule_per_hour` (500) records `rate_limited`, which never counts (rule 21).
 17. Idempotency: one execution per (rule version, event, mode), a unique key of `automation_execution`; every action's command key is `automation:<rule version id>:<event id>:<n>`, so a retried delivery replays the stored responses (ADR-0008 rule 16) and never duplicates a draft or an item.
 
 **Decision tables**

@@ -98,6 +98,8 @@ ADR-0017 fixed the envelope: permissions are the names of registered commands, q
    - **Installation-scoped commands** (package loading, installation roles, the operator variants of rule 3) stay with the `operator` role (ADR-0017 rule 7) and are outside the tree. `ConfirmUserInvitation` and the invited person's `CancelUserInvitation` need no leaf either: their check is that the caller is the invitation's user (rule 3).
 
    Note: new leaves: one per agent type under `agent` (`agent_customer_onboarding`, `agent_quotation`, `agent_bank_matching`, `agent_purchase_invoice`, `agent_planning`, `agent_data_migration`), each holding `start_agent:<agent_type>`, and `event_delivery` under Administration; `agent` belongs to module `agents`. `StartAgentRun` and `CancelAgentRun` need no leaf of their own: their check is a capability (rule 24 note), as the invitation commands' check is the caller. Commands registered `is_internal_only` keep their leaf for grouping, and no level reaches them (rule 8 note).
+
+   Note ([ADR-0063](0063-configurable-policy-settings.md), proposed 2026-11-15): a new leaf `data_processing` under `agent` (module `agents`) holds `SetDataProcessingPermission`, `EndDataProcessingPermission` and `RunDataProcessingProviderCheck`, so a data-protection role can approve permissions without managing agents (rule 14).
 8. The level a permission needs:
    - **Levels are ordered:** `none` < `read` < `edit` < `post` < `full`.
    - **Queries** (`Get`, `List`, computed queries) need `read`.

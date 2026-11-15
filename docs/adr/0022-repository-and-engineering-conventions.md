@@ -209,6 +209,8 @@ Checks:
     - **Documents.** Relative Markdown links resolve, and per-directory `AGENTS.md` files are within 40 lines.
     - **Licences and workflows.** Dependency licences are on the allowlist ([18](../spec/18-license-governance.md)). No workflow uses a self-hosted runner, and actions are pinned by commit SHA.
 
+    Note ([ADR-0063](0063-configurable-policy-settings.md), proposed 2026-11-15): transaction-level advisory locks (`pg_advisory_xact_lock`) are allowed on handler and trigger paths, because they end with the transaction; session-level advisory locks stay banned. The first user is the settings trigger, which serializes changes per company and key ([ADR-0063](0063-configurable-policy-settings.md) rule 2).
+
 **One command for agents and CI**
 
 14. `erpme-dev` subcommands. Each prints a JSON summary as its last line with `--json`; at `build_step` 0 a subcommand whose inputs do not exist yet reports `skipped` with the reason:

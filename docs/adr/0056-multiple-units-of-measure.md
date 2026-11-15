@@ -40,6 +40,8 @@ Catch weight, batch-specific factors, an order price unit, handling-unit quantit
    - **Statutory unit names.** A localization package may supply statutory names of the core units for its regime's statutory outputs (e-invoice lines, statutory prints), as terminology keys `uom.<code>.name` read from its file `i18n/<language>/unit_names.csv`, one row per core unit with its basis (ADR-0016 rules 5, 6, 18). Statutory outputs take the package's name when present, else the core translation (rule 18). The core holds no country's statutory unit names; `l10n_vn`'s draft file is DS-19's.
    - **Retired units.** `is_active` false retires a unit: no new product unit, price entry, supplier order unit, product default unit or source line may name it. History keeps it.
 
+   Note ([ADR-0063](0063-configurable-policy-settings.md), proposed 2026-11-15): this interim stands. The regime settings `documents.unit_name_source` (default `statutory_then_translation`) and `documents.e_invoice_unit_code_scheme` (default `unece_rec20_21`) join `documents.unit_name_max_length` (rule 23).
+
 3. **Global conversions.** `uom_conversion` is a core catalog, `catalogs/unit-conversions.csv` (owner DS-20), between core units of one kind:
    - **Direct pairs only.** Each pair is stored once, from the larger unit, so its factor is at least 1 (1 `KGM` = 1000/1 `GRM`). The inverse is derived, never stored. The database refuses a second row for the same pair in either direction.
    - **No chaining.** A conversion is found only as a stored pair or its inverse, never through a third unit. Gram to tonne needs its own row.

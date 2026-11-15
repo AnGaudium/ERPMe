@@ -464,6 +464,21 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Case-reference column | — | A column of another table that points at a case of a tunable function (a payment's link to its bank line); held-out filtering follows it |
 | Account rule | bank\_matching\_rule | A matching rule that maps a token to an account, scored only for a whole, reference-shaped token on the account's natural side |
 | Matching rule version | bank\_matching\_rule version | A bank matching rule as a `matching_rule` artifact: written as a draft version, raised by `SetArtifactVersionState`; this supersedes "proposal-bound" in the row Bank matching rule |
+| Settings registry, setting definition | setting\_definition | The registered definition of a setting: key, scope, type, core default or fail-closed, bounds, direction, leaf, change effect and what a loosening outdates ([ADR-0063](../adr/0063-configurable-policy-settings.md)) |
+| Setting value | setting\_value | An append-only, dated value of a setting at a company, category, money account, scanner profile, agent type or installation scope, with old value, actor, reason, proposal and approver |
+| Effective setting | EvaluateSetting | The value in force for a key, scope and date, with its source: core default, regime, company or a narrower scope |
+| Tighten, loosen | change\_kind | A change toward less autonomy or risk, which one person makes at once; a change toward more, which needs an approved change proposal and outdates dependent evidence |
+| Fail closed | fail\_closed | A setting without a core default: reading it without a value fails instead of assuming one |
+| Hard lock | — | A rule no setting can relax, kept few, each with its reason in ADR-0063 rule 6 |
+| Bank charge rule | bank\_charge | An account rule for a bank's own charges, recognized by the line's bank transaction code; it may auto-post below a capped amount |
+| Bank transaction code | bank\_transaction\_code | The bank's code for a statement line's kind of transaction, from the statement |
+| Wake-up mode | wake\_up\_mode | Per agent type and configurable kind: `always`, `by_rule` or `off` |
+| Drift action | drift\_action | What an agent type's quality signal also does: nothing, pause new runs, or run as shadow |
+| Declared projection | tainted\_projection | The closed-shape columns of a query that a tainted run may receive, at most 20 rows per call |
+| Extension point | extension\_point | A module's declared seat for a later sandboxed pure function: typed input and output, a code default and ceilings |
+| Flood guard | automation.max\_executions\_per\_rule\_per\_hour | The hourly limit of one rule's live executions, beyond which they are recorded `rate_limited` |
+| Narrative mode | analysis.narrative\_mode | How analysis answers explain: key facts only, a claim plan rendered by code, or later free prose |
+| Best before date | best\_before\_date | A lot's quality date from GS1 (15), kept apart from its expiry date |
 | Outbound content check | query `GetOutboundContentCheck` (check result `outbound_content_flagged`) | The check that a customer-facing draft names no other partner's records and carries no cost or margin fields; evaluated in the plan of the command that creates or updates the draft |
 | Outside subject | (registry mark on subject tables) | A run subject that is outside content (an inbound interaction, an incoming e-invoice record, a bank statement line, an import batch or row, or any row whose `is_untrusted` is true); a run on it starts tainted, whoever starts it |
 | Work item | work\_item | Business work for a person or agent, with claim and due date; module `work`, layer 2 (DS-29); kinds registered in [work-item-kinds.csv](../catalogs/work-item-kinds.csv) ([ADR-0042](../adr/0042-work-queue.md)) (see also Work queue item) |

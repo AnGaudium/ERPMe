@@ -715,10 +715,12 @@ ALTER TABLE warehouse ADD CONSTRAINT fk_warehouse_default_shipping_bin FOREIGN K
 CREATE TABLE lot (                                         -- ADR-0020 rule 17 [inventory]
     id uuid PRIMARY KEY, company_id uuid NOT NULL, item_id uuid NOT NULL,
     code text NOT NULL, expiry_date date, manufacture_date date, UNIQUE (item_id, code),
+    best_before_date date,                                 -- ADR-0063 rule 26: (15) best before, kept apart from expiry_date
     barcode text, UNIQUE (company_id, barcode),            -- the lot's own internal label code, registered across types (ADR-0061 rules 7-8)
     CONSTRAINT ck_lot_code_not_empty CHECK (code <> ''),   -- any code is kept as it comes, but never an empty one (ADR-0061 rule 8)
     FOREIGN KEY (company_id, item_id) REFERENCES item (company_id, id),
-    CONSTRAINT ck_lot_dates CHECK (expiry_date IS NULL OR manufacture_date IS NULL OR expiry_date >= manufacture_date)
+    CONSTRAINT ck_lot_dates CHECK (expiry_date IS NULL OR manufacture_date IS NULL OR expiry_date >= manufacture_date),
+    CONSTRAINT ck_lot_best_before CHECK (best_before_date IS NULL OR manufacture_date IS NULL OR best_before_date >= manufacture_date)
 );
 CREATE TABLE serial_number (                               -- ADR-0020 rule 17 [inventory]
     id uuid PRIMARY KEY, company_id uuid NOT NULL, item_id uuid NOT NULL,

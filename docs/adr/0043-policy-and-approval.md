@@ -145,6 +145,8 @@ Policy is a deterministic threshold table per company, as runbook B7 asks.
     - **Who approves.** The approver must hold that procedure's role, the target commands' permissions and every field class the proposal changes (ADR-0029 rule 3), and segregation of duties applies.
     - **The bank-account rule.** It is seeded (rule 15) and cannot be disabled while ADR-0029 rule 4's interim stands: the command that changes a partner's bank account returns `proposal_required`.
     - **The mechanism.** A rule with `action` `direct_master_data_change`, a `command_type`, and `effect` `deny` for `human` is checked by the dispatcher before the command runs. Only `deny` is allowed for this action. It writes no decision row, only the error.
+
+    Note ([ADR-0063](0063-configurable-policy-settings.md), proposed 2026-11-15): a loosening of a registered setting is a change proposal with the item `UpdateCompanySetting`, approved by a person holding the setting's leaf at `full` who is neither the submitter nor a writer; tightening never needs one (rule 3).
 13. Approvals:
     - **Commands.** `Approve<Type>` and `Reject<Type>` are human actions (ADR-0017 rule 15).
     - **Who may approve.** The approver must hold the procedure's role in the document's scope.
@@ -166,6 +168,8 @@ Policy is a deterministic threshold table per company, as runbook B7 asks.
     The shadow evidence comes through an evidence hook that `policy` declares and `cash` registers (`GetAutoPostShadowEvaluation`), wired by `app`, and is stored on the rule version; `EnablePolicyRule` returns `shadow_evidence_insufficient` below the figures of [ADR-0051](0051-agent-workflows.md) rule 18.
 
     Note ([ADR-0059](0059-ai-tuning-and-development-of-deterministic-functions.md), proposed 2026-11-15): the hook also answers `auto_post_eligibility` for a `system` posting of a cascade draft: its line carries the parameters hash the stored evidence names, was proposed while the parameter set's state in force was `active` or `core_default`, is not a tied match, carries no `counterparty_unverified` or `paid_by_third_party` flag, and the rule version's evidence is not marked outdated (`shadow_evidence_outdated_by`, set by `policy.contract.mark_auto_post_evidence_outdated` through the hook `artifact_in_force_changed`, in the same transaction as a demotion, rollback, invalidation or failed re-evaluation of the parameter set); otherwise the posting gets `human_post`. The stored evidence names the function code with the hash. Account-rule drafts also need evidence that counts account-rule proposals. `EnablePolicyRule` refuses outdated evidence (`auto_post_evidence_outdated`). `GetAutoPostShadowEvaluation` counts only proposals made under one hash and names it with the parameter set's latest transition (rules 2, 6, 10).
+
+    Note ([ADR-0063](0063-configurable-policy-settings.md), proposed 2026-11-15): the evidence floor is the setting `auto_post.max_error_rate` (default 1%, at most 2%): at least ceil(3 / rate) proposals with at least (1 - rate) posted unchanged, which the default makes ADR-0051 rule 18's 300 at 99%. `bank_charge` rules have their own capped evidence. A reversal of a `system` posting, or a confirmation recording it wrong, marks the rule version's evidence outdated and raises `auto_post_suspended` (rules 9, 10).
 15. Templates. The core seeds each company with:
     - two procedures, `standard` (rank 10, `accountant`) and `senior` (rank 20, `chief_accountant`);
     - the bank-account rule of rule 12;

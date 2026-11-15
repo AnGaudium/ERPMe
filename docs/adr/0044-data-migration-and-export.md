@@ -67,6 +67,8 @@ The migration period is then locked.
 
    Note ([ADR-0062](0062-product-engineering-workflow.md), proposed 2026-11-15): phase 2 also loads work centers and activity types, bills of materials (multi-level by a level or indent column), routings with setup and run times and activities, and production versions, after products and items; rows resolve components by exact code, barcode, supplier code with its supplier and manufacturer part number with its manufacturer, each to exactly one item, else `item_unresolved` ([ADR-0062](0062-product-engineering-workflow.md) rule 18).
 
+   Note ([ADR-0063](0063-configurable-policy-settings.md), proposed 2026-11-15): company setup also presents the settings registry grouped by area with each setting's core default, bounds and direction; the company starts on the core defaults, and values set during setup follow the change path (rule 5).
+
 **Formats and identities**
 
 4. The template is one workbook, generated from the registry:

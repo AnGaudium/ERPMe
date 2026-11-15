@@ -30,6 +30,8 @@ Every amended ADR gets a note at the end of the amended rule, citing a rule of t
 
    Note ([ADR-0057](0057-document-intake-and-extraction.md), proposed 2026-11-15): the data-processing policy is core and regime-neutral: the core registers the key `data_processing.policy` and the gate, without a default; a regime's values (such as a recorded assessment for cross-border processing of personal data) are package data, and the test package `l10n_xx` declares its own ([ADR-0057](0057-document-intake-and-extraction.md) rules 20, 30).
 
+   Note ([ADR-0063](0063-configurable-policy-settings.md), proposed 2026-11-15): every core setting is registered with a core default or `fail_closed`; a key whose content is a regime's law or accounting rule has no core default, and packages fill such neutral keys and may only tighten core floors (rules 1, 18).
+
 **Tax**
 
 2. Tax kinds. The core `tax_kind` of a tax code is one of `vat`, `sales_tax`, `excise`, `customs_duty` or `other` (ADR-0041 rule 1 gets a note).

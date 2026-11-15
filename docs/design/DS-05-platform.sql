@@ -350,6 +350,8 @@ CREATE TABLE policy_rule_version (
     shadow_evidence         jsonb,                         -- stored on the rule version by EnablePolicyRule (rule 14)
     -- ADR-0059 rule 6: the demotion, rollback, invalidation or failed re-evaluation of the cascade's parameter set that made the
     -- stored evidence outdated, set once in that transaction; no key: the configuration file is loaded after this one.
+    -- ADR-0063 rules 3 and 10: also the setting_value row of a loosening that outdates auto-post evidence, or the audit record
+    -- of a reversal or wrong confirmation of a system posting.
     shadow_evidence_outdated_by uuid CONSTRAINT ck_policy_rule_version_outdated CHECK (shadow_evidence_outdated_by IS NULL OR shadow_evidence IS NOT NULL),
     recorded_at             timestamptz NOT NULL,
     UNIQUE (policy_rule_id, version),
@@ -1012,6 +1014,7 @@ CREATE TABLE bank_statement_line (
     counterparty_name             text,
     counterparty_bank_code        text,
     counterparty_account_number   text,
+    bank_transaction_code         text,                    -- ADR-0063 rule 9: the bank's code for the line (an ISO 20022 family and sub-family, or the bank's own), from the statement reader
     description                   text,
     match_state                   text NOT NULL DEFAULT 'unmatched' CONSTRAINT ck_bank_statement_line_match_state CHECK (match_state IN ('unmatched', 'proposed', 'matched', 'ignored')),
     ignore_reason                 text,
@@ -1028,7 +1031,7 @@ CREATE TABLE bank_statement_line (
     match_parameter_state         text CONSTRAINT ck_bank_statement_line_match_parameter_state CHECK (match_parameter_state IN ('core_default', 'assisted', 'active')),
     match_is_tied                 boolean NOT NULL DEFAULT false,
     match_basis                   text CONSTRAINT ck_bank_statement_line_match_basis CHECK (match_basis IN (
-                                      'already_posted', 'reference', 'account_amount', 'account_subset', 'company_rule', 'llm_suggestion', 'manual')),   -- interim: values not stated in ADR-0048 (cascade steps of rule 9)
+                                      'already_posted', 'reference', 'account_amount', 'account_subset', 'company_rule', 'bank_charge_rule', 'llm_suggestion', 'manual')),   -- bank_charge_rule: ADR-0063 rule 9   -- interim: values not stated in ADR-0048 (cascade steps of rule 9)
     -- RecordBankLineSuggestion (ADR-0051 rule 17): tokens, name, purpose and run, all is_untrusted. interim: column names not stated in ADR-0051.
     suggested_reference_tokens    text[] CONSTRAINT ck_bank_statement_line_suggested_tokens CHECK (cardinality(suggested_reference_tokens) <= 5),
     suggested_payer_name_text     text,

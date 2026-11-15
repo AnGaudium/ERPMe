@@ -167,6 +167,8 @@ The hard floor on what a tainted run may read stays the literal spec 03 rule 1 u
 
     Note: for a generated file the outbound check reads the attachment's `generated_kind`, `generated_audience` and `generated_subject_document_id`: only an external print of a document of the message's partner passes ([ADR-0049](0049-statutory-reporting-and-printing.md) rule 29).
 
+    Note ([ADR-0063](0063-configurable-policy-settings.md), proposed 2026-11-15): declared projections of closed shapes (the first is `ListItemCandidate`) join the reference data of the literal scope as a reading of spec 03 rule 1 under the author's direction of 2026-11-15; the company setting `agents.tainted_reference_reads` only narrows it back to the literal scope, so no setting widens the floor (rule 16).
+
 **Audit and checks**
 
 15. Audit rows (ADR-0027 rule 8) also record `origin_agent_run_id`, `on_behalf_of_id` and `policy_decision_id`. Full columns: [ADR-0038](0038-audit-and-observability.md) rule 2.

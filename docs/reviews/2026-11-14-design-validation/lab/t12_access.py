@@ -322,10 +322,20 @@ REG += [("cancel_agent_runs", "agent", "capability", None, "full"),
         ("ReplayEvents", "event_delivery", "command", "Replay", "other"),
         ("RecordSalesInvoiceEInvoiceOutcome", "sales_invoice", "command", "Record", "other"),
         ("RunAutomationOwnerScopeCheck", "automation", "command", "Run", "other")]   # ADR-0058 rule 9: a daily system job
+# Configurable policy settings (ADR-0063 rule 28).
+REG += [("UpdateCompanySetting", "company_setting", "command", "Update", "master_data_change"),
+        ("RunSettingUpgradeCheck", "company_setting", "command", "Run", "other"),
+        ("RunDataProcessingProviderCheck", "data_processing", "command", "Run", "other"),
+        ("SetDataProcessingPermission", "data_processing", "command", "Set", "master_data_change", "full"),
+        ("EndDataProcessingPermission", "data_processing", "command", "End", "master_data_change", "full"),
+        ("ListSettingDefinition", "company_setting", "query", "List", None), ("ListSettingValue", "company_setting", "query", "List", None),
+        ("EvaluateSetting", "company_setting", "query", "Evaluate", None), ("ListItemCandidate", "product", "query", "List", None),
+        ("GetArtifactVersionContent", "configuration", "query", "Get", None)]
 # Commands registered is_internal_only (ADR-0008 rule 1 note; ADR-0054 rule 8 note): outside the level expansion.
 INTERNAL = {"RunRetiredSsccCleanup", "CompleteAgentRun", "RunAgentQualityCheck", "RunApprovalEscalation", "RecordSalesInvoiceEInvoiceOutcome",
             "RecordInboundMessage", "RecordMailboxIntakeOutcome", "RecordMailboxAuthenticationCheck", "RecordOutboundMessageOutcome",
-            "RecordPartnerTaxLookup", "RecordRenderOutcome", "RunPartnerDuplicateScan", "RunPartnerInsightComputation", "RunAutomationOwnerScopeCheck"}
+            "RecordPartnerTaxLookup", "RecordRenderOutcome", "RunPartnerDuplicateScan", "RunPartnerInsightComputation", "RunAutomationOwnerScopeCheck",
+            "RunSettingUpgradeCheck", "RunDataProcessingProviderCheck"}
 
 def need(entry):
     perm, leaf, kind, verb, effect = entry[:5]

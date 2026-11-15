@@ -111,7 +111,7 @@ CREATE TABLE automation_execution (
     causation_chain_id          uuid NOT NULL,             -- the triggering event's chain and depth (rule 12)
     causation_depth             smallint NOT NULL CONSTRAINT ck_automation_execution_depth CHECK (causation_depth BETWEEN 0 AND 3),
     outcome                     text NOT NULL CONSTRAINT ck_automation_execution_outcome CHECK (outcome IN (
-                                    'acted', 'partial', 'skipped', 'would_act', 'skipped_same_target', 'depth_exceeded', 'refused', 'failed')),
+                                    'acted', 'partial', 'skipped', 'would_act', 'skipped_same_target', 'depth_exceeded', 'refused', 'failed', 'rate_limited')),   -- rate_limited: ADR-0063 rule 21
     condition_results           jsonb NOT NULL,            -- per condition: field, operator, field class, label, value read (personal: HMAC under the company key, or omitted), result; readers lacking a class get value and result omitted
 
     input_hash                  text NOT NULL CONSTRAINT ck_automation_execution_input_hash CHECK (input_hash ~ '^[0-9a-f]{64}$'),
