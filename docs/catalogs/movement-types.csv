@@ -1,6 +1,6 @@
 code,name,direction,value_source,costing_role,offset_transaction_key,needs_reference,sap_analog,added_in,meaning
 purchase_receipt,Purchase receipt,in,document,receipt,gr_ir_clearing,true,101,0.1.0,"Goods received against a purchase order, valued from the order; offset to GR/IR clearing."
-purchase_return,Purchase return,out,regime,regime,gr_ir_clearing,true,122,0.1.0,"Goods returned to a supplier. Set by regime; interim seed (unverified): document value, negative receipt."
+purchase_return,Purchase return,out,regime,regime,gr_ir_clearing,true,122,0.1.0,"Goods returned to a supplier. Set by regime; interim seed (unverified): document value, negative receipt. For goods received against a purchase order line the document value is the GR/IR debit of the positions the return debits, the latest (ADR-0020 rule 5 note)."
 sales_issue,Sales issue,out,preliminary_price,revalued_issue,cost_of_goods_sold,true,601,0.1.0,"Goods issued for a sale, valued at the preliminary price and revalued at period end."
 sales_return_receipt,Sales return receipt,in,regime,regime,cost_of_goods_sold,true,651,0.1.0,"Goods a customer returned. Set by regime; interim seed (unverified): document value (the original issue cost), receipt."
 transfer_out,Transfer out,out,preliminary_price,transfer,,true,301,0.1.0,Issuing side of a transfer between warehouses; the receiving side is transfer_in on the same document.

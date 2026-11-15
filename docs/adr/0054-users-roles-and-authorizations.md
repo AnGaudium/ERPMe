@@ -189,6 +189,12 @@ ADR-0017 fixed the envelope: permissions are the names of registered commands, q
 
     `sales_manager` and `chief_accountant` no longer hold these capabilities, so the people who approve quotations, onboarding proposals and mismatched supplier invoices are not their writers through a run. `owner` and `it_administrator` keep every agent type. In [role-template-levels.csv](../catalogs/role-template-levels.csv); lab check `t12_access.py` C28. Interim, flagged with the template contents (open question).
 
+    Note (UoM simulation review, 2026-11-15): unit maintenance moves to its own leaves ([ADR-0056](0056-multiple-units-of-measure.md) rule 20 note): `product_unit` (`CreateProductUom`, `UpdateProductUom`, `CreateUom`, `UpdateUom`) and, below it, `uom_alias` (`CreateUomAlias`, `UpdateUomAlias`), under `product`. Template changes, in [role-template-levels.csv](../catalogs/role-template-levels.csv):
+    - `purchasing_manager`, `chief_accountant` and `warehouse_keeper`: `product_unit` `edit`, which covers `uom_alias`;
+    - `accountant`: `uom_alias` `edit`, so the purchase invoice agent's workflow owner maintains unit aliases but not units or conversions.
+
+    The rows carry no approval flag: no document type lies below these leaves, so the flag would add no command (rule 9). The purchasing manager and the chief accountant already approve change proposals (`change_proposal` with `can_approve`, and Master data for the chief accountant), and now also hold the target commands, so either can approve a unit or alias proposal ([ADR-0055](0055-approval-pools-and-stages.md) rule 7; [ADR-0043](0043-policy-and-approval.md) rule 12); the accountant submits such proposals and approves none, and the warehouse keeper approves nothing. No seeded segregation rule names these commands. `owner` keeps them through Master data `full`, and `auditor` reads. Lab check `t12_access.py` C28c and G53. Interim, flagged with the template contents (open question).
+
 **Assignments, record scope and owner scope**
 
 12. `role_assignment` (company data, change-tracked):

@@ -693,6 +693,80 @@ vn = read_csv(vn_path) if os.path.exists(vn_path) else []
 check("U48 l10n_vn unit names: one Vietnamese name for every core unit and only for core units, each unverified with an open question",
       vn and sorted(r["code"] for r in vn) == sorted(CORE) and all(r["name_vi"].strip() and r["basis"] == "unverified" and r["basis_document"].startswith("(DS-") for r in vn),
       len(vn))
+# --- UoM simulation review, 2026-11-15: the positions and value of a return, the preliminary price before the first receipt
+def layer_value(layers, x):
+    """V(x): the exact value of positions 0 to x over GR/IR price layers (from, to, price) (ADR-0047 rule 13)."""
+    return sum(p * max(F(0), min(F(x), b) - a) for a, b, p in layers)
+rc, c_, p_ = [], F(0), F(0)
+for _ in range(3):                                                # receipts of one bag each: 2.333, 2.334, 2.333
+    x = convert_part(f_bag, c_, p_, 1, dkg); rc.append(x); c_ += 1; p_ += x
+own_pos = [(sum(rc[:k]), sum(rc[:k + 1])) for k in range(3)]     # each receipt line's stored range
+q_ret = rc[1]                                                    # the return of receipt 2 mirrors its part (ADR-0056 rule 10)
+ret_pos = (p_ - q_ret, p_)                                       # and debits the latest received positions (ADR-0047 rule 13 note)
+one = [(F(0), F(10), price_kg)]                                  # one GR/IR price on the line
+co = [(F(0), F("4.667"), price_kg), (F("4.667"), F(10), F(33000))]   # a change order before receipt 3: 33,000 per kg
+debit = lambda L, a, b: round_amount(layer_value(L, b)) - round_amount(layer_value(L, a))
+check("U70 a return debits GR/IR at the line's latest positions and stores them: receipts 2.333, 2.334 and 2.333 hold 0-2.333, "
+      "2.333-4.667 and 4.667-7.000; the return of receipt 2 mirrors that receipt's 2.334 kg (its part reference) and stores positions "
+      "4.666-7.000 (to - from = its inventory quantity); with one price both ranges are worth 70,020, after a change order to 33,000 "
+      "the debit is 77,019 against 70,020 for the named receipt's own range (ADR-0047 rule 13 note)",
+      rc == [F("2.333"), F("2.334"), F("2.333")] and own_pos[1] == (F("2.333"), F("4.667")) and ret_pos == (F("4.666"), F(7))
+      and ret_pos[1] - ret_pos[0] == q_ret and ret_pos != own_pos[1]
+      and debit(one, *ret_pos) == debit(one, *own_pos[1]) == 70020 and (debit(co, *ret_pos), debit(co, *own_pos[1])) == (77019, 70020),
+      (debit(co, *ret_pos), debit(co, *own_pos[1])))
+gr_in = [debit(co, a, b) for a, b in own_pos]                     # receipts credit GR/IR and add stock: 69,990, 70,020, 76,989
+stock_out = debit(co, *ret_pos)                                  # interim seed: document value = the GR/IR debit (ADR-0020 rule 5 note)
+price_diff = stock_out - debit(co, *ret_pos)
+stock_left = sum(gr_in) - stock_out
+inv_debit = debit(co, F(0), F(7))                                # the invoice of 3 bags reaches positions 0-7.000
+credit_q = debit(co, F(7) - q_ret, F(7))                         # the supplier's credit follows its stock return: 2.334 at the latest invoiced positions
+balance = (inv_debit - credit_q) - (sum(gr_in) - stock_out)      # round(V(I)) - round(V(R)) with R = I = 4.666
+alt_diff = stock_out - debit(co, *own_pos[1])                    # valuing at the named receipt's own range would leave a price difference
+mt = {r["code"]: r for r in read_csv(os.path.join(CAT, "movement-types.csv"))}
+check("U71 under the interim seed the value leaving stock on a purchase return is the GR/IR debit of the positions debited: 77,019 "
+      "leaves with no price difference, 139,980 stays for 4.666 kg (the value of the positions still held), and after the supplier's "
+      "credit GR/IR is 0; the named receipt's value would leave a price difference of 6,999; movement type purchase_return keeps value "
+      "source regime and states the seed (ADR-0020 rule 5 note)",
+      gr_in == [69990, 70020, 76989] and (stock_out, price_diff, stock_left) == (77019, 0, 139980)
+      and stock_left == round_amount(layer_value(co, F("4.666"))) and balance == 0 and alt_diff == 6999
+      and mt["purchase_return"]["value_source"] == "regime" and "GR/IR debit of the positions" in mt["purchase_return"]["meaning"],
+      (stock_out, stock_left, balance, alt_diff))
+def preliminary_price(item, prior_actual=None, area_receipt=None, company_receipt=None, produced=False, estimate=None,
+                      list_entries=None, last_invoice=None, manual=None):
+    """ADR-0020 rule 11 and its notes: the actual average of N-1, then receipts (area, company); then a produced item takes its
+    released estimate, a purchased item its purchase list price (find_price for one inventory unit, in the inventory unit),
+    else its last purchase invoice price (net after the document discount / inventory quantity); then a manual price."""
+    for p, src in ((prior_actual, "prior_actual"), (area_receipt, "area_receipt"), (company_receipt, "company_receipt")):
+        if p is not None:
+            return F(p), src
+    if produced:
+        chain = ((estimate, "cost_estimate"), (manual, "manual"))
+    else:
+        lp = find_price(list_entries, item, PROD[ITEM[item]][0], 1) if list_entries else None
+        li = F(last_invoice[0]) / F(last_invoice[1]) if last_invoice else None
+        chain = ((lp, "purchase_list"), (li, "last_purchase_invoice"), (manual, "manual"))
+    for p, src in chain:
+        if p is not None:
+            return F(p), src
+    return "preliminary_price_missing", None
+both = [("H87", 0, 11000), ("x-carton", 0, 250000)]
+ctn_only = [("x-carton", 0, 250000)]
+last_inv = (500000, 48)                                          # 2 cartons invoiced at 500,000 net: 48 pieces
+ds22 = open(os.path.join(DOCS, "design", "DS-22-09-42-commercial-inventory.sql"), encoding="utf-8").read()
+ck_src = ds22.split("CONSTRAINT ck_preliminary_price_price_source CHECK", 1)[1].split("\n", 1)[0]
+check("U72 preliminary price of a purchased item before its first receipt: the supplier list price for one piece in the inventory "
+      "unit (11,000, not 250,000 / 24); a list priced only per carton gives none, so the last purchase invoice price per inventory "
+      "unit applies (500,000 / 48); else a manual price; else preliminary_price_missing; a receipt still comes first; a produced item "
+      "keeps its released estimate and never takes a list or invoice price; DS-22 stores both new price sources (ADR-0020 rule 11 note; "
+      "ADR-0035 rule 14 note)",
+      preliminary_price("I_STD", list_entries=both, last_invoice=last_inv, manual=9000) == (11000, "purchase_list")
+      and preliminary_price("I_STD", list_entries=ctn_only, last_invoice=last_inv, manual=9000) == (F(31250, 3), "last_purchase_invoice")
+      and preliminary_price("I_STD", list_entries=ctn_only, manual=9000) == (9000, "manual")
+      and preliminary_price("I_STD", list_entries=ctn_only)[0] == "preliminary_price_missing"
+      and preliminary_price("I_STD", area_receipt=10500, list_entries=both) == (10500, "area_receipt")
+      and preliminary_price("I_STD", produced=True, estimate=8000, list_entries=both) == (8000, "cost_estimate")
+      and preliminary_price("I_STD", produced=True, list_entries=both, last_invoice=last_inv)[0] == "preliminary_price_missing"
+      and "'purchase_list'" in ck_src and "'last_purchase_invoice'" in ck_src)
 
 # ======================================================================= D: database checks (--load)
 if "--load" in sys.argv:

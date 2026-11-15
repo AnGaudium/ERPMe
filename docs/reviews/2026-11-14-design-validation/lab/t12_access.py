@@ -278,6 +278,10 @@ REG += [(f"start_agent:{a}", f"agent_{a}", "capability", None, "edit") for a in 
 # The lead-time update of ADR-0024 rule 23 (simulation review 2026-11-15).
 REG += [("CreateSupplierItem", "supplier_item", "command", "Create", "master_data_change"),
         ("UpdateSupplierItem", "supplier_item", "command", "Update", "master_data_change")]
+# Unit maintenance off the owner (ADR-0056 rule 20 note; UoM simulation review 2026-11-15).
+UNIT_CMDS, ALIAS_CMDS = ("CreateProductUom", "UpdateProductUom", "CreateUom", "UpdateUom"), ("CreateUomAlias", "UpdateUomAlias")
+REG += [(n, "product_unit", "command", verb_of(n), "master_data_change") for n in UNIT_CMDS]
+REG += [(n, "uom_alias", "command", verb_of(n), "master_data_change") for n in ALIAS_CMDS]
 REG += [("cancel_agent_runs", "agent", "capability", None, "full"),
         ("UpdateAgentTypeSetting", "agent", "command", "Update", "master_data_change", "full"),
         ("CreateAgentPromotionEvidence", "agent", "command", "Create", "other"), ("ListAgentRun", "agent", "query", "List", None),
@@ -478,6 +482,12 @@ check("C28b the supplier item commands (lead-time update, ADR-0024 rule 23 note)
       PARENT.get("supplier_item") == "planning" and KIND.get("supplier_item") == "function"
       and {t for t in TEMPLATES if "UpdateSupplierItem" in EXP[t]} == {"buyer", "purchasing_manager", "production_planner", "owner"}
       and {t for t in TEMPLATES if "CreateSupplierItem" in EXP[t]} == {"buyer", "purchasing_manager", "production_planner", "owner"})
+OLD_REG = [(e[0], "product") + tuple(e[2:]) if e[0] in UNIT_CMDS + ALIAS_CMDS else e for e in REG]   # as before: on the leaf product
+check("C28c unit maintenance (ADR-0056 rule 20 note): the unit commands need edit on the leaf product_unit and the alias commands on uom_alias below it, under product; the purchasing manager, chief accountant, warehouse keeper and owner hold all six, the accountant only the alias commands, the sales roles, buyer, production planner, IT administrator and auditor none; on the leaf product only the owner held them",
+      PARENT.get("product_unit") == "product" and PARENT.get("uom_alias") == "product_unit"
+      and all({t for t in TEMPLATES if n in EXP[t]} == {"owner", "purchasing_manager", "chief_accountant", "warehouse_keeper"} for n in UNIT_CMDS)
+      and all({t for t in TEMPLATES if n in EXP[t]} == {"owner", "purchasing_manager", "chief_accountant", "warehouse_keeper", "accountant"} for n in ALIAS_CMDS)
+      and all({t for t in TEMPLATES if n in expand(TPL[t], OLD_REG)} == {"owner"} for n in UNIT_CMDS + ALIAS_CMDS))
 check("C29 general_access at edit for every template but the auditor (uploads, list exports, approval progress); event deliveries only owner and IT administrator; ClearTaint owner and chief accountant",
       all({"CreateAttachment", "CreateListExport", "GetApprovalProgress"} <= EXP[t] for t in TEMPLATES - {"auditor"})
       and "CreateAttachment" not in EXP["auditor"] and "GetApprovalProgress" in EXP["auditor"]
@@ -1565,6 +1575,23 @@ check("G50 A approves std (own document, an exception) and O approves sen: appro
       w5["state"] == "approved" and {a_["approver"] for a_ in two_on.counted(w5)} == {"A", "O"} and ("own_document_approval", "A", w5["id"]) in two_on.exceptions)
 w6 = new_doc(author="O"); two_on.submit(w6, 20, T0); two_on.approve("A", w6, T0); two_on.approve("O", w6, T0)
 check("G51 rank 20 written by O: A approves std and O approves sen with an exception", w6["state"] == "approved")
+
+# UoM simulation review 2026-11-15: a unit alias proposal is approved by a non-owner (ADR-0056 rule 20 note). The approver needs
+# ApproveChangeProposal and the target command (ADR-0055 rule 7; ADR-0043 rule 12), and membership of the general pool's
+# seeded standard stage with the flow review's members (ADR-0055 rule 5 notes); the templates' expansions decide the rest.
+GEN_STD = ("accountant", "chief_accountant", "owner", "sales_manager", "purchasing_manager", "production_planner")
+def cp_holder(t, targets):
+    ok_ = "ApproveChangeProposal" in EXP[t] and set(targets) <= EXP[t]
+    return {"roles": {t: None}, "approve": {"change_proposal"} if ok_ else set(), "read": None, "human": True}
+GEN = {"general": [stage("gstd", 1, 10, 1, roles=GEN_STD), stage("gsen", 2, 20, 1, roles=("chief_accountant", "owner"))]}
+ua = Engine(GEN, {}, [10, 20], {t: cp_holder(t, ("CreateUomAlias",)) for t in TEMPLATES})
+d53 = new_doc(author="accountant", dtype="change_proposal")
+chk53 = ua.submit(d53, 10, T0)
+cand53 = ua.candidates(d53, d53["decision"]["plan"][0], T0)
+r53a, r53b = ok_call(ua.approve, "accountant", d53, T0), ok_call(ua.approve, "chief_accountant", d53, T0)
+check("G53 the accountant submits the purchase invoice agent's CreateUomAlias proposal; the eligible approvers are the chief accountant, the purchasing manager and the owner (ApproveChangeProposal, general.standard and the target command; the sales manager and the planner lack the target); the accountant is refused; the chief accountant approves it",
+      chk53 == [] and cand53 == {"chief_accountant", "purchasing_manager", "owner"} and r53a == "approver_not_eligible"
+      and r53b is None and d53["state"] == "approved", (sorted(cand53), r53a, r53b))
 
 c.close()
 passed = sum(1 for ok_, *_ in RESULTS if ok_)

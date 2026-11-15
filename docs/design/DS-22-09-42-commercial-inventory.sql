@@ -533,8 +533,10 @@ CREATE TABLE return_to_supplier_line (
     inventory_quantity      types.quantity NOT NULL CONSTRAINT ck_return_to_supplier_line_inventory_quantity CHECK (inventory_quantity > 0),
     warehouse_id            uuid NOT NULL,
     bin_id                  uuid,
-    gr_ir_position_from     types.quantity,                  -- interim: not stated in ADR-0047 (the latest positions the return takes, rule 13)
-    gr_ir_position_to       types.quantity,
+    gr_ir_position_from     types.quantity,                  -- the GR/IR positions [from, to) the return actually debits: the order
+    gr_ir_position_to       types.quantity,                  -- line's latest received positions (ADR-0047 rule 13 and its note); the
+                                                             -- named receipt part, the part-as-source reference (ADR-0056 rule 10),
+                                                             -- is goods_receipt_line_id
     recorded_at             timestamptz NOT NULL DEFAULT now(),
     UNIQUE (return_to_supplier_id, line_number),
     UNIQUE (company_id, id),
@@ -1301,7 +1303,7 @@ CREATE TABLE preliminary_price (
     valuation_warehouse_id  uuid,                            -- the valuation area; null at company level
     posting_period_id       uuid NOT NULL REFERENCES posting_period (id),
     unit_price              types.unit_price NOT NULL CONSTRAINT ck_preliminary_price_unit_price CHECK (unit_price >= 0),   -- company currency per inventory unit
-    price_source            text NOT NULL CONSTRAINT ck_preliminary_price_price_source CHECK (price_source IN ('prior_actual', 'area_receipt', 'company_receipt', 'cost_estimate', 'opening', 'manual')),   -- interim: not stated in ADR-0020 (which branch of rule 11 gave the price)
+    price_source            text NOT NULL CONSTRAINT ck_preliminary_price_price_source CHECK (price_source IN ('prior_actual', 'area_receipt', 'company_receipt', 'cost_estimate', 'purchase_list', 'last_purchase_invoice', 'opening', 'manual')),   -- interim: not stated in ADR-0020 (which branch of rule 11 gave the price; purchase_list and last_purchase_invoice: its rule 11 note of the UoM simulation review)
     derivation_trace_id     uuid REFERENCES derivation_trace (id),
     set_by_user_id          uuid REFERENCES user_account (id),   -- UpdatePreliminaryPrice is human_only, audited
     recorded_at             timestamptz NOT NULL DEFAULT now(),

@@ -44,6 +44,7 @@ chief_accountant,report_finance,post,false
 chief_accountant,report_tax,post,false
 chief_accountant,agent_run_bodies,none,false
 chief_accountant,print_profile,none,false
+chief_accountant,product_unit,edit,false
 accountant,sales,read,true
 accountant,sales_invoice,post,false
 accountant,sales_return,edit,true
@@ -78,6 +79,7 @@ accountant,agent_run_bodies,none,false
 accountant,print_profile,none,false
 accountant,agent_bank_matching,edit,false
 accountant,agent_purchase_invoice,edit,false
+accountant,uom_alias,edit,false
 cashier,banking,read,false
 cashier,cash_receipt,post,false
 cashier,cash_payment,post,false
@@ -151,6 +153,7 @@ purchasing_manager,interaction,edit,false
 purchasing_manager,outbound_message,post,true
 purchasing_manager,agent_run_bodies,none,false
 purchasing_manager,print_profile,none,false
+purchasing_manager,product_unit,edit,false
 warehouse_keeper,inventory,post,false
 warehouse_keeper,production_issue,post,false
 warehouse_keeper,production_receipt,post,false
@@ -164,6 +167,7 @@ warehouse_keeper,work_queue,edit,false
 warehouse_keeper,report_inventory,read,false
 warehouse_keeper,agent_run_bodies,none,false
 warehouse_keeper,print_profile,none,false
+warehouse_keeper,product_unit,edit,false
 production_planner,production,post,false
 production_planner,planning,full,false
 production_planner,inventory,read,false

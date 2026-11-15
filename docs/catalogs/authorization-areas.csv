@@ -83,7 +83,9 @@ money_account,banking,master_data,cash,Money accounts,0.1.0,ADR-0048 rule 2.
 dunning,banking,function,cash,Dunning and collections,0.1.0,ADR-0048 rule 17.
 partner,master_data,master_data,master_data,Partners,0.1.0,"Partners, roles, profiles, addresses, contacts and partner item codes (ADR-0019; ADR-0045)."
 partner_bank_account,master_data,master_data,master_data,Partner bank accounts,0.1.0,Changed only through change proposals (ADR-0029 rule 4); segregation rule bank_account_vs_payment.
-product,master_data,master_data,master_data,Products and items,0.1.0,"Products, items, variants, units, barcodes, classifications (ADR-0018; ADR-0045)."
+product,master_data,master_data,master_data,Products and items,0.1.0,"Products, items, variants, barcodes, classifications; GetItemUnits reads units here, and unit maintenance is on product_unit below (ADR-0018; ADR-0045; ADR-0056 rule 20 note)."
+product_unit,product,master_data,master_data,Product units,0.1.0,"CreateProductUom, UpdateProductUom, CreateUom and UpdateUom at edit: product and item units, their conversions and packaging, and company units; the aliases are on uom_alias below (ADR-0056 rules 4, 5, 15, 20)."
+uom_alias,product_unit,master_data,master_data,Unit aliases,0.1.0,"CreateUomAlias and UpdateUomAlias at edit: unit texts of partners and old systems, the purchase invoice agent's alias proposals included (ADR-0056 rules 19, 20)."
 configuration_model,master_data,master_data,production,Configuration models,0.1.0,ADR-0046.
 price_list,master_data,master_data,master_data,Price lists,0.1.0,ADR-0045 rules 2-7.
 warehouse,master_data,master_data,master_data,Warehouses and bins,0.1.0,"Warehouses, zones, bins, lots and serials (ADR-0023; ADR-0045)."
