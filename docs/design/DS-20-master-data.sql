@@ -7,7 +7,7 @@
 -- Every table carries company_id, FORCE ROW LEVEL SECURITY and the generated company policy (ADR-0022 rule 8), except
 -- the global catalogs currency, uom (core rows have a null company_id and are readable by all), uom_conversion, and
 -- company itself, whose policy compares its own id. The lab checks this list (ADR-0045 rule 14).
--- Owner module per table in brackets (ADR-0022 rule 2). Referenced tables defined elsewhere: user_account (DS-15),
+-- Owner module per table in brackets (ADR-0022 rule 2). Referenced tables defined elsewhere: user_account and department (DS-15-access.sql, which adds employee_profile's department key),
 -- account and payment_term (DS-06, ledger), tax groups' matrix (ADR-0041, tax).
 -- IDs are UUIDv7 from context.new_id or the client (ADR-0006 rule 3); no ID defaults.
 -- Template-copied company data keeps its package basis in `basis`, always set by the command: the template entry's
@@ -267,14 +267,19 @@ CREATE INDEX ix_supplier_profile_price_list_id ON supplier_profile (price_list_i
 CREATE TABLE employee_profile (                            -- personal data (ADR-0019 rule 7)
     company_id             uuid NOT NULL,
     partner_id             uuid PRIMARY KEY,
-    user_account_id        uuid UNIQUE REFERENCES user_account (id),
+    user_account_id        uuid REFERENCES user_account (id),           -- unique per company; set only by UpdateEmployeeOrganization (ADR-0054 rule 6)
     receivable_account_id  uuid REFERENCES account (id),           -- advances (receivable_employee_advance)
     branch_id              uuid,
     cost_center_id         uuid,
     job_title              text,
+    department_id          uuid,                                    -- key to department in DS-15-access.sql; set only by UpdateEmployeeOrganization (ADR-0054 rule 6)
+    manager_partner_id     uuid,                                    -- the employee's manager; no loops (command, employee_manager_cycle); set only by UpdateEmployeeOrganization
+    UNIQUE (company_id, user_account_id),
     FOREIGN KEY (company_id, partner_id) REFERENCES partner (company_id, id),
     FOREIGN KEY (company_id, branch_id) REFERENCES branch (company_id, id),
-    FOREIGN KEY (company_id, cost_center_id) REFERENCES cost_center (company_id, id)
+    FOREIGN KEY (company_id, cost_center_id) REFERENCES cost_center (company_id, id),
+    FOREIGN KEY (company_id, manager_partner_id) REFERENCES partner (company_id, id),
+    CONSTRAINT ck_employee_profile_manager CHECK (manager_partner_id IS DISTINCT FROM partner_id)
 );
 CREATE TABLE partner_address (
     id                uuid PRIMARY KEY,

@@ -42,6 +42,8 @@ Every exception, pending approval and other piece of business work is one `work_
      - `version`.
 
    The table has `company_id`, row-level security and the generated company policy (ADR-0017 rule 19).
+
+   Note: owner kind `approval_stage` with `owner_approval_stage_id`; the item is visible to everyone eligible for the stage ([ADR-0055](0055-approval-pools-and-stages.md) rule 12).
 3. `work_item_link` (`work_item_id`, `target_table`, `target_id`, `link_kind`: `evidence`, `draft`, `result`) holds the evidence and what was done about it, such as a derivation trace, a pegging row, a task, a delivery, or a draft the agent made.
    - **Notes.** `work_item_note` (author, text, `created_at`) is append-only. A note an agent writes from outside content is marked untrusted (ADR-0029 rule 10).
 4. Uniqueness. A unique partial index on (`company_id`, `kind`, `open_key`) where `state` is `open` or `claimed` allows one open item per exception.
@@ -68,6 +70,8 @@ Every exception, pending approval and other piece of business work is one `work_
      - `company_owner` (the `owner` role);
      - `role:<role template>`, such as `role:accountant`, company-wide.
    - **Fallback.** When a rule yields no one, or the person is deactivated, the owner is the `owner` role. When an owner is deactivated after the raise, `permissions` raises `owner_suspended` with that person's open items as evidence, and the company's owner reassigns them with `AssignWorkItem`. Kind rules `subject_assignee` (the user the subject names as assignee, such as a follow-up task's) and `subject_owner` (the user the subject names as owner, such as a mailbox's `owner_user_id`) ([ADR-0052](0052-minimal-crm.md) rules 12, 19).
+
+   Note: the kind rule `approver_role` becomes `approval_stage`, whose item falls back to `company_owner` with a reason when nobody could approve ([ADR-0055](0055-approval-pools-and-stages.md) rule 12). `role:<template>` and `company_owner` resolve through `role.template_code`, never role codes; when no active role has the template, the owner is `company_owner`. `role:sales` becomes `role:sales_clerk` ([ADR-0054](0054-users-roles-and-authorizations.md) rule 11).
 8. Due rules give business dates through the company calendar (ADR-0024 rule 4; calendar days for layer-2 callers, rule 5):
    - `same_day`, or `days:<n>` business days after the raise;
    - `required_date` minus the lead time, for planning;
@@ -75,6 +79,8 @@ Every exception, pending approval and other piece of business work is one `work_
    - `subject_due_date`, the subject's own due date, such as a data subject request's.
 
    Overdue is a query condition. Escalation comes after Phase 1 (spec 07).
+
+   Note: due rule `stage_due_days`: the day the approval stage became current plus its `due_days`, in calendar days. Approval stages escalate in Phase 1 at the author's request ([ADR-0055](0055-approval-pools-and-stages.md) rules 12–13).
 
 **Claims**
 
@@ -90,6 +96,8 @@ Every exception, pending approval and other piece of business work is one `work_
     - **Lease.** Agent claims expire after `work_claim_minutes` (company setting, default 30) unless renewed; a run renews on each command.
 
     Agent claims are taken by `StartAgentRun` and renewed by the runner ([ADR-0050](0050-agent-runtime-and-query-layer.md) rules 15–16).
+
+    Note: an item whose subject is a document, or a line of one, is visible only when the caller's read owner scope reaches the document; `work` applies it through a registered visibility function ([ADR-0054](0054-users-roles-and-authorizations.md) rules 2, 15).
 11. Precedence and exclusion (Principle 8):
     - **A person over an agent.** A person's `ClaimWorkItem` on an item an agent run holds takes the claim. The dispatcher then rejects every later command of that run with `work_item_claim_lost` (rule 11, agent commands), so the agent stops and never works at the same time as a person.
     - **A person over a person.** Taking a claim from another person needs `AssignWorkItem`.
@@ -129,6 +137,8 @@ Every exception, pending approval and other piece of business work is one `work_
       - **INV-204:** every document in `pending_approval` has exactly one open `approval_pending` item.
       - **INV-205:** no command of an agent run on an item is audited after a person's claim on that item.
     - **What stays later.** Delegation and escalation remain after Phase 1 (spec 07).
+
+    Note: one open item per pending document still holds. It belongs to the current stage and moves to the next stage in the same transaction. Delegation and escalation of approvals are in Phase 1 ([ADR-0055](0055-approval-pools-and-stages.md) rules 12–14).
 18. The catalog seeds the kinds that earlier ADRs name, with their owners:
     - planning exceptions (ADR-0024 rule 21; ADR-0036 rule 11);
     - warehouse exceptions (ADR-0023 rule 21);

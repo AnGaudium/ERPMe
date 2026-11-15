@@ -103,6 +103,8 @@ This ADR amends the document lifecycle (ADR-0009) in five places, before step 3 
     - **The approval row** refers to the `policy_decision_id` it satisfies.
     - **At `Post` of an approved document, and at `Issue`**, the policy is asked again when the `policy_input_hash` differs. The existing approvals stand when they satisfy the new decision's procedure (the comparison is DS-28's). Otherwise the command is rejected with `approval_context_changed`, whose `details` give the approved and current amounts and procedures.
     - **Resubmission.** The document may then be submitted again without edit (`approved → pending_approval`).
+
+    Note: the comparison is by stages. Approvals stand when every stage the new plan requires already has its approvals in the round; a resubmission continues the round when the pool stays the same and starts a new one when it changes ([ADR-0055](0055-approval-pools-and-stages.md) rules 8, 11).
 15. Payment-type documents (DS-25) carry the beneficiary's `partner_bank_account_id` in their content.
 
 **Partner snapshot**

@@ -57,3 +57,5 @@ One file per decision, named `NNNN-short-title.md`, using [template.md](template
 | [ADR-0051](0051-agent-workflows.md) | Agent workflows (DS-34) | Accepted (2026-11-15) |
 | [ADR-0052](0052-minimal-crm.md) | Minimal CRM: partners, contacts, interaction timeline, email intake (DS-35) | Accepted (2026-11-15) |
 | [ADR-0053](0053-core-neutrality.md) | Core neutrality: Vietnamese accounting and tax as an overlay | Accepted (2026-11-15) |
+| [ADR-0054](0054-users-roles-and-authorizations.md) | Users, roles and authorizations (DS-15 full) | Accepted (2026-11-15) |
+| [ADR-0055](0055-approval-pools-and-stages.md) | Approval pools and stages (DS-28) | Accepted (2026-11-15) |

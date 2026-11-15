@@ -241,6 +241,8 @@ Six agent types are designed now, each as a code-orchestrated workflow on the ru
       - **EC-83:** a quotation run whose worker crashes after an LLM call; the retry replays the recorded step and drafts once.
     - **DS-17 event:** `customer_inquiry_received` (an e-mail from an unknown sender, step 5), in the sales group.
 
+    Note: the owner rule `role:sales` named here is now `role:sales_clerk` ([ADR-0054](0054-users-roles-and-authorizations.md) rule 11).
+
 ## Context
 
 Spec 14 names four first workflows and the planning agent; ADR-0032 adds a production agent. ADR-0003 R8 defines "done" for step 10 on the synthetic dataset and lets this ADR raise the 90% threshold. Earlier ADRs left workflow obligations here: change proposals for non-document changes (ADR-0029), draft keys (ADR-0030 rule 11), shadow evidence and unattended postings (ADR-0043 rules 5, 14), the bank matching agent (ADR-0048), the configuring quotation agent (ADR-0046), the planning agent (ADR-0024 rule 23, ADR-0036 rule 12) and the migration agent (ADR-0044 rule 15).

@@ -84,6 +84,8 @@ DS-25 keeps payments, bank statements, matching UX, netting, payment allocation 
     - `GetPartnerExposure` (a computed result, like `GetExchangeRate`): open receivable and payable amounts per partner and currency by kind and due bucket. Open order value is added by DS-22's own query; `ledger` never reads a higher layer.
 
     Indexes: `(company_id, partner_id)`, `(company_id, account_id)` and `(company_id, due_date)` where neither settled nor reversed; `(origin_document_id)`.
+
+    Note: `ListOpenItem` shows an item only within its origin document's read owner scope; `GetPartnerExposure` totals without listing, so it is registered `is_owner_scoped: false` and needs owner scope `branch` or `company` ([ADR-0054](0054-users-roles-and-authorizations.md) rule 15).
 16. `general_journal` lines may declare `creates` or `settles` when the flagged rule on manual journals (ADR-0014 rule 10) allows posting to control accounts; step 1 tests run with that flag on in the test configuration, so the interfaces and invariants are exercised from step 1.
 
 **Placement**

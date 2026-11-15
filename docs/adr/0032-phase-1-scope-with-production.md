@@ -87,6 +87,8 @@ On 2026-11-14 the author decided that every capability a customer cannot operate
    - payroll;
    - multi-level approval.
 
+   Note: the author asked (2026-11-15) for approval pools with several stages; they are designed in [ADR-0055](0055-approval-pools-and-stages.md) (proposed).
+
 ## Context
 
 The author's words, in summary: core capabilities should all be in Phase 1, because without them the product does not run. The author would rather spend more time on a usable product than save time on a demo that is hard to fix later because its structure was incomplete. For the same reason production enters Phase 1, to offer ERPMe to manufacturers. The production core is to learn from SAP, simplified and agentic-native, not industry-specific, with costing by best practice.

@@ -169,6 +169,8 @@ Status: accepted (2026-11-15) under ADR-0005, reviewed by Claude Fable 5.2 (buil
     - **Queries.** `ListAgentRun` and `GetAgentRun` (with its steps, paged), each with its generated permission. Request and response bodies are returned only to holders of the capability `read_agent_run_bodies` (ADR-0017 rule 4; in the `owner` template only); access to bodies is by that capability alone. They are on no agent tool list (rule 30).
     - **Export.** `ExportCompanyData` includes both tables (ADR-0044 rule 17).
     - **Erasure.** `EraseDataSubject` (ADR-0019 rule 10) blanks `request_body` and `response_body` of every step whose `personal_subject_refs` or `personal_fields_sent` names the subject or one of its rows, keeping the rows and counts.
+
+    Note: `read_agent_run_bodies` is `full` on its own authorization leaf `agent_run_bodies`, which every role template except `owner` sets to `none` ([ADR-0054](0054-users-roles-and-authorizations.md) rules 8, 11).
 21. Telemetry (ADR-0038 rules 10–11):
     - **Spans.** One span per gateway call and per tool call, as children of the run's span (`agent_run.trace_id`). Allow-listed attributes: agent type and version, step code, seat, provider, model, template code and version, token counts, cost, duration, attempt, outcome or error code, and `is_tainted` as a boolean. Never text, values or IDs other than the trace ID.
     - **Metrics:** tokens and cost per agent type (ADR-0038 rule 10), runs by outcome, budget trips, denials per agent type, retries per step, and the deterministic share per workflow (spec 14). Labels are codes only.
@@ -237,6 +239,8 @@ Status: accepted (2026-11-15) under ADR-0005, reviewed by Claude Fable 5.2 (buil
     - `StartAgentRun`, `CancelAgentRun`, `CompleteAgentRun` (no agent starts agents), and claim, assign and resolve commands of work items (the runtime manages the run's claim);
     - audit queries (ADR-0038 rule 7), `ListAgentRun`, `GetAgentRun`, `ListAllowedCommand`, `GetSessionContext`, `GetPolicyEvaluation`, and `CreateListExport` (rule 54).
 31. Effective permissions are the intersection of the agent type's declared permissions and those of the human acted for, re-evaluated at every call against current assignments, for permissions, record scope and field classes (ADR-0017 rule 11). A tainted run's read scope (rule 27) narrows that further. The tool list is a third limit: a tool must be on the list and allowed by the intersection.
+
+    Note: agent types get no role assignments, so no further set of rights joins this intersection; the human's owner scope binds the run as their record scope does ([ADR-0054](0054-users-roles-and-authorizations.md) rule 16).
 32. LLM steps read, code writes:
     - **Read tools only.** An LLM step's tools are a subset of the tool list holding only queries. Commands on the list are called by workflow code, never chosen by the model.
     - **Every command** is built by workflow code from a validated output (rules 35–36), sent in simulate mode, checked against the step's deterministic expectations, then executed with the simulated `plan_hash` (Principle 2). In `shadow` mode the execute call is skipped.

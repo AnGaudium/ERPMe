@@ -116,6 +116,8 @@ The commercial documents are a thin layer over the core (B3). They hold what was
       - `landed_cost`: freight, insurance or handling. It posts to `purchase_cost_clearing` and proposes a landed cost (ADR-0021 rule 12); it never touches GR/IR.
     - **Taxes.** The supplier's stated tax per line (ADR-0041 rule 10), and `input_use` on each line.
     - **Posting.** GR/IR debit by rule 13, the price difference as the regime sends it (ADR-0030 rule 4), input tax, and one payable control line per installment.
+
+    Note: for a purchase invoice, the policy input `is_direct_expense` is true when no line references a purchase order line and every line is an expense or service line; it selects the `expense` approval pool ([ADR-0055](0055-approval-pools-and-stages.md) rule 3).
 13. GR/IR per purchase order line, by unit positions. This details ADR-0030 rule 4:
     - **Positions.** The line's units, in its inventory unit, are positions in order. `R` is the received quantity net of returns, `I` the invoiced quantity net of quantity credits. When a receipt or an invoice first reaches a position, the position is priced at the line's GR/IR price then in force (rule 10). It keeps that price for the life of the line. Prices are stored as layers (from, to, price), exact rationals, in `purchase_order_line_gr_ir_layer`. `V(x)` is the exact value of positions 0 to `x`.
     - **Postings are differences of rounded cumulative values**, in the order's currency:

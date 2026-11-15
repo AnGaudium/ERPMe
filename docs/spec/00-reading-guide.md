@@ -209,9 +209,20 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Regime setting | regime\_setting | One dated rule of an accounting regime, read through `regime_setting(company, key, date)`; keys, schemas, date basis and company options registered by the core; a used row's value never changes |
 | Work queue item | work\_item | Business work; distinct from technical jobs (job) |
 | Permission, capability | permission | The name of a command type or query, or a registered capability such as `post_in_soft_locked_period` or `start_agent:<agent_type>`; generated, never hand-maintained ([ADR-0017](../adr/0017-permission-envelope.md)) |
-| Role, role assignment | role, role\_assignment | A company's named set of permissions, and its grant to a user with optional record and field scope; templates owner, chief\_accountant, accountant, warehouse\_keeper, sales, purchasing, viewer; installation role operator |
+| Role, role assignment | role, role\_assignment | A company's named set of permissions, and its grant to a user with optional record and field scope; roles store levels per authorization area; templates owner, chief\_accountant, accountant, cashier, sales\_clerk, sales\_manager, buyer, purchasing\_manager, warehouse\_keeper, production\_planner, shop\_floor\_lead, auditor, it\_administrator, found by `template_code` ([ADR-0054](../adr/0054-users-roles-and-authorizations.md)); installation role operator |
 | Record scope | record scope | Branches or warehouses an assignment is limited to (document headers and master data); rows outside are reported as not found; filtered results say `is_scope_filtered` |
 | Field class | field\_class: cost, margin | Closed list of labels on schema fields that an assignment grants; fields of other classes are omitted from responses |
+| Authorization area | authorization\_area | Node of the core tree of areas (sales, purchasing, inventory, production, planning, finance, banking, master data, administration, reports) whose leaves are document types, master data, functions and report groups; every permission has one leaf ([ADR-0054](../adr/0054-users-roles-and-authorizations.md)) |
+| Authorization level | level: none, read, edit, post, full; can\_approve | What a role may do on a node and below; expanded into permissions by verb, effect class and a command's declared minimum level; approval is a separate flag |
+| Owner scope | owner\_scope\_read, owner\_scope\_edit: own, team, department, branch, company | Which documents a user assignment reaches by their owner, beside record scope; everything that shows a document's data follows it |
+| Document owner | owner\_employee\_id, created\_by\_user\_id, owner\_field | The employee a document belongs to (salesperson, buyer, or the creator's employee) and the human who created it |
+| Department, team | department, team, team\_member | Company organization for access and routing: a tree of departments with managers, and optional teams of employees; changed only by dedicated commands at level full |
+| Shared user | — | A user account with current or future role assignments in more than one company; only an operator changes its e-mail or credentials |
+| User invitation | user\_invitation | A company's request to link an existing login, pending until that user confirms it or it expires (30 days by default); a new login's invitation is confirmed at creation |
+| Permission hold | role\_permission\_hold | A permission an upgrade would have added to a role but held back because it would break segregation mode block or the small-company bound; a person confirms or ignores it |
+| Delegation | delegation | A dated lending of a user's approval authority or role assignments to another user, never to an agent |
+| Segregation rule | segregation\_rule (catalog), company\_segregation\_rule | A pair of conflicting permission sets, checked on every change of rights and on related documents |
+| Small-company mode | permissions.small\_company\_mode, segregation\_exception | Company mode for at most two posting or approving users: segregation refusals become recorded exceptions, reviewed by the owner each period (flagged) |
 | Policy, approval | policy, approval | An approval row binds to a document version and its `version_hash`; a new version voids it ([ADR-0009](../adr/0009-document-lifecycle.md) rule 11) |
 | Document version, version hash | document\_version, version\_hash | Every change to an unposted document writes a new version; its canonical content is hashed with SHA-256 |
 | Numbering series | numbering\_series | Gapless counter per company, document type, fiscal year and optional branch; posting documents are numbered at posting, by the fiscal year of the posting date ([ADR-0009](../adr/0009-document-lifecycle.md) rules 8, 15) |
@@ -358,7 +369,12 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Outside subject | (registry mark on subject tables) | A run subject that is outside content (an inbound interaction, an incoming e-invoice record, a bank statement line, an import batch or row, or any row whose `is_untrusted` is true); a run on it starts tainted, whoever starts it |
 | Work item | work\_item | Business work for a person or agent, with claim and due date; module `work`, layer 2 (DS-29); kinds registered in [work-item-kinds.csv](../catalogs/work-item-kinds.csv) ([ADR-0042](../adr/0042-work-queue.md)) |
 | Policy rule | policy\_rule | Row of the company's threshold table: action, type, actor kind, ordered conditions, effect, owner ([ADR-0043](../adr/0043-policy-and-approval.md)). Agents, systems and integrations start from a baseline (a person posts; approval for types with no posting step) that only an allow rule lifts |
-| Approval procedure | approval\_procedure | One-level approval by a role in the document's scope, with a rank unique per company; an approval satisfies decisions requiring its rank or lower |
+| Approval procedure | approval\_procedure | A named rank, unique per company; a policy decision's rank selects the required stages of the document's approval pool ([ADR-0055](../adr/0055-approval-pools-and-stages.md)) |
+| Approval pool | approval\_pool, approval\_pool\_document\_type | A company's group of document types that share approval stages; a selector may route by a boolean policy input |
+| Approval stage | approval\_stage, approval\_stage\_member | An ordered step of a pool: members, required approvals k of n, minimum rank, escalation role, due days from the day it became current |
+| Approval step | approval | One person's immutable approve or reject decision at a stage, bound to a document version |
+| Approval round | — | The approvals counted for one submission: from Submit until Post, a rejection, an edit or a cancel; a resubmission after a context change continues it unless the pool changes |
+| Approval plan | approval\_plan | The required stages recorded in a policy decision when it is made; never empty for a decision with a rank |
 | Consequence posting | is\_consequence\_posting | A deterministic posting run on behalf of the person who started its chain, evaluated by policy as that person |
 | Period unlock request | period\_unlock\_request | Non-posting document asking to unlock a period area; its approval lets `UnlockPostingPeriod` run once ([ADR-0043](../adr/0043-policy-and-approval.md)) |
 | Attachment | attachment, attachment\_link | File stored once per company by SHA-256, outside the database, linked to any record; module `attachments`, layer 2 |
@@ -416,8 +432,8 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Reject | Reject a document version | Rejected |
 | Post | Make a document part of the books or the stock records | Posted |
 | Reverse | Post a reversal document for a posted document | Reversed |
-| Cancel | End an open document that is not posted, or an open warehouse task, reservation or work item | Canceled |
-| Clear | Remove a flag deliberately with a reason, e.g. a document version's taint (`ClearTaint`) | Cleared |
+| Cancel | End an open document that is not posted, or an open warehouse task, reservation, work item, delegation or invitation | Canceled |
+| Clear | Remove a flag deliberately with a reason, e.g. a document version's taint (`ClearTaint`) or a sign-in lockout (`ClearUserAccountLockout`) | Cleared |
 | Resume | Continue a stopped job from where it stopped, e.g. an import batch (`ResumeImport`) | Resumed |
 | Abandon | Stop a job for good; what it already posted stays until reversed, e.g. an import batch | Abandoned |
 | Issue | Request legal issuance of a document; it posts when the issue is accepted (e.g. `IssueSalesInvoice`) | IssueRequested |
@@ -436,16 +452,18 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Export | Produce a company's full data as files | Exported |
 | Unclaim | Give up the claim of a work item | Unclaimed |
 | Resolve | Close a work item whose exception a person has dealt with | Resolved |
-| Enable | Put a policy rule version in force; reversible, unlike Activate | Enabled |
-| Disable | Take a policy rule version out of force | Disabled |
+| Enable | Put something in force, reversibly, unlike Activate: a policy rule version, a user account, a segregation rule, the small-company mode | Enabled |
+| Disable | Take a policy rule version, a user account, a segregation rule or the small-company mode out of force | Disabled |
 | Reserve | Hold stock for a demand line, e.g. components of a production order | Reserved |
 | Release | Make a draft revision of master data effective from its start date, e.g. a bill of materials revision | Released |
 | Convert | Turn a record into another form once, e.g. a planned order into draft documents | Converted |
 | Match, Unmatch | Link or unlink bank lines or documents, or an interaction and its partner; open items are settled against each other by an `open_item_matching` document | Matched, Unmatched |
-| Ignore | Set an imported line aside with a reason, so that no rule or person matches it ([ADR-0048](../adr/0048-cash-bank-receivables-payables.md) rule 8) | Ignored |
+| Ignore | Set an imported line aside with a reason, so that no rule or person matches it ([ADR-0048](../adr/0048-cash-bank-receivables-payables.md) rule 8); or keep withheld a permission an upgrade held back (`IgnoreRolePermissionHold`) | Ignored |
 | Transfer | Move records to another account or owner, e.g. a partner's open items | Transferred |
 | Allocate | Distribute an amount or quantity over targets | Allocated |
 | Import | Read an external file into the system | Imported |
+| Set | Replace a record's whole list of values in one command, e.g. a price list's entries (`SetPriceListEntries`) | Set |
+| Verify | Check a configuration against an outside system and record the result, e.g. a mailbox's sender authentication (`VerifyMailboxAuthentication`) | Verified |
 | Run | Start a deterministic system job, e.g. period-end actual costing | Completed (`<job noun>Completed`) |
 | Assign | Set the owner of a work item or a warehouse task; or attach output serials to a production order | Assigned |
 | Start | A person begins work on an assigned warehouse task; or start a migration's loading or reconciliation; or start an agent run (`StartAgentRun`) | Started |
@@ -454,7 +472,7 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Open | Let a restricted posting period accept postings from everyone with permission again (soft-locked to open) | Opened |
 | Lock | Stop all postings in a posting period (soft-locked to locked) | Locked |
 | Unlock | Take a locked posting period back to soft-locked, with approval | Unlocked |
-| Confirm | A human confirms a fact the system cannot check, e.g. a manual close task, or accepts a result the system produced, e.g. auto-posts (`ConfirmAutoPost`) | Confirmed |
+| Confirm | A human confirms a fact the system cannot check, e.g. a manual close task or that they are the person a company invited (`ConfirmUserInvitation`), or accepts a result the system produced, e.g. auto-posts (`ConfirmAutoPost`) or a permission an upgrade held back (`ConfirmRolePermissionHold`) | Confirmed |
 | Skip | Leave out an optional step with a reason, e.g. an optional close task | Skipped |
 | Retry | Try a held step again, e.g. a held event delivery | Retried |
 | Replay | Deliver retained events again to a consumer that has not handled them | Replayed |

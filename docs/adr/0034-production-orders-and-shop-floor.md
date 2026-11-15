@@ -227,7 +227,7 @@ It adds only what production needs:
     The production and capture agents are later agents ([ADR-0051](0051-agent-workflows.md) rule 29).
 18. Events, permissions and queries:
     - **Events.** Beyond ADR-0009 rule 22's document events: `ProductionOrderCompleted` and `ProductionOrderReopened`. Reservations emit ADR-0023's events.
-    - **Permissions.** Record scope for production documents uses `production_warehouse_id` as the warehouse dimension (ADR-0017 rule 9 gets a note). DS-15 adds a shop-floor role template.
+    - **Permissions.** Record scope for production documents uses `production_warehouse_id` as the warehouse dimension (ADR-0017 rule 9 gets a note). DS-15 adds a shop-floor role template. It is `shop_floor_lead` ([ADR-0054](0054-users-roles-and-authorizations.md) rule 11).
     - **Planning interfaces.** `production.contract` also exposes `plan_production`, `create_production_order_from_plan` and `get_order_inspection_quantities` ([ADR-0036](0036-multi-level-mrp.md) rules 3, 8, 9).
     - **Queries.**
       - `GetProductionOrderStatus`: progress per operation and output; components required, reserved, staged, issued and backflushed; shortages; postings; cost object.

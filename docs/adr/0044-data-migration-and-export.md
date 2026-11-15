@@ -113,6 +113,8 @@ The migration period is then locked.
       - stock quantity per item, warehouse, bin, lot or serial, and stock value per item and valuation area, the level ERPMe holds (ADR-0020).
     - **Comparing.** `GetMigrationReconciliation` compares them with ERPMe's figures on `opening_date`, through the old-account map.
     - **Accepting a difference.** `AcceptMigrationDifference` (`human_only`, by a holder of the `chief_accountant` role, with a reason) accepts a difference where ERPMe's figure stands because the old one is wrong (go-live). Differences do not touch the clearing account, because ERPMe's documents balance by construction.
+
+    Note: "a holder of the `chief_accountant` role" means the permission `AcceptMigrationDifference`, on the leaf `opening_balance_entry` at level `full`, held through Finance `full` by templates `owner` and `chief_accountant` ([ADR-0054](0054-users-roles-and-authorizations.md) rules 8, 24).
 12. `CompleteMigration` runs these steps:
     1. It checks that every batch is `posted`, `opening_balance_clearing` is zero in company currency, no difference is unaccepted, and INV-20 to INV-24 and INV-30 to INV-33 pass.
     2. Where the installation has a group currency, it posts a `migration_completion_entry` in the migration period. The entry has group-only lines per transaction currency of the clearing account (ADR-0011 rule 2) and moves the clearing account's group balance.

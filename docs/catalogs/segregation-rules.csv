@@ -1,0 +1,7 @@
+code,side_a,side_b,document_relation,added_in,meaning
+bank_account_vs_payment,CreatePartnerBankAccount;UpdatePartnerBankAccount,PostCashPayment;PostBankPayment;ApproveCashPayment;ApproveBankPayment,bank_account_used,0.1.0,"Who maintains a supplier's bank account does not pay to it; per document: a payment to an account whose latest change the person wrote or approved."
+purchase_order_vs_goods_receipt,CreatePurchaseOrder;UpdatePurchaseOrder;ApprovePurchaseOrder,PostGoodsReceipt,referenced_order,0.1.0,"Who orders does not confirm receipt; per document: a goods receipt referencing lines of an order the person wrote or approved."
+purchase_invoice_vs_payment,PostPurchaseInvoice;ApprovePurchaseInvoice,PostCashPayment;PostBankPayment,settled_item,0.1.0,"Who books a supplier invoice does not pay it; per document: a payment settling an item of an invoice the person posted or approved."
+price_list_vs_sales_approval,CreatePriceList;UpdatePriceList;SetPriceListEntries;SetPriceListOptionExtras,ApproveQuotation;ApproveSalesOrder,none,0.1.0,"Who maintains prices does not approve sales; below cost stays a policy condition (ADR-0043 rule 3)."
+partner_vs_purchase_invoice,CreatePartner;UpdatePartner,PostPurchaseInvoice,none,0.1.0,Who creates or changes partners does not book supplier invoices.
+role_administration_vs_posting,CreateRole;UpdateRole;CreateRoleAssignment;UpdateRoleAssignment,PostGeneralJournal;PostCashPayment;PostBankPayment;PostPurchaseInvoice,none,0.1.0,"Who administers access does not post journal entries, payments or supplier invoices."

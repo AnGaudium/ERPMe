@@ -155,6 +155,8 @@ Leads, opportunities, marketing automation, appointments, chat connectors and se
     - **Recomputed.** `UnmatchInteraction` replaces the candidates by a new computation; candidates are evidence, not history.
     - **Evidence only.** Candidates are evidence for a person, never a match (ADR-0019 rule 15). Forwarded content, a message inside a message, is never matched.
 
+    Note: the owner rule `role:sales` resolves as `role:sales_clerk`, through `role.template_code` ([ADR-0054](0054-users-roles-and-authorizations.md) rule 11).
+
 **Customer onboarding from e-mail**
 
 16. An e-mail from an unknown sender follows [ADR-0051](0051-agent-workflows.md) rules 11–13:
@@ -188,6 +190,8 @@ Leads, opportunities, marketing automation, appointments, chat connectors and se
     - **Tainted runs** may ask only for their scope partner (spec 03 rule 1; ADR-0029 rule 14; ADR-0050 rule 27); otherwise `tainted_read_out_of_scope`.
     - **No amounts.** Entries carry no amounts; callers read the document. DS-33 may expose the same rows as a view.
 
+    Note: a document entry also needs the document inside the actor's read owner scope; otherwise it is left out and `is_scope_filtered` is true ([ADR-0054](0054-users-roles-and-authorizations.md) rule 15).
+
 **Follow-up tasks**
 
 19. A follow-up is an interaction of kind `task`, with `due_date`, `assignee_user_id` and text, usually linked to a document ("call back about the quotation"):
@@ -204,6 +208,8 @@ Leads, opportunities, marketing automation, appointments, chat connectors and se
     - **Commands.** `CreateComplaint` opens it and raises `complaint_open` (owner `role:sales`, due in two days, resolved by `CloseComplaint`). `UpdateComplaint` changes category, title and documents. `CloseComplaint` takes a resolution note. `ReopenComplaint` opens it again. Other transitions fail with `invalid_state_transition`.
     - **Agents propose.** The four commands are `is_proposal_bound`, because their effect reaches `cash`'s dunning; a person decides. A title an agent wrote from untrusted content sets `is_title_untrusted`.
     - **Not a document type.** A complaint has no versions, approval or number; its history is in `audit` (ADR-0038).
+
+    Note: the owner rule `role:sales` resolves as `role:sales_clerk`, through `role.template_code` ([ADR-0054](0054-users-roles-and-authorizations.md) rule 11).
 21. The complaint events that `cash` consumes (ADR-0048 rule 17):
     - **Names.** `ComplaintCreated`, `ComplaintUpdated`, `ComplaintClosed` and `ComplaintReopened`, with the complaint as subject and its ID, partner ID and state as payload. Under ADR-0004 rule 22, `CreateComplaint` emits `ComplaintCreated`; there is no `ComplaintOpened`, because the verb Open belongs to posting periods.
     - **Order does not matter.** Events of different complaints have no common order (ADR-0013 rule 3). So on each event the `cash` consumer reads the partner's open complaints through the query `ListComplaint` and sets `has_open_complaint` to whether any exist. Two complaints closed in either order leave the right flag (INV-501). `cash` still never imports `crm`.

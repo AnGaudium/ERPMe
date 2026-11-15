@@ -61,6 +61,8 @@ Checks:
 
    Note: `reporting` imports only contracts of layers 1 to 3 and no other layer-4 module; names of records that other layer-4 modules own reach its prints through the hook `print_relation_resolver`. Agents reach its queries through `query` ([ADR-0049](0049-statutory-reporting-and-printing.md) rules 1, 25).
 
+   Note: access and approval decisions use functions that `master_data`, `documents`, `permissions`, `periods` and `policy` register with the dispatcher, wired by `app`; work item visibility is a registered function too. No new import between layer-2 modules is needed ([ADR-0054](0054-users-roles-and-authorizations.md) rule 2; [ADR-0055](0055-approval-pools-and-stages.md) rule 1).
+
 3. Shape of each module:
    - A module that owns tables or commands has:
      - `contract.py`, the only part other modules import (rule 4);

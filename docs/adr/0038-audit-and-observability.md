@@ -33,6 +33,8 @@ The retention periods and the strictness of scanning are flagged for the author.
    - **Actor:** `actor_kind`, `actor_id`, `on_behalf_of_id`, `agent_run_id`, `origin_agent_run_id`, `policy_decision_id` (ADR-0029 rule 15). `policy_decision_id` is null for commands at no policy point; period commands have one only for `UnlockPostingPeriod` (DS-28). It comes from the approved `period_unlock_request` ([ADR-0043](0043-policy-and-approval.md) rule 16).
    - **Subject:** `subject_table`, `subject_id`, `document_id` and `document_version` for documents, and the subject's scope dimensions (`branch_id`, `warehouse_id`) for record scope.
    - **Result:** `plan_hash`, `trace_id`, and `check_codes`, the codes of the command's check results ([ADR-0040](0040-ui-architecture.md) rule 10).
+
+   Note: `delegated_from_user_id` when a substitute acts ([ADR-0054](0054-users-roles-and-authorizations.md) rule 21).
 3. Field changes, in `audit_change` (`id`, `company_id`, `audit_record_id`, `subject_table`, `row_id`, `field`, `before`, `after`, `erased_at`):
    - **Which tables.** A closed set, `is_change_tracked` in each module's table declarations and checked by CI: master data, settings including enabled regime settings (ADR-0016), role assignments, period area state and production structures. Documents rely on `document_version`. Balances, counters, open items and other derived rows are not tracked.
    - **How it is captured.** Only `context`'s write helpers capture it. They read the before row and compute the diff with the canonical forms and diff code of ADR-0029 rule 1. Handlers never build changes by hand.
@@ -71,6 +73,8 @@ The retention periods and the strictness of scanning are flagged for the author.
    **Agents.** These queries are on no agent tool list in Phase 1 (ADR-0008 rule 6; DS-32), and tainted runs never read audit data. Reading denials would let an injected agent probe.
 
    `ListAgentRun`, `GetAgentRun` and every view over audit tables are on no agent tool list either ([ADR-0050](0050-agent-runtime-and-query-layer.md) rules 30, 50).
+
+   Note: a record whose subject is a document is shown only within that document's read owner scope ([ADR-0054](0054-users-roles-and-authorizations.md) rule 15).
 8. INV-89: every idempotency record of an executed command (ADR-0008 rule 19), within its retention, has an audit record with the same key, actor and command type, or the same `batch_id` for batches. The company is compared null-safely, and ADR-0008 rule 16 gets `company_id` on idempotency records. Area `platform`, first step 1. Group 80–89 is now full: further safety and platform invariants use INV-200 to INV-299 (DS-16).
 
 **Other audit duties**
@@ -127,6 +131,8 @@ The retention periods and the strictness of scanning are flagged for the author.
     - **Untrusted content.** Attachments from outside content are untrusted (ADR-0029 rule 10).
 
     Note: generated files (source kind `generated`) are created `clean` without a malware scan: the render worker produces their bytes from company templates in a sandbox without network access. `clean` covers only the scan. A generated file whose rendered instance held an `is_untrusted` field carries `contains_untrusted`, and reading it taints a run ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 25; [ADR-0049](0049-statutory-reporting-and-printing.md) rule 28).
+
+    Note: an attachment linked to a document follows that document's read owner scope ([ADR-0054](0054-users-roles-and-authorizations.md) rule 15).
 15. Retention:
     - **Accounting attachments.** `Post` sets `attachment.is_accounting_evidence` on every linked attachment; it is never unset. Bytes of such an attachment are kept `attachment_retention_years` after its last link ends. This is a regime setting, seeded `unverified` at 10 years for accounting vouchers. Under ADR-0016 rule 12 an unverified setting fails closed, so such bytes are not purged until the author verifies it. TT99 seed: package `settings.yaml` ([ADR-0039](0039-vietnam-package-tt99.md) rule 9).
     - **Erasure.** Erasure removes a subject's links except links to posted accounting documents, which stay as voucher evidence; ADR-0027 rule 2 gets a note.

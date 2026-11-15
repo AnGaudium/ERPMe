@@ -97,6 +97,8 @@ It loads together with the DS-06 journal in the design lab, and the earlier jour
     - **Profile.** `employee_profile` gains `branch_id`, `cost_center_id` and `job_title`. Its `user_account_id` is unique. The profile is `personal` data (ADR-0019 rule 7).
     - **Buyers and salespeople.** A `buyer_id` or `salesperson_id` must be a partner with the active `employee` role, else `partner_not_employee`.
     - **Work items.** A buyer without a user account cannot own work items; the fallback of ADR-0042 rule 7 then applies.
+
+    Note: `employee_profile` gains `department_id` and `manager_partner_id`, and `user_account_id` becomes unique per company, so one user can be an employee of several companies. The three columns change only through `UpdateEmployeeOrganization`, never through `CreatePartner`, `UpdatePartner` or a change proposal ([ADR-0054](0054-users-roles-and-authorizations.md) rule 6).
 12. Groups:
     - **Which:** partner groups, partner tax groups (with the directions they apply to), item groups, valuation classes, item tax groups and product categories.
     - **Ownership.** They are `master_data` tables, copied from package templates with their basis (ADR-0016 rule 7). `basis` has no default: the command sets the template entry's basis, or `company_decision` (ADR-0016 rule 12). The tax matrix of ADR-0041, owned by `tax`, reads the tax groups.

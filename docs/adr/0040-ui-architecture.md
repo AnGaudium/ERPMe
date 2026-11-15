@@ -98,6 +98,8 @@ The web UI is one more client of the command and query layer. It writes data onl
 
    [ADR-0050](0050-agent-runtime-and-query-layer.md) rule 34 proposes keeping it people-only: agents plan from their tool list and simulate mode.
 
+   Note: its checks also read owner scope, delegations, segregation pairs and, for `Approve`, stage eligibility and the stranded-stage check ([ADR-0054](0054-users-roles-and-authorizations.md) rule 22; [ADR-0055](0055-approval-pools-and-stages.md) rule 7).
+
 **Simulate, plan, execute**
 
 9. A form submits in two steps, with one envelope and one idempotency key per intent (ADR-0008 rule 13):
@@ -148,6 +150,8 @@ The web UI is one more client of the command and query layer. It writes data onl
 
       The menu, palette and company switch read it.
     - **Schemas and catalogs.** The annotated JSON Schemas and the i18n catalogs (core and every package's terminology) are generated into `frontend/src/generated/`, which is possible because packages ship with the build (ADR-0016 rule 3). They are loaded per screen and per language by dynamic import, so the shell stays within its size budget (rule 17).
+
+    Note: a hand-written endpoint `POST /api/auth/password` consumes a one-time reset token or changes a password; `GetSessionContext` also returns owner scopes, the delegations in force and the user's pending invitations ([ADR-0054](0054-users-roles-and-authorizations.md) rules 3, 4, 22).
 13. Live updates (ADR-0013 rule 12) work as follows:
     - **The header.** When the dispatcher inserts an event (ADR-0013 rule 6), it also sends `pg_notify('erpme_ui', header)` in the same transaction. The notification goes out only on commit and never from a simulation.
     - **Header contents:** event ID, event type, company, the subject's root (`subject_table` and `subject_id`, with child subjects resolved to their document), `subject_sequence`, and the subject's record-scope dimensions as the dispatcher's scope resolver computes them (the same values `audit_record` stores, ADR-0038 rule 2). It carries no payload values. This replaces the consumer that ADR-0013 rule 12 foresaw, so there are no delivery rows, pausing or retention to manage.
@@ -167,6 +171,8 @@ The web UI is one more client of the command and query layer. It writes data onl
     - **Delivery.** Best effort. After a reconnect, the client refetches what is open.
 
     The query builder emits one `SELECT` per statement, and `EXECUTE` on `pg_notify` is revoked from `PUBLIC` and granted to `erpme_app` and `erpme_worker` ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 44).
+
+    Note: the header also carries the subject document's `owner_employee_id` and `created_by_user_id` (IDs), and a header is forwarded only when the session's read owner scope reaches the document, checked against the same cached assignments and organization data ([ADR-0054](0054-users-roles-and-authorizations.md) rule 15).
 14. Notifications to people beyond live screens (e-mail, push) are after Phase 1 (spec 07).
 
 **Language, keyboard, display**

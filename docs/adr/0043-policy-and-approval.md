@@ -30,12 +30,16 @@ Policy is a deterministic threshold table per company, as runbook B7 asks.
    - **Approvals.** `approval` rows stay with `documents`, beside the versions they bind to (ADR-0009 rule 11).
    - **Imports within layer 2:** `registry` imports the `policy` contract, `policy` imports the `work` contract, and `policy` imports neither `registry` nor `documents`. ADR-0022 rule 2 and ADR-0027 rule 1 get notes.
 
+   Note: approval pools and stages are `policy`'s too. Stage eligibility combines functions that `policy`, `permissions` and `documents` register with the dispatcher, wired by `app`, so no new import is needed ([ADR-0055](0055-approval-pools-and-stages.md) rule 1; [ADR-0054](0054-users-roles-and-authorizations.md) rule 2).
+
 **Rules and procedures**
 
 2. `approval_procedure` (company data):
    - **Columns:** `code`, `name`, `rank` (an integer unique per company), `approver_role`, `scope_binding` (`document_scope` or `company`), `is_active`.
    - **When an approval satisfies a decision.** When its procedure's rank is at least the rank required.
    - **Rank and roles.** That a higher rank's role may stand in for a lower one is a business choice (open question).
+
+   Note: `approver_role` and `scope_binding` move to approval stages. Procedures stay as named ranks, and a decision's rank selects the required stages of the document's approval pool ([ADR-0055](0055-approval-pools-and-stages.md) rules 4–5).
 3. `policy_rule` (company data, versioned: a change writes a new version with `effective_from`, and decisions record the version they used):
    - **What it matches:**
      - `action`: `submit`, `post`, `issue`, or `direct_master_data_change` (rule 12);
@@ -137,6 +141,8 @@ Policy is a deterministic threshold table per company, as runbook B7 asks.
     - **Small companies.** Until the author decides, a person may approve their own document, and segregation of duties (which covers documents an agent wrote on the approver's behalf) applies to every company, and a company without a second eligible person cannot satisfy a rule that requires approval. The command that saves such a rule returns the check result `policy_no_eligible_approver` (open question).
 
     Exception to the interim: a proposal promoting an agent type to assisted mode must be approved by a person other than its submitter (`approver_is_submitter`), so a one-person company cannot promote an agent until the author decides ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 14).
+
+    Note: who may approve is now stage eligibility. Writers of any version are excluded by default, replacing the interim above (flagged; small companies: [ADR-0054](0054-users-roles-and-authorizations.md) rule 20), and `approval_stage_unsatisfiable` replaces `policy_no_eligible_approver` for stages, on save and at `Submit` ([ADR-0055](0055-approval-pools-and-stages.md) rules 4, 7–9).
 14. Auto-posts and confirmation:
     - **Scope.** `is_confirmation_required` applies only to `post` and `issue` by `system` or `integration` actors.
     - **Work items.** Each such posting adds evidence to one `auto_post_unconfirmed` work item per rule and period (ADR-0042).
@@ -155,6 +161,8 @@ Policy is a deterministic threshold table per company, as runbook B7 asks.
 
     A rule requiring `standard` approval for `submit` and `post` of `general_journal`, for every actor kind, is seeded ([ADR-0048](0048-cash-bank-receivables-payables.md) rule 15).
 
+    Note: the seed migrates to approval pools whose stages are `standard` (minimum rank 10, roles `accountant`, `chief_accountant` and `owner`) and `senior` (minimum rank 20, roles `chief_accountant` and `owner`); rank 20 then needs two people ([ADR-0055](0055-approval-pools-and-stages.md) rules 2, 5).
+
 **Specific points**
 
 16. Unlocking a period. `UnlockPostingPeriod` (`human_only`, ADR-0012) takes the ID of an approved `period_unlock_request`. That is a non-posting document (period, area, reason) whose `Submit` is a policy point, which always requires at least the lowest-rank procedure. The unlock closes the request in the same transaction, so one request unlocks once, and records the request's `policy_decision_id` in its audit record (ADR-0038 rule 2).
@@ -172,10 +180,14 @@ Policy is a deterministic threshold table per company, as runbook B7 asks.
     - **Registration.** All are `human_only`, effect class `master_data_change`, change-tracked (ADR-0038 rule 3) and on no agent tool list. One person may change policy alone (open question).
     - **Queries:** `ListPolicyRule`, `ListApprovalProcedure`, `ListPolicyDecision`.
     - **`GetPolicyEvaluation`** (action, type, actor kind, input; computed) is for people only, like `ListAllowedCommand` (ADR-0040 rule 8).
+
+    Note: `CreateApprovalPool` and `UpdateApprovalPool` join these commands with the same registration, and `CreateApprovalProcedure` and `UpdateApprovalProcedure` re-run the pool checks, because a rank or its activity changes what the stages must cover ([ADR-0055](0055-approval-pools-and-stages.md) rules 4, 17).
 19. Invariants:
     - **INV-82** is restated by rank: every posted document whose decision requires a rank has an `approved` approval on that version whose procedure has at least that rank.
     - **INV-202:** the enabled rule set passes the check of rule 11.
     - **INV-203:** every enabled rule that allows a non-human actor has an owner and a maximum, and confirmation at post and issue.
+
+    Note: INV-82 is restated by stages and rounds ([ADR-0055](0055-approval-pools-and-stages.md) rule 18).
 
 ## Context
 

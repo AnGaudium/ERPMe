@@ -1,0 +1,120 @@
+code,parent_code,kind,module,name,added_in,meaning
+sales,,area,,Sales,0.1.0,"Quotations, orders, invoices and sales corrections (ADR-0047)."
+purchasing,,area,,Purchasing,0.1.0,"Requests, orders, supplier documents and customs (ADR-0047; ADR-0021)."
+inventory,,area,,Inventory,0.1.0,"Stock documents, warehouse tasks and reservations (ADR-0020; ADR-0023; ADR-0027 rule 7)."
+production,,area,,Production,0.1.0,"Production orders, issues, confirmations, receipts and subcontracting (ADR-0034; ADR-0037)."
+planning,,area,,Planning,0.1.0,"Planning runs, planned orders and forecasts (ADR-0024; ADR-0036)."
+finance,,area,,Finance,0.1.0,"Journal, periods, closing, currency, tax and costing (ADR-0011; ADR-0012; ADR-0014; ADR-0041)."
+banking,,area,,Banking,0.1.0,"Cash and bank documents, statements, money accounts and collections (ADR-0048)."
+master_data,,area,,Master data,0.1.0,"Partners, products, prices, warehouses, organization and production structures (ADR-0045)."
+crm,,area,,CRM,0.1.0,"Interactions, complaints, outbound messages, mailboxes, data protection and partner insights (ADR-0052)."
+administration,,area,,Administration,0.1.0,"Users, roles, delegations, segregation, policy, settings, agents, work queue, audit and data (ADR-0054)."
+reports,,area,,Reports,0.1.0,"Report queries that total over documents, registered is_owner_scoped false (ADR-0054 rule 15; DS-26)."
+quotation,sales,document_type,sales,Quotation,0.1.0,ADR-0047 rule 3.
+sales_order,sales,document_type,sales,Sales order,0.1.0,ADR-0047 rule 4.
+sales_invoice,sales,document_type,sales,Sales invoice,0.1.0,ADR-0047; whether it may wait for approval follows the regime setting documents.issuance_without_delay (ADR-0053 rule 8).
+sales_return,sales,document_type,sales,Sales return,0.1.0,ADR-0047 rule 7; ADR-0009 rule 23.
+credit_note,sales,document_type,sales,Credit note,0.1.0,ADR-0047; ADR-0009 rule 23.
+debit_note,sales,document_type,sales,Debit note,0.1.0,ADR-0047; ADR-0009 rule 23.
+purchase_request,purchasing,document_type,purchasing,Purchase request,0.1.0,ADR-0047.
+purchase_order,purchasing,document_type,purchasing,Purchase order,0.1.0,ADR-0047.
+purchase_invoice,purchasing,document_type,purchasing,Purchase invoice,0.1.0,ADR-0047 rules 12-14.
+purchase_return,purchasing,document_type,purchasing,Purchase return,0.1.0,ADR-0047 rule 15.
+purchase_credit_note,purchasing,document_type,purchasing,Purchase credit note,0.1.0,ADR-0047.
+purchase_debit_note,purchasing,document_type,purchasing,Purchase debit note,0.1.0,ADR-0047.
+gr_ir_write_off,purchasing,document_type,purchasing,GR/IR write-off,0.1.0,ADR-0047 rule 13.
+customs_declaration,purchasing,document_type,purchasing,Customs declaration,0.1.0,"ADR-0021 rule 10, with its amendments."
+landed_cost,purchasing,document_type,inventory,Landed cost,0.1.0,ADR-0021.
+goods_receipt,inventory,document_type,inventory,Goods receipt,0.1.0,ADR-0027 rule 7.
+delivery,inventory,document_type,inventory,Delivery,0.1.0,ADR-0027 rule 7; ADR-0047 rule 6.
+return_to_supplier,inventory,document_type,inventory,Return to supplier,0.1.0,ADR-0027 rule 7.
+return_from_customer,inventory,document_type,inventory,Return from customer,0.1.0,ADR-0027 rule 7.
+stock_transfer,inventory,document_type,inventory,Stock transfer,0.1.0,ADR-0027 rule 7.
+transfer_order,inventory,document_type,inventory,Transfer order,0.1.0,ADR-0027 rule 7.
+stock_count,inventory,document_type,inventory,Stock count,0.1.0,ADR-0023 rule 18.
+internal_consumption,inventory,document_type,inventory,Internal consumption,0.1.0,ADR-0027 rule 7.
+other_receipt,inventory,document_type,inventory,Other receipt,0.1.0,ADR-0027 rule 7.
+other_issue,inventory,document_type,inventory,Other issue,0.1.0,ADR-0027 rule 7.
+scrap,inventory,document_type,inventory,Scrap,0.1.0,ADR-0027 rule 7.
+opening_balance,inventory,document_type,inventory,Stock opening balance,0.1.0,ADR-0027 rule 7; ADR-0044.
+warehouse_task,inventory,function,inventory,Warehouse tasks,0.1.0,"Putaway, picking and status tasks, handling units (ADR-0023)."
+stock_reservation,inventory,function,inventory,Stock reservations,0.1.0,ADR-0023 rules 12-13.
+production_order,production,document_type,production,Production order,0.1.0,ADR-0034 rules 4-5; release is Submit.
+production_issue,production,document_type,production,Production issue,0.1.0,ADR-0034 rule 11.
+operation_confirmation,production,document_type,production,Operation confirmation,0.1.0,ADR-0034 rule 12.
+production_receipt,production,document_type,production,Production receipt,0.1.0,ADR-0034 rule 13.
+service_receipt,production,document_type,production,Service receipt,0.1.0,ADR-0037 rule 5.
+planning_run,planning,function,planning,Planning runs,0.1.0,ADR-0024; ADR-0036.
+planned_order,planning,function,planning,Planned orders,0.1.0,"Firm, update and convert planned orders (ADR-0024; ADR-0036 rule 12)."
+forecast,planning,function,planning,Forecasts,0.1.0,ADR-0024 rule 12.
+general_journal,finance,document_type,ledger,General journal entry,0.1.0,ADR-0014 rule 3; ADR-0048 rule 15.
+open_item_matching,finance,document_type,ledger,Open item matching,0.1.0,ADR-0026 rule 9.
+balance_transfer,finance,document_type,ledger,Balance transfer,0.1.0,ADR-0026; ADR-0048 rule 18.
+write_off,finance,document_type,cash,Write-off,0.1.0,ADR-0048 rule 11.
+partner_netting,finance,document_type,cash,Partner netting,0.1.0,ADR-0048 rule 10.
+provision_entry,finance,document_type,cash,Provision entry,0.1.0,ADR-0048 rule 14.
+prepaid_amortization,finance,document_type,cash,Prepaid amortization,0.1.0,"ADR-0048 rule 14, with prepaid schedules."
+closing_entry,finance,document_type,ledger,Closing entry,0.1.0,ADR-0012.
+fx_revaluation,finance,document_type,ledger,FX revaluation,0.1.0,ADR-0011 rule 17.
+tax_adjustment,finance,document_type,tax,Tax adjustment,0.1.0,ADR-0041 rule 13.
+costing_adjustment,finance,document_type,inventory,Costing adjustment,0.1.0,ADR-0020; ADR-0035.
+period_unlock_request,finance,document_type,policy,Period unlock request,0.1.0,ADR-0043 rule 16.
+opening_balance_entry,finance,document_type,imports,Account opening balance,0.1.0,"ADR-0044 rule 7; AcceptMigrationDifference at full (ADR-0044 rule 11; ADR-0054 rule 24)."
+opening_open_item_entry,finance,document_type,imports,Opening open item,0.1.0,ADR-0044 rule 8.
+posting_period,finance,function,periods,Posting periods,0.1.0,"Fiscal years and periods; Restrict and Open need post, Lock and Unlock full; capability post_in_soft_locked_period is full (ADR-0012; ADR-0054 rule 8)."
+close_checklist,finance,function,periods,Close checklist,0.1.0,Close tasks and their jobs (ADR-0012 rule 13).
+costing_run,finance,function,inventory,Costing runs,0.1.0,Period-end actual costing (ADR-0035).
+exchange_rate,finance,function,ledger,Exchange rates,0.1.0,"Rate sources and manual rates; CreateExchangeRate needs edit (ADR-0011; ADR-0054 rule 24)."
+chart_of_accounts,finance,function,ledger,Chart and determination,0.1.0,"Accounts, account determination and subledger activation (ADR-0010; ADR-0015; ADR-0025)."
+tax_setup,finance,function,tax,Tax setup,0.1.0,Tax codes and the tax matrix (ADR-0041).
+regime_option,finance,function,localization,Regime options,0.1.0,Company choices among a regime's options; full (ADR-0016; ADR-0054 rule 24).
+cash_receipt,banking,document_type,cash,Cash receipt,0.1.0,ADR-0048 rule 3.
+cash_payment,banking,document_type,cash,Cash payment,0.1.0,ADR-0048 rule 3.
+bank_receipt,banking,document_type,cash,Bank receipt,0.1.0,ADR-0048 rule 3.
+bank_payment,banking,document_type,cash,Bank payment,0.1.0,ADR-0048 rule 3.
+currency_exchange,banking,document_type,cash,Currency exchange,0.1.0,ADR-0048 rule 12.
+advance_settlement,banking,document_type,cash,Advance settlement,0.1.0,ADR-0048 rule 13.
+cash_count,banking,document_type,cash,Cash count,0.1.0,ADR-0048 rule 4.
+cash_count_adjustment,banking,document_type,cash,Cash count adjustment,0.1.0,ADR-0048 rule 4.
+bank_statement,banking,function,cash,Bank statements and matching,0.1.0,"Statement import, matching and matching rules (ADR-0048 rules 8-9)."
+money_account,banking,master_data,cash,Money accounts,0.1.0,ADR-0048 rule 2.
+dunning,banking,function,cash,Dunning and collections,0.1.0,ADR-0048 rule 17.
+partner,master_data,master_data,master_data,Partners,0.1.0,"Partners, roles, profiles, addresses, contacts and partner item codes (ADR-0019; ADR-0045)."
+partner_bank_account,master_data,master_data,master_data,Partner bank accounts,0.1.0,Changed only through change proposals (ADR-0029 rule 4); segregation rule bank_account_vs_payment.
+product,master_data,master_data,master_data,Products and items,0.1.0,"Products, items, variants, units, barcodes, classifications (ADR-0018; ADR-0045)."
+configuration_model,master_data,master_data,production,Configuration models,0.1.0,ADR-0046.
+price_list,master_data,master_data,master_data,Price lists,0.1.0,ADR-0045 rules 2-7.
+warehouse,master_data,master_data,master_data,Warehouses and bins,0.1.0,"Warehouses, zones, bins, lots and serials (ADR-0023; ADR-0045)."
+organization,master_data,master_data,master_data,Organization,0.1.0,"Branches, cost centers, projects, working calendars, departments and teams (ADR-0045); the department, team and UpdateEmployeeOrganization commands need full (ADR-0054 rule 6)."
+master_data_group,master_data,master_data,master_data,Groups,0.1.0,"Partner, tax, item and valuation groups and product categories (ADR-0045 rule 12)."
+print_profile,master_data,master_data,master_data,Print profiles,0.1.0,"Company and branch print profiles, seals and signatures; none in every template except owner (ADR-0049 rule 26; ADR-0054 rule 11)."
+production_structure,master_data,master_data,production,Production structures,0.1.0,"Bills of materials, routings, work centers, production versions and settings (ADR-0033)."
+change_proposal,master_data,document_type,documents,Change proposal,0.1.0,ADR-0029 rule 1.
+interaction,crm,function,crm,Interactions,0.1.0,"Interactions, participants, links, matching, partner e-mail domains, summaries, inbound messages and the partner timeline (ADR-0052 rules 5-10, 13, 18, 31)."
+complaint,crm,function,crm,Complaints,0.1.0,"Complaints; Close and Reopen need post (ADR-0052 rule 20)."
+outbound_message,crm,document_type,crm,Outbound message,0.1.0,"ADR-0052 rules 27-28; Send needs post; the outcome is recorded by the sender job at full."
+data_subject_request,crm,document_type,crm,Data subject request,0.1.0,ADR-0052 rule 24.
+mailbox,crm,function,crm,Mailboxes,0.1.0,"Mailboxes, the authentication probe and the intake; the jobs' Record and Run commands at full (ADR-0052 rules 11-14)."
+data_protection,crm,function,crm,Data protection,0.1.0,"Processing purposes and bases; EraseDataSubject at full (ADR-0052 rules 22-25)."
+partner_insight,crm,function,crm,Partner insights,0.1.0,"Insights, the duplicate scan and tax lookups; the jobs at full (ADR-0052 rules 17, 31)."
+general_access,administration,function,registry,General access,0.1.0,ListAllowedCommand; in every template at read (ADR-0040 rule 8).
+work_queue,administration,function,work,Work queue,0.1.0,"ListWorkItem, GetWorkItem, ClaimWorkItem, UnclaimWorkItem, ResolveWorkItem, CreateWorkItemNote (ADR-0042)."
+work_queue_administration,administration,function,work,Work queue administration,0.1.0,"AssignWorkItem, CancelWorkItem and capability list_all_work_items at full (ADR-0042 rules 10, 12)."
+user_account,administration,function,permissions,Users,0.1.0,ADR-0054 rules 3-4.
+role,administration,function,permissions,Roles and assignments,0.1.0,ADR-0054 rules 9-12.
+delegation,administration,function,permissions,Delegations,0.1.0,ADR-0054 rule 21; capability delegate_for_others at full.
+segregation_rule,administration,function,permissions,Segregation of duties,0.1.0,"Segregation rules, conflicts, exceptions, reviews and the small-company mode (ADR-0054 rules 17-20)."
+policy,administration,function,policy,Policy and approval,0.1.0,"Policy rules, approval procedures and approval pools (ADR-0043; ADR-0055)."
+company_setting,administration,function,registry,Company settings,0.1.0,"Company settings and numbering configuration (ADR-0009 rule 15)."
+agent,administration,function,agent_runs,Agents,0.1.0,Capabilities start_agent:<agent_type> at edit; agent schedules and intakes (ADR-0017 rules 11-12; DS-32).
+agent_run_bodies,administration,function,agent_runs,Agent run bodies,0.1.0,"Capability read_agent_run_bodies at full; none in every template except owner (ADR-0050 rule 20; ADR-0054 rule 8)."
+audit,administration,function,audit,Audit log,0.1.0,"GetAuditRecord, ListAuditRecord, denials (ADR-0038)."
+print_template,administration,function,reporting,Print templates,0.1.0,"Print templates and print data contracts, no document data; GetPrintData is on general_access with the subject's own check; the render worker's outcome at full (ADR-0049 rules 20, 24-25)."
+data_import,administration,function,imports,Data imports,0.1.0,Staged import batches (ADR-0030 rule 9; ADR-0044).
+data_export,administration,function,imports,Data export,0.1.0,Full company data export (ADR-0044).
+report_finance,reports,report,query,Financial reports,0.1.0,"Financial statements, books and the cash book (DS-26); FileStatutoryReport at post (ADR-0049 rule 19)."
+report_tax,reports,report,query,Tax reports,0.1.0,"Tax returns and listings (DS-26; ADR-0041); FileTaxReturn at post (ADR-0041 rule 18)."
+report_inventory,reports,report,query,Inventory reports,0.1.0,Stock and valuation reports (DS-26).
+report_sales,reports,report,query,Sales reports,0.1.0,Sales analysis (DS-26).
+report_purchasing,reports,report,query,Purchasing reports,0.1.0,Purchasing analysis (DS-26).
+report_production,reports,report,query,Production reports,0.1.0,Production and variance reports (DS-26; ADR-0035).
