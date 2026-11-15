@@ -29,7 +29,7 @@ CREATE TABLE document_reader (                             -- installation data;
     recorded_at    timestamptz NOT NULL,
     UNIQUE (code, version),
     CONSTRAINT ck_document_reader_purposes CHECK (cardinality(purposes) > 0
-        AND purposes <@ ARRAY['supplier_invoice', 'contact_card', 'inquiry_lines', 'product_source', 'delivery_note']::text[])
+        AND purposes <@ ARRAY['supplier_invoice', 'contact_card', 'inquiry_lines', 'product_source', 'shop_floor_report', 'delivery_note']::text[])
 );
 
 -- ===== Extractions [attachments] (ADR-0057 rules 3, 7-10, 14, 17-19, 23) =====
@@ -37,7 +37,7 @@ CREATE TABLE document_extraction (                         -- one per attachment
     id                       uuid PRIMARY KEY,
     company_id               uuid NOT NULL REFERENCES company (id),
     attachment_id            uuid NOT NULL,
-    purpose                  text NOT NULL CONSTRAINT ck_document_extraction_purpose CHECK (purpose IN ('supplier_invoice', 'contact_card', 'inquiry_lines', 'product_source', 'delivery_note')),
+    purpose                  text NOT NULL CONSTRAINT ck_document_extraction_purpose CHECK (purpose IN ('supplier_invoice', 'contact_card', 'inquiry_lines', 'product_source', 'shop_floor_report', 'delivery_note')),
     attachment_sha256        text NOT NULL CONSTRAINT ck_document_extraction_sha256 CHECK (attachment_sha256 ~ '^[0-9a-f]{64}$'),
     detected_media_type      text NOT NULL,                -- from the bytes, never the file name (rule 4)
     document_kind            text CONSTRAINT ck_document_extraction_document_kind CHECK (document_kind IN ('xml', 'pdf_embedded_xml', 'pdf_text', 'pdf_image', 'image', 'spreadsheet', 'email')),
@@ -209,7 +209,7 @@ CREATE TABLE extraction_mapping_rule (                     -- company data, chan
     id                       uuid PRIMARY KEY,
     company_id               uuid NOT NULL REFERENCES company (id),
     partner_id               uuid NOT NULL,
-    purpose                  text NOT NULL CONSTRAINT ck_extraction_mapping_rule_purpose CHECK (purpose IN ('supplier_invoice', 'contact_card', 'inquiry_lines', 'product_source', 'delivery_note')),
+    purpose                  text NOT NULL CONSTRAINT ck_extraction_mapping_rule_purpose CHECK (purpose IN ('supplier_invoice', 'contact_card', 'inquiry_lines', 'product_source', 'shop_floor_report', 'delivery_note')),
     rule_kind                text NOT NULL CONSTRAINT ck_extraction_mapping_rule_kind CHECK (rule_kind IN ('label_anchor', 'column_header', 'unit_text')),
     source_text              text NOT NULL,                -- as first seen
     normalized_source_text   text NOT NULL,                -- NFKC, case folded, whitespace collapsed

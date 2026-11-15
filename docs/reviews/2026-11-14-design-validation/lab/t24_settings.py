@@ -8,7 +8,7 @@ Run: python t24_settings.py [--load]
 
 C: the catalog settings.csv: constant field count, unique keys, scope, storage, type, a core default or fail-closed,
    bounds, direction and a known leaf on every row, defaults within bounds, order directions listing every allowed value,
-   every setting key ADR-0063 names catalogued and the reverse, no country content; the ADR's invariant, edge case,
+   every setting key ADR-0063 names catalogued, every catalog key named by an ADR its row's source cites, no country content; the ADR's invariant, edge case,
    work item kind and leaf rows, their codes unique and the tables they name defined; the DS-04 codes they use.
 A: rule 3's change path (tighten at once by one person, loosen only through another person's approved proposal, neutral
    directly, outdating dependent auto-post evidence, period starts, scope overrides); rule 4's bounds as a property test
@@ -172,17 +172,47 @@ bad = [r["key"] for r in SET if r["change_effect"] not in ("immediate", "period_
        or (r["change_effect"] == "package_release") != (r["storage"] == "regime_setting" and "company" not in r["scope"].split(";"))]
 check("C09 change effects and outdating are from the registry's lists, and package_release exactly for package-only keys", not bad, bad)
 acting = sorted(k for k, r in S.items() if r["outdates"] == "auto_post")
-check("C10 the keys whose loosening outdates auto-post evidence are the acting paths of rules 8-10 (cash and the error ceiling)",
-      all(k.startswith(("cash.", "auto_post.")) for k in acting) and "auto_post.max_error_rate" in acting, acting)
+ADR_DIR = os.path.dirname(ADR)
+_ADR_TEXT = {}
+
+
+def adr_text_of(num):
+    """The text of ADR-<num> beside ADR-0063, or empty when there is none (ADR-0064 note on rule 29)."""
+    if num not in _ADR_TEXT:
+        hits = [f for f in os.listdir(ADR_DIR) if f.startswith(num + "-") and f.endswith(".md")]
+        _ADR_TEXT[num] = open(os.path.join(ADR_DIR, hits[0]), encoding="utf-8").read() if len(hits) == 1 else ""
+    return _ADR_TEXT[num]
+
+
+def cited_adrs(r):
+    return re.findall(r"ADR-(\d{4})", r["source"])
+
+
+def rule_blocks(text):
+    """Numbered rules (a top-level `N. ` line up to the next), where a declaration and its key stand together."""
+    return re.split(r"\n(?=\d+\. )", text)
+
+
+def declares_auto_post(r):
+    return any(f"`{r['key']}`" in b and re.search(r"auto-post|auto_post|evidence", b)
+               for n in cited_adrs(r) for b in rule_blocks(adr_text_of(n)))
+
+
+bad = [k for k in acting if not declares_auto_post(S[k])]
+check("C10 every key whose loosening outdates auto-post evidence stands in a rule of an ADR its row cites that declares an auto-post or evidence path (ADR-0063 rules 8-10 and later ADRs)",
+      not bad and "auto_post.max_error_rate" in acting, bad or acting)
 adr_text = open(ADR, encoding="utf-8").read()
 PREFIXES = ("intake.", "cash.", "auto_post.", "artifacts.", "agents.", "data_processing.", "analysis.", "extensions.", "automation.",
             "master_data.", "documents.", "movement_type.", "barcode.")
 NOT_SETTINGS = {"cash.match_bank_line"}            # a tunable function's code, not a setting
 named = {t for t in re.findall(r"`([a-z0-9_<>.]+)`", adr_text) if t.startswith(PREFIXES) and t.count(".") >= 1} - NOT_SETTINGS
-check("C11 every setting key ADR-0063 names is in the catalog, and every catalog key is named in ADR-0063",
-      named == set(S), {"missing": sorted(named - set(S)), "unnamed": sorted(set(S) - named)})
+unnamed = sorted(k for k, r in S.items() if not any(f"`{k}`" in adr_text_of(n) for n in cited_adrs(r)))
+check("C11 every setting key ADR-0063 names is in the catalog, and every catalog key is named by an ADR its row's source cites",
+      not (named - set(S)) and not unnamed and all(cited_adrs(r) for r in SET), {"missing": sorted(named - set(S)), "unnamed": unnamed})
 m = re.search(r"\[settings\.csv\]\(\.\./catalogs/settings\.csv\), version 0\.1\.0, (\d+) definitions", adr_text)
-check("C12 rule 29 states the catalog's row count", m and int(m.group(1)) == len(SET), m and m.group(1))
+added = sum(int(x) for x in re.findall(r"\) adds (\d+) definitions", adr_text))
+check("C12 the catalog's row count is rule 29's stated count plus the definitions that later ADRs' notes on rule 29 add",
+      m and int(m.group(1)) + added == len(SET), (m and m.group(1), added, len(SET)))
 COUNTRY = re.compile(r"Vietnam|vietnam|l10n_vn|\bTT ?99\b|\btt99\b|\bVND\b|\bVAS\b|Decree|Circular|DS-19")
 texts = {"adr": adr_text, "settings.csv": open(os.path.join(CAT, "settings.csv"), encoding="utf-8").read(),
          "DS-28-settings.sql": open(os.path.join(DOCS, "design", "DS-28-settings.sql"), encoding="utf-8").read()}

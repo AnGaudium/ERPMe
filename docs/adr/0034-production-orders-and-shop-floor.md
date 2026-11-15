@@ -152,6 +152,8 @@ It adds only what production needs:
    - **Shortages.** The rest is a shortage, with the check result `component_shortage`. `ReserveProductionOrderComponent` (effect class `other`) reserves again later; humans and the production agent run it directly.
    - **Destination.** `destination_bin_id` is passed only for components issued from the production warehouse.
    - **Interim, flagged:** release with shortages is allowed. Reserving at release can hold stock for an order that starts months later (open question).
+
+   Note ([ADR-0064](0064-production-agent.md), proposed 2026-11-15): `production.reservation.mode` (company: `off`, `on_release`, `scheduled`; default `on_release`, today's behavior) and `production.reservation.window_days` (14) settle reservation timing; the production agent's reservation sweep, a workflow without an LLM step, reserves shortfalls in the reservation priority and never takes stock reserved for another demand; a move between orders is `TransferStockReservation` from an approved change proposal (rules 7, 15, 23, 24).
 10. Staging:
     - **New bin type.** ADR-0023 rule 2 gains bin type `production`, which pick removal never reads. A work center's `supply_bin_id` and `output_bin_id` must be of that type (ADR-0033 rule 11 gets a note). A work center without a supply bin stages to the production warehouse's default bin.
     - **Pick tasks.** `RunPickRelease` (ADR-0023 rule 14) also serves production orders. Its pick tasks move reserved components to the reservation's `destination_bin_id`, released by `release_sequence`.
@@ -196,6 +198,8 @@ It adds only what production needs:
     Note: one table holds every generated backflush line: the production-owned `operation_progress_component` (calling document type and ID, order component line, material document line). Confirmations, service receipts and backflush at receipt (rule 13) all write it. `operation_confirmation_component` and `production_receipt_component` are dropped; plans and traceability read the one table, and INV-112 covers every calling document (holistic review 2026-11-15, item P11).
 
     Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): generated backflush lines carry the line unit block in the inventory unit (source `identity`), rounded up (rules 8, 9).
+
+    Note ([ADR-0064](0064-production-agent.md), proposed 2026-11-15): the capture agent is the agent type `production_capture`: tainted, scope `subject` on one production order resolved from a trusted order number of an extraction of purpose `shop_floor_report`, quantities copied as stated, drafts only, a person posts. Confirmations carry `entry_source` (`person`, `capture_agent`, `production_import`) and get the yield, activity and duplicate checks of rule 22; a deterministic production import may post them as `integration` only behind `production.mes_import.auto_post` and the evidence of ADR-0043 rule 14 (rules 19, 22, 25).
 
 **Output: receipt, inspection and make to order**
 
@@ -247,6 +251,8 @@ It adds only what production needs:
     The production and capture agents are later agents ([ADR-0051](0051-agent-workflows.md) rule 29).
 
     Note: registry flags. `production_order` and `production_issue` have `is_approval_hold_allowed: true`. `operation_confirmation` and `production_receipt` record facts on the floor and have `is_approval_hold_allowed: false`, so they never wait in a pool and a rank becomes `human_post` ([ADR-0043](0043-policy-and-approval.md) rule 10). Pools: `production_order` in `mo`, `production_issue` in `consumption` ([ADR-0055](0055-approval-pools-and-stages.md) rule 2's note) (holistic review 2026-11-15, item P12).
+
+    Note ([ADR-0064](0064-production-agent.md), proposed 2026-11-15): the production and capture agents are designed: agent types `production`, `production_capture` and `production_variance` (rule 1).
 18. Events, permissions and queries:
     - **Events.** Beyond ADR-0009 rule 22's document events: `ProductionOrderCompleted` and `ProductionOrderReopened`. Reservations emit ADR-0023's events.
     - **Permissions.** Record scope for production documents uses `production_warehouse_id` as the warehouse dimension (ADR-0017 rule 9 gets a note). DS-15 adds a shop-floor role template. It is `shop_floor_lead` ([ADR-0054](0054-users-roles-and-authorizations.md) rule 11).
@@ -256,6 +262,8 @@ It adds only what production needs:
       - `ListProductionOrder`.
       - `ListWorkCenterLoad`.
       - `GetTraceability`.
+
+    Note ([ADR-0064](0064-production-agent.md), proposed 2026-11-15): the agent's queries: `ListComponentShortage`, `EvaluateProductionOrderRelease`, `GetProductionOrderUsageVariance`, `ListProductionOrderVarianceDriver` (`production`), `GetProductionOrderPegging` and `ListShortageResolutionCandidate` (`planning`); the daily job `RunProductionOrderCheck` raises the shortage, completion-candidate, stalled-order and standards items (rules 5–12).
 
 **Locks, checks and later features**
 

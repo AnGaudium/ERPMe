@@ -60,7 +60,7 @@ CREATE TABLE mailbox (
     owner_user_id               uuid NOT NULL REFERENCES user_account (id),   -- owner of mailbox_unreachable (subject_owner)
     is_intake_enabled           boolean NOT NULL DEFAULT true,
     is_sending_enabled          boolean NOT NULL DEFAULT false,
-    document_intake_purpose     text CONSTRAINT ck_mailbox_document_intake_purpose CHECK (document_intake_purpose IN ('supplier_invoice', 'inquiry_lines')),   -- attachments go to the reader ladder (ADR-0057 rule 25)
+    document_intake_purpose     text CONSTRAINT ck_mailbox_document_intake_purpose CHECK (document_intake_purpose IN ('supplier_invoice', 'inquiry_lines', 'shop_floor_report')),   -- attachments go to the reader ladder (ADR-0057 rule 25)
     document_intake_quarantine_limit integer NOT NULL DEFAULT 20 CONSTRAINT ck_mailbox_document_intake_quarantine_limit CHECK (document_intake_quarantine_limit > 0),   -- quarantined records of messages not matched to a partner, per receipt date; past it, extracted but not imported (ADR-0057 rule 25)
     intake_cursor               jsonb,                         -- provider position, e.g. IMAP UIDVALIDITY and last UID
     last_intake_at              timestamptz,

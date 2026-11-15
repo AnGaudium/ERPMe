@@ -1331,6 +1331,7 @@ CREATE TABLE stock_reservation (
     destination_bin_id      uuid,                            -- production component staging (ADR-0034 rule 9)
     release_sequence        integer,
     owner_partner_id        uuid,
+    transferred_from_reservation_id uuid,                    -- TransferStockReservation from an approved change proposal (ADR-0064 rule 24)
     recorded_at             timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, demand_supply_line_id) REFERENCES demand_supply_line (company_id, id),
@@ -1341,10 +1342,40 @@ CREATE TABLE stock_reservation (
     CONSTRAINT ck_stock_reservation_progress CHECK (picked_quantity BETWEEN 0 AND quantity AND fulfilled_quantity BETWEEN 0 AND quantity),
     -- fulfilled when fulfilled equals quantity (rule 13); a plain warehouse fulfils without picks (ADR-0023 rule 16).
     CONSTRAINT ck_stock_reservation_fulfilled CHECK ((state = 'fulfilled') = (fulfilled_quantity = quantity) OR state = 'canceled'),
-    CONSTRAINT ck_stock_reservation_picked CHECK (state <> 'picked' OR picked_quantity > fulfilled_quantity)
+    CONSTRAINT ck_stock_reservation_picked CHECK (state <> 'picked' OR picked_quantity > fulfilled_quantity),
+    CONSTRAINT ck_stock_reservation_transferred_from CHECK (transferred_from_reservation_id IS NULL OR transferred_from_reservation_id <> id)
 );
 CREATE INDEX ix_stock_reservation_company_id_item_id_warehouse_id ON stock_reservation (company_id, item_id, warehouse_id) WHERE state IN ('open', 'picked');
 CREATE INDEX ix_stock_reservation_demand_supply_line_id ON stock_reservation (demand_supply_line_id);
+-- The transfer's source, a reservation of the same company (ADR-0064 rule 24); added after the table, as it refers to itself.
+ALTER TABLE stock_reservation ADD CONSTRAINT fk_stock_reservation_transferred_from FOREIGN KEY (company_id, transferred_from_reservation_id) REFERENCES stock_reservation (company_id, id);
+-- reservation_transfer_invalid: a transferred row has its source's company, item, warehouse and lot; the link never changes after
+-- insert, so a transfer chain has no cycle; item, warehouse and lot never change on a row that has or is a source (ADR-0064 rule 24).
+CREATE FUNCTION stock_reservation_transfer_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE src stock_reservation%ROWTYPE;
+BEGIN
+    IF TG_OP = 'UPDATE' THEN
+        IF NEW.transferred_from_reservation_id IS DISTINCT FROM OLD.transferred_from_reservation_id THEN
+            RAISE EXCEPTION 'reservation_transfer_link_immutable' USING ERRCODE = 'check_violation';
+        END IF;
+        IF (NEW.item_id, NEW.warehouse_id, NEW.lot_id) IS DISTINCT FROM (OLD.item_id, OLD.warehouse_id, OLD.lot_id)
+           AND (NEW.transferred_from_reservation_id IS NOT NULL
+                OR EXISTS (SELECT 1 FROM stock_reservation s WHERE s.transferred_from_reservation_id = NEW.id)) THEN
+            RAISE EXCEPTION 'reservation_transfer_invalid' USING ERRCODE = 'check_violation';
+        END IF;
+        RETURN NEW;
+    END IF;
+    IF NEW.transferred_from_reservation_id IS NOT NULL THEN
+        SELECT * INTO src FROM stock_reservation WHERE id = NEW.transferred_from_reservation_id;
+        IF FOUND AND ((src.company_id, src.item_id, src.warehouse_id) IS DISTINCT FROM (NEW.company_id, NEW.item_id, NEW.warehouse_id)
+                      OR src.lot_id IS DISTINCT FROM NEW.lot_id) THEN
+            RAISE EXCEPTION 'reservation_transfer_invalid' USING ERRCODE = 'check_violation';
+        END IF;
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER trg_stock_reservation_transfer_guard BEFORE INSERT OR UPDATE OF transferred_from_reservation_id, item_id, warehouse_id, lot_id ON stock_reservation
+    FOR EACH ROW EXECUTE FUNCTION stock_reservation_transfer_guard();
 CREATE TABLE warehouse_task (
     id                      uuid PRIMARY KEY,
     company_id              uuid NOT NULL,

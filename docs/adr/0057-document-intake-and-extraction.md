@@ -43,6 +43,8 @@ A capability check found multimodal input largely undesigned: business-card phot
    | `contact_card` | `partner` | `crm` |
    | `inquiry_lines` | `quotation` | `sales` |
    | `product_source` | `production_structure` | `production` |
+
+   Note ([ADR-0064](0064-production-agent.md), proposed 2026-11-15): purpose `shop_floor_report` (leaf `operation_confirmation`, consumer `production`): order number, operation number, yield, scrap, scrap reason text, lot and posting date, from spreadsheets, photos or an operator's message; a mailbox may carry it as `document_intake_purpose` (rule 26).
 3. Requesting an extraction, `RequestDocumentExtraction` (module `attachments`, effect class `other`, verb Request at `edit` on the purpose's leaf):
    - **Payload:** `attachment_id`, `purpose`, optional `partner_id` (a person's statement of whose document it is).
    - **Who:** a person, or the mailbox route as `system` on behalf of the mailbox owner (rule 25).

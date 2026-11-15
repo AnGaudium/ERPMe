@@ -140,3 +140,6 @@ saved_analysis,reports,function,query,Saved analyses,0.1.0,"ListAnalysisExample 
 analysis_debug,administration,function,query,Analysis debug,0.1.0,"Capability read_analysis_debug at full: other people's stored analysis answers and the planner's raw cost estimates; none in every template except owner (ADR-0060 rules 14, 21)."
 agent_analysis,agent,function,agents,Analysis agent,0.1.0,Capability start_agent:analysis at edit (ADR-0060 rule 20; ADR-0054 rule 24).
 data_processing,agent,function,agents,Data processing,0.1.0,"Data-processing permissions of the company: SetDataProcessingPermission through an approved proposal and EndDataProcessingPermission at full; the provider check job (ADR-0063 rule 14; ADR-0057 rule 20)."
+agent_production,agent,function,agents,Production agent,0.1.0,Capability start_agent:production at edit (ADR-0064 rule 1; ADR-0054 rule 24).
+agent_production_capture,agent,function,agents,Production capture agent,0.1.0,Capability start_agent:production_capture at edit (ADR-0064 rule 1; ADR-0054 rule 24).
+agent_production_variance,agent,function,agents,Production variance agent,0.1.0,Capability start_agent:production_variance at edit (ADR-0064 rule 1; ADR-0054 rule 24).

@@ -67,3 +67,4 @@ One file per decision, named `NNNN-short-title.md`, using [template.md](template
 | [ADR-0062](0062-product-engineering-workflow.md) | Product engineering workflow (DS-57, master-data part) | Accepted (2026-11-15) |
 | [ADR-0060](0060-agent-assisted-reporting-and-analysis.md) | Agent-assisted reporting and analysis (DS-33, DS-34) | Accepted (2026-11-15) |
 | [ADR-0063](0063-configurable-policy-settings.md) | Configurable policy settings (DS-28) | Accepted (2026-11-15) |
+| [ADR-0064](0064-production-agent.md) | Production agent (DS-57) | Accepted (2026-11-15) |

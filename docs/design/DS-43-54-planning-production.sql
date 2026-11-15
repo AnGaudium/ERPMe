@@ -764,7 +764,7 @@ CREATE TABLE planning_exception (                          -- one work item per 
     kind                   text NOT NULL CONSTRAINT ck_planning_exception_kind CHECK (kind IN (
                                'shortage_inside_lead_time', 'below_safety_stock', 'above_maximum', 'supplier_minimum_excess',
                                'below_supplier_minimum_amount', 'container_underfilled', 'stock_expiring', 'firmed_order_overdue',
-                               'planning_parameter_missing', 'capacity_overload')),
+                               'planning_parameter_missing', 'capacity_overload', 'production_order_start_overdue', 'production_order_overdue')),   -- production orders: ADR-0064 rule 17
     -- interim: not stated in ADR-0024 (the reasons named in ADR-0024 rule 21 and ADR-0036 rules 1, 4, 5 as values)
     reason                 text CONSTRAINT ck_planning_exception_reason CHECK (reason IN (
                                'planning_row_missing', 'supplier_missing', 'preferred_supplier_ambiguous', 'route_missing', 'lead_time_missing',
@@ -777,6 +777,7 @@ CREATE TABLE planning_exception (                          -- one work item per 
     start_date             date,                               -- capacity_overload: the overloaded range of buckets
     end_date               date,
     planned_order_id       uuid,
+    production_order_id    uuid,                               -- the real order of production_order_start_overdue and production_order_overdue (ADR-0064 rule 17)
     demand_supply_line_id  uuid,                               -- the demand that hit a missing parameter (ADR-0036 rule 1)
     lateness_days          integer CONSTRAINT ck_planning_exception_lateness CHECK (lateness_days > 0),
     evidence               jsonb NOT NULL DEFAULT '{}',
@@ -790,12 +791,14 @@ CREATE TABLE planning_exception (                          -- one work item per 
     FOREIGN KEY (company_id, supplier_partner_id) REFERENCES partner (company_id, id),
     FOREIGN KEY (company_id, work_center_id) REFERENCES work_center (company_id, id),
     FOREIGN KEY (company_id, planned_order_id) REFERENCES planned_order (company_id, id),
+    FOREIGN KEY (company_id, production_order_id) REFERENCES production_order (company_id, id),
     FOREIGN KEY (company_id, demand_supply_line_id) REFERENCES demand_supply_line (company_id, id),
     CONSTRAINT ck_planning_exception_reason_kind CHECK ((kind = 'planning_parameter_missing') = (reason IS NOT NULL)),
     CONSTRAINT ck_planning_exception_subject CHECK (CASE
         WHEN kind = 'capacity_overload' THEN work_center_id IS NOT NULL AND start_date IS NOT NULL AND coalesce(end_date >= start_date, false)
         WHEN kind IN ('below_supplier_minimum_amount', 'container_underfilled') THEN supplier_partner_id IS NOT NULL
         ELSE item_id IS NOT NULL AND warehouse_id IS NOT NULL END),
+    CONSTRAINT ck_planning_exception_production_order CHECK ((kind IN ('production_order_start_overdue', 'production_order_overdue')) = (production_order_id IS NOT NULL)),
     CONSTRAINT ck_planning_exception_closed CHECK ((state = 'closed') = (closed_at IS NOT NULL))
 );
 CREATE UNIQUE INDEX ux_planning_exception_open ON planning_exception (company_id, exception_key) WHERE state = 'open';
@@ -1072,6 +1075,8 @@ CREATE TABLE operation_confirmation (                      -- an internal operat
     employee_partner_id            uuid,                       -- interim: not stated in ADR-0034 ("optional people or teams": column names)
     team_id                        uuid,                       -- interim: not stated in ADR-0034
     posting_date                   date NOT NULL,
+    entry_source                   text NOT NULL DEFAULT 'person' CONSTRAINT ck_operation_confirmation_entry_source CHECK (entry_source IN ('person', 'capture_agent', 'production_import')),   -- ADR-0064 rules 19, 25
+    external_reference             text,                       -- the production import's row reference, unique per company (ADR-0064 rule 25)
     recorded_at                    timestamptz NOT NULL,
     UNIQUE (company_id, id),
     UNIQUE (company_id, id, production_order_id),
@@ -1082,8 +1087,11 @@ CREATE TABLE operation_confirmation (                      -- an internal operat
         REFERENCES production_order_operation (company_id, id, production_order_id, control),
     FOREIGN KEY (company_id, employee_partner_id) REFERENCES partner (company_id, id),
     FOREIGN KEY (company_id, team_id) REFERENCES team (company_id, id),
-    CONSTRAINT ck_operation_confirmation_scrap_reason CHECK (scrap_reason_code IS NULL OR scrap_quantity > 0)
+    CONSTRAINT ck_operation_confirmation_scrap_reason CHECK (scrap_reason_code IS NULL OR scrap_quantity > 0),
+    CONSTRAINT ck_operation_confirmation_external_reference CHECK ((entry_source = 'production_import') = (external_reference IS NOT NULL) AND coalesce(btrim(external_reference), 'x') <> '')
 );
+-- duplicate_external_document: one confirmation per company and import reference (ADR-0064 rule 25).
+CREATE UNIQUE INDEX ux_operation_confirmation_external_reference ON operation_confirmation (company_id, external_reference) WHERE external_reference IS NOT NULL;
 CREATE TABLE operation_confirmation_activity (             -- actual activity quantities, defaulting to the standards (rule 12)
     company_id                 uuid NOT NULL,
     operation_confirmation_id  uuid NOT NULL,

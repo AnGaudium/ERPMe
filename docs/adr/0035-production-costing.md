@@ -167,6 +167,8 @@ The accounting choices are the author's (ADR-0005 item 1). Each one below is a r
 
     Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), proposed 2026-11-15): the split is also written per order, period and variance category, with the order's output item, warehouse and branch, to `production`'s read model `production_order_variance` when the costing run settles the order's period cost; its DDL comes with the costing tables of DS-53 (a note in DS-43-54-planning-production.sql). The analysis fact `production_variance_overview` reads those rows only, so the variance agent and the analysis layer read one figure (rule 19).
 
+    Note ([ADR-0064](0064-production-agent.md), proposed 2026-11-15): the variance agent is `production_variance` on the analysis layer; `GetProductionOrderUsageVariance` gives in-period quantity variances before settlement and `ListProductionOrderVarianceDriver` the document lines per category and cost component, which sum to `production_order_variance` (rules 9–11, 20).
+
 **Vietnamese costing methods**
 
 16. The methods are views over the one model, so a choice per product group changes reports and settings, not the core:

@@ -199,6 +199,8 @@ A small shop and a managed distribution warehouse run on the same model.
     - **Lots.** Availability is not lot-aware. A reservation whose lots fail shelf-life rules at pick time gives a short pick. Planning ignores reservations in netting and counts demand in full ([ADR-0024](0024-planning.md) rule 9).
     - **Build step.** Reservations, the check and the posting interfaces are step 3 core; documents call them at step 5. Production orders reserve components at release, passing `destination_bin_id` and `release_sequence` ([ADR-0034](0034-production-orders-and-shop-floor.md) rule 9). Picked and fulfilled quantities stay stored here, checked by INV-58; the open quantity of the demand line is stored in `demand_supply_line` ([ADR-0031](0031-design-simplifications.md) rules 5, 6).
 
+    Note ([ADR-0064](0064-production-agent.md), proposed 2026-11-15): `TransferStockReservation` (module `inventory`, verb Transfer, `is_proposal_bound`, `stock_reservation` at `post`) moves open, unpicked reserved quantity from one production order component line to another of the same item and warehouse, at most the target's unreserved open requirement, only from the execution of an approved change proposal; the new reservation carries `transferred_from_reservation_id` (rule 24). Sales order reservations are not transferred in Phase 1. The production sweep orders production demands by requested date, not first come (rule 7; the reservation question in open-questions.md).
+
 **Picking and outbound**
 
 14. Pick tasks:
