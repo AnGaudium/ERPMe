@@ -4,7 +4,7 @@ For the author and design reviewers. Coding agents read the short [coder core](a
 
 **Rule of this document.** It summarizes and links. It creates no rule. Where an ADR, a DDL draft or a catalog disagrees with another, the point is listed under [Findings for the review](#findings-for-the-review) with `file:line`, and is not resolved here. ADRs win over this file.
 
-Status: written 2026-11-16 against `main`, from the outline approved after a systems review and a developer review. Revised 2026-11-16 after independent review round 1. Facts that could not be confirmed would be marked "(to verify)"; none remain.
+Status: written 2026-11-16 against `main`, from the outline approved after a systems review and a developer review. Revised 2026-11-16 after independent review round 1, and updated the same day for the design hardening notes (budgets set by the customer, the pinned business date, unknown external outcomes, one restore point for database and attachments, bulk review). Facts that could not be confirmed would be marked "(to verify)"; none remain.
 
 ## Contents
 
@@ -18,7 +18,7 @@ ERPMe is an open-source ERP designed for agentic workflows, for trading and asse
 
 **Five ideas the design follows** (Principles in [02-principles](../spec/02-principles.md):7–19; D2, D4):
 1. **Deterministic core, AI proposes.** "The business core is fully deterministic; AI lives only in the proposal layer" (01-vision:13). Agents draft; people submit, approve and post.
-2. **Every write is a schema'd command, simulated before executed** (Principles 1, 2, 9). One envelope, two calls, one `plan_hash` ([ADR-0008](../adr/0008-command-envelope-and-registry.md)).
+2. **Every write is a schema'd command, simulated before executed** (Principles 1, 2, 9). One envelope, two calls, one `plan_hash` ([ADR-0008](../adr/0008-command-envelope-and-registry.md)). Only internal callers (consumers and system jobs, in process) execute without a simulation; everyone else simulates first (ADR-0008 rule 13 and its note).
 3. **Append-only books and explainable numbers** (Principles 5, 6). Posted documents are immutable and corrected by correction documents ([ADR-0009](../adr/0009-document-lifecycle.md)).
 4. **State tables plus a transactional outbox; no event sourcing** (D4; [ADR-0013](../adr/0013-outbox-and-events.md)). The work queue is central (Principle 8).
 5. **Fully usable without an LLM** (Principle 12). Every agent run is bound to a work item, and every consumer works with the LLM off.
@@ -59,7 +59,7 @@ flowchart LR
 - **LLM provider.** One provider per installation in Phase 1; `llm_provider` accepts only `anthropic`; the `local` adapter is designed but not enabled. If unset, the LLM is off and everything works by hand ([ADR-0050](../adr/0050-agent-runtime-and-query-layer.md):52–63).
 - **Mailboxes.** `crm.contract.MailboxConnector`, IMAP over TLS and SMTP submission ([ADR-0052](../adr/0052-minimal-crm.md):112).
 - **Bank files.** `ImportBankStatement` runs the package's `BankStatementReader`; no money moves from ERPMe in Phase 1 ([ADR-0048](../adr/0048-cash-bank-receivables-payables.md):97, :114).
-- **E-invoices.** The provider connection is an add-on designed after the core; a deterministic stub stands in ([backlog](backlog.md):77; [ADR-0028](../adr/0028-document-lifecycle-hardening.md):105).
+- **E-invoices.** The provider connection is an add-on designed after the core; a deterministic stub stands in ([backlog](backlog.md):77; [ADR-0028](../adr/0028-document-lifecycle-hardening.md):107).
 - **Identity.** Password (argon2) with TOTP, or OIDC through Authlib; no separate identity server ([ADR-0017](../adr/0017-permission-envelope.md):14; [ADR-0002](../adr/0002-core-technology-tools.md):29).
 - **Warehouse app.** The same React app as a PWA, with wedge, camera and manual scans ([ADR-0061](../adr/0061-barcodes.md):123; D14).
 
@@ -89,9 +89,9 @@ flowchart LR
 | `erpme worker --queue integrations` | External consumers: e-invoice, mail, malware scan | `erpme_worker` | Calls with no transaction open (ADR-0013 rule 10) |
 | `erpme worker --queue jobs` | System jobs, scheduled jobs, long-job consumers | `erpme_worker` | Procrastinate periodic tasks; stalled-job retry (ADR-0022 rule 12) |
 | `erpme worker --queue pdf` | Render worker | `erpme_worker` | Own process, sandboxed, 30-min lease, 3 attempts ([ADR-0049](../adr/0049-statutory-reporting-and-printing.md):199) |
-| `erpme worker --queue agents` | `agent_runner` | `erpme_worker`, derived from ADR-0017 rule 18 ("`erpme_worker` runs delivery workers and system jobs") plus ADR-0050:160 (`agent_runner` is a consumer); a run's read-only queries use `erpme_readonly` (ADR-0050:369) | 5-min lease with a 60-s heartbeat (ADR-0013:53; ADR-0050:160) |
+| `erpme worker --queue agents` | `agent_runner` | `erpme_worker`, derived from ADR-0017 rule 18 ("`erpme_worker` runs delivery workers and system jobs") plus ADR-0050:162 (`agent_runner` is a consumer); a run's read-only queries use `erpme_readonly` (ADR-0050:385) | 5-min lease with a 60-s heartbeat (ADR-0013:62; ADR-0050:162) |
 | `erpme admin migrate` / `bootstrap` | Migrations, catalogs, package data; first operator and owner | `erpme_migration` | Only role with `BYPASSRLS` (ADR-0017 rule 18) |
-| Read-only query layer | Views in schema `query` | `erpme_readonly` | Statement timeout 10 s for agent runs, 30 s otherwise (ADR-0050:369) |
+| Read-only query layer | Views in schema `query` | `erpme_readonly` | Statement timeout 10 s for agent runs, 30 s otherwise (ADR-0050:385) |
 
 ADR-0022 rule 12 lists four worker queues; ADR-0013 rule 13 adds `agents`. Five queues are shown here; the difference is a [finding](#findings-for-the-review).
 
@@ -140,7 +140,7 @@ flowchart TB
 
 - Schemas `erpme`, `types`, `procrastinate`, `query` ([ADR-0022](../adr/0022-repository-and-engineering-conventions.md) rule 7).
 - Attachment bytes live in an object store, never in the database ([ADR-0027](../adr/0027-cross-cutting-ownership.md):38). The upload endpoint streams to it, then dispatches `CreateAttachment` ([ADR-0038](../adr/0038-audit-and-observability.md):134).
-- The scanner runs as a consumer of `AttachmentCreated` on `integrations` (ADR-0038:140). Scanner, collector and telemetry backend are chosen in DS-37 (ADR-0038:125).
+- The scanner runs as a consumer of `AttachmentCreated` on `integrations` (ADR-0038:142). Scanner, collector and telemetry backend are chosen in DS-37 (ADR-0038:125).
 - The secret store holds the LLM key, mailbox credentials and `automation.value_hmac_key` (ADR-0050:61; ADR-0052:110; [ADR-0058](../adr/0058-configurable-workflows.md):212). Its product is DS-37.
 - The OCR engine is a self-hosted installation component ([ADR-0057](../adr/0057-document-intake-and-extraction.md):80). Intake extraction runs in the consumer `document_extraction_runner`, a long job on queue `jobs` (ADR-0057:57).
 - In `test` and `simulation`, every external lookup and gateway is a recording stub (ADR-0022 rule 9).
@@ -282,6 +282,8 @@ The generator fails on any new unowned or stub table; the known ones are listed 
 
 **Boundaries**
 - One command, or one batch, runs in one transaction. Simulate rolls it back; execute commits it (ADR-0008 rules 9, 20).
+- **Who executes without simulate.** Only internal callers: consumers and system jobs calling the dispatcher in process, the change-proposal executor among them with its stored plan hash (ADR-0008 rule 13 and its note; ADR-0013 rule 9). People, agents, integrations and MCP clients simulate first and execute with `expected_plan_hash` (Principle 2).
+- **Pinned business date.** A simulation returns the `as_of_date` it used for `clock.today(company)`. An execution that sends it reads that date in every `clock.today` call, and the date is part of the hashed plan, so `plan_hash` stays equal across midnight. An `as_of_date` more than one day from the business date is refused (`as_of_date_out_of_range`). `posting_date` stays explicit, and internal callers keep the date fixed when the job was enqueued ([ADR-0007](../adr/0007-time-model.md) rules 15, 17 and the rule 15 note; ADR-0008 rules 7, 12, 13 notes; [DS-04](DS-04-command-envelope.md)).
 - The idempotency record is taken first and held to commit. Locks then follow the one global order of [ADR-0027](../adr/0027-cross-cutting-ownership.md) rule 10 (documents → period state → planning or structure or configuration state → warehouse tasks → handling units → `stock_value` → `stock_quantity` → bins → partners → `money_account_balance` → open items → numbering counters → `event_subject`).
 - Timeouts: `lock_timeout` 5 s; `transaction_timeout` 30 s, 4 min for consumers, 15 min for registered long jobs; idle in transaction 60 s (ADR-0022 rule 9). Exceeding one returns `concurrent_update` or `timeout`, both retryable.
 - Simulation takes no serialized-row lock and consumes no number (ADR-0008 rule 10). Handler paths use no sequences, session advisory locks or non-`LOCAL` `SET` (ADR-0008 rule 9); transaction-level advisory locks are allowed (ADR-0022 rule 13 note).
@@ -304,9 +306,9 @@ sequenceDiagram
   D->>D: steps 7-9 claim, state checks, policy
   D->>H: step 10 handle(context, payload)
   H->>DB: reads and writes via context, no serialized locks
-  D-->>C: plan, plan_hash, events, checks
+  D-->>C: plan, plan_hash, as_of_date, events, checks
   end
-  C->>D: same envelope, mode=execute, expected_plan_hash
+  C->>D: same envelope, mode=execute, expected_plan_hash, as_of_date
   rect rgb(220, 235, 250)
   note over D,DB: one transaction
   D->>DB: steps 1-5, then INSERT idempotency_record
@@ -328,13 +330,13 @@ sequenceDiagram
 | Database down, failover | Not specified | Not specified | Not specified (DS-37) |
 | Worker crash | `locked_until` passes | Delivery returns to `pending`, attempt counts (ADR-0013 rule 7) | None |
 | Delivery keeps failing | `held` after `max_attempts`; operations dashboard; work item where it matters (ADR-0013 rule 8) | Blocks later events of the subject for that consumer | `RetryEventDelivery` or `SkipEventDelivery` |
-| External call, outcome unknown | Crash or timeout after the call | Retry asks the provider for the status of our reference first (ADR-0013 rule 10); mail searches the Sent folder, never resends blindly (ADR-0052:286) | Work item, e.g. `outbound_message_failed` (ADR-0052:285) |
+| External call, outcome unknown | Crash or timeout after the call | Our reference is the provider's idempotency key where it has one; the retry waits the settle delay `integrations.<provider>.status_settle_delay_minutes` (default 10) and resends only when two status queries at least that far apart both find nothing; the document stays in `issuing` or `sending`; mail searches the Sent folder the same way and never resends blindly (ADR-0013 rule 10 note; ADR-0052:286) | After `integrations.<provider>.max_unknown_rounds` (default 3): the delivery is held with `external_call_outcome_unknown`, or `outbound_message_failed` for mail (ADR-0052:285) |
 | LLM provider down | Provider errors | 2 retries, then `provider_unavailable`; breaker opens after 5 failures in 60 s, for 5 min (ADR-0050:69–71) | Work item `agent_run_stopped`; the item returns to people |
-| Agent budget exceeded | Reservation before each call | Run stops `budget_exceeded`; daily breaker (ADR-0050:234, :240) | Work item `agent_budget_exhausted` |
-| Agent run crash | Lease expiry | Retried at most 3 times, then outcome `crashed` (ADR-0050:164–170) | Work item |
+| Agent budget exceeded | Reservation of the worst case before each call on the run, agent type, company, outside-content pool and installation rows (ADR-0050 rule 23 note) | Run stops `budget_exceeded`; daily breaker (ADR-0050:246, :254) | Work item `agent_budget_exhausted`; raising a cap is a change proposal another person approves |
+| Agent run crash | Lease expiry | Retried at most 3 times, then outcome `crashed` (ADR-0050:166–172) | Work item |
 | Mailbox unreachable | Failure count | Cursor makes refetch safe (ADR-0052:129) | `mailbox_unreachable` after 3 failures (ADR-0052:130) |
 | PDF render fails | Job state | 30-min lease, 3 attempts; `render_failed`, `render_too_large` (ADR-0049:199–200) | Held delivery on the dashboard (ADR-0049:322) |
-| Malware scanner down | Consumer failures | Retries, then held; unscanned bytes are never served and `Post` is refused (ADR-0038:140–144) | Release the held delivery |
+| Malware scanner down | Consumer failures | Retries, then held; unscanned bytes are never served and `Post` is refused (ADR-0038:142–146) | Release the held delivery |
 | Object store unavailable | Not specified | Not specified | Not specified (DS-37) |
 | LLM switched off | `llm_provider` unset | Every agent mode is off (ADR-0050:63) | Work continues by hand (Principle 12) |
 
@@ -342,7 +344,7 @@ sequenceDiagram
 
 **Error codes.** New codes go into the registry's catalog with the same columns; envelope-level codes are defined only in DS-04 ([DS-04](DS-04-command-envelope.md), Error catalog).
 
-**Event delivery with an unknown external outcome** (ADR-0013 rule 10; e-invoice example, [ADR-0028](../adr/0028-document-lifecycle-hardening.md) rule 7)
+**Event delivery with an unknown external outcome** (ADR-0013 rule 10 and its note; e-invoice example, [ADR-0028](../adr/0028-document-lifecycle-hardening.md) rule 7)
 
 ```mermaid
 sequenceDiagram
@@ -352,19 +354,21 @@ sequenceDiagram
   participant P as Provider
   H->>DB: tx: intent with our reference, event, delivery
   X->>DB: tx 1: claim delivery SKIP LOCKED, running, lease
-  X->>P: call, no transaction open
+  X->>P: call with our reference as idempotency key, no transaction open
   P--xX: timeout or crash, outcome unknown
-  note over X,DB: lease expires, delivery back to pending
+  note over X,DB: document stays in issuing; next attempt after the settle delay
   X->>DB: tx 1: claim again, attempts + 1
-  X->>P: status of our reference?
+  X->>P: status query 1 of our reference
+  note over X,P: wait at least the settle delay
+  X->>P: status query 2 of our reference
   alt provider has it
     P-->>X: accepted or rejected
-  else provider has nothing
-    X->>P: send again
+  else both queries find nothing
+    X->>P: send again with the same idempotency key
     P-->>X: outcome
   end
   X->>DB: tx 2: record outcome by command, delivery done
-  note over DB: after max_attempts: held, work item, human retries or skips
+  note over DB: after max_unknown_rounds: held, external_call_outcome_unknown, a person checks with the provider
 ```
 
 ## B8. Business flows at a glance
@@ -411,11 +415,12 @@ Procure to pay mirrors it: purchase order → goods receipt (stock and GR/IR) �
 **Runtime** ([ADR-0050](../adr/0050-agent-runtime-and-query-layer.md))
 - `agent_runs` (layer 2) holds the run tables and contracts; `agents` (layer 5) holds the gateway, runtime and workflows; `query` (layer 5) holds the views (ADR-0050:33–35). No agent framework (ADR-0050:39).
 - Every LLM call goes through `agents.gateway.complete`. Prompts are rendered from versioned templates and typed context items, never assembled by workflow code (ADR-0050:47, :79–82).
-- LLM steps get queries only. Workflow code builds each command from validated output, simulates it, checks it and executes it with the `plan_hash` (ADR-0050:310–313).
+- LLM steps get queries only. Workflow code builds each command from validated output, simulates it, checks it and executes it with the `plan_hash` (ADR-0050:326–329).
 - Tool lists are fixed per agent type version and checked on every call. Never on a tool list: posting commands, `Submit`, `Post`, `Issue`, `Approve`, `Reject`, `human_only` and `outbound_send` commands, among others (ADR-0050 rule 30; INV-214).
-- Rights are the intersection of the agent type's and the acting human's, re-evaluated per call (ADR-0050:305; ADR-0017 rule 11).
-- **Taint.** `agent_run.tainted_at` is set once, committed before untrusted data is returned. A tainted run may run only `is_draft_only` commands and reads only its tainted scope ([ADR-0029](../adr/0029-proposals-and-agent-safety.md) rule 14; ADR-0050:247–267).
-- **Budgets and stops.** Worst-case cost is reserved before each call; daily caps per company (USD 50) and installation (USD 200) by default; the third denial stops a run; invalid output gets two retries (ADR-0050:225–238, :315, :326).
+- Rights are the intersection of the agent type's and the acting human's, re-evaluated per call (ADR-0050:321; ADR-0017 rule 11).
+- **Taint.** `agent_run.tainted_at` is set once, committed before untrusted data is returned. A tainted run may run only `is_draft_only` commands and reads only its tainted scope ([ADR-0029](../adr/0029-proposals-and-agent-safety.md) rule 14; ADR-0050:263–283). A document version's taint can be cleared by a person only: `ClearTaint` (`human_only`, with a reason, never by the human the tainted run acted for) writes an immutable `taint_clearance` row (ADR-0029 rule 8). Only who may clear is open for the author ([open-questions](../open-questions.md):36).
+- **Fewer clicks on deterministic paths.** Values that pass [ADR-0057](../adr/0057-document-intake-and-extraction.md) rule 17's checks are trusted and do not taint a run. Evidence-gated auto-post paths post deterministic or evidenced matches without a person, confirmed in batches before close ([ADR-0051](../adr/0051-agent-workflows.md) rule 18; [ADR-0063](../adr/0063-configurable-policy-settings.md) rules 9–10). Bulk review lets a person submit or approve up to `work.bulk_review_max_items` (default 50) drafts that hold only trusted values and have no check results in one action; each still runs as its own command with its own approval record ([ADR-0042](../adr/0042-work-queue.md) rule 12 note; [ADR-0055](../adr/0055-approval-pools-and-stages.md) rule 7 note).
+- **Budgets and stops.** Worst-case cost is reserved before each call; the third denial stops a run; invalid output gets two retries (ADR-0050:227–250, :331, :342). The customer sets every cap in the settings registry: the operator sets the installation maxima at deployment (`agents.installation_daily_max_cost`, default USD 200, and the maximum of company caps); each company sets its cap (`agents.company_daily_max_cost`, default USD 50), daily cost and runs per agent type, and per-run limits within the version's declared ceilings. Lowering is immediate; raising is a proposal another person approves. `agents.internal_reserve_share` (default 0.40) keeps that share of the company cap for agent types that read no outside content (ADR-0050 rules 22–23 notes).
 - **Change proposals.** Master-data changes and `is_proposal_bound` commands from agents go through a change proposal that a person submits and another person approves ([ADR-0029](../adr/0029-proposals-and-agent-safety.md) rules 1–4).
 
 **An agent run**
@@ -460,20 +465,20 @@ sequenceDiagram
 | `production_capture` | 0064:36 | Tainted draft confirmations, issues, receipts | A person posts every draft |
 | `production_variance` | 0064:37 | An explanation only | Information |
 
-**Where the LLM is allowed.** The common rule: the LLM never computes a price, tax, quantity, account, match or score; it reads, chooses among candidates code gave it, and writes text (ADR-0051:15). Every number in free text must equal a number in the input (ADR-0050:333). Numbers come only from code (ADR-0063:60).
+**Where the LLM is allowed.** The common rule: the LLM never computes a price, tax, quantity, account, match or score; it reads, chooses among candidates code gave it, and writes text (ADR-0051:15). Every number in free text must equal a number in the input (ADR-0050:349). Numbers come only from code (ADR-0063:60).
 
 | Task | Deterministic part | LLM role | Output | Approver |
 | --- | --- | --- | --- | --- |
-| Onboarding | Precheck, field checks against source spans | Classify intent, extract fields | Change proposal | Another person (ADR-0051:119–127) |
-| Quotation | Item resolution, configuration evaluation, pricing, tax | Pick among ≤5 candidates; set configuration values; reply text | Draft quotation | Salesperson submits (ADR-0051:146–167) |
-| Bank matching | Matching cascade before and after | Read reference tokens | Suggestion | A person; auto-post only for cascade matches without LLM (ADR-0051:180–187) |
-| Purchase invoice | Line mapping, order-line selection, tax copied from record | Choose among ≤10 candidates | Draft invoice | Accountant (ADR-0051:220–229) |
-| Planning | Candidate actions computed by code | Explain, pick a handle | Proposal | Eligible approver (ADR-0051:242–260) |
+| Onboarding | Precheck, field checks against source spans | Classify intent, extract fields | Change proposal | Another person (ADR-0051:121–129) |
+| Quotation | Item resolution, configuration evaluation, pricing, tax | Pick among ≤5 candidates; set configuration values; reply text | Draft quotation | Salesperson submits (ADR-0051:148–169) |
+| Bank matching | Matching cascade before and after | Read reference tokens | Suggestion | A person; auto-post only for cascade matches without LLM (ADR-0051:182–189) |
+| Purchase invoice | Line mapping, order-line selection, tax copied from record | Choose among ≤10 candidates | Draft invoice | Accountant (ADR-0051:222–231) |
+| Planning | Candidate actions computed by code | Explain, pick a handle | Proposal | Eligible approver (ADR-0051:244–262) |
 | Intake | Reader ladder (XML, embedded XML, QR, spreadsheet, PDF text, OCR); alignment check; totals recomputed | Vision values last, no confidence | Extraction fields | A person verifies (ADR-0057:57–135) |
 | Analysis | Validator V1–V14, compiler to one `SELECT`, executor | Draft a JSON plan; narrative plan of claim codes | Cells and code-rendered sentences | Asker (ADR-0060:147–296) |
 | Product engineering | Resolution ladder, checks, cost estimate | Quantity structure only; ≤5 candidates | Proposals and drafts | Another person (ADR-0062:11–108) |
 
-**Evaluation and promotion.** One golden set per workflow from the synthetic dataset, with at least 90% equal answers; a replay suite on every commit; live evaluation capped at USD 10 and never on fork pull requests (ADR-0050:344–354). Promotion from `shadow` to `assisted` needs `agent_promotion_evidence` and an approved change proposal, with at least 10 business days of shadow (ADR-0050:134; ADR-0051:39). Decision artifacts follow ADR-0059's lifecycle draft → backtested → shadow → assisted → active → retired; AI drafts L1 parameters and L2 rules as data, never L3 code ([ADR-0059](../adr/0059-ai-tuning-and-development-of-deterministic-functions.md):9–11, :117–125).
+**Evaluation and promotion.** One golden set per workflow from the synthetic dataset, with at least 90% equal answers; a replay suite on every commit; live evaluation capped at USD 10 and never on fork pull requests (ADR-0050:360–370). Promotion from `shadow` to `assisted` needs `agent_promotion_evidence` and an approved change proposal, with at least 10 business days of shadow (ADR-0050:134; ADR-0051:39). Decision artifacts follow ADR-0059's lifecycle draft → backtested → shadow → assisted → active → retired; AI drafts L1 parameters and L2 rules as data, never L3 code ([ADR-0059](../adr/0059-ai-tuning-and-development-of-deterministic-functions.md):9–11, :117–125).
 
 **Intake and analysis.** Intake is a system job, not an agent; the reader ladder stops at the first valid record, and vision values that do not align with OCR words fill nothing ([ADR-0057](../adr/0057-document-intake-and-extraction.md):11, :57–71, :130–134). Analysis compiles a validated plan into one read-only `SELECT` under `erpme_readonly`; every cell equals the sum of its drill rows ([ADR-0060](../adr/0060-agent-assisted-reporting-and-analysis.md):11–13, :173–186).
 
@@ -540,8 +545,8 @@ flowchart LR
 - **Privilege misuse.** Permissions, record and owner scope (documents record `owner_employee_id` and `created_by_user_id`, ADR-0054 rule 14), field classes (`cost`, `margin`; separate from the data labels that govern LLM routing, ADR-0017 rule 10), segregation of duties ([ADR-0054](../adr/0054-users-roles-and-authorizations.md) rules 17–20; ADR-0017 rule 16). Only humans approve (ADR-0017 rule 15).
 - **Cross-company leaks.** RLS with `FORCE ROW LEVEL SECURITY`, fail closed (ADR-0017 rules 18–19).
 - **Data egress to the LLM.** Data labels and the routing switch, default off; with it on, typed placeholders, a residual scan and shape masks; the processing log is committed before the send (ADR-0050:86–101). The data-processing policy fails closed; providers are permitted with four eyes (ADR-0057:206–218).
-- **Malicious files.** Type detected from bytes, SVG not allowed, 25 MiB limit, scanning before use (ADR-0038:133–144). Rendering runs in a Jinja2 sandbox with no network (ADR-0049:254–255).
-- **Supply chain and CI.** GitHub-hosted runners only, actions pinned by SHA, `contents: read`, the labeling workflow never checks out the head, Dependabot off until approved; the nightly run starts from a timer on the test server, with a token limited to issues (ADR-0022 rules 13, 15, 16, 18). LLM evaluation never runs on fork pull requests (ADR-0050:352–353).
+- **Malicious files.** Type detected from bytes, SVG not allowed, 25 MiB limit, scanning before use (ADR-0038:133–146). Rendering runs in a Jinja2 sandbox with no network (ADR-0049:254–255).
+- **Supply chain and CI.** GitHub-hosted runners only, actions pinned by SHA, `contents: read`, the labeling workflow never checks out the head, Dependabot off until approved; the nightly run starts from a timer on the test server, with a token limited to issues (ADR-0022 rules 13, 15, 16, 18). LLM evaluation never runs on fork pull requests (ADR-0050:368–369).
 - **Operator.** `erpme_migration` is the only `BYPASSRLS` role; definer functions (`erpme_claim`, `erpme_invitation`, `erpme_setting_reader`) give narrow cross-row access (ADR-0017 rules 18–19).
 
 **Authentication and sessions.** Argon2 with TOTP or OIDC; TOTP required by role flag; sessions server-side, idle 2 h, absolute 12 h, lockout 15 min after 10 failures; API tokens hashed, at most one year; run tokens bound to one run (ADR-0017:14–19; ADR-0054:69–74). Cookie `__Host-erpme_session` with CSRF header and Origin check (ADR-0040:147–148).
@@ -560,14 +565,15 @@ flowchart LR
 | `outbox_event` | 400 days; partitions with open deliveries are kept (ADR-0013 rule 15) | Monthly by `id` range (ADR-0006 rule 22) |
 | `event_delivery` | `done`/`skipped` deleted after retention; `held` never automatically | None |
 | `audit_record`, `audit_change` | Never deleted (ADR-0038) | Monthly by `id` range |
-| `agent_run_step` | 400 days; the `agent_run` row is kept (ADR-0050:209) | Monthly by `id` range |
-| Accounting attachments | `attachment_retention_years`, flagged unverified, so never purged until verified (ADR-0038:151) | — |
+| `agent_run_step` | 400 days; the `agent_run` row is kept (ADR-0050:211) | Monthly by `id` range |
+| Accounting attachments | `attachment_retention_years`, flagged unverified, so never purged until verified (ADR-0038:155) | — |
+| Released attachment bytes (rejected, unlinked, erased) | Not served from release; physically deleted by the orphan sweep only after `attachments.delete_grace_days` (default 35, at least the database recovery window) ([ADR-0038](../adr/0038-audit-and-observability.md) rule 15 note) | — |
 | Ledger tables | Append-only | Not partitioned in Phase 1 (ADR-0006 rule 23) |
 | Procrastinate jobs | 30 days after finishing (ADR-0013 rule 15) | — |
 
 A daily job creates partitions 3 months ahead (ADR-0022 rule 12). ADR-0002's sentence on fiscal-year partitioning is superseded by ADR-0006 rules 22–23 (see findings).
 
-**Backup and restore.** pgBackRest is the tool (ADR-0002:52); a restore is tested, not only written, before go-live ([runbook/go-live](../runbook/go-live.md):19, :81); restores run with triggers disabled ([ADR-0014](../adr/0014-universal-journal.md):51). No document defines one restore point shared by the database and the attachment object store; this is a finding. RPO and RTO are not stated anywhere.
+**Backup and restore.** pgBackRest is the tool (ADR-0002:52); a restore is tested, not only written, before go-live ([runbook/go-live](../runbook/go-live.md):19, :81); restores run with triggers disabled ([ADR-0014](../adr/0014-universal-journal.md):51). The database and the attachment store share one restore point: objects are write-once under SHA-256 keys, in a store with versioning or object lock where available; no object is deleted while a database restore point could still name it, because physical deletion waits `attachments.delete_grace_days`, at least the point-in-time-recovery window. Restoring the database to a time T finds every object referenced at T, and objects written later are swept as orphans after the grace period (ADR-0038 rules 13–15 notes). RPO and RTO are not stated anywhere.
 
 **Upgrades and migrations.** One linear Alembic history; `erpme admin migrate` runs migrations, catalogs and package data (ADR-0022 rule 8). Event payloads get upcasters (ADR-0013 rule 17). Command schemas serve the current and previous major until the next LTS (ADR-0008 rule 23). Packages load at deploy, no downgrades (ADR-0016:15). Upgrade tests from N-2 and LTS ([07-shared-foundation](../spec/07-shared-foundation.md):83).
 
@@ -575,7 +581,7 @@ A daily job creates partitions 3 months ahead (ADR-0022 rule 12). ADR-0002's sen
 
 **Observability** ([ADR-0038](../adr/0038-audit-and-observability.md) rules 10–12): spans, metrics and structlog JSON logs; value-free attribute allow-lists with a CI canary; no SQL capture; consumer spans link to the event's `trace_id`; the Phase 1 dashboard is the telemetry backend's; held deliveries are read through a query (ADR-0038:98–126).
 
-**What waits for DS-37** ([backlog](backlog.md):49): Compose deployment, object store, secret store, scanner and telemetry backend, OCR engine, provider registry, LTS and release policy, staging, installation values from deployment configuration, the upgrade procedure, and pgBackRest operation.
+**What waits for DS-37** ([backlog](backlog.md):49): Compose deployment, object store, secret store, scanner and telemetry backend, OCR engine, provider registry, LTS and release policy, staging, installation values from deployment configuration, the upgrade procedure, pgBackRest operation, and the recovery window and object versioning or lock that `attachments.delete_grace_days` depends on.
 
 ## B14. Non-functional targets
 
@@ -590,8 +596,8 @@ A daily job creates partitions 3 months ahead (ADR-0022 rule 12). ADR-0002's sen
 | Delivery lease, attempts | 5 min, 10; render 30 min, 3 | ADR-0013 rules 7–8; ADR-0049:199 |
 | Worker poll, backoff | 5 s; min(2ⁿ s, 1 h) | ADR-0022 rule 12 |
 | LLM breaker | 5 failures in 60 s, open 5 min | ADR-0050:71 |
-| Agent budgets | USD 50 per company per day, USD 200 per installation | ADR-0050:226–227 |
-| Query timeouts | 10 s for agent runs, 30 s otherwise | ADR-0050:369 |
+| Agent budgets | Core defaults: USD 50 per company per day, USD 200 per installation, 40% of the company cap reserved for agent types that read no outside content; each customer sets them within the installation maxima | ADR-0050:228–229 and the rule 22 note |
+| Query timeouts | 10 s for agent runs, 30 s otherwise | ADR-0050:385 |
 | CI jobs | 15 min each; nightly 6 h | ADR-0022 rule 16; ADR-0003:16 |
 | Dataset sizes | About 10,000 documents a year (medium), 100,000 (large) | [12-testing](../spec/12-testing.md):45–46 |
 
@@ -681,13 +687,13 @@ The production core step proposed by ADR-0032 rule 7 has no number yet ([open-qu
 Disagreements between documents, recorded and not resolved.
 
 1. **DS-20 `recorded_at`.** [ADR-0007](../adr/0007-time-model.md) rule 9 (:24) puts `recorded_at` on every row. DS-20-master-data.sql has 55 tables and `recorded_at` only at :438, :795 and :819. DS-15-access.sql (24 of 25 tables), DS-56-product-configuration.sql (10 of 10) and DS-06-universal-journal.sql (5 of 11: `cost_object` :29, `fixed_asset` :45, `payment_term` :89, `payment_term_line` :97, `open_item` :109) also lack it.
-2. **Primary keys.** [ADR-0006](../adr/0006-id-and-numeric-model.md) rule 1 (:13) allows only a single-column `id uuid`. DS-20 has a `code` primary key on `currency` (:21–22), a composite key on `company_currency_activation` (:27–30) and 11 more non-`id` keys (e.g. profiles keyed on `partner_id` :251, :269, :285; `barcode` :796). Other files: DS-15 (8, and no key on `role_assignment_scope` :259, `approval_stage_member` :372), DS-43-54 (23, and no key on `item_low_level_code` :612, `normal_capacity` :1316), DS-35 (9), DS-05 (4, e.g. `event_consumer` :685), DS-28-34 (4), DS-36 (4), DS-56 (4), DS-22 (3), DS-28-settings (2).
-3. **Queue lists.** ADR-0022 rule 12 lists `events|integrations|jobs|pdf` ([ADR-0022](../adr/0022-repository-and-engineering-conventions.md):188). ADR-0013 rule 13 adds `agents` ([ADR-0013](../adr/0013-outbox-and-events.md):53, and the note at :27). ADR-0022 has no note.
+2. **Primary keys.** [ADR-0006](../adr/0006-id-and-numeric-model.md) rule 1 (:13) allows only a single-column `id uuid`. DS-20 has a `code` primary key on `currency` (:21–22), a composite key on `company_currency_activation` (:27–30) and 11 more non-`id` keys (e.g. profiles keyed on `partner_id` :251, :269, :285; `barcode` :796). Other files: DS-15 (8, and no key on `role_assignment_scope` :259, `approval_stage_member` :372), DS-43-54 (23, and no key on `item_low_level_code` :612, `normal_capacity` :1316), DS-35 (9), DS-05 (4, e.g. `event_consumer` :686), DS-28-34 (4), DS-36 (4), DS-56 (4), DS-22 (3), DS-28-settings (2).
+3. **Queue lists.** ADR-0022 rule 12 lists `events|integrations|jobs|pdf` ([ADR-0022](../adr/0022-repository-and-engineering-conventions.md):188). ADR-0013 rule 13 adds `agents` ([ADR-0013](../adr/0013-outbox-and-events.md):62, and the note at :27). ADR-0022 has no note.
 4. **Partitioning.** ADR-0002 still says the ledger key is chosen for later partitioning by fiscal year (:60) and "partition by fiscal year" (:75). Its status line (:3) and ADR-0006 rules 22–23 (:56–57) supersede both; the old text remains in the body.
 5. **Stub tables.** `account`, `fiscal_year`, `posting_period`, `posting_period_area_state`, `tax_code`, `system_account`, `transaction_key`, `applied_rate`, `close_task` exist only in the lab stubs (lab/00_stubs.sql; DS-05-platform.sql:25–26).
-6. **Tables without one owner.** ADR-0022 rule 7 needs exactly one owner per table. DS-06 states none for `journal_entry` (:66), `journal_line` (:153), `open_item` (:109), `payment_term_line` (:97), `subledger_activation` (:55), `account_period_balance` (:414). Sections name two owners for `policy_decision` (DS-05:497), `auto_post_confirmation` (:573), `period_unlock_request` (:583), `document_line_price_step`, `document_line_custom_text`, `document_installment` (DS-22:1159, :1179, :1192), `planning_setting`, `planning_run`, `planning_state`, `production_structure` (DS-43-54:31, :42, :61, :67).
+6. **Tables without one owner.** ADR-0022 rule 7 needs exactly one owner per table. DS-06 states none for `journal_entry` (:66), `journal_line` (:153), `open_item` (:109), `payment_term_line` (:97), `subledger_activation` (:55), `account_period_balance` (:414). Sections name two owners for `policy_decision` (DS-05:498), `auto_post_confirmation` (:574), `period_unlock_request` (:584), `document_line_price_step`, `document_line_custom_text`, `document_installment` (DS-22:1159, :1179, :1192), `planning_setting`, `planning_run`, `planning_state`, `production_structure` (DS-43-54:31, :42, :61, :67).
 7. **Platform tables without DDL.** `idempotency_record` (ADR-0008 rule 16), `business_date_override` (ADR-0007 rule 15) and `regime_setting` (ADR-0016:49) have no CREATE TABLE in any design DDL or lab stub.
-8. **Restore point for the object store.** Attachment bytes live in an object store (ADR-0027:38); backups use pgBackRest (ADR-0002:52; go-live.md:19). No document defines a restore point shared by the database and the object store, or the object store's own backup.
+8. **Restore point for the object store.** Addressed by the [ADR-0038](../adr/0038-audit-and-observability.md) rule 15 note (design hardening, 2026-11-16): write-once objects keyed by SHA-256, physical deletion only after a grace period at least the database recovery window, an orphan sweep, and the restore procedure. The store's product and the recovery window stay with DS-37.
 9. **CRM separability.** Spec 01 (:15), spec 18 (:16) and D3 (decisions.md:9) say one edition. ADR-0052 (:25, :192) limits only `crm`'s layer-4 imports. `customer_profile` and `supplier_profile` hold `NOT NULL` single-column foreign keys to `account` (DS-20:252, :270), which is a lab stub. Whether a CRM-only deployment is a goal is undecided (B17).
 10. **Frontend budgets.** The outline treated the size budgets as decided; ADR-0040 lists them as "Targets (open question)" in rule 17 (:209–212).
 11. **Spec 09 and spec 11 versus ADR-0032.** Spec 09 (:12, :15) still shows production and planning as later; spec 11 has no production core step (open-questions.md:64, :122, :212).

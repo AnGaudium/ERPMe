@@ -110,6 +110,8 @@ ADR-0043 decides whether a document needs approval and at which rank, and approv
    **Small companies.** In ADR-0054's small-company mode, condition 5 is lifted for the document's human writers and recorded as a segregation exception. The agent-run part of condition 5 is a hard floor and is never lifted, and neither is condition 6. Rule 20 walks through companies of one and two people.
 
    Note ([ADR-0063](0063-configurable-policy-settings.md), proposed 2026-11-15): the approver of a change proposal that loosens a registered setting also meets conditions 5 and 6, and the small-company mode does not lift `approver_is_submitter` for it (rule 3).
+
+   Note (Design hardening, 2026-11-16): an approval given through bulk review ([ADR-0042](0042-work-queue.md) rule 12 note) is one `Approve<Type>` per document, checked against conditions 1 to 8 and recorded as its own `approval` row; one approval never counts for more than one document.
 8. Counting and completion:
    - **The round.** A round starts with a `Submit` from draft. It ends with `Post` (or `Issue`) of the document, a rejection, an edit or a cancel. A resubmission without edit after `approval_context_changed` continues it when the selected pool stays the same, and starts a new round when the pool changes (rule 11).
    - **Counted approvals** of a stage are its `approved` rows within the current round, for stages of the current plan. A round has one version, because an edit ends it. When a continued round's new plan drops a stage (a lower rank, or a stage deactivated in between), the approvals at that stage stay recorded but no longer count.

@@ -136,6 +136,8 @@ The retention periods and the strictness of scanning are flagged for the author.
     - **Allowed types.** The list is installation data: PDF; PNG, JPEG and WebP (not SVG); XML; CSV; XLSX, recognised by its ZIP content types; and e-mail messages. The type is detected from the bytes.
 
     Note ([ADR-0057](0057-document-intake-and-extraction.md), proposed 2026-11-15): the allowed types are unchanged; a vCard file is not one in Phase 1. Photos, business cards, delivery notes, voice and inquiry attachments, and every attachment from inbound e-mail, are labelled `personal` as a whole at creation, and the label is never lowered; extractions take it or a higher one ([ADR-0057](0057-document-intake-and-extraction.md) rules 3, 19).
+
+    Note (Design hardening, 2026-11-16): bytes are stored write-once under the key `attachments/<company_id>/<sha256>`, in a store with object versioning or object lock where the store offers it (DS-37); an object is never overwritten or changed. The upload endpoint copies the temporary bytes to that key only when no object is there yet. The 24-hour sweep of temporary keys stays, because no attachment row ever names a temporary key.
 14. Scan state machine, `attachment.state` (`pending_scan`, `clean`, `rejected`):
     - **Running the scan.** A new attachment emits `AttachmentCreated`. A consumer on `integrations` runs the scanner and records the outcome. A scanner outage retries and is eventually held (ADR-0013 rule 8).
     - **Rejected attachments.** Their bytes are deleted at once, and their links are removed with a work item. A new upload of the same SHA-256 as a rejected row is refused with `attachment_rejected`. An upload matching a pending row reuses it.
@@ -147,12 +149,23 @@ The retention periods and the strictness of scanning are flagged for the author.
     Note: generated files (source kind `generated`) are created `clean` without a malware scan: the render worker produces their bytes from company templates in a sandbox without network access. `clean` covers only the scan. A generated file whose rendered instance held an `is_untrusted` field carries `contains_untrusted`, and reading it taints a run ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 25; [ADR-0049](0049-statutory-reporting-and-printing.md) rule 28).
 
     Note: an attachment linked to a document follows that document's read owner scope ([ADR-0054](0054-users-roles-and-authorizations.md) rule 15).
+
+    Note (Design hardening, 2026-11-16): "their bytes are deleted at once" now reads: a rejected attachment stops being served at once, and the transaction that records the rejection sets its `bytes_released_at`; its bytes are physically removed only by the orphan sweep of rule 15's note, after the grace period. Bytes that are not `clean` are never served in the meantime.
 15. Retention:
     - **Accounting attachments.** `Post` sets `attachment.is_accounting_evidence` on every linked attachment; it is never unset. Bytes of such an attachment are kept `attachment_retention_years` after its last link ends. This is a regime setting, seeded `unverified` at 10 years for accounting vouchers. Under ADR-0016 rule 12 an unverified setting fails closed, so such bytes are not purged until the author verifies it. TT99 seed: package `settings.yaml` ([ADR-0039](0039-vietnam-package-tt99.md) rule 9).
     - **Erasure.** Erasure removes a subject's links except links to posted accounting documents, which stay as voucher evidence; ADR-0027 rule 2 gets a note.
     - **Other attachments.** Their bytes are deleted when the last link goes, including at erasure (ADR-0019 rule 10).
 
     Note: linking a generated file to a posted document, or to a statutory report filing as the submitted file, sets `is_accounting_evidence` ([ADR-0049](0049-statutory-reporting-and-printing.md) rules 19, 28).
+
+    Note (Design hardening, 2026-11-16): the database and the attachment store share one restore point.
+    - **No early delete.** No object is physically deleted while a database restore point could still name it. Where this ADR or another deletes bytes (a rejection, the last link of an ordinary attachment, an erasure, the end of retention), the transaction only sets `attachment.bytes_released_at`; the bytes are no longer served.
+    - **Grace period.** `attachments.delete_grace_days` (installation, a deployment value, default 35, bounds 7 to 3,650) must be at least the database's point-in-time-recovery window that the deployment configures (DS-37); the startup step refuses to start when it is shorter.
+    - **Orphan sweep.** `RunAttachmentOrphanSweep` (module `attachments`, effect class `other`, installation scope, a daily system job, `is_internal_only`) compares the store's objects with the attachment rows and deletes an object only when it is an orphan older than the grace period: every row naming its key set `bytes_released_at` more than the grace period ago, or no row names it and the object was written more than the grace period ago. It sets `bytes_deleted_at` on those rows. Attachment rows are never deleted.
+    - **Restore procedure.** Restore the database to a time T inside the recovery window. Every object an attachment row named at T without a release still exists, because only objects released or written before now minus the grace period have been deleted. Objects written after T are orphans to the restored database, and the sweep deletes them once they are older than the grace period. The store's versioning or object lock covers operator error.
+    - **Still immediate:** a rejected attachment stops being served at once (rule 14), and an erased subject's bytes stop being served at once; they are physically gone within the grace period, the window in which database backups still hold the erased rows.
+
+    [DS-05-platform.sql](../design/DS-05-platform.sql) adds `attachment.bytes_released_at`; DS-37 ([backlog](../design/backlog.md)) chooses the store, its versioning or object lock, and the recovery window.
 
 ## Context
 

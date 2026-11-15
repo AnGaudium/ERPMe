@@ -22,7 +22,7 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Owned tables (0):** none stated
 - **Events produced (0):** none found
 - **Commands and queries named in ADRs (0):** none found
-- **Settings (5):** `agents.<agent_type>.drift_action`, `agents.<agent_type>.wake_up_mode.<kind>`, `agents.tainted_reference_reads`, `production.agent.readiness_horizon_days`, `production.agent.shortage_candidate_kinds`
+- **Settings (17):** `agents.<agent_type>.daily_max_cost`, `agents.<agent_type>.daily_max_runs`, `agents.<agent_type>.drift_action`, `agents.<agent_type>.run_max_cost`, `agents.<agent_type>.run_max_input_tokens`, `agents.<agent_type>.run_max_llm_calls`, `agents.<agent_type>.run_max_output_tokens`, `agents.<agent_type>.run_max_rows_read`, `agents.<agent_type>.run_max_seconds`, `agents.<agent_type>.run_max_tool_calls`, `agents.<agent_type>.wake_up_mode.<kind>`, `agents.company_daily_max_cost` …
 - **Work item kinds (7):** `agent_budget_exhausted`, `agent_denials_repeated`, `agent_mode_degraded`, `agent_quality_below_threshold`, `agent_run_stopped`, `agent_task`, `data_processing_permission_suspended`
 - **Authorization areas (14):** `agent`, `agent_analysis`, `agent_bank_matching`, `agent_customer_onboarding`, `agent_data_migration`, `agent_document_reader`, `agent_planning`, `agent_product_engineering`, `agent_production`, `agent_production_capture`, `agent_production_variance`, `agent_purchase_invoice`, `agent_quotation`, `data_processing`
 - **ADRs (declared):** none declared
@@ -254,8 +254,8 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Note in ADR-0022 rule 2:** —
 - **Owned tables (9):** `attachment`, `attachment_link`, `document_extraction`, `document_reader`, `extraction_confirmation`, `extraction_field`, `extraction_result_link`, `extraction_rule_run`, `extraction_word`
 - **Events produced (6):** `AttachmentCreated`, `DocumentExtractionCanceled`, `DocumentExtractionRecorded`, `DocumentExtractionRequested`, `DocumentExtractionVerified`, `ExtractionFieldCorrected`
-- **Commands and queries named in ADRs (8):** `CancelDocumentExtraction`, `CorrectExtractionField`, `CreateAttachment`, `GetDocumentExtraction`, `ListDocumentExtraction`, `RecordDocumentExtraction`, `RequestDocumentExtraction`, `VerifyDocumentExtraction`
-- **Settings (0):** none in settings.csv
+- **Commands and queries named in ADRs (9):** `CancelDocumentExtraction`, `CorrectExtractionField`, `CreateAttachment`, `GetDocumentExtraction`, `ListDocumentExtraction`, `RecordDocumentExtraction`, `RequestDocumentExtraction`, `RunAttachmentOrphanSweep`, `VerifyDocumentExtraction`
+- **Settings (1):** `attachments.delete_grace_days`
 - **Work item kinds (2):** `attachment_rejected`, `document_extraction_review`
 - **Authorization areas (0):** none
 - **ADRs (declared):** [ADR-0027](../../adr/0027-cross-cutting-ownership.md), [ADR-0038](../../adr/0038-audit-and-observability.md), [ADR-0049](../../adr/0049-statutory-reporting-and-printing.md), [ADR-0057](../../adr/0057-document-intake-and-extraction.md)
@@ -329,7 +329,7 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Events produced (0):** none found
 - **Commands and queries named in ADRs (2):** `RetryEventDelivery`, `SkipEventDelivery`
 - **Settings (0):** none in settings.csv
-- **Work item kinds (1):** `event_delivery_held`
+- **Work item kinds (2):** `event_delivery_held`, `external_call_outcome_unknown`
 - **Authorization areas (1):** `event_delivery`
 - **ADRs (declared):** [ADR-0013](../../adr/0013-outbox-and-events.md)
 - **ADRs that name this module most (mentions; not complete):** [ADR-0013](../../adr/0013-outbox-and-events.md)
@@ -389,7 +389,7 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Owned tables (3):** `work_item`, `work_item_link`, `work_item_note`
 - **Events produced (6):** `WorkItemAssigned`, `WorkItemCanceled`, `WorkItemClaimed`, `WorkItemRaised`, `WorkItemResolved`, `WorkItemUnclaimed`
 - **Commands and queries named in ADRs (8):** `AssignWorkItem`, `CancelWorkItem`, `ClaimWorkItem`, `CreateWorkItemNote`, `GetWorkItem`, `ListWorkItem`, `ResolveWorkItem`, `UnclaimWorkItem`
-- **Settings (0):** none in settings.csv
+- **Settings (1):** `work.bulk_review_max_items`
 - **Work item kinds (0):** none
 - **Authorization areas (2):** `work_queue`, `work_queue_administration`
 - **ADRs (declared):** [ADR-0042](../../adr/0042-work-queue.md), [ADR-0054](../../adr/0054-users-roles-and-authorizations.md), [ADR-0055](../../adr/0055-approval-pools-and-stages.md)

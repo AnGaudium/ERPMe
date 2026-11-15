@@ -16,6 +16,7 @@ A command may be registered `is_internal_only`: only a consumer or system job ru
 | `idempotency_key` | string, 1–128 of `A-Z a-z 0-9 _ - . :` | yes | Unique per (actor, command type) for at least 90 days |
 | `mode` | `simulate` or `execute` | yes | Run and roll back, or run and commit |
 | `expected_plan_hash` | 64 lowercase hex characters | when `mode` is `execute` | `plan_hash` returned by the simulation the client reviewed |
+| `as_of_date` | `YYYY-MM-DD` (`BusinessDate`) | no | The business date that every `clock.today(company)` read of this run returns. Send the `as_of_date` of the simulation you reviewed when you execute, so the plan stays equal across midnight. Refused with `as_of_date_out_of_range` when more than one day from the company's business date; never replaces `posting_date` ([ADR-0007](../adr/0007-time-model.md) rule 15 note; [ADR-0008](../adr/0008-command-envelope-and-registry.md) rules 7, 12 and 13 notes) |
 | `include_canonical_plan` | boolean | no | Also return `canonical_plan`, the plan as hashed (tokenized IDs, no numbers or system instants), filtered by field class ([ADR-0040](../adr/0040-ui-architecture.md) rule 9) |
 | `payload` | object | yes | The command's own schema; unknown fields rejected |
 
@@ -31,6 +32,7 @@ The causation chain (`causation_chain_id`) and depth (`causation_depth`) are nev
 | `plan` | always | `{"journal_lines": [...], "stock_movements": [...], "document_versions": [...], "record_versions": [...]}` as produced by the handler ([ADR-0031](../adr/0031-design-simplifications.md) rules 1–2), filtered by the actor's field permissions; generated IDs are real IDs here, tokens only inside the hash |
 | `result` | always | The command's result model, e.g. the created document's `id` and, after execution, its number; also part of the hashed plan |
 | `plan_hash` | always | SHA-256 of the canonical plan and result (ADR-0008 rule 12) |
+| `as_of_date` | always | The business date the run used: the request's `as_of_date`, else `clock.today(company)`; part of the hashed plan ([ADR-0008](../adr/0008-command-envelope-and-registry.md) rules 7, 12 notes) |
 | `recorded_at` | `execute` and replays | Instant of the transaction (ADR-0007 rule 10) |
 | `events` | `simulate` | Event types the command would emit, in order; not part of `plan_hash` ([ADR-0013](../adr/0013-outbox-and-events.md) rule 5) |
 | `replayed` | always | `true` when the response comes from `idempotency_record` (ADR-0008 rules 16–18), otherwise `false` |
@@ -48,7 +50,7 @@ Errors name the item: `field` is `items[<n>].payload.<field>`. All items are val
 
 ## Query request and response
 
-Request: `schema_version`, `company_id` (for company-scoped queries) and `payload` (the filters, plus `limit` and `cursor` for `List<Noun>`). No `idempotency_key`, `mode` or `expected_plan_hash`.
+Request: `schema_version`, `company_id` (for company-scoped queries) and `payload` (the filters, plus `limit` and `cursor` for `List<Noun>`). No `idempotency_key`, `mode`, `expected_plan_hash` or `as_of_date`.
 
 Response for `Get<Noun>`: `result`. For `List<Noun>`: `results` (at most `limit`, default 100, maximum 1,000, ordered by `id` unless the query defines another stable order) `next_cursor` (null on the last page) and `is_scope_filtered` (true when record scope left rows out, [ADR-0017](../adr/0017-permission-envelope.md) rule 9). Results are filtered by the actor's record and field permissions.
 
@@ -56,7 +58,7 @@ Two registry queries serve clients ([ADR-0040](../adr/0040-ui-architecture.md) r
 
 ## Handler context
 
-A handler receives `context` with: the database connection, `new_id(table)`, the clock (`now()`, `today(company)`), the lock helpers for serialized rows, and `emit(event_type, subject, payload)` for events ([ADR-0013](../adr/0013-outbox-and-events.md) rule 1). Consumers and system jobs call the dispatcher in process; their commands execute without `expected_plan_hash` (ADR-0008 rule 13).
+A handler receives `context` with: the database connection, `new_id(table)`, the clock (`now()`, `today(company)`, which returns the envelope's `as_of_date` when it is present), the lock helpers for serialized rows, and `emit(event_type, subject, payload)` for events ([ADR-0013](../adr/0013-outbox-and-events.md) rule 1). Consumers and system jobs call the dispatcher in process; their commands execute without `expected_plan_hash` (ADR-0008 rule 13).
 
 The consumer that executes an approved change proposal also passes `change_proposal_execution` (the proposal's ID and version) in `context`. A handler whose effect needs a proposal whatever the actor, such as `UpdateAgentTypeSetting` setting `assisted`, returns `proposal_required` without it ([ADR-0029](../adr/0029-proposals-and-agent-safety.md) rule 4 note).
 
@@ -77,6 +79,7 @@ The dispatcher runs its checks for every command, batch item and query in one or
 
 - **Why this order.** Checks that read the subject's current state run after the replay lookup, so a retry gets what the first execution returned. The tool list runs before `human_only`, `proposal_required` and permission, so an agent run calling a command outside its list gets `tool_not_allowed` whatever the command is; no agent run simulates a `human_only` command. No check needs the result of a later one.
 - **Batches.** Steps 1 to 5, 7 and 8 run for every item; step 6 runs once, for the batch.
+- **`as_of_date`.** Checked after step 6 and before step 7, in both modes: an `as_of_date` more than one day from the date `clock.today(company)` gives without it returns `as_of_date_out_of_range`. A replay returns its stored response first ([ADR-0008](../adr/0008-command-envelope-and-registry.md) rule 13 note).
 - **Denials.** The codes that write denial records, and those that count toward an agent run's three-denial stop, are listed in [ADR-0038](../adr/0038-audit-and-observability.md) rule 5's note.
 - **EC-56.** An agent run that calls the bank-account command directly gets `tool_not_allowed`, since allowed-target commands are on no tool list ([ADR-0050](../adr/0050-agent-runtime-and-query-layer.md) rule 29); a consumer command carrying the run as origin gets `proposal_required`; a change proposal approved by a second person succeeds.
 - **Automation chains.** An automation action runs as `system` on behalf of the rule's owner, so step 4 checks the owner's current rights at every execution: the command's permission, or for `RaiseAutomationWorkItem`, which is internal-only, the owner's `Get` or `List` permission on the subject. The consumer reads the facts with the owner's record and owner scope before it dispatches anything: a subject outside them is a non-match, added to the rule's daily count, never a refusal. A lost permission or field class is a refusal, recorded as the action's outcome `refused`, and counts toward the rule's circuit breaker. The same-rule-same-target guard and the breaker belong to the consumer and the database, not to this order ([ADR-0058](../adr/0058-configurable-workflows.md) rules 8, 9, 13, 16).
@@ -494,6 +497,7 @@ Outcome and violation enumerations are not error codes and are not catalogued he
 | `approval_required` | precondition | 422 | no | The policy engine requires an approval first (DS-28) |
 | `approval_hold_not_allowed` | precondition | 422 | no | `Submit`, `Approve` or `Reject` on a document whose type allows an approval hold only by regime, while the regime setting `documents.issuance_without_delay` is true for its date; `details` name the setting; issue or post it directly ([ADR-0053](../adr/0053-core-neutrality.md) rule 8) |
 | `invalid_state_transition` | precondition | 422 | no | The command is not allowed in the document's (including `issuing` and change states, ADR-0028) or warehouse task's state; `details` lists the allowed commands ([ADR-0009](../adr/0009-document-lifecycle.md) rule 5) |
+| `as_of_date_out_of_range` | precondition | 422 | no | The envelope's `as_of_date` is more than one day before or after the company's business date; simulate again ([ADR-0007](../adr/0007-time-model.md) rule 15 note; [ADR-0008](../adr/0008-command-envelope-and-registry.md) rule 13 note) |
 | `posting_date_mismatch` | validation | 422 | no | `Post` carries a `posting_date` different from the document's ([ADR-0009](../adr/0009-document-lifecycle.md) rule 9) |
 | `document_referenced` | precondition | 422 | no | Delete, cancel or reverse of a document that other documents refer to ([ADR-0009](../adr/0009-document-lifecycle.md) rules 7, 19) |
 | `rate_limited` | rate_limited | 429 | yes | `details.retry_after_seconds` says when to retry |
@@ -608,5 +612,5 @@ Warehouse task proposals (target and source bins) and planning run results are l
 1. Take the full plan and result, before field filtering.
 2. Replace each ID created by `context.new_id(table)` during the run with `new:<table>:<n>`, numbering per table from 1 in creation order. Keep IDs that existed before the run, client-supplied IDs and client-supplied instants.
 3. Remove values of the types `DocumentNumber` and `SystemInstant`.
-4. Serialize `{"journal_lines": …, "stock_movements": …, "document_versions": …, "record_versions": …, "result": …, "checks": …}` ([ADR-0031](../adr/0031-design-simplifications.md) rule 1; the two new lists hold canonical content, tokenized by steps 2–3) as JSON with keys sorted, separators `,` and `:` without spaces, UTF-8, no escaping of non-ASCII characters. Numbers, dates and instants are already strings in canonical form. `checks` is the list of `[code, field]` pairs of the check results whose code is hashed, a null field as `""`, duplicates removed, sorted by code then field ([ADR-0040](../adr/0040-ui-architecture.md) rule 10).
+4. Serialize `{"journal_lines": …, "stock_movements": …, "document_versions": …, "record_versions": …, "result": …, "checks": …, "as_of_date": …}` ([ADR-0031](../adr/0031-design-simplifications.md) rule 1; the two new lists hold canonical content, tokenized by steps 2–3) as JSON with keys sorted, separators `,` and `:` without spaces, UTF-8, no escaping of non-ASCII characters. Numbers, dates and instants are already strings in canonical form. `checks` is the list of `[code, field]` pairs of the check results whose code is hashed, a null field as `""`, duplicates removed, sorted by code then field ([ADR-0040](../adr/0040-ui-architecture.md) rule 10). `as_of_date` is the business date the run used, in its canonical form ([ADR-0008](../adr/0008-command-envelope-and-registry.md) rule 12 note).
 5. `plan_hash` = lowercase hex SHA-256 of those bytes. A batch hashes the list of item plans in item order the same way.

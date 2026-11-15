@@ -136,7 +136,7 @@ CREATE TABLE agent_type_setting (                          -- company data, chan
     agent_type_code       text NOT NULL REFERENCES agent_type (code),
     mode                  text NOT NULL DEFAULT 'off' CONSTRAINT ck_agent_type_setting_mode CHECK (mode IN ('off', 'shadow', 'assisted')),
     workflow_owner_id     uuid REFERENCES user_account (id),
-    lowered_budget        jsonb NOT NULL DEFAULT '{}',     -- only values below the version's maximums (rule 22; command check)
+    -- budget values are setting_value rows of scope agent_type (rule 14 and 22 notes); no lowered_budget column
     promoted_version      text,
     promoted_seat_models  jsonb,                           -- (seat, model) pairs the evidence covered
     recorded_at           timestamptz NOT NULL,
@@ -271,11 +271,12 @@ CREATE TABLE agent_run_step (
     CONSTRAINT ck_agent_run_step_bodies CHECK ((request_body IS NULL OR kind = 'llm_request') AND (response_body IS NULL OR kind = 'llm_response')),
     CONSTRAINT ck_agent_run_step_reservation CHECK ((kind = 'llm_request') = (reserved_amount IS NOT NULL) OR erased_at IS NOT NULL)
 ) PARTITION BY RANGE (id);
--- Rule 23: one row per (company, agent type, business date), (company, business date) and (installation, day). Each
+-- Rule 23: one row per (company, agent type, business date), (company, business date), (company, outside-content pool,
+-- business date; rule 23 note) and (installation, day). Each
 -- reservation is one guarded UPDATE; the check below is the guard, so a failed reservation reserves nothing.
 CREATE TABLE agent_budget_usage (
     id               uuid PRIMARY KEY,
-    scope_kind       text NOT NULL CONSTRAINT ck_agent_budget_usage_scope_kind CHECK (scope_kind IN ('company_agent_type', 'company', 'installation')),
+    scope_kind       text NOT NULL CONSTRAINT ck_agent_budget_usage_scope_kind CHECK (scope_kind IN ('company_agent_type', 'company', 'company_outside_content', 'installation')),
     company_id       uuid REFERENCES company (id),
     agent_type_code  text REFERENCES agent_type (code),
     business_date    date NOT NULL,                        -- the company's business date; the installation row uses the UTC day (rule 22)
@@ -849,7 +850,8 @@ CREATE TABLE attachment (
     generated_subject_document_id  uuid,
     contains_untrusted             boolean NOT NULL DEFAULT false,
     last_link_ended_at             timestamptz,            -- interim: not stated in ADR-0038 (retention counts from the last link's end, rule 15)
-    bytes_deleted_at               timestamptz,            -- interim: not stated in ADR-0038
+    bytes_released_at              timestamptz,            -- the bytes are no longer needed or served; physical deletion waits attachments.delete_grace_days (ADR-0038 rule 15 note)
+    bytes_deleted_at               timestamptz,            -- set by RunAttachmentOrphanSweep after the grace period (ADR-0038 rule 15 note)
     recorded_at                    timestamptz NOT NULL,
     CONSTRAINT uq_attachment_company_id_sha256 UNIQUE (company_id, sha256),
     UNIQUE (company_id, id),
@@ -857,7 +859,8 @@ CREATE TABLE attachment (
     CONSTRAINT ck_attachment_generated CHECK ((source_kind = 'generated') = (generated_kind IS NOT NULL)
         AND (source_kind = 'generated') = (generated_audience IS NOT NULL)
         AND (generated_subject_document_id IS NULL OR source_kind = 'generated')
-        AND (source_kind <> 'generated' OR state = 'clean'))
+        AND (source_kind <> 'generated' OR state = 'clean')),
+    CONSTRAINT ck_attachment_bytes_deleted CHECK (bytes_deleted_at IS NULL OR bytes_released_at IS NOT NULL)
 );
 CREATE TABLE attachment_link (                             -- polymorphic target, checked by INV-83
     id             uuid PRIMARY KEY,

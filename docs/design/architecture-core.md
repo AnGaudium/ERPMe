@@ -55,10 +55,11 @@ Rules: ADR-0022 rules 3, 4, 7, 8, 17, 23 unless named.
 
 ### Envelope and actor
 
-- Envelope fields: `command_type`, `schema_version`, `company_id`, `idempotency_key`, `mode`, `expected_plan_hash`, `payload` (and `include_canonical_plan`). No others (ADR-0008 rule 7).
+- Envelope fields: `command_type`, `schema_version`, `company_id`, `idempotency_key`, `mode`, `expected_plan_hash`, `payload` (and `include_canonical_plan`, `as_of_date`). No others (ADR-0008 rule 7 and its note).
 - The actor, `on_behalf_of` and `agent_run_id` come from the credential, never the client. `idempotency_key` is required in both modes, scoped to (actor, command type) (ADR-0008 rules 8, 14).
 - `simulate` runs the real handler and rolls back; `execute` commits only if the plan hash equals `expected_plan_hash`, else `plan_hash_mismatch` (ADR-0008 rules 9, 13).
-- Consumers and system jobs call the dispatcher in process, without `expected_plan_hash` (ADR-0013 rule 9).
+- Only consumers and system jobs (internal callers, in process) execute without a simulation and `expected_plan_hash`; every other actor simulates first (ADR-0013 rule 9; ADR-0008 rule 13 note).
+- `as_of_date`: the simulation returns the business date it used; send it on execute and every `clock.today(company)` returns it, so the plan hash survives midnight. More than one day off returns `as_of_date_out_of_range`. Never use it as `posting_date` ([ADR-0007](../adr/0007-time-model.md) rule 15 note).
 
 ### Dispatcher steps, in order
 
@@ -198,6 +199,7 @@ Some DDL drafts break these rules ([findings](architecture-overview.md#findings-
 | Put personal data or a snapshot in an event payload | ADR-0013 rule 4 | Registry CI check of payload fields against data labels |
 | Edit a generated file | ADR-0022 rules 17, 24 | `erpme-dev generate --check` |
 | Write separate simulation code | ADR-0008 rule 9; ADR-0004 rule 18 | INV-12 `executed_equals_simulated` |
+| Execute over a transport without simulating first, or change `as_of_date` between simulate and execute | ADR-0008 rules 12, 13 and notes; Principle 2 | Dispatcher: `expected_plan_hash` required; `plan_hash_mismatch` |
 | Omit `company_id` on a company table | ADR-0017 rule 19 | RLS policy test against `pg_policies` (ADR-0022 rule 8) |
 
 ## A6. Error model and check results
