@@ -23,7 +23,7 @@ X("insert into user_account values (%s)", (I["user"],))
 X("insert into company (id,code,legal_name,company_currency,time_zone,localization_package,accounting_regime,valuation_area_level,fiscal_calendar_owner_id,default_language)"
   " values (%s,%s,'Co','VND','Asia/Ho_Chi_Minh','l10n_vn','tt99','warehouse',%s,'vi')", (I["co"], "C6-" + t, I["user"]))
 for k, code, kind, dec in (("ea", "EA6" + t, "count", 0), ("mm", "MM6" + t, "length", 0)):
-    X("insert into uom (id, code, quantity_kind, decimal_places) values (%s,%s,%s,%s)", (I[k], code, kind, dec))
+    X("insert into uom (id, code, name, quantity_kind, decimal_places) values (%s,%s,%s,%s,%s)", (I[k], code, code, kind, dec))
 X("insert into item_group (id, company_id, code, name, basis) values (%s,%s,'fg','FG',%s)", (I["ig"], I["co"], B))
 X("insert into valuation_class (id, company_id, code, name, basis) values (%s,%s,'fg','FG',%s)", (I["vc"], I["co"], B))
 X("insert into item_tax_group (id, company_id, code, name, basis) values (%s,%s,'std','Std',%s)", (I["itg"], I["co"], B))

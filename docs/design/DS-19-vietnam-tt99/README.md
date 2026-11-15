@@ -13,6 +13,7 @@ Draft package data decided by [ADR-0039](../../adr/0039-vietnam-package-tt99.md)
 | [regimes/tt99/close_checklist.yaml](regimes/tt99/close_checklist.yaml) | Period pattern and special periods; tasks come in step 8 |
 | [regimes/tt99/settings.yaml](regimes/tt99/settings.yaml) | Regime rules: FX, closing, movement types, landed cost, counts, production |
 | [tax/](tax/tax_codes.csv) | Tax codes with their package kinds ([package_kinds.csv](tax/package_kinds.csv)), dated rates, tax matrix, item and partner tax groups, the 01/GTGT form ([ADR-0041](../../adr/0041-tax-engine.md)), and the non-cash payment condition ([deductibility_rules.yaml](tax/deductibility_rules.yaml); [ADR-0053](../../adr/0053-core-neutrality.md)) |
+| [i18n/vi/unit_names.csv](i18n/vi/unit_names.csv) | Statutory Vietnamese names of the core units for e-invoice lines and statutory prints, terminology keys `uom.<code>.name`, all `unverified`; the length setting `documents.unit_name_max_length` is in [settings.yaml](settings.yaml), empty until verified ([ADR-0056](../../adr/0056-multiple-units-of-measure.md) rule 18); checked against `catalogs/units.csv` |
 
 Bases: TT99 rows that only restate Appendix II carry it as legal source (not yet verified). Every package choice is `unverified` and cites an open question, except the two author decisions (purchase invoice posting date; rounding to 515 and 635). Production refuses unverified content (ADR-0016 rule 12).
 

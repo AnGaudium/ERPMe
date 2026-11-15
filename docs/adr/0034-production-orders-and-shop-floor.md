@@ -141,6 +141,8 @@ It adds only what production needs:
    - **Operations.** Operations with confirmations cannot be removed or change work center.
    - **When it takes force.** Reservations and demand and supply lines are adjusted.
 
+   Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): "unit" includes the line's conversion snapshot (rule 9).
+
 **Components: reservation, staging, issue and return**
 
 9. Reservation:
@@ -169,6 +171,8 @@ It adds only what production needs:
     - **Components not on the order.** They are first added through the order or a change order.
     - **Other reservations.** An issue that would cut into other demands' reservations is rejected with `stock_reserved` (ADR-0023 rule 13).
 
+    Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): issue lines carry the line unit block: `quantity` as entered in any allowed unit of the component, `uom_id`, the snapshot and `inventory_quantity`, which the stock movement and the order line's progress use (rules 9, 17).
+
 **Operations: confirmation and backflush**
 
 12. `operation_confirmation` is an internal posting document (reversible):
@@ -191,6 +195,8 @@ It adds only what production needs:
 
     Note: one table holds every generated backflush line: the production-owned `operation_progress_component` (calling document type and ID, order component line, material document line). Confirmations, service receipts and backflush at receipt (rule 13) all write it. `operation_confirmation_component` and `production_receipt_component` are dropped; plans and traceability read the one table, and INV-112 covers every calling document (holistic review 2026-11-15, item P11).
 
+    Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): generated backflush lines carry the line unit block in the inventory unit (source `identity`), rounded up (rules 8, 9).
+
 **Output: receipt, inspection and make to order**
 
 13. `production_receipt` is an internal posting document (reversible):
@@ -210,6 +216,8 @@ It adds only what production needs:
       Serial-tracked output is never received automatically.
 
     Note: backflush at receipt writes its lines to `operation_progress_component`, keyed by the receipt, not to `production_receipt_component` (rule 12's note) (holistic review 2026-11-15, item P11).
+
+    Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): receipt lines carry the line unit block; the tolerance and progress compare inventory quantities (rules 9, 17).
 14. Make to order:
     - **The rule.** When `for_demand_supply_line_id` is set and that demand is in the same warehouse, `available` output is reserved for it, up to that demand's unreserved open quantity. Output in inspection is reserved when it is released: a `production` consumer of `WarehouseTaskConfirmed` runs the reservation (effect class `other`). Planning nets the line against this order through the supply link ([ADR-0036](0036-multi-level-mrp.md) rule 9).
     - **Status.** Interim, flagged: this automatic reservation is business behavior (open question).

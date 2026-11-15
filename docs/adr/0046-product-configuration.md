@@ -192,6 +192,8 @@ Numbers join lists: a characteristic may take a number in a range with a step, s
     - **Number rates.** `price_list_characteristic_rate` (list, product, numeric characteristic, dates, `rate_per_value`) adds `rate_per_value` × the chosen number, per inventory unit. The database keys it to number characteristics. Rates of one list, product and characteristic never overlap in dates.
     - **The sum.** Base + extras + rates, multiplied by the factor and rounded once, exactly as ADR-0045 rule 17. The result lists every row used.
 
+    Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): for a configured item, its own product units (item-level `product_uom` rows, added by a person) come first in the conversion factor, then the product's (rules 4, 6).
+
 **Serials and service**
 
 16. The configuration after delivery:

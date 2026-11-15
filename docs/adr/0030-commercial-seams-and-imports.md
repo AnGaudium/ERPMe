@@ -97,6 +97,8 @@ Accounting and business choices stay with the author, as flagged interims: close
      6. **Abandon.** `AbandonImportBatch` stops a batch. Documents already posted stay, and the close check keeps blocking until they are reversed, by ordinary commands or DS-21's bulk reversal.
    - **Glossary.** "Every data import is one command batch" becomes "every data import is posted through simulated command batches; large ones are staged in an `import_batch`".
 
+   Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): an imported row's unit text resolves through the partner item's text, `uom_alias`, then a unit code; an unresolved text fails the row with `unit_text_unresolved` and is never guessed (rules 19, 21).
+
 **Natural keys and agent drafts** (F18)
 
 10. External documents get unique business keys, all including `company_id`. A second arrival is rejected with `duplicate_external_document`, naming the existing record, unless stated otherwise. Interim, flagged: reject versus warn is the author's (open question).

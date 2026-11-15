@@ -23,6 +23,7 @@ purchase_return,purchasing,document_type,purchasing,Purchase return,0.1.0,ADR-00
 purchase_credit_note,purchasing,document_type,purchasing,Purchase credit note,0.1.0,ADR-0047.
 purchase_debit_note,purchasing,document_type,purchasing,Purchase debit note,0.1.0,ADR-0047.
 gr_ir_write_off,purchasing,document_type,purchasing,GR/IR write-off,0.1.0,ADR-0047 rule 13.
+gr_ir_rounding_clearing,purchasing,document_type,purchasing,GR/IR rounding clearing,0.1.0,ADR-0056 rule 10; posted only by the system as a consequence posting (is_internal_only); level full; in no template's expansion.
 customs_declaration,purchasing,document_type,purchasing,Customs declaration,0.1.0,"ADR-0021 rule 10, with its amendments."
 landed_cost,purchasing,document_type,inventory,Landed cost,0.1.0,ADR-0021.
 goods_receipt,inventory,document_type,inventory,Goods receipt,0.1.0,ADR-0027 rule 7.

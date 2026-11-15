@@ -130,11 +130,12 @@ CREATE TABLE supplier_item (                               -- the only home of s
     company_id                uuid NOT NULL,
     supplier_partner_id       uuid NOT NULL,
     item_id                   uuid NOT NULL,                  -- also a service item of an external operation (ADR-0037 rule 3)
+    order_uom_id              uuid NOT NULL REFERENCES uom (id),   -- the supplier's order unit: the inventory unit or an active product unit (ADR-0056 rule 14)
     partner_item_id           uuid REFERENCES partner_item (id),   -- the supplier's own code (ADR-0019 rule 6)
     supplier_processing_days  integer NOT NULL CONSTRAINT ck_supplier_item_processing CHECK (supplier_processing_days >= 0),   -- on the supplier's calendar
     transit_days              integer NOT NULL CONSTRAINT ck_supplier_item_transit CHECK (transit_days >= 0),                 -- calendar days
-    minimum_order_quantity    types.quantity NOT NULL DEFAULT 0 CONSTRAINT ck_supplier_item_minimum CHECK (minimum_order_quantity >= 0),   -- purchase unit
-    order_multiple            types.quantity CONSTRAINT ck_supplier_item_multiple CHECK (order_multiple > 0),                 -- purchase unit; null = none
+    minimum_order_quantity    types.quantity NOT NULL DEFAULT 0 CONSTRAINT ck_supplier_item_minimum CHECK (minimum_order_quantity >= 0),   -- in order_uom_id
+    order_multiple            types.quantity CONSTRAINT ck_supplier_item_multiple CHECK (order_multiple > 0),                 -- in order_uom_id; null = none
     is_preferred              boolean NOT NULL DEFAULT false,  -- none or several valid preferred rows give planning_parameter_missing (a run check, not a key)
     start_date                date NOT NULL,
     end_date                  date,                            -- inclusive; null = open
@@ -426,9 +427,12 @@ CREATE TABLE bill_of_materials_component (                 -- ADR-0033 rule 6; s
     component_item_id               uuid NOT NULL,              -- an active item of a stock product (checked at release)
     quantity                        types.quantity NOT NULL,    -- per base quantity, in uom_id
     uom_id                          uuid NOT NULL REFERENCES uom (id),
-    -- the exact quantity in the component's inventory unit is quantity * numerator / denominator (ADR-0018 rule 11)
-    numerator                       bigint NOT NULL DEFAULT 1 CONSTRAINT ck_bill_of_materials_component_numerator CHECK (numerator > 0),
-    denominator                     bigint NOT NULL DEFAULT 1 CONSTRAINT ck_bill_of_materials_component_denominator CHECK (denominator > 0),
+    -- the conversion snapshot, no default factor: the exact quantity in the component's inventory unit is
+    -- quantity * uom_numerator / uom_denominator, never stored, rounded once per order line (ADR-0033 rule 6; ADR-0056 rules 9, 17)
+    uom_numerator                   bigint NOT NULL,
+    uom_denominator                 bigint NOT NULL,
+    uom_factor_source               text NOT NULL,
+    issue_multiple                  types.quantity CONSTRAINT ck_bill_of_materials_component_issue_multiple CHECK (issue_multiple > 0),   -- in uom_id: requirements round up to whole multiples
     component_scrap_percent         types.percent NOT NULL DEFAULT 0 CONSTRAINT ck_bill_of_materials_component_scrap CHECK (component_scrap_percent >= 0 AND component_scrap_percent < 100),
     is_fixed_quantity               boolean NOT NULL DEFAULT false,
     operation_number                integer CONSTRAINT ck_bill_of_materials_component_operation CHECK (operation_number > 0),   -- must exist in the paired routing (operation_not_in_routing, release check)
@@ -447,7 +451,9 @@ CREATE TABLE bill_of_materials_component (                 -- ADR-0033 rule 6; s
     -- result at the characteristic's minimum and maximum is a release check (configured_quantity_negative, ADR-0046
     -- rule 12 and its note), and a zero result drops the line
     CONSTRAINT ck_bill_of_materials_component_quantity CHECK (quantity > 0 OR sizing = 'linear'),
-    CONSTRAINT ck_bill_of_materials_component_linear CHECK ((sizing = 'linear') = (quantity_per_value IS NOT NULL AND sizing_attribute_id IS NOT NULL))
+    CONSTRAINT ck_bill_of_materials_component_linear CHECK ((sizing = 'linear') = (quantity_per_value IS NOT NULL AND sizing_attribute_id IS NOT NULL)),
+    CONSTRAINT ck_bill_of_materials_component_uom_factor CHECK (uom_numerator > 0 AND uom_denominator > 0 AND uom_factor_source IN ('identity', 'item', 'product', 'global')
+        AND (uom_factor_source <> 'identity' OR (uom_numerator = 1 AND uom_denominator = 1)))
 );
 CREATE TABLE bill_of_materials_output (                    -- co-products and by-products besides the main output (ADR-0033 rule 7)
     id                              uuid PRIMARY KEY,
@@ -457,15 +463,18 @@ CREATE TABLE bill_of_materials_output (                    -- co-products and by
     output_item_id                  uuid NOT NULL,
     quantity                        types.quantity NOT NULL CONSTRAINT ck_bill_of_materials_output_quantity CHECK (quantity > 0),
     uom_id                          uuid NOT NULL REFERENCES uom (id),
-    numerator                       bigint NOT NULL DEFAULT 1 CONSTRAINT ck_bill_of_materials_output_numerator CHECK (numerator > 0),   -- interim: not stated in ADR-0033 (as components)
-    denominator                     bigint NOT NULL DEFAULT 1 CONSTRAINT ck_bill_of_materials_output_denominator CHECK (denominator > 0),
+    uom_numerator                   bigint NOT NULL,            -- the conversion snapshot, as components (ADR-0056 rule 17)
+    uom_denominator                 bigint NOT NULL,
+    uom_factor_source               text NOT NULL,
     output_type                     text NOT NULL CONSTRAINT ck_bill_of_materials_output_type CHECK (output_type IN ('co_product', 'by_product')),
     cost_coefficient                numeric(18,6),              -- co-products; data only (rule 7)
     recorded_at                     timestamptz NOT NULL,
     UNIQUE (bill_of_materials_revision_id, position),
     FOREIGN KEY (company_id, bill_of_materials_revision_id) REFERENCES bill_of_materials_revision (company_id, id),
     FOREIGN KEY (company_id, output_item_id) REFERENCES item (company_id, id),
-    CONSTRAINT ck_bill_of_materials_output_coefficient CHECK ((output_type = 'co_product') = (cost_coefficient IS NOT NULL) AND coalesce(cost_coefficient, 0) >= 0)
+    CONSTRAINT ck_bill_of_materials_output_coefficient CHECK ((output_type = 'co_product') = (cost_coefficient IS NOT NULL) AND coalesce(cost_coefficient, 0) >= 0),
+    CONSTRAINT ck_bill_of_materials_output_uom_factor CHECK (uom_numerator > 0 AND uom_denominator > 0 AND uom_factor_source IN ('identity', 'item', 'product', 'global')
+        AND (uom_factor_source <> 'identity' OR (uom_numerator = 1 AND uom_denominator = 1)))
 );
 CREATE TABLE routing (                                     -- may serve several items; with conditions, one configurable product (ADR-0033 rule 9; ADR-0046 rule 12)
     id           uuid PRIMARY KEY,
@@ -616,6 +625,13 @@ CREATE TABLE planned_order (
     for_demand_supply_line_id  uuid,                           -- make_to_order: the sales demand line is part of the key (ADR-0036 rule 4)
     sequence                   integer NOT NULL DEFAULT 1 CONSTRAINT ck_planned_order_sequence CHECK (sequence > 0),
     quantity                   types.quantity NOT NULL CONSTRAINT ck_planned_order_quantity CHECK (quantity > 0),   -- inventory unit
+    -- the order unit block (ADR-0056 rules 9, 14): a purchase proposal in the supplier's order unit after minimum and multiple;
+    -- transfer and production proposals in the inventory unit (identity)
+    order_quantity             types.quantity NOT NULL CONSTRAINT ck_planned_order_order_quantity CHECK (order_quantity > 0),
+    order_uom_id               uuid NOT NULL REFERENCES uom (id),
+    uom_numerator              bigint NOT NULL,
+    uom_denominator            bigint NOT NULL,
+    uom_factor_source          text NOT NULL,
     rounding_excess_quantity   types.quantity NOT NULL DEFAULT 0 CONSTRAINT ck_planned_order_rounding_excess CHECK (rounding_excess_quantity >= 0),   -- shown on the proposal (rule 6)
     release_date               date NOT NULL,
     state                      text NOT NULL DEFAULT 'proposed' CONSTRAINT ck_planned_order_state CHECK (state IN ('proposed', 'firmed', 'converted', 'canceled')),
@@ -641,7 +657,14 @@ CREATE TABLE planned_order (
                                                    AND planned_end_date IS NOT NULL AND availability_date IS NOT NULL)),
     CONSTRAINT ck_planned_order_production_dates CHECK (order_type <> 'production' OR (planned_end_date >= planned_start_date
                                                          AND availability_date >= planned_end_date AND release_date <= planned_start_date)),
-    CONSTRAINT ck_planned_order_make_to_order CHECK (for_demand_supply_line_id IS NULL OR (order_type = 'production' AND need_date IS NOT NULL))
+    CONSTRAINT ck_planned_order_make_to_order CHECK (for_demand_supply_line_id IS NULL OR (order_type = 'production' AND need_date IS NOT NULL)),
+    -- the line unit block (ADR-0056 rule 9): a known source, identity only at 1/1, and the inventory quantity within two
+    -- inventory units of the exact conversion: a gross-error check that per-line rounding, the clamped forward parts and the
+    -- returns' shares of a part (rule 10) provably keep
+    CONSTRAINT ck_planned_order_uom_factor CHECK (uom_numerator > 0 AND uom_denominator > 0 AND uom_factor_source IN ('identity', 'item', 'product', 'global')
+        AND (uom_factor_source <> 'identity' OR (uom_numerator = 1 AND uom_denominator = 1))),
+    CONSTRAINT ck_planned_order_uom_quantity CHECK (abs(quantity * uom_denominator - order_quantity * uom_numerator) <= 2 * uom_denominator
+        AND (uom_factor_source <> 'identity' OR quantity = order_quantity))
 );
 -- One open proposal per key without need_date (reorder_point and min_max, rule 18).
 CREATE UNIQUE INDEX ux_planned_order_open_without_need_date ON planned_order (company_id, item_id, warehouse_id, order_type, supplier_partner_id, transfer_route_id)
@@ -789,7 +812,12 @@ CREATE TABLE replenishment_request_line (
     order_type                text NOT NULL CONSTRAINT ck_replenishment_request_line_type CHECK (order_type IN ('purchase', 'transfer')),
     supplier_partner_id       uuid,
     transfer_route_id         uuid,
-    quantity                  types.quantity NOT NULL CONSTRAINT ck_replenishment_request_line_quantity CHECK (quantity > 0),
+    quantity                  types.quantity NOT NULL CONSTRAINT ck_replenishment_request_line_quantity CHECK (quantity > 0),   -- in uom_id, the planned order's order unit
+    uom_id                    uuid NOT NULL REFERENCES uom (id),
+    uom_numerator             bigint NOT NULL,                  -- the conversion snapshot: 1 uom_id = uom_numerator / uom_denominator
+    uom_denominator           bigint NOT NULL,                  -- inventory units, taken when the unit was set, never re-read (ADR-0056 rule 9)
+    uom_factor_source         text NOT NULL,                    -- identity, item, product or global (ADR-0056 rule 6)
+    inventory_quantity        types.quantity NOT NULL CONSTRAINT ck_replenishment_request_line_inventory_quantity CHECK (inventory_quantity > 0),
     need_date                 date,
     release_date              date NOT NULL,
     recorded_at               timestamptz NOT NULL,
@@ -800,7 +828,14 @@ CREATE TABLE replenishment_request_line (
     FOREIGN KEY (company_id, warehouse_id) REFERENCES warehouse (company_id, id),
     FOREIGN KEY (company_id, supplier_partner_id) REFERENCES partner (company_id, id),
     CONSTRAINT fk_replenishment_request_line_route FOREIGN KEY (company_id, transfer_route_id, warehouse_id) REFERENCES transfer_route (company_id, id, destination_warehouse_id),
-    CONSTRAINT ck_replenishment_request_line_source CHECK ((order_type = 'purchase') = (supplier_partner_id IS NOT NULL) AND (order_type = 'transfer') = (transfer_route_id IS NOT NULL))
+    CONSTRAINT ck_replenishment_request_line_source CHECK ((order_type = 'purchase') = (supplier_partner_id IS NOT NULL) AND (order_type = 'transfer') = (transfer_route_id IS NOT NULL)),
+    -- the line unit block (ADR-0056 rule 9): a known source, identity only at 1/1, and the inventory quantity within two
+    -- inventory units of the exact conversion: a gross-error check that per-line rounding, the clamped forward parts and the
+    -- returns' shares of a part (rule 10) provably keep
+    CONSTRAINT ck_replenishment_request_line_uom_factor CHECK (uom_numerator > 0 AND uom_denominator > 0 AND uom_factor_source IN ('identity', 'item', 'product', 'global')
+        AND (uom_factor_source <> 'identity' OR (uom_numerator = 1 AND uom_denominator = 1))),
+    CONSTRAINT ck_replenishment_request_line_uom_quantity CHECK (abs(inventory_quantity * uom_denominator - quantity * uom_numerator) <= 2 * uom_denominator
+        AND (uom_factor_source <> 'identity' OR inventory_quantity = quantity))
 );
 
 -- ===== Production orders [production] (ADR-0034 rules 1-10, 14-16) =====
@@ -977,7 +1012,12 @@ CREATE TABLE production_issue_line (
     production_order_component_id  uuid NOT NULL,
     item_id                        uuid NOT NULL,
     warehouse_id                   uuid NOT NULL,              -- interim: not stated in ADR-0034 (the component line's issue warehouse, for the bin key)
-    quantity                       types.quantity NOT NULL CONSTRAINT ck_production_issue_line_quantity CHECK (quantity > 0),
+    quantity                       types.quantity NOT NULL CONSTRAINT ck_production_issue_line_quantity CHECK (quantity > 0),   -- as entered, in uom_id (ADR-0056 rule 9)
+    uom_id                         uuid NOT NULL REFERENCES uom (id),
+    uom_numerator                  bigint NOT NULL,             -- the conversion snapshot: 1 uom_id = uom_numerator / uom_denominator
+    uom_denominator                bigint NOT NULL,             -- inventory units, taken when the unit was set, never re-read (ADR-0056 rule 9)
+    uom_factor_source              text NOT NULL,               -- identity, item, product or global (ADR-0056 rule 6)
+    inventory_quantity             types.quantity NOT NULL CONSTRAINT ck_production_issue_line_inventory_quantity CHECK (inventory_quantity > 0),
     lot_id                         uuid REFERENCES lot (id),
     serial_number_id               uuid REFERENCES serial_number (id),
     bin_id                         uuid NOT NULL,
@@ -999,7 +1039,14 @@ CREATE TABLE production_issue_line (
     CONSTRAINT fk_production_issue_line_cost_object FOREIGN KEY (company_id, production_order_id, cost_object_id) REFERENCES production_order (company_id, id, cost_object_id),
     -- INV-105: an output serial assigned to the same order
     CONSTRAINT fk_production_issue_line_output_serial FOREIGN KEY (production_order_id, output_serial_number_id) REFERENCES production_order_output_serial (production_order_id, serial_number_id),
-    CONSTRAINT ck_production_issue_line_tracking CHECK (num_nonnulls(lot_id, serial_number_id) <= 1 AND (serial_number_id IS NULL OR quantity = 1))
+    CONSTRAINT ck_production_issue_line_tracking CHECK (num_nonnulls(lot_id, serial_number_id) <= 1 AND (serial_number_id IS NULL OR inventory_quantity = 1)),
+    -- the line unit block (ADR-0056 rule 9): a known source, identity only at 1/1, and the inventory quantity within two
+    -- inventory units of the exact conversion: a gross-error check that per-line rounding, the clamped forward parts and the
+    -- returns' shares of a part (rule 10) provably keep
+    CONSTRAINT ck_production_issue_line_uom_factor CHECK (uom_numerator > 0 AND uom_denominator > 0 AND uom_factor_source IN ('identity', 'item', 'product', 'global')
+        AND (uom_factor_source <> 'identity' OR (uom_numerator = 1 AND uom_denominator = 1))),
+    CONSTRAINT ck_production_issue_line_uom_quantity CHECK (abs(inventory_quantity * uom_denominator - quantity * uom_numerator) <= 2 * uom_denominator
+        AND (uom_factor_source <> 'identity' OR inventory_quantity = quantity))
 );
 CREATE TABLE operation_confirmation (                      -- an internal operation of the order (rule 12)
     id                             uuid PRIMARY KEY,
@@ -1062,7 +1109,12 @@ CREATE TABLE production_receipt_line (
     production_order_output_id  uuid NOT NULL,
     item_id                     uuid NOT NULL,
     warehouse_id                uuid NOT NULL,                 -- interim: not stated in ADR-0034 (for the bin key)
-    quantity                    types.quantity NOT NULL CONSTRAINT ck_production_receipt_line_quantity CHECK (quantity > 0),
+    quantity                    types.quantity NOT NULL CONSTRAINT ck_production_receipt_line_quantity CHECK (quantity > 0),   -- as entered, in uom_id (ADR-0056 rule 9)
+    uom_id                      uuid NOT NULL REFERENCES uom (id),
+    uom_numerator               bigint NOT NULL,                -- the conversion snapshot: 1 uom_id = uom_numerator / uom_denominator
+    uom_denominator             bigint NOT NULL,                -- inventory units, taken when the unit was set, never re-read (ADR-0056 rule 9)
+    uom_factor_source           text NOT NULL,                  -- identity, item, product or global (ADR-0056 rule 6)
+    inventory_quantity          types.quantity NOT NULL CONSTRAINT ck_production_receipt_line_inventory_quantity CHECK (inventory_quantity > 0),
     lot_id                      uuid REFERENCES lot (id),      -- created at receipt when lot-tracked
     serial_number_id            uuid,
     bin_id                      uuid NOT NULL,
@@ -1080,7 +1132,14 @@ CREATE TABLE production_receipt_line (
     CONSTRAINT fk_production_receipt_line_cost_object FOREIGN KEY (company_id, production_order_id, cost_object_id) REFERENCES production_order (company_id, id, cost_object_id),
     -- received serials are serials assigned to the same order (rule 16)
     CONSTRAINT fk_production_receipt_line_serial FOREIGN KEY (production_order_id, serial_number_id) REFERENCES production_order_output_serial (production_order_id, serial_number_id),
-    CONSTRAINT ck_production_receipt_line_tracking CHECK (num_nonnulls(lot_id, serial_number_id) <= 1 AND (serial_number_id IS NULL OR quantity = 1))
+    CONSTRAINT ck_production_receipt_line_tracking CHECK (num_nonnulls(lot_id, serial_number_id) <= 1 AND (serial_number_id IS NULL OR inventory_quantity = 1)),
+    -- the line unit block (ADR-0056 rule 9): a known source, identity only at 1/1, and the inventory quantity within two
+    -- inventory units of the exact conversion: a gross-error check that per-line rounding, the clamped forward parts and the
+    -- returns' shares of a part (rule 10) provably keep
+    CONSTRAINT ck_production_receipt_line_uom_factor CHECK (uom_numerator > 0 AND uom_denominator > 0 AND uom_factor_source IN ('identity', 'item', 'product', 'global')
+        AND (uom_factor_source <> 'identity' OR (uom_numerator = 1 AND uom_denominator = 1))),
+    CONSTRAINT ck_production_receipt_line_uom_quantity CHECK (abs(inventory_quantity * uom_denominator - quantity * uom_numerator) <= 2 * uom_denominator
+        AND (uom_factor_source <> 'identity' OR inventory_quantity = quantity))
 );
 -- Backflushed and processor-consumed component lines, generated at Post by production.contract.record_operation_progress
 -- or the receipt's backflush, keyed by the calling posting document. One table (holistic decision 11) replaces
@@ -1095,7 +1154,12 @@ CREATE TABLE operation_progress_component (
     production_order_component_id  uuid NOT NULL,
     item_id                        uuid NOT NULL,
     warehouse_id                   uuid NOT NULL,              -- the production warehouse, or the processor location
-    quantity                       types.quantity NOT NULL CONSTRAINT ck_operation_progress_component_quantity CHECK (quantity > 0),
+    quantity                       types.quantity NOT NULL CONSTRAINT ck_operation_progress_component_quantity CHECK (quantity > 0),   -- as entered, in uom_id (ADR-0056 rule 9)
+    uom_id                         uuid NOT NULL REFERENCES uom (id),
+    uom_numerator                  bigint NOT NULL,             -- the conversion snapshot: 1 uom_id = uom_numerator / uom_denominator
+    uom_denominator                bigint NOT NULL,             -- inventory units, taken when the unit was set, never re-read (ADR-0056 rule 9)
+    uom_factor_source              text NOT NULL,               -- identity, item, product or global (ADR-0056 rule 6)
+    inventory_quantity             types.quantity NOT NULL CONSTRAINT ck_operation_progress_component_inventory_quantity CHECK (inventory_quantity > 0),
     lot_id                         uuid REFERENCES lot (id),   -- backflush never takes serials (serial_component_backflush)
     bin_id                         uuid NOT NULL,              -- the supply bin, or the processor's default bin
     cost_object_id                 uuid NOT NULL,
@@ -1108,7 +1172,16 @@ CREATE TABLE operation_progress_component (
         REFERENCES production_order_component (company_id, id, production_order_id, component_item_id, issue_warehouse_id),
     CONSTRAINT fk_operation_progress_component_bin FOREIGN KEY (bin_id, warehouse_id) REFERENCES bin (id, warehouse_id),
     CONSTRAINT fk_operation_progress_component_cost_object FOREIGN KEY (company_id, production_order_id, cost_object_id) REFERENCES production_order (company_id, id, cost_object_id),
-    CONSTRAINT ck_operation_progress_component_caller CHECK (num_nonnulls(operation_confirmation_id, production_receipt_id, service_receipt_id) = 1)
+    CONSTRAINT ck_operation_progress_component_caller CHECK (num_nonnulls(operation_confirmation_id, production_receipt_id, service_receipt_id) = 1),
+    -- the line unit block (ADR-0056 rule 9): a known source, identity only at 1/1, and the inventory quantity within two
+    -- inventory units of the exact conversion: a gross-error check that per-line rounding, the clamped forward parts and the
+    -- returns' shares of a part (rule 10) provably keep
+    CONSTRAINT ck_operation_progress_component_uom_factor CHECK (uom_numerator > 0 AND uom_denominator > 0 AND uom_factor_source IN ('identity', 'item', 'product', 'global')
+        AND (uom_factor_source <> 'identity' OR (uom_numerator = 1 AND uom_denominator = 1))),
+    CONSTRAINT ck_operation_progress_component_uom_quantity CHECK (abs(inventory_quantity * uom_denominator - quantity * uom_numerator) <= 2 * uom_denominator
+        AND (uom_factor_source <> 'identity' OR inventory_quantity = quantity)),
+    -- generated backflush lines are written in the inventory unit (ADR-0056 rule 9)
+    CONSTRAINT ck_operation_progress_component_uom_identity CHECK (uom_factor_source = 'identity')
 );
 CREATE INDEX ix_operation_progress_component_component ON operation_progress_component (production_order_component_id);
 

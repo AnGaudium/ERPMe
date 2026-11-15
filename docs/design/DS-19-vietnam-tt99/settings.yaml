@@ -90,3 +90,9 @@
   effective_from: 2026-01-01
   status: unverified
   open_question: "(DS-23) Tax date and declaration date"
+
+- key: documents.unit_name_max_length
+  value: null
+  effective_from: 2026-01-01
+  status: unverified
+  open_question: "(DS-40, DS-24) Vietnamese unit names on prints and e-invoices"

@@ -60,6 +60,8 @@ Planning answers, per item and warehouse: what to buy or move, how much, and by 
      It may refer to the partner's own item code in `partner_item` (ADR-0019 rule 6). It is the only home of supplier minimums, multiples and preference.
    - `supplier_purchasing_term` (one row per supplier partner) holds `minimum_order_amount` with its currency, an optional `container_volume` and `container_weight`, and an optional `order_cycle_days`.
    - `supplier_item_lead_time` stores measured lead times per (supplier, item), refreshed by the forecast job: mean and standard deviation (square root through `erpme.numeric`) of the days from the supply line's `ordered_date` to receipt, read from `demand_supply_line` (rule 8). They are visible data (spec 03 rule 9) and are never applied without approval.
+
+   Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): `supplier_item` gains `order_uom_id` (NOT NULL; the inventory unit or an active product unit; proposed from the product's purchase unit), and its minimum and multiple are in that unit. A supplier with another pack size gets its own product unit, never a supplier factor. `supplier_purchasing_term.volume_uom_id` and `weight_uom_id` stay interim; item dimensions and weights convert to them through `uom_conversion` only (rules 14, 23).
 3. `transfer_route` holds:
    - source warehouse, destination warehouse;
    - `lead_time_days` (calendar days); the destination warehouse's `receiving_days` and calendar then apply, as for purchases.
@@ -72,6 +74,8 @@ Planning answers, per item and warehouse: what to buy or move, how much, and by 
    - **Lead time of a purchase:** `supplier_processing_days` on the supplier's calendar, then `transit_days` as calendar days, then `receiving_days` on the warehouse's calendar.
    - **Release date:** the latest working day of the supplier's calendar from which the order still arrives by its `need_date`.
 6. Units: every planning quantity is in the item's inventory unit (ADR-0018 rule 9). The supplier's minimum and multiple are applied in the purchase unit, then converted exactly. Rounding excess is shown on the proposal.
+
+   Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): "the purchase unit" is the supplier item's `order_uom_id`. The run converts the shortfall exactly into it, applies the minimum and the multiple rounding up, and converts the order quantity back half up, as the purchase order line will; the planned order stores `order_quantity`, `order_uom_id` and the snapshot beside `quantity` in the inventory unit (rule 14).
 7. `planning_setting` per company holds:
    - `planning_owner_id`: the human accountable for scheduled runs (spec 03 rule 3);
    - `planning_horizon_days`;
@@ -164,6 +168,8 @@ Planning answers, per item and warehouse: what to buy or move, how much, and by 
 
     When the minimum or the multiple forces a quantity above the cap, the forced quantity wins. The excess is shown, and the exception `supplier_minimum_excess` is raised.
 
+    Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): steps 2 and 3 work in the supplier item's order unit; every proposal quantity, purchase, transfer or production, rounds up (rules 8, 14).
+
 **The planning graph and the run**
 
 16. The planning graph:
@@ -189,6 +195,8 @@ Planning answers, per item and warehouse: what to buy or move, how much, and by 
     - pegging rows.
 
     A run matches proposals to existing ones by business key and updates them in place. It creates new ones, and cancels proposals no longer needed. A canceled row never blocks a new proposal: the new one takes the next `sequence`. Firmed and converted orders are never changed by a run; a firmed order whose release date has passed raises `firmed_order_overdue`.
+
+    Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): a planned order also holds its order unit block, `order_quantity`, `order_uom_id`, `uom_numerator`, `uom_denominator` and `uom_factor_source` (identity for transfer and production proposals); `quantity` stays in the inventory unit (rules 9, 14).
 19. The firm fence covers release dates strictly before planning date + `firm_horizon_days` (default 0, so no fence). Inside it a run changes no existing proposal. A new shortage there is proposed with its release date moved to the first date outside the fence, and raises `shortage_inside_lead_time`; the projection continues with it. Commands: Production planned orders start no earlier than `earliest_start` = max(planning date, fence end) + `conversion_lead_days` ([ADR-0036](0036-multi-level-mrp.md) rule 4).
     - `FirmPlannedOrder`;
     - `UpdatePlannedOrder`, which sets quantity or dates and implies firming;
@@ -250,6 +258,8 @@ Planning answers, per item and warehouse: what to buy or move, how much, and by 
     - **Splits.** A planned order converts whole; a split is two `UpdatePlannedOrder` calls in Phase 1.
     - **Canceled drafts.** When the document lines of a converted order close with `closed_reason` `canceled` (rule 8), the next run sets it `canceled` and may propose again.
     - **Auto-conversion.** Converting under a value threshold by policy is an open question (DS-28). Sending to a supplier always stays a separate approved step. For agents, `UpdatePlannedOrder`, `FirmPlannedOrder` and `ConvertPlannedOrder` are proposal-bound for every order type ([ADR-0036](0036-multi-level-mrp.md) rule 12).
+
+    Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): the replenishment request line and the drafted purchase request line carry the planned order's order unit and snapshot; a purchase order copied from a request keeps the request's unit unless the person changes it (rule 14).
 
 **Agents, events, queries, performance**
 

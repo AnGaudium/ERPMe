@@ -363,6 +363,20 @@ def run(docs, pkg, regime, quiet=False):
         for k in sorted(tax_settings - have): fail(f'required tax setting {k} missing')
         notes.append(f'tax: {len(tcodes)} codes, {len(trates)} rates, {len(tmatrix)} matrix rows')
 
+    # Unit names (ADR-0056 rule 18): each row names a core unit of catalogs/units.csv once, with a name and one basis.
+    un_path = os.path.join(pkg, 'i18n', 'vi', 'unit_names.csv')
+    if os.path.exists(un_path):
+        core_units = {r['code'] for r in load(os.path.join(cat, 'units.csv'))}
+        seen_u = set()
+        for r in load(un_path):
+            where = f'unit name {r["code"]}'
+            if r['code'] in seen_u: fail(f'{where}: listed twice')
+            seen_u.add(r['code'])
+            if r['code'] not in core_units: fail(f'{where}: not a core unit of catalogs/units.csv')
+            if not r['name_vi'].strip(): fail(f'{where}: empty name')
+            basis_csv(r, where)
+        for code in sorted(core_units - seen_u): fail(f'unit name {code}: core unit without a name')
+        notes.append(f'unit names: {len(seen_u)} of {len(core_units)} core units')
     if not quiet:
         print(f'legal forms {forms}; chart rows {len(chart)}; determination rows {len(det)}; combinations resolved {combos}; settings {len(settings)}')
         for n in notes: print('NOTE', n)
@@ -421,6 +435,9 @@ def self_test(docs, pkg, regime):
         ('deductibility rule without basis', lambda d: edit_pkg(d, 'tax/deductibility_rules.yaml', '  status: unverified\n', '')),
         ('two deductibility rules for one kind, direction and date', lambda d: edit_pkg(d, 'tax/deductibility_rules.yaml', '- code: non_cash_payment_threshold\n', '- code: second_rule\n  condition_type: payment_evidence_threshold\n  applies_to: {tax_kind: vat, directions: [purchase]}\n  parameters:\n    threshold: {amount: "1", currency: VND, includes_tax: true}\n    aggregation: {default: per_document}\n    failing_methods: [cash]\n    lapse: none\n    exempt_document_kinds: []\n  effective_from: 2026-01-01\n  status: unverified\n  open_question: "(DS-23) Input VAT and non-cash payment"\n- code: non_cash_payment_threshold\n')),
         ('a none deductibility rule with parameters', lambda d: edit_pkg(d, 'tax/deductibility_rules.yaml', 'condition_type: payment_evidence_threshold', 'condition_type: none')),
+        ('unit name of a unit that is not a core unit', lambda d: edit_pkg(d, 'i18n/vi/unit_names.csv', '\nKGM,', '\nKGMX,')),
+        ('core unit without a name', lambda d: drop_pkg(d, 'i18n/vi/unit_names.csv', 'MLT,')),
+        ('unit name without basis', lambda d: edit_pkg(d, 'i18n/vi/unit_names.csv', '\nGRM,g,Gam,unverified,', '\nGRM,g,Gam,,')),
         ('test_fixture basis outside a test package', edit('account_determination.csv', ',unverified,(DS-19) TT99 default account determination,', ',test_fixture,,')),
     ]
     wrong = 0

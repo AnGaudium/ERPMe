@@ -20,7 +20,7 @@ for k, code in [("partner","CUS1"),("partner2","CUS2")]:
     X("insert into partner (id, company_id, code, name, partner_kind, country) values (%s,%s,%s,%s,'organization','VN')", (ids[k], ids["co"], code, code))
 # DS-20 master data for the item and warehouse the journal lines refer to (ADR-0045)
 u, ig, vc, tg, pr = new(), new(), new(), new(), new()
-X("insert into uom (id, code, quantity_kind, decimal_places) values (%s,%s,'count',0)", (u, "EA-" + str(u)[-8:]))
+X("insert into uom (id, code, name, quantity_kind, decimal_places) values (%s,%s,'Each','count',0)", (u, "EA-" + str(u)[-8:]))
 X("insert into item_group (id, company_id, code, name, basis) values (%s,%s,'goods','Goods','{}')", (ig, ids["co"]))
 X("insert into valuation_class (id, company_id, code, name, basis) values (%s,%s,'merchandise','Merchandise','{}')", (vc, ids["co"]))
 X("insert into item_tax_group (id, company_id, code, name, basis) values (%s,%s,'standard','Standard','{}')", (tg, ids["co"]))

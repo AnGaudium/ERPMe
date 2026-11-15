@@ -33,20 +33,36 @@ CREATE TABLE uom (                                         -- ADR-0018 rule 8; c
     id              uuid PRIMARY KEY,
     company_id      uuid REFERENCES company (id),
     code            text NOT NULL,
+    name            text NOT NULL,                          -- core: the English name of catalogs/units.csv; company: the company's text (ADR-0056 rule 2)
     quantity_kind   text NOT NULL CONSTRAINT ck_uom_quantity_kind CHECK (quantity_kind IN ('count', 'mass', 'length', 'area', 'volume', 'time')),
     decimal_places  smallint NOT NULL CONSTRAINT ck_uom_decimal_places CHECK (decimal_places BETWEEN 0 AND 6),
-    is_active       boolean NOT NULL DEFAULT true,
+    is_active       boolean NOT NULL DEFAULT true,          -- false: retired, no new uses; history keeps it (ADR-0056 rule 2)
     CONSTRAINT ck_uom_company_code CHECK ((company_id IS NULL) = (code NOT LIKE 'x-%'))
 );
 CREATE UNIQUE INDEX ux_uom_core_code ON uom (code) WHERE company_id IS NULL;
 CREATE UNIQUE INDEX ux_uom_company_code ON uom (company_id, code) WHERE company_id IS NOT NULL;
-CREATE TABLE uom_conversion (                              -- units of one kind, exact ratio of two positive integers (ADR-0006 rule 11; ADR-0018 rule 8)
+CREATE TABLE uom_conversion (                              -- core catalog unit-conversions.csv: units of one kind, exact ratio of two positive integers (ADR-0006 rule 11; ADR-0018 rule 8; ADR-0056 rule 3)
+    id           uuid PRIMARY KEY,                         -- uuid5 of 'uom_conversion:<from code>:<to code>' (ADR-0006 rule 4)
     from_uom_id  uuid NOT NULL REFERENCES uom (id),
     to_uom_id    uuid NOT NULL REFERENCES uom (id),
     numerator    bigint NOT NULL CONSTRAINT ck_uom_conversion_numerator CHECK (numerator > 0),       -- 1 from = numerator/denominator to
     denominator  bigint NOT NULL CONSTRAINT ck_uom_conversion_denominator CHECK (denominator > 0),
-    PRIMARY KEY (from_uom_id, to_uom_id),
-    CONSTRAINT ck_uom_conversion_distinct CHECK (from_uom_id <> to_uom_id)
+    is_active    boolean NOT NULL DEFAULT true,            -- false: retired by a catalog version; immutable once used
+    CONSTRAINT ck_uom_conversion_distinct CHECK (from_uom_id <> to_uom_id),
+    -- direct pairs only, stored once from the larger unit (factor >= 1); the inverse is derived, never stored or chained
+    CONSTRAINT ck_uom_conversion_direction CHECK (numerator >= denominator)
+);
+-- One row per pair of units in either direction (ADR-0056 rule 3).
+CREATE UNIQUE INDEX ux_uom_conversion_pair ON uom_conversion (least(from_uom_id, to_uom_id), greatest(from_uom_id, to_uom_id));
+CREATE TABLE uom_alias (                                   -- unit text as partners and old systems write it, for intake (ADR-0056 rule 19)
+    id                uuid PRIMARY KEY,
+    company_id        uuid NOT NULL REFERENCES company (id),
+    alias             text NOT NULL,                       -- as first entered, e.g. Thùng
+    normalized_alias  text NOT NULL,                       -- master_data.contract.normalize_unit_text(alias), e.g. thung
+    uom_id            uuid NOT NULL REFERENCES uom (id),   -- a core unit or a unit of the same company (command check)
+    is_active         boolean NOT NULL DEFAULT true,
+    CONSTRAINT uq_uom_alias_normalized UNIQUE (company_id, normalized_alias),
+    CONSTRAINT ck_uom_alias_normalized CHECK (length(normalized_alias) > 0 AND normalized_alias = lower(normalized_alias) AND normalized_alias !~ '\s')
 );
 
 -- ===== Organization [master_data] (ADR-0027 rule 5; moved here from DS-06) =====
@@ -395,20 +411,45 @@ CREATE TABLE product (
     is_active                      boolean NOT NULL DEFAULT true,
     UNIQUE (company_id, code),
     UNIQUE (company_id, id),
+    UNIQUE (company_id, id, inventory_uom_id),             -- product_uom holds the inventory unit through it (ADR-0056 rule 4)
     FOREIGN KEY (company_id, buyer_id) REFERENCES partner (company_id, id),
     CONSTRAINT ck_product_valuation_class CHECK ((product_type = 'stock') = (valuation_class_id IS NOT NULL)),
     CONSTRAINT ck_product_tracking_stock CHECK (tracking = 'none' OR product_type = 'stock'),
     CONSTRAINT ck_product_configurable CHECK (NOT is_configurable OR (is_item_created_on_order AND product_type = 'stock'))
 );
-CREATE TABLE product_uom (                                 -- other units of one product (ADR-0018 rule 10)
-    company_id   uuid NOT NULL,
-    product_id   uuid NOT NULL,
-    uom_id       uuid NOT NULL REFERENCES uom (id),
-    numerator    bigint NOT NULL CONSTRAINT ck_product_uom_numerator CHECK (numerator > 0),       -- 1 uom = numerator/denominator inventory units (ADR-0006 rule 11)
-    denominator  bigint NOT NULL CONSTRAINT ck_product_uom_denominator CHECK (denominator > 0),
-    PRIMARY KEY (product_id, uom_id),
-    FOREIGN KEY (company_id, product_id) REFERENCES product (company_id, id)
+CREATE TABLE product_uom (                                 -- other units of one product, or of one item: the item master's conversions (ADR-0018 rule 10; ADR-0056 rules 4-5, 15)
+    id                    uuid PRIMARY KEY,
+    company_id            uuid NOT NULL,
+    product_id            uuid NOT NULL,
+    item_id               uuid,                            -- set: an item's own unit (a variant or configured item), resolved before the product's
+    uom_id                uuid NOT NULL REFERENCES uom (id),
+    inventory_uom_id      uuid NOT NULL,                   -- the product's inventory unit, held by the key below
+    numerator             bigint NOT NULL CONSTRAINT ck_product_uom_numerator CHECK (numerator > 0),       -- 1 uom = numerator/denominator inventory units (ADR-0006 rule 11)
+    denominator           bigint NOT NULL CONSTRAINT ck_product_uom_denominator CHECK (denominator > 0),
+    factor_source         text NOT NULL DEFAULT 'stated' CONSTRAINT ck_product_uom_factor_source CHECK (factor_source IN ('stated', 'packaging', 'catalog', 'nominal')),
+    is_exact              boolean NOT NULL,                -- computed at creation: numerator x 10^dI divisible by denominator x 10^dE (ADR-0056 rule 7)
+    contains_uom_id       uuid REFERENCES uom (id),        -- packaging: one unit contains contains_quantity of this unit (ADR-0056 rule 15)
+    contains_quantity     types.quantity,
+    is_counting_unit      boolean NOT NULL DEFAULT false,  -- a count may be entered in it
+    is_default_pick_unit  boolean NOT NULL DEFAULT false,  -- proposed on pick lists for a demand line in the inventory unit
+    is_active             boolean NOT NULL DEFAULT true,   -- false: retired, no new uses; a new row for the same unit may replace it (ADR-0056 rule 5)
+    retired_at            timestamptz,
+    recorded_at           timestamptz NOT NULL DEFAULT now(),   -- in force from recorded_at until retired_at (INV-603)
+    CONSTRAINT fk_product_uom_inventory_unit FOREIGN KEY (company_id, product_id, inventory_uom_id) REFERENCES product (company_id, id, inventory_uom_id) ON UPDATE CASCADE,
+    FOREIGN KEY (company_id, item_id) REFERENCES item (company_id, id),
+    CONSTRAINT fk_product_uom_item_product FOREIGN KEY (item_id, product_id) REFERENCES item (id, product_id),
+    CONSTRAINT ck_product_uom_not_inventory CHECK (uom_id <> inventory_uom_id),
+    -- the shape of the packaging hierarchy; its consistency with the factors is a command check (uom_packaging_inconsistent)
+    CONSTRAINT ck_product_uom_packaging CHECK ((contains_uom_id IS NULL) = (contains_quantity IS NULL)
+        AND (contains_quantity IS NULL OR (contains_quantity > 1 AND contains_quantity = trunc(contains_quantity) AND contains_uom_id <> uom_id))
+        AND (factor_source <> 'packaging' OR contains_uom_id IS NOT NULL)),
+    CONSTRAINT ck_product_uom_retired CHECK (is_active = (retired_at IS NULL) AND (is_active OR NOT is_default_pick_unit))
 );
+-- At most one default pick unit per product, or per item for item-level rows (ADR-0056 rule 15).
+CREATE UNIQUE INDEX ux_product_uom_default_pick_unit ON product_uom (company_id, product_id, item_id) NULLS NOT DISTINCT WHERE is_default_pick_unit;
+-- At most one active row per product, item (a null item counting as one value) and unit; retired rows of the unit stay for
+-- history and for the lines that snapshot them, and a replacement row keeps the unit code (ADR-0056 rules 4-5).
+CREATE UNIQUE INDEX ux_product_uom_active_unit ON product_uom (company_id, product_id, item_id, uom_id) NULLS NOT DISTINCT WHERE is_active;
 CREATE TABLE variant_attribute (                          -- ADR-0018 rule 6; variant_mode: ADR-0045 rule 15
     id            uuid PRIMARY KEY,
     company_id    uuid NOT NULL REFERENCES company (id),
@@ -511,12 +552,13 @@ CREATE TABLE item_variant_value (                         -- one per variant-mod
         REFERENCES variant_attribute_value (company_id, variant_attribute_id, variant_mode, id)        -- line options never make items
 );
 CREATE INDEX ix_item_variant_value_value ON item_variant_value (variant_attribute_value_id);
-CREATE TABLE item_barcode (
+CREATE TABLE item_barcode (                              -- one barcode per packaging unit of an item (ADR-0018 rule 14)
+    id          uuid PRIMARY KEY,                      -- a line or trace can name the row (ADR-0006 rule 1; ADR-0056 rule 25)
     company_id  uuid NOT NULL,
     item_id     uuid NOT NULL,
     uom_id      uuid NOT NULL REFERENCES uom (id),
     barcode     text NOT NULL,
-    PRIMARY KEY (company_id, barcode),
+    CONSTRAINT uq_item_barcode_barcode UNIQUE (company_id, barcode),
     FOREIGN KEY (company_id, item_id) REFERENCES item (company_id, id)
 );
 CREATE INDEX ix_item_barcode_item_id ON item_barcode (item_id);

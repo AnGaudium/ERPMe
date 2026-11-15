@@ -71,9 +71,13 @@ Note: the formats of print templates (DS-27) and of statutory reports and books 
 **Translations and terminology**
 
 18. English is the source of every string (D8). The core ships catalogs for its own strings and for the names and meanings of system accounts and transaction keys, in English and Vietnamese (D8), in i18next JSON maintained through Weblate (ADR-0002). A package ships catalogs in the same format for its own strings (report lines, template texts, tax code names) and a terminology catalog that overrides core terms for its companies (e.g. `income_summary` shown as "Xác định kết quả kinh doanh"). Chart templates carry each account's name in English and in the package's languages. Note: the core catalog keeps the UI strings, Vietnamese included (D8), and plain translations of system account and key names; Vietnamese accounting names for system accounts and keys belong to `l10n_vn`'s terminology catalog ([ADR-0053](0053-core-neutrality.md) rule 16).
+
+    Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): unit names: the core catalog holds the plain translations of core unit names (`uom.<code>.name`), the Vietnamese UI included; a package supplies only statutory unit names for its regime, as terminology keys `uom.<code>.name` read from `i18n/<language>/unit_names.csv`, each row with its basis (interim, flagged) (rules 2, 18).
 19. A string is looked up in this order: the package terminology of the company, the core catalog, then English, in the language of the output: the user's language for screens, the document's or partner's language for printed documents and emails (DS-27). The server translates what it renders (PDFs, emails, exports, report lines) from the same catalogs; the client translates screens (DS-30). Data that users enter (names, descriptions) is never translated. Identifiers, error codes and API error messages stay English (ADR-0004; ADR-0008 rule 24). The core catalog keys are generated from the registry ([ADR-0040](0040-ui-architecture.md) rule 15).
 
     Note: for printed documents the order is the render request's language, the document's `print_language`, the partner's language, then the company's ([ADR-0049](0049-statutory-reporting-and-printing.md) rule 27).
+
+    Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): statutory outputs (e-invoice lines, statutory prints) take a unit's package statutory name when present, else the core translation; their length is limited by the regime setting `documents.unit_name_max_length` (rule 18).
 
 **Agents**
 

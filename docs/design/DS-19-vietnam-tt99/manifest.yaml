@@ -37,3 +37,4 @@ components:
   regime_settings: ["settings.yaml", "regimes/{regime}/settings.yaml"]
   numbering: numbering.yaml
   translations: i18n
+  unit_names: i18n/vi/unit_names.csv   # statutory unit names, terminology keys uom.<code>.name (ADR-0056 rule 2)

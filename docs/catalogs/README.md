@@ -14,3 +14,5 @@ Versioned data the core relies on. Each catalog is owned by one design item and 
 | Authorization verb levels | DS-15 | [authorization-verb-levels.csv](authorization-verb-levels.csv), version 0.1.0, one row per glossary verb ([ADR-0054](../adr/0054-users-roles-and-authorizations.md) rule 8) |
 | Role templates | DS-15 | [role-templates.csv](role-templates.csv) and [role-template-levels.csv](role-template-levels.csv), version 0.1.0, interim defaults ([ADR-0054](../adr/0054-users-roles-and-authorizations.md) rule 11) |
 | Segregation rules | DS-15 | [segregation-rules.csv](segregation-rules.csv), version 0.1.0 ([ADR-0054](../adr/0054-users-roles-and-authorizations.md) rule 17) |
+| Units | DS-20 | [units.csv](units.csv), version 0.1.0, core units from UN/ECE Recommendation 20 with kinds and decimal places; packaging units are company units ([ADR-0056](../adr/0056-multiple-units-of-measure.md) rule 2) |
+| Unit conversions | DS-20 | [unit-conversions.csv](unit-conversions.csv), version 0.1.0, direct pairs of core units stored once from the larger unit ([ADR-0056](../adr/0056-multiple-units-of-measure.md) rule 3) |

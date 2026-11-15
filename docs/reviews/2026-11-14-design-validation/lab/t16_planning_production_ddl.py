@@ -123,7 +123,7 @@ for k, code in (("co", "C13-"), ("co2", "C13B-")):
     X("insert into company (id,code,legal_name,company_currency,time_zone,localization_package,accounting_regime,legal_form,valuation_area_level,fiscal_calendar_owner_id,default_language)"
       " values (%s,%s,'Co','VND','Asia/Ho_Chi_Minh','l10n_vn','tt99','joint_stock','warehouse',%s,'vi')", (I[k], code + t, I["user"]))
 for k, code, kind in (("ea", "EA13", "count"), ("kg", "KG13", "mass"), ("hr", "HR13", "time")):
-    X("insert into uom (id, code, quantity_kind, decimal_places) values (%s,%s,%s,2)", (I[k], code + t, kind))
+    X("insert into uom (id, code, name, quantity_kind, decimal_places) values (%s,%s,%s,%s,2)", (I[k], code + t, code, kind))
 for tbl, k in (("item_group", "ig"), ("valuation_class", "vc"), ("item_tax_group", "itg")):
     X(f"insert into {tbl} (id, company_id, code, name, basis) values (%s,%s,'std','Std',%s)", (I[k], I["co"], B_))
 def product(pk, ik, code, ptype="stock", tracking="none", co="co"):
@@ -175,10 +175,10 @@ step("P02 a bill of materials with two components (backflush at operation 10, ma
     ("insert into bill_of_materials (id, company_id, item_id, alternative, name, recorded_at) values (%s,%s,%s,'1','Unit',now())", (I["B"], I["co"], I["iFG"])),
     ("insert into bill_of_materials_revision (id, company_id, bill_of_materials_id, revision, start_date, base_quantity, recorded_at) values (%s,%s,%s,1,'2026-01-01',1,now())",
      (I["R1"], I["co"], I["B"])),
-    ("""insert into bill_of_materials_component (id, company_id, bill_of_materials_revision_id, position, component_item_id, quantity, uom_id, operation_number, consumption_method, recorded_at)
-        values (%s,%s,%s,10,%s,2,%s,10,'backflush_at_operation',now())""", (new(), I["co"], I["R1"], I["iC1"], I["ea"])),
-    ("""insert into bill_of_materials_component (id, company_id, bill_of_materials_revision_id, position, component_item_id, quantity, uom_id, operation_number, consumption_method, recorded_at)
-        values (%s,%s,%s,20,%s,1,%s,10,'manual',now())""", (new(), I["co"], I["R1"], I["iC2"], I["ea"])),
+    ("""insert into bill_of_materials_component (id, company_id, bill_of_materials_revision_id, position, component_item_id, quantity, uom_id, uom_numerator, uom_denominator, uom_factor_source, operation_number, consumption_method, recorded_at)
+        values (%s,%s,%s,10,%s,2,%s,1,1,'identity',10,'backflush_at_operation',now())""", (new(), I["co"], I["R1"], I["iC1"], I["ea"])),
+    ("""insert into bill_of_materials_component (id, company_id, bill_of_materials_revision_id, position, component_item_id, quantity, uom_id, uom_numerator, uom_denominator, uom_factor_source, operation_number, consumption_method, recorded_at)
+        values (%s,%s,%s,20,%s,1,%s,1,1,'identity',10,'manual',now())""", (new(), I["co"], I["R1"], I["iC2"], I["ea"])),
     ("update bill_of_materials_revision set state='released', content_hash=%s, released_at=now() where id=%s", (H("a"), I["R1"])),
     ("insert into bill_of_materials (id, company_id, item_id, usage, alternative, name, recorded_at) values (%s,%s,%s,'kit','1','Kit',now())", (I["BK"], I["co"], I["iK"])),
 ])
@@ -209,8 +209,8 @@ step("P04 a production version, the production setting, low-level codes, routes,
         values (%s,%s,%s,%s,'net_requirements','purchase',5,1,now())""", (new(), I["co"], I["iC1"], I["WP"])),
     ("""insert into item_warehouse_planning (id, company_id, item_id, warehouse_id, planning_method, replenishment_source, transfer_route_id, reorder_point, recorded_at)
         values (%s,%s,%s,%s,'reorder_point','transfer',%s,4,now())""", (new(), I["co"], I["iFG"], I["WD"], I["RQ"])),
-    ("""insert into supplier_item (id, company_id, supplier_partner_id, item_id, supplier_processing_days, transit_days, minimum_order_quantity, order_multiple, is_preferred, start_date, recorded_at)
-        values (%s,%s,%s,%s,5,3,10,5,true,'2026-01-01',now())""", (new(), I["co"], I["S1"], I["iC1"])),
+    ("""insert into supplier_item (id, company_id, supplier_partner_id, item_id, order_uom_id, supplier_processing_days, transit_days, minimum_order_quantity, order_multiple, is_preferred, start_date, recorded_at)
+        values (%s,%s,%s,%s,%s,5,3,10,5,true,'2026-01-01',now())""", (new(), I["co"], I["S1"], I["iC1"], I["ea"])),
     ("insert into supplier_purchasing_term (company_id, supplier_partner_id, minimum_order_amount, currency, recorded_at) values (%s,%s,1000000,'VND',now())", (I["co"], I["S1"])),
     ("insert into planning_setting (company_id, planning_owner_id, planning_horizon_days, conversion_window_days, backtest_weeks, recorded_at) values (%s,%s,180,3,26,now())", (I["co"], I["user"])),
 ])
@@ -228,10 +228,10 @@ step("P05 sales history, a forecast run with lines, a sales demand line and a pu
     ("insert into planning_state (company_id, last_planning_run_id, recorded_at) values (%s,%s,now())", (I["co"], I["PR"])),
 ])
 step("P06 a make-to-order planned production order pegged to the sales line, with components and operations, and a purchase planned order pegged to its component line", [
-    ("""insert into planned_order (id, company_id, item_id, warehouse_id, order_type, need_date, for_demand_supply_line_id, quantity, release_date, production_version_id,
-        planned_start_date, planned_end_date, availability_date, planning_run_id, recorded_at)
-        values (%s,%s,%s,%s,'production','2026-12-15',%s,10,'2026-12-01',%s,'2026-12-01','2026-12-10','2026-12-11',%s,now())""",
-     (I["PO_P"], I["co"], I["iFG"], I["WP"], I["ds_so"], I["PV"], I["PR"])),
+    ("""insert into planned_order (id, company_id, item_id, warehouse_id, order_type, need_date, for_demand_supply_line_id, quantity, order_quantity, order_uom_id, uom_numerator, uom_denominator,
+        uom_factor_source, release_date, production_version_id, planned_start_date, planned_end_date, availability_date, planning_run_id, recorded_at)
+        values (%s,%s,%s,%s,'production','2026-12-15',%s,10,10,%s,1,1,'identity','2026-12-01',%s,'2026-12-01','2026-12-10','2026-12-11',%s,now())""",
+     (I["PO_P"], I["co"], I["iFG"], I["WP"], I["ds_so"], I["ea"], I["PV"], I["PR"])),
     ("insert into planned_order_component (id, company_id, planned_order_id, line_number, component_item_id, warehouse_id, quantity, requested_date, operation_number, recorded_at) values (%s,%s,%s,1,%s,%s,20,'2026-12-01',10,now())",
      (I["poc1"], I["co"], I["PO_P"], I["iC1"], I["WP"])),
     ("insert into planned_order_component (id, company_id, planned_order_id, line_number, component_item_id, warehouse_id, quantity, requested_date, operation_number, recorded_at) values (%s,%s,%s,2,%s,%s,10,'2026-12-01',10,now())",
@@ -242,8 +242,9 @@ step("P06 a make-to-order planned production order pegged to the sales line, wit
      (I["co"], I["PO_P"])),
     ("insert into planned_order_pegging (id, company_id, planned_order_id, pegging_target_kind, demand_supply_line_id, quantity, recorded_at) values (%s,%s,%s,'demand_line',%s,10,now())",
      (new(), I["co"], I["PO_P"], I["ds_so"])),
-    ("""insert into planned_order (id, company_id, item_id, warehouse_id, order_type, supplier_partner_id, need_date, quantity, rounding_excess_quantity, release_date, planning_run_id, recorded_at)
-        values (%s,%s,%s,%s,'purchase',%s,'2026-11-30',25,0,'2026-11-18',%s,now())""", (I["PO_C1"], I["co"], I["iC1"], I["WP"], I["S1"], I["PR"])),
+    ("""insert into planned_order (id, company_id, item_id, warehouse_id, order_type, supplier_partner_id, need_date, quantity, order_quantity, order_uom_id, uom_numerator, uom_denominator,
+        uom_factor_source, rounding_excess_quantity, release_date, planning_run_id, recorded_at)
+        values (%s,%s,%s,%s,'purchase',%s,'2026-11-30',25,25,%s,1,1,'identity',0,'2026-11-18',%s,now())""", (I["PO_C1"], I["co"], I["iC1"], I["WP"], I["S1"], I["ea"], I["PR"])),
     ("insert into planned_order_pegging (id, company_id, planned_order_id, pegging_target_kind, target_planned_order_id, planned_order_component_id, quantity, recorded_at) values (%s,%s,%s,'planned_order',%s,%s,20,now())",
      (new(), I["co"], I["PO_C1"], I["PO_P"], I["poc1"])),
     ("insert into planned_order_pegging (id, company_id, planned_order_id, pegging_target_kind, quantity, recorded_at) values (%s,%s,%s,'lot_size_excess',5,now())", (new(), I["co"], I["PO_C1"])),
@@ -254,8 +255,8 @@ step("P06 a make-to-order planned production order pegged to the sales line, wit
 ])
 step("P07 the purchase planned order converts: replenishment request line with origin_planned_order_id", [
     ("insert into replenishment_request (id, company_id, requested_by_user_id, recorded_at) values (%s,%s,%s,now())", (I["RQ"], I["co"], I["user"])),
-    ("""insert into replenishment_request_line (company_id, replenishment_request_id, line_number, origin_planned_order_id, item_id, warehouse_id, order_type, supplier_partner_id, quantity, need_date, release_date, recorded_at)
-        values (%s,%s,1,%s,%s,%s,'purchase',%s,25,'2026-11-30','2026-11-18',now())""", (I["co"], I["RQ"], I["PO_C1"], I["iC1"], I["WP"], I["S1"])),
+    ("""insert into replenishment_request_line (company_id, replenishment_request_id, line_number, origin_planned_order_id, item_id, warehouse_id, order_type, supplier_partner_id, quantity, uom_id, uom_numerator, uom_denominator, uom_factor_source, inventory_quantity, need_date, release_date, recorded_at)
+        values (%s,%s,1,%s,%s,%s,'purchase',%s,25,%s,1,1,'identity',25,'2026-11-30','2026-11-18',now())""", (I["co"], I["RQ"], I["PO_C1"], I["iC1"], I["WP"], I["S1"], I["ea"])),
     ("update planned_order set state='converted' where id=%s", (I["PO_C1"],)),
 ])
 step("P08 the production planned order converts into a draft production order with components, outputs, operations and demand and supply lines", [
@@ -299,26 +300,26 @@ def posting_doc(dk, mk, lk, dtype):
 step("P10 a production issue of the manual lot-tracked component, carrying the order's cost object", posting_doc("doc_i", "md_i", "mdl_i", "production_issue") + [
     ("insert into lot (id, company_id, item_id, code) values (%s,%s,%s,'LOT-1')", (I["LOT1"], I["co"], I["iC2"])),
     ("insert into production_issue (id, company_id, production_order_id, posting_date, recorded_at) values (%s,%s,%s,'2026-12-01',now())", (I["doc_i"], I["co"], I["doc"])),
-    ("""insert into production_issue_line (id, company_id, production_issue_id, production_order_id, line_number, production_order_component_id, item_id, warehouse_id, quantity, lot_id, bin_id,
-        output_serial_number_id, cost_object_id, material_document_line_id, recorded_at) values (%s,%s,%s,%s,1,%s,%s,%s,10,%s,%s,%s,%s,%s,now())""",
-     (new(), I["co"], I["doc_i"], I["doc"], I["L2"], I["iC2"], I["WP"], I["LOT1"], I["SB"], I["SER1"], I["CO"], I["mdl_i"])),
+    ("""insert into production_issue_line (id, company_id, production_issue_id, production_order_id, line_number, production_order_component_id, item_id, warehouse_id, quantity, uom_id, uom_numerator, uom_denominator, uom_factor_source, inventory_quantity, lot_id, bin_id,
+        output_serial_number_id, cost_object_id, material_document_line_id, recorded_at) values (%s,%s,%s,%s,1,%s,%s,%s,10,%s,1,1,'identity',10,%s,%s,%s,%s,%s,now())""",
+     (new(), I["co"], I["doc_i"], I["doc"], I["L2"], I["iC2"], I["WP"], I["ea"], I["LOT1"], I["SB"], I["SER1"], I["CO"], I["mdl_i"])),
     ("update production_order set execution_state='in_progress' where id=%s", (I["doc"],)),
 ])
 step("P11 a confirmation of internal operation 10 with actual activities, and its backflush line in operation_progress_component", posting_doc("doc_c", "md_c", "mdl_c", "operation_confirmation") + [
     ("""insert into operation_confirmation (id, company_id, production_order_id, production_order_operation_id, yield_quantity, scrap_quantity, is_final, employee_partner_id, posting_date, recorded_at)
         values (%s,%s,%s,%s,10,0,true,%s,'2026-12-02',now())""", (I["doc_c"], I["co"], I["doc"], I["OP10"], I["E1"])),
     ("insert into operation_confirmation_activity (company_id, operation_confirmation_id, activity_type_id, quantity, recorded_at) values (%s,%s,%s,5,now())", (I["co"], I["doc_c"], I["machine"])),
-    ("""insert into operation_progress_component (id, company_id, production_order_id, operation_confirmation_id, production_order_component_id, item_id, warehouse_id, quantity, bin_id, cost_object_id,
-        material_document_line_id, recorded_at) values (%s,%s,%s,%s,%s,%s,%s,20,%s,%s,%s,now())""",
-     (new(), I["co"], I["doc"], I["doc_c"], I["L1"], I["iC1"], I["WP"], I["SB"], I["CO"], I["mdl_c"])),
+    ("""insert into operation_progress_component (id, company_id, production_order_id, operation_confirmation_id, production_order_component_id, item_id, warehouse_id, quantity, uom_id, uom_numerator, uom_denominator, uom_factor_source, inventory_quantity, bin_id, cost_object_id,
+        material_document_line_id, recorded_at) values (%s,%s,%s,%s,%s,%s,%s,20,%s,1,1,'identity',20,%s,%s,%s,now())""",
+     (new(), I["co"], I["doc"], I["doc_c"], I["L1"], I["iC1"], I["WP"], I["ea"], I["SB"], I["CO"], I["mdl_c"])),
 ])
 step("P12 a production receipt of the main output (serial S-1) into the output bin", posting_doc("doc_r", "md_r", "mdl_r", "production_receipt") if False else [
     ("insert into document (id, company_id, document_type, state) values (%s,%s,'production_receipt','posted')", (I["doc_r"], I["co"])),
     ("insert into production_receipt (id, company_id, production_order_id, posting_date, operation_confirmation_id, recorded_at) values (%s,%s,%s,'2026-12-10',%s,now())",
      (I["doc_r"], I["co"], I["doc"], I["doc_c"])),
-    ("""insert into production_receipt_line (id, company_id, production_receipt_id, production_order_id, line_number, production_order_output_id, item_id, warehouse_id, quantity, serial_number_id, bin_id,
-        movement_type, cost_object_id, recorded_at) values (%s,%s,%s,%s,1,%s,%s,%s,1,%s,%s,'production_receipt',%s,now())""",
-     (new(), I["co"], I["doc_r"], I["doc"], I["OUT"], I["iFG"], I["WP"], I["SER1"], I["OB"], I["CO"])),
+    ("""insert into production_receipt_line (id, company_id, production_receipt_id, production_order_id, line_number, production_order_output_id, item_id, warehouse_id, quantity, uom_id, uom_numerator, uom_denominator, uom_factor_source, inventory_quantity, serial_number_id, bin_id,
+        movement_type, cost_object_id, recorded_at) values (%s,%s,%s,%s,1,%s,%s,%s,1,%s,1,1,'identity',1,%s,%s,'production_receipt',%s,now())""",
+     (new(), I["co"], I["doc_r"], I["doc"], I["OUT"], I["iFG"], I["WP"], I["ea"], I["SER1"], I["OB"], I["CO"])),
 ])
 step("P13 a cost estimate with a costing lot quantity and lines is released; rates, a pool allocation rule and normal capacity are set", [
     ("insert into posting_period (id, company_id, start_date, end_date) values (%s,%s,'2026-12-01','2026-12-31')", (I["per"], I["co"])),
@@ -346,8 +347,22 @@ n_ds = X("select count(*) from demand_supply_line where company_id=%s and origin
 check("P15 both planned orders are converted, and the order's output supply line keeps origin_planned_order_id (INV-62)", n_po == 2 and n_ds == 1, (n_po, n_ds))
 
 # ======================================================================= N: the main checks reject bad rows
+def uom_fixture(table, v):
+    """Lab fixture: the identity snapshot in the inventory unit EA unless the scenario gives one (ADR-0056 rules 9, 14)."""
+    ident = dict(uom_numerator=1, uom_denominator=1, uom_factor_source="identity")
+    if table == "supplier_item":
+        v.setdefault("order_uom_id", I["ea"])
+    elif table == "planned_order":
+        v.setdefault("order_quantity", v.get("quantity")); v.setdefault("order_uom_id", I["ea"])
+        for k_, x_ in ident.items(): v.setdefault(k_, x_)
+    elif table in ("bill_of_materials_component", "bill_of_materials_output"):
+        for k_, x_ in ident.items(): v.setdefault(k_, x_)
+    elif table in ("production_issue_line", "production_receipt_line", "operation_progress_component"):
+        v.setdefault("uom_id", I["ea"]); v.setdefault("inventory_quantity", v.get("quantity"))
+        for k_, x_ in ident.items(): v.setdefault(k_, x_)
 def ins(table, **v):
     v.setdefault("company_id", I["co"]); v.setdefault("recorded_at", "2026-11-16T00:00:00Z")
+    uom_fixture(table, v)
     return (f"insert into {table} ({', '.join(v)}) values ({', '.join(['%s'] * len(v))})", list(v.values()))
 def bad(name, match, *stmts):
     def fn(cx):
@@ -490,6 +505,10 @@ bad("N52 a scrap reason needs scrap", "ck_operation_confirmation_scrap_reason",
 bad("N53 a generated progress line has exactly one calling document", "ck_operation_progress_component_caller",
     ins("operation_progress_component", id=new(), production_order_id=I["doc"], operation_confirmation_id=I["doc_c"], production_receipt_id=I["doc_r"], production_order_component_id=I["L1"],
         item_id=I["iC1"], warehouse_id=I["WP"], quantity=1, bin_id=I["SB"], cost_object_id=I["CO"], material_document_line_id=I["mdl_c"]))
+bad("N53b a generated progress line is in the inventory unit (identity; ADR-0056 rule 9)", "ck_operation_progress_component_uom_identity",
+    ins("operation_progress_component", id=new(), production_order_id=I["doc"], operation_confirmation_id=I["doc_c"], production_order_component_id=I["L1"],
+        item_id=I["iC1"], warehouse_id=I["WP"], quantity=1, uom_id=I["ea"], uom_numerator=2, uom_denominator=1, uom_factor_source="product",
+        inventory_quantity=2, bin_id=I["SB"], cost_object_id=I["CO"], material_document_line_id=I["mdl_c"]))
 rline = lambda **o: ins("production_receipt_line", id=new(), production_receipt_id=I["doc_r"], production_order_id=I["doc"], line_number=o.pop("ln", 9),
                         production_order_output_id=I["OUT"], item_id=o.pop("item", I["iFG"]), warehouse_id=I["WP"], quantity=1, bin_id=o.pop("bin", I["OB"]),
                         movement_type=o.pop("mt", "production_receipt"), cost_object_id=I["CO"], **o)

@@ -126,7 +126,7 @@ X("insert into user_account (id, login, display_name, language, password_hash, c
 for k, code in (("co", "C14-"), ("co2", "C14B-")):
     X("insert into company (id,code,legal_name,company_currency,time_zone,localization_package,accounting_regime,valuation_area_level,fiscal_calendar_owner_id,default_language)"
       " values (%s,%s,'Co','VND','Asia/Ho_Chi_Minh','l10n_vn','tt99','warehouse',%s,'vi')", (I[k], code + t, I["user"]))
-X("insert into uom (id, code, quantity_kind, decimal_places) values (%s,%s,'count',0)", (I["ea"], "EA14" + t))
+X("insert into uom (id, code, name, quantity_kind, decimal_places) values (%s,%s,'Each','count',0)", (I["ea"], "EA14" + t))
 for co in ("co", "co2"):
     X("insert into item_group (id, company_id, code, name, basis) values (%s,%s,'g','G',%s)", (I["ig"] if co == "co" else new(), I[co], B))
 X("insert into valuation_class (id, company_id, code, name, basis) values (%s,%s,'v','V',%s)", (I["vc"], I["co"], B))
@@ -168,7 +168,12 @@ X("""insert into movement_type (id, code, name, direction, value_source, costing
             (%s,%s,'Sales issue','out','preliminary_price','revalued_issue','cost_of_goods_sold',true,'601','0.1.0')""",
   (I["mt_pr"], "purchase_receipt" + t, I["mt_si"], "sales_issue" + t))
 
+SNAPSHOT_TABLES = {"quotation_line", "sales_order_line", "purchase_request_line", "purchase_order_line", "goods_receipt_line", "return_to_supplier_line",
+                   "delivery_line", "return_from_customer_line", "service_receipt_line", "sales_invoice_line", "sales_return_line", "purchase_invoice_line",
+                   "credit_note_line", "purchase_return_line", "purchase_credit_note_line"}
 def ins(cx, table, **v):
+    if table in SNAPSHOT_TABLES and v.get("uom_id") is not None and "uom_numerator" not in v:
+        v.update(uom_numerator=1, uom_denominator=1, uom_factor_source="identity")   # lab fixture: lines in the inventory unit EA (ADR-0056 rule 9)
     cx.execute(f"insert into {table} ({', '.join(v)}) values ({', '.join(['%s'] * len(v))})", list(v.values()))
     return v.get("id")
 def doc(cx, dtype, state="posted", partner=None, date="2026-11-10", co="co", correction_of=None):

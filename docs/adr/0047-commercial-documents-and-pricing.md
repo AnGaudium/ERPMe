@@ -50,6 +50,8 @@ The commercial documents are a thin layer over the core (B3). They hold what was
    | Type | Module | Posting | Change orders | E-invoice capable | Approval hold allowed | Reversible | `is_item_creating` | Demand and supply |
    | --- | --- | --- | --- | --- | --- | --- | --- | --- |
    | `service_receipt` | `purchasing` | yes | no | no | no | while no invoice refers to it (rule 13) | no | — |
+
+   Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): document type `gr_ir_rounding_clearing`: `purchasing`, posting, no change orders, not e-invoice capable, no approval hold, reversed only as a consequence (never by `Reverse`), not item-creating, no demand or supply. Its `Post` is `is_internal_only` and `is_consequence_posting`; its authorization leaf is under purchasing at level `full`, in no template's expansion. It has its own `document` row and no header or line table: its `purchase_order_line_gr_ir_posting` row of kind `rounding_clearing` carries the line, positions and amount (rule 10).
 2. Lines, references and copying:
    - **Quantities.** Lines store the entered quantity and unit and the inventory quantity (ADR-0018 rule 11). GR/IR positions, correction limits and progress use inventory quantities.
    - **Line references** use the typed keys of ADR-0028 rule 2: `quotation_line_id`, `sales_order_line_id`, `delivery_line_id`, `return_from_customer_line_id`, `purchase_request_line_id`, `purchase_order_line_id`, `goods_receipt_line_id`, `return_to_supplier_line_id`, and `correction_of_line_id` on correction lines.
@@ -65,6 +67,8 @@ The commercial documents are a thin layer over the core (B3). They hold what was
    Note: copying carries taint. On `Create<Type>` with `source_lines`, and on every `Update` that adds source lines, the new version's `is_tainted` is the OR of the effective taint, at that moment, of every source line's document version; `derived_from_version_id` names the first source document's version, and INV-88 reads the others through the lines' typed references ([ADR-0029](0029-proposals-and-agent-safety.md) rule 8). `inventory`'s stock documents and `production`'s orders created from source lines set it the same way ([ADR-0023](0023-warehouse-management.md) rule 16).
 
    Note: `service_receipt_line_id` joins the typed line references, for purchase invoice service lines that clear GR/IR against a service receipt (rule 12; [ADR-0037](0037-subcontracting.md) rule 6).
+
+   Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): receipts, deliveries, invoices, returns and credits may use any allowed unit of the item; every quantity relation compares inventory quantities. `source_lines` quantities are in the source line's unit, and a copied line takes the source line's unit and snapshot, so a part in the source's unit converts by the cumulative rule (rules 10, 11).
 
 **Sales**
 
@@ -99,6 +103,8 @@ The commercial documents are a thin layer over the core (B3). They hold what was
    - **The money.** `sales_return` is the posting correction of ADR-0009 rule 23. `correction_of_id` is the sales invoice, and lines refer to the `return_from_customer` lines they credit. It posts `revenue_deduction_return` and output tax at the original line's price and tax data (ADR-0041 rule 8), and creates a `credit` item, which it may match to the invoice (ADR-0026 rule 9).
    - **When it is due.** A `sales` consumer of the stock return's posted event compares, per order line, invoiced net with delivered net. When invoiced net is the larger, it raises a work item `sales_return_due` for the difference (rule 20). The `sales_return` closes it.
    - **Goods returned before invoicing** need no `sales_return`: they reduce what remains to invoice.
+
+   Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): a sales return line that names a return-from-customer line in the same unit and for the same entered quantity takes that line's inventory quantity, so invoiced net and delivered net move together and `sales_return_due` closes exactly (rule 10).
 8. `credit_note` and `debit_note` (sales):
    - **Reasons and accounts:**
      - `allowance` → `revenue_deduction_allowance`;
@@ -110,6 +116,8 @@ The commercial documents are a thin layer over the core (B3). They hold what was
    - **Original data.** `correction_of_id` is the sales invoice. Lines take the original line's net unit price after the document discount, its taxes, tax date and rate (ADR-0041 rule 8). A quantity credit is `round_amount(quantity × original net unit price after the document discount)`.
    - **Open items.** A credit note creates a `credit` item and may match it to the invoice in the same command (ADR-0026 rule 9).
    - **Invoices from before the cut-over.** A credit note or sales return may name an original that exists only in the old system: `correction_of_id` is empty, and `external_original` holds its number, date, net amounts, tax date and rates. This is allowed only for originals dated before the company's migration cut-over ([ADR-0044](0044-data-migration-and-export.md) rule 13). Rule 20's limits then apply against the entered amounts. Returns of goods delivered before the cut-over come in as `other_receipt` with a reason, since no delivery line exists (flagged). The same applies to supplier documents.
+
+   Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): a credit or return line in another unit than its original converts the original's price per inventory unit by its own factor, `round_unit_price(p × d_o / n_o × n / d)`; a credit that completes the invoiced inventory quantity takes exactly the rest of the net amount. The same holds for purchase returns and supplier credits (rule 11).
 
 **Purchasing**
 
@@ -137,6 +145,8 @@ The commercial documents are a thin layer over the core (B3). They hold what was
     - **Value.** Movement `purchase_receipt` at the GR/IR value of rule 13. The receipt credits GR/IR with `purchase_order_line_id` (ADR-0030 rule 3).
 
     Note: returns of closed orders. A `return_to_supplier` is accepted against receipt lines of a closed order, within rule 20's limits. It does not reopen the order: a closed line takes no replacement receipt (rule 13's replacement receipt needs an open line), so a replacement is a new order. The GR/IR balance it leaves is cleared as rule 13 says for lines closed short, and rule 15's `supplier_credit_due` still applies.
+
+    Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): the tolerance applies to the ordered quantity: received net inventory quantity ≤ the order line's inventory quantity × (1 + tolerance), so partial receipts do not each earn it again (rule 11).
 12. `purchase_invoice`:
     - **Header:** supplier, `partner_reference` (the supplier's invoice number; required), `supplier_invoice_date` (the tax date, ADR-0041 rule 7), posting date (DS-19's default), currency and invoice rate (ADR-0011 rule 12), payment term.
     - **Duplicates.** Where the regime declares a natural key for supplier invoices (ADR-0030 rule 10; Vietnam: seller tax ID, form, symbol, number), it applies. Otherwise the fallback key is supplier, `partner_reference` and the year of the supplier's date (flagged). Documents that are canceled or reversed do not count. A second arrival is rejected with `duplicate_external_document`.
@@ -167,6 +177,8 @@ The commercial documents are a thin layer over the core (B3). They hold what was
     - **Ownership.** The layer table, each receipt line's position range, and the interfaces `inventory.contract.set_order_line_gr_ir_price` and `inventory.contract.post_gr_ir_positions` (side, quantity, sign; returning the amount) are `inventory`'s. `purchasing` calls them downward, under the order's document lock (ADR-0027 rule 10, class 1). They belong to the step 3 design (DS-09) and stay empty until step 5 (B3).
     - **Foreign currency.** INV-37 holds in the order's currency. The company-currency residual from different receipt and invoice rates stays with the existing FX open question (ADR-0030 rule 4). Interim, flagged: the posting that makes `R = I` clears the line's company-currency residual to realized exchange difference (`fx_gain_realized`, `fx_loss_realized`).
     - **Lines closed short with `R ≠ I`.** Closing stops receipts, not invoices. A balance left on a closed line is listed by a close checklist task (DS-12) and cleared through the positions, so INV-92 keeps holding: `I > R` by a supplier quantity credit (rule 15); `R > I`, when the supplier will never invoice, by a `gr_ir_write_off` (`purchasing`, internal posting, `human_only`). That document moves `I` up to `R` at the positions' value, debiting GR/IR, and credits the regime's price difference (flagged for the author).
+
+    Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): positions count inventory quantities. An invoice's source is always the order line; a receipt or invoice entered in the order line's unit takes its inventory quantity by the cumulative rule; a return or credit takes the part it names as its source, and a purchase return naming a return-to-supplier line in the same unit and entered quantity takes that line's inventory quantity, so R and I move together. When the line is fulfilled within the unit rounding tolerance and R and I still differ, the consequence posting `gr_ir_rounding_clearing` posts on the lagging side at the positions' value, against `price_difference`, with no human step. It also runs on a closed line whose R and I differ by no more than the tolerance. Its positions count in R or I for GR/IR, so INV-92 holds with them; it is the posting that makes R = I for the interim company-currency rule above, and reversing it reverses that entry; it never counts as latest in the latest-only check; and every later GR/IR posting on the line, a `gr_ir_write_off` included, first reverses it as a consequence, after which it fires again if the line is within tolerance. A larger difference stays on the closed-short path (rule 10).
 14. Three-way match:
     - **For each goods line**, computed at the invoice's `Submit` and `Post`:
       - quantity: invoiced net may not exceed the ordered quantity times `1 + purchasing.match.quantity_tolerance_percent / 100`; when `purchasing.match.require_receipt` is true, it may not exceed received net either. Otherwise check result `match_quantity_exceeded`;
@@ -175,10 +187,14 @@ The commercial documents are a thin layer over the core (B3). They hold what was
     - **Policy.** A difference sets the new condition `is_match_exceeded` (ADR-0043 rule 3 gets a note), which is part of the invoice's `policy_input` and so of `policy_input_hash`. The seeded rule requires `standard` approval for both `submit` and `post` of a purchase invoice, for every actor kind, when it is true. A mismatched invoice therefore cannot pass by submitting first.
 
     Note: the order price of the price check is the GR/IR value per unit of the positions the invoice reaches, `(V(I + q) − V(I)) / q`, exact, for an invoice of `q` inventory units at the line's layers (rule 13). It is compared with the invoice line's net amount after the document discount per inventory unit. With one order price this is rule 10's GR/IR price; after a change order it is the price of the very positions the invoice debits, so the tolerance check and the posted price difference agree.
+
+    Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): the price check is per inventory unit, as the note says, whatever unit the invoice line is in; `purchasing.match.price_tolerance_amount` is an amount per inventory unit, in the document currency (rule 12).
 15. Purchase returns:
     - **The goods.** `return_to_supplier` (inventory; `correction_of_id`: the goods receipt) issues them with movement `purchase_return`, debiting GR/IR by rule 13. `inventory` checks returned ≤ received per receipt line.
     - **The money.** `purchase_return` records the supplier's adjustment for returned goods: `correction_of_id` is the purchase invoice, and lines refer to `return_to_supplier` lines. It credits GR/IR by rule 13 as a quantity credit. A `purchasing` consumer raises a work item `supplier_credit_due` when a stock return leaves invoiced net above received net on an order line.
     - **Other supplier credits.** `purchase_credit_note` (`correction_of_id`: the purchase invoice) records the supplier's credit for anything but returned goods. Its quantity lines (goods invoiced but never delivered, or an invoicing error) are quantity credits on `I` by rule 13, within the invoice line's invoiced net (rule 20). Its price lines are price-only. `purchase_debit_note` records the supplier's increase, price-only.
+
+    Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): purchase return and supplier credit note lines carry the line unit block, credit note lines also `item_id`. A purchase return line that names a return-to-supplier line in the same unit and for the same entered quantity takes that line's inventory quantity, so the stock return and the supplier's credit move R and I by the same amount (rules 9, 10).
 
 **Pricing**
 
@@ -204,6 +220,8 @@ The commercial documents are a thin layer over the core (B3). They hold what was
     - **Choice.** At most one promotion per line: the eligible one with the highest priority, then the lowest code. Promotions over a whole order are later (open question).
     - **Free goods** are a generated line: price 0, `is_free_of_charge`, the promotion, and the line it came from. The document discount skips them.
     - **Delivery of free goods.** The flag is copied to the delivery line (a column reserved in the step 3 design). Such lines post movement `free_goods_issue` (new catalog row: out, preliminary price, offset key `free_goods_cost`). The new key `free_goods_cost` has regime alternatives `cost_of_goods_sold` and `selling_expense`, and Vietnam seeds `cost_of_goods_sold`, `unverified`. Their tax treatment is the package's rule, `unverified` (open question).
+
+    Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): `minimum_line_quantity`, `qualifying_quantity` and `free_quantity` are inventory-unit quantities; `amount_per_unit` is per inventory unit times the line's factor, rounded once (rule 16).
 18. Credit:
     - **Exposure.** `sales.contract.get_credit_exposure(partner)` composes ADR-0030 rule 6's four parts per currency. It converts them to the limit's currency at rate type `transaction` on the check date (ADR-0011 rule 11; flagged). The query `GetCreditExposure` exposes it to people and agents.
     - **At Submit.** The sales order's `Submit` locks as ADR-0030 rule 7 says: classes 1–8, then the partner row (class 9). It reads the exposure with the order included, and passes `is_credit_exceeded` to the policy hook.
@@ -241,6 +259,8 @@ The commercial documents are a thin layer over the core (B3). They hold what was
     Violations are rejected with `correction_exceeds_original`. Documents in `issuing` count.
     - **EC-20, interim and flagged:** when a return makes invoiced net exceed delivered net on an order line, a `sales_return` for the difference is due (rule 7). Returned goods that were never invoiced simply reduce what remains to invoice. The author confirms this outcome.
 
+    Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): every limit compares inventory quantities and allows the unit rounding tolerance of the source line. It grows by one smallest inventory step per part posted in another unit whose conversion rounded, and by the change each return, credit, reversal or clamped part made to the deviation `P − round(C × f)`; it never shrinks, and with an exact snapshot it stays zero, so every limit is exact (rule 10).
+
 **Posting summary and policy**
 
 21. Postings, by transaction key (ADR-0015):
@@ -266,6 +286,8 @@ The commercial documents are a thin layer over the core (B3). They hold what was
     | Release at order close (invoice-first) | `purchase_cost_clearing` | `price_difference` (ADR-0030 rule 4) |
 
     Note (TT99 example, flow review 2026-11-15; accounts `unverified`, DS-19): a goods line with a price difference. A purchase order line of 100 kg of a raw material at 10,000 VND/kg; the goods receipt of 100 kg posts Dr 152 (`inventory_posting`) 1,000,000 / Cr 33881 (`gr_ir_clearing`) 1,000,000. The supplier invoices 100 kg at 10,500 VND/kg with VAT 10%. GR/IR is debited `round(V(100)) − round(V(0))` = 1,000,000 (rule 13), so the price difference is 50,000. TT99 sends `price_difference` for `raw_material` to 152, an inventory account, so the invoice posts the difference to 33882 (`purchase_cost_clearing`) instead ([ADR-0021](0021-landed-cost.md) rule 12): Dr 33881 1,000,000, Dr 33882 50,000, Dr 1331 (`input_tax`) 105,000 / Cr 331 (`payable_reconciliation`) 1,155,000. In the same transaction `inventory.contract.adjust_receipt_value` writes a `landed_cost` with `cost_type` `price_difference`, `posted`, targeting the receipt line ([ADR-0030](0030-commercial-seams-and-imports.md) rule 1): with the receipt's period open, Dr 152 50,000 / Cr 33882 50,000, so the receipt is valued at 1,050,000 and 33882 is back to zero. If the receipt's period is closed, the same 50,000 leaves 33882 split between the stock still on hand (152) and the consumers that took the goods (method `consumer_split`, ADR-0021 rules 6–7). A regime that sends `price_difference` to an expense account (the TT99 alternative 6324) posts the 50,000 there on the invoice, with no landed cost.
+
+    Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): `gr_ir_rounding_clearing` posts GR/IR against `price_difference` at the positions' value, as a consequence posting (rule 10).
 22. Policy input of each type ([ADR-0043](0043-policy-and-approval.md) rule 4):
     - **Amount:** document total in company currency at the applied rate.
     - **`discount_percent`:** (Σ quantity × list price − net amount after the document discount) ÷ Σ quantity × list price. Lines without a list price count at their base price; free goods count at their list price.

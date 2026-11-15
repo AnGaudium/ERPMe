@@ -88,10 +88,14 @@ Agents read the structures through deterministic queries. They draft revisions f
      - Requirements are computed as exact rationals and rounded once per order line, up (away from zero), to the component's inventory unit. `round_quantity` gains an optional mode argument taking ADR-0006 rule 17's modes. Rounding half away from zero (ADR-0018 rule 11) would under-issue.
 
    Components of a product-level bill of materials carry a `selection_condition` and `fixed` or `linear` sizing over item-defining characteristics, applied before the requirement formula ([ADR-0046](0046-product-configuration.md) rules 12–13).
+
+   Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): the component's factor is a snapshot (`uom_numerator`, `uom_denominator`, `uom_factor_source`) without a default; "the quantity in the component's inventory unit" is the exact rational `quantity × uom_numerator / uom_denominator`, not a stored column. An optional `issue_multiple`, in the line's unit, rounds each order-line requirement up to whole multiples before the inventory unit's decimals. Q = G / (1 − assembly scrap) is stored rounded up to the main output's inventory unit, and requirements are computed from the stored Q. `quantity_per_value` stays `types.quantity`; a finer rate uses a smaller unit (rules 8, 17).
 7. `bill_of_materials_output` rows of a revision list outputs besides the main one:
    - **Fields.** `output_item_id`, `quantity` per base quantity with its unit, `output_type` (`co_product` or `by_product`) and `cost_coefficient` (co-products).
    - **Coefficients are data only.** `cost_coefficient` and `main_output_cost_coefficient` hold equivalence coefficients. Whether the coefficient method applies, and how by-products are valued, are the author's through DS-53. VAS 02 para 09 values by-products at net realisable value (unverified, ADR-0016).
    - **What is rejected.** An item may not be both a component and an output of one revision (`item_both_component_and_output`; rework orders are the exception, [ADR-0034](0034-production-orders-and-shop-floor.md) rule 2); recycling loops are not modeled in Phase 1. A phantom's bill of materials may not have outputs (`phantom_with_outputs`). This is checked when `is_phantom` is set (rule 14), and at release and production version save for an item that is a phantom in the version's warehouse.
+
+   Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): outputs carry the same snapshot as components, without a default factor; planned co-product and by-product quantities round half up, each in its own inventory unit (rules 8, 17).
 8. Releasing a revision checks, deterministically:
    - **Items.** Components and outputs are active items of `stock` products, distinct from the main output.
    - **Units and quantities.** Units are convertible; quantities and the base quantity are positive; scrap percentages are in [0, 100).

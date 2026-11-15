@@ -220,6 +220,8 @@ Tax codes, dated rates and a dated tax matrix are package rules, read live. The 
     Note: this content is `l10n_vn`'s, owned by ADR-0039 ([ADR-0053](0053-core-neutrality.md) rule 13).
 22. Not in Phase 1 unless the author decides otherwise (open question): the direct VAT method, foreign contractor tax withholding, personal income tax withholding, and capitalizing non-deductible VAT into stock or assets (`input_tax_non_deductible` requires an expense).
 
+    Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): also after Phase 1: taxes computed per physical quantity (per litre, per kg) and the statistical unit of customs declarations. They will convert through `master_data.contract.convert_quantity` to the unit the package names, and stay package rules (rule 23).
+
 ## Context
 
 DS-23 is needed by step 2 (data model) and step 7 (logic and returns). The Vietnamese texts changed in 2025–2026:

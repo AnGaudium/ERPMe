@@ -207,6 +207,8 @@ Every amended ADR gets a note at the end of the amended rule, citing a rule of t
     - **`l10n_vn`'s terminology catalog:** Vietnamese accounting names for system accounts and keys (e.g. `income_summary` as "Xác định kết quả kinh doanh").
     - **Notes** on ADR-0016 rule 18 and ADR-0040 rules 15 and 19.
 
+    Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): for units: the core catalog's plain translations of core unit names, and the package's statutory unit names as terminology keys with their bases (rules 2, 18).
+
 **Follow-ups**
 
 17. Open questions:

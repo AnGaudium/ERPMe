@@ -112,6 +112,8 @@ A small shop and a managed distribution warehouse run on the same model.
    - **Returns.** A returned unit is received as a new unit.
    - **Packing.** `PackHandlingUnit` and `UnpackHandlingUnit` are warehouse movements.
 
+   Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): handling unit types stay physical containers, unrelated to product units in Phase 1; a quantity per handling unit type and packaging dimensions come after Phase 1 (rule 15).
+
 **Movements**
 
 7. Inventory-level movements are material documents (ADR-0020), with `bin_id`, `stock_status` and `handling_unit_id` filled in on their lines where managed. Per movement type (the production types: [ADR-0034](0034-production-orders-and-shop-floor.md) rules 11 and 13):
@@ -210,6 +212,8 @@ A small shop and a managed distribution warehouse run on the same model.
     - **No stock.** When no eligible stock exists, the line is short: the command succeeds with the check result `no_pickable_stock`, and the shortage becomes an exception.
 
     Note: a demand line without a reservation (with `sales.reserve_on_approval` false, or a backorder that stock now covers) is first reserved by `RunPickRelease`, up to available to promise by rule 13, in the same transaction and under the same `stock_value` locks; its tasks are then created from that reservation, and what cannot be reserved is short (`no_pickable_stock`). Rows not released or on hold are refused with `demand_supply_not_released` or `demand_on_hold` ([ADR-0047](0047-commercial-documents-and-pricing.md) rules 18–19).
+
+    Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): the breakdown uses the product's packaging hierarchy (`contains_uom_id`, `contains_quantity`), largest whole unit first, and `is_default_pick_unit` marks the unit a pick list proposes for a demand line in the inventory unit. When a part's provisional quantity changes at Post, an open task is adjusted, and a task already confirmed gets a follow-up task (an extra pick, or a putaway back), with the check result `part_quantity_recomputed` (rules 10, 15).
 15. Confirming a task:
     - `ConfirmWarehouseTask` records the scanned source and target bins, the handling units, lot or serials, and the actual quantity, which may not exceed the task's (`task_quantity_exceeded`). A smaller quantity requires a `shortage_reason`. The scanned target may differ from the proposal (rule 12).
     - Every confirmed pick moves the goods to a non-pickable bin (rule 7), so no later release allocates them again.
@@ -235,6 +239,8 @@ A small shop and a managed distribution warehouse run on the same model.
     - **Confirmation.** Confirming the task creates a `draft` `stock_count` (ADR-0020 rule 18) per bin, lot or serial and status, which stores the book quantity at confirmation beside the counted quantity, and the block lifts. Posting posts counted minus that stored book quantity, so picks and putaways after confirmation never become count differences. It posts through its normal lifecycle, with policy and approval (ADR-0009 rules 11, 13); a scan never posts a count difference.
     - **Bin differences.** A shortage in one bin and a surplus of the same item and lot in another are either netted per (item, warehouse, lot), with the bins corrected by warehouse movements, or posted gross. This is a required regime setting (`stock_count.bin_difference_method`), seeded unverified as `net` (open question).
     - **Plans.** Cycle-count plans (second slice) are company data; an agent proposes them.
+
+    Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): counted quantities may be entered in the product's counting units, several lines per key, each converted and summed in the inventory unit (rule 15).
 19. Returns:
     - Returns arrive in a `returns` bin as `blocked` (rule 7).
     - A disposition creates a `status_change` task to restock (then putaway) or to quality, or a draft scrap document.

@@ -25,8 +25,8 @@ for k, code in (("co", "C5-"), ("co2", "C5B-")):
       " values (%s,%s,'Co','VND','Asia/Ho_Chi_Minh','l10n_vn','tt99','joint_stock','warehouse',%s,'vi')", (I[k], code + t, I["user"]))
 for k, code, kind, dec in (("ea", "EA" + t, "count", 0), ("ctn", "CT" + t, "count", 0), ("kg", "KG" + t, "mass", 3), ("g", "G" + t, "mass", 0),
                            ("bag", "BAG" + t, "count", 0), ("cm", "CM" + t, "length", 2)):
-    X("insert into uom (id, code, quantity_kind, decimal_places) values (%s,%s,%s,%s)", (I[k], code, kind, dec))
-X("insert into uom_conversion values (%s,%s,1,1000)", (I["g"], I["kg"]))          # 1 g = 1/1000 kg
+    X("insert into uom (id, code, name, quantity_kind, decimal_places) values (%s,%s,%s,%s,%s)", (I[k], code, code, kind, dec))
+X("insert into uom_conversion (id, from_uom_id, to_uom_id, numerator, denominator) values (%s,%s,%s,1000,1)", (new(), I["kg"], I["g"]))   # 1 kg = 1000 g; grams take the inverse (ADR-0056 rule 3)
 for co, ig, vc, itg in (("co", "ig", "vc", "itg"), ("co2", "ig2", "vc2", "itg2")):
     X("insert into item_group (id, company_id, code, name, basis) values (%s,%s,'goods','Goods',%s)", (I[ig], I[co], B))
     X("insert into valuation_class (id, company_id, code, name, basis) values (%s,%s,'merchandise','Merchandise',%s)", (I[vc], I[co], B))
@@ -45,8 +45,9 @@ def product(cx, pid, ptype="stock", vc=True, company="co", tracking="none", inv=
 product(c, I["prod"])
 product(c, I["prod_kg"], inv="kg", pur="kg")
 product(c, I["prod2"], company="co2")
-X("insert into product_uom values (%s,%s,%s,24,1)", (I["co"], I["prod"], I["ctn"]))        # 1 carton = 24 each
-X("insert into product_uom values (%s,%s,%s,7,3)", (I["co"], I["prod_kg"], I["bag"]))      # 1 bag = 7/3 kg: a ratio with no finite decimal
+PU = "insert into product_uom (id, company_id, product_id, inventory_uom_id, uom_id, numerator, denominator, is_exact) values (%s,%s,%s,%s,%s,%s,%s,%s)"
+X(PU, (new(), I["co"], I["prod"], I["ea"], I["ctn"], 24, 1, True))        # 1 carton = 24 each
+X(PU, (new(), I["co"], I["prod_kg"], I["kg"], I["bag"], 7, 3, False))    # 1 bag = 7/3 kg: a ratio with no finite decimal (inexact, ADR-0056 rule 7)
 X("insert into variant_attribute (id, company_id, code, name) values (%s,%s,'color','Color'),(%s,%s,'size','Size')", (I["attr_color"], I["co"], I["attr_size"], I["co"]))
 X("insert into variant_attribute_value (id, company_id, variant_attribute_id, variant_mode, code, name) values (%s,%s,%s,'variant','red','Red'),(%s,%s,%s,'variant','blue','Blue'),(%s,%s,%s,'variant','s','S')",
   (I["v_red"], I["co"], I["attr_color"], I["v_blue"], I["co"], I["attr_color"], I["v_s"], I["co"], I["attr_size"]))
@@ -151,9 +152,9 @@ def bank(cx):
     for _ in range(2):
         cx.execute("insert into partner_bank_account (id, company_id, partner_id, bank_name, account_number, holder_name) values (%s,%s,%s,'Bank','123','H')", (new(), I["co"], I["partner"]))
 trial("M37 a bank account without a bank code cannot be entered twice", bank, True, "partner_bank_account_partner_id_bank_code_account_number_key")
-trial("M38 a core unit code may not start with x-", lambda cx: cx.execute("insert into uom (id, code, quantity_kind, decimal_places) values (%s,%s,'count',0)", (new(), 'x-' + t)), True, "ck_uom_company_code")
-trial("M39 a company unit code must start with x-", lambda cx: cx.execute("insert into uom (id, company_id, code, quantity_kind, decimal_places) values (%s,%s,%s,'count',0)", (new(), I["co"], 'PK' + t)), True, "ck_uom_company_code")
-trial("M40 a conversion factor is positive", lambda cx: cx.execute("insert into product_uom values (%s,%s,%s,0,1)", (I["co"], I["prod"], I["kg"])), True, "ck_product_uom_numerator")
+trial("M38 a core unit code may not start with x-", lambda cx: cx.execute("insert into uom (id, code, name, quantity_kind, decimal_places) values (%s,%s,'X','count',0)", (new(), 'x-' + t)), True, "ck_uom_company_code")
+trial("M39 a company unit code must start with x-", lambda cx: cx.execute("insert into uom (id, company_id, code, name, quantity_kind, decimal_places) values (%s,%s,%s,'Pack','count',0)", (new(), I["co"], 'PK' + t)), True, "ck_uom_company_code")
+trial("M40 a conversion factor is positive", lambda cx: cx.execute(PU, (new(), I["co"], I["prod"], I["ea"], I["kg"], 0, 1, True)), True, "ck_product_uom_numerator")
 trial("M41 a group row needs its basis", lambda cx: cx.execute("insert into item_group (id, company_id, code, name) values (%s,%s,'g2','G2')", (new(), I["co"])), True, "basis")
 # M42: every DS-20 table carries company_id except the global catalogs (ADR-0045 rule 1; ADR-0022 rule 8).
 ddl = open(os.environ.get("ERPME_DS20", os.path.join(os.path.expanduser(os.environ.get("ERPME_DOCS", "~/Projects/ERPMe/docs")), "design", "DS-20-master-data.sql"))).read()
@@ -176,8 +177,9 @@ def factor(cx, item, uom):
     """Inventory units per one unit: 1 for the inventory unit, else the product unit, else the unit conversion."""
     prod, inv = cx.execute("select p.id, p.inventory_uom_id from item i join product p on p.id=i.product_id where i.id=%s", (item,)).fetchone()
     if uom == inv: return prod, inv, F(1)
-    r = cx.execute("select numerator, denominator from product_uom where product_id=%s and uom_id=%s", (prod, uom)).fetchone() or \
-        cx.execute("select numerator, denominator from uom_conversion where from_uom_id=%s and to_uom_id=%s", (uom, inv)).fetchone()
+    r = cx.execute("select numerator, denominator from product_uom where product_id=%s and item_id is null and uom_id=%s", (prod, uom)).fetchone() or \
+        cx.execute("select numerator, denominator from uom_conversion where from_uom_id=%s and to_uom_id=%s", (uom, inv)).fetchone() or \
+        cx.execute("select denominator, numerator from uom_conversion where from_uom_id=%s and to_uom_id=%s", (inv, uom)).fetchone()   # the inverse (ADR-0056 rule 3)
     return prod, inv, (F(r[0], r[1]) if r else None)
 def find_price(cx, pl, item, uom, qty, on, values=()):
     qty = F(str(qty))

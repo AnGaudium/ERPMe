@@ -264,6 +264,23 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Unit conversion | uom\_conversion | Exact global conversion between two units of one kind: one from-unit = numerator / denominator to-units |
 | Product unit | product\_uom | Another unit a product may use, with its exact conversion to the inventory unit; with the inventory unit, the spec's UoM group |
 | Item barcode | item\_barcode | Barcode of an item in one unit (e.g. a carton) |
+| Item-level unit | product\_uom.item\_id | A product unit row for one item (a variant or configured item), resolved before the product's rows ([ADR-0056](../adr/0056-multiple-units-of-measure.md)) |
+| Conversion snapshot | uom\_numerator, uom\_denominator, uom\_factor\_source | The factor a line used to convert its entered quantity to the inventory unit, and its source (identity, item, product, global); stored on the line, never re-read |
+| Line unit block | quantity, uom\_id, snapshot, inventory\_quantity | The six fields every quantity line stores |
+| Exact unit, inexact unit | product\_uom.is\_exact | A unit is exact when every quantity it can hold converts to a quantity the inventory unit can hold: numerator × 10^dI divisible by denominator × 10^dE |
+| Cumulative conversion | convert\_part | A forward part of a source line in the source's unit takes round((C + q) × f) − P with C and P the actual net sums, so parts that complete the line sum to its inventory quantity; a return or credit takes the part it names as source |
+| Unit rounding tolerance | — | Of a source line: one smallest inventory step per part posted in another unit whose conversion rounded, plus the change each return, credit, reversal or clamped part made to the deviation P − round(C × f); it only grows, is zero for exact units, and widens the upper limits and the closing check alike |
+| GR/IR rounding clearing | gr\_ir\_rounding\_clearing | The consequence posting that moves the lagging GR/IR side to the other at the positions' value when a line is fulfilled within the unit rounding tolerance |
+| Service receipt inventory quantity | service\_receipt\_line.inventory\_quantity | For a service, the quantity in the service item's inventory unit (hours, pieces of work); the name follows the line unit block, not stock |
+| Retired unit | is\_active, retired\_at | A unit, product unit row or conversion taken out of new use; history and follow-on lines keep it; a changed pack size retires the row and a new row of the same unit takes over |
+| Statutory unit name | uom.<code>.name (package terminology) | A unit's name on statutory outputs, supplied by a localization package; else the core translation |
+| Factor source | product\_uom.factor\_source | How a product unit's factor was set: stated, packaging (from its contains relation) or nominal (an approximation for goods that vary per piece) |
+| Packaging hierarchy | contains\_uom\_id, contains\_quantity | "1 pallet contains 40 cartons": a product unit's contained unit and whole count, checked against the factors |
+| Counting unit, default pick unit | is\_counting\_unit, is\_default\_pick\_unit | Units a count may be entered in; the unit a pick list proposes |
+| Supplier order unit | supplier\_item.order\_uom\_id | The unit of a supplier's minimum and multiple, and the proposed unit of its purchase lines |
+| Proposed unit | proposed\_uom\_source | The unit a new line proposes, in order: source line, barcode, partner item, supplier item, product default, inventory unit |
+| Unit alias | uom\_alias | Unit text as partners and old systems write it, normalized and mapped to a unit for intake; unknown text is never guessed |
+| Issue multiple | bill\_of\_materials\_component.issue\_multiple | Rounds a component's order-line requirement up to whole cans, rolls or reels |
 | Classification scheme | classification\_scheme, classification\_value, product\_classification | Company-defined grouping of products for analysis; `product_line` is seeded and protected; one value per scheme per product |
 | Product category | product\_category | Built-in hierarchy of products that proposes defaults when a product is created |
 | Item tax group, partner tax group | item\_tax\_group, partner\_tax\_group | The two axes of the dated tax matrix (with direction) that proposes and checks a line's tax codes (DS-23) |
