@@ -244,6 +244,8 @@ ADR-0017 fixed the envelope: permissions are the names of registered commands, q
     - **Aggregating queries.** A query that totals over documents without returning them is registered `is_owner_scoped: false` (a note on ADR-0008 rule 1). This covers reports (DS-26; ADR-0049) and also non-report aggregates such as `GetPartnerExposure` (ADR-0026 rule 15) and aging totals over open items. It needs an assignment with owner scope `branch` or `company` for its permission; otherwise `permission_denied`. So totals never reveal documents outside a user's owner scope.
     - **Row-level security** stays company-only (ADR-0017 rule 19). Owner and record scope live in the dispatcher and the read-only layer, as the second line is for companies.
 
+    Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), proposed 2026-11-15): `EvaluateAnalysisPlan` is owner-scoped per fact view: it aggregates only the rows each view's grants reach and flags `is_scope_filtered`, so its totals reveal no document outside the scope. A plan over a fact registered `is_owner_scoped: false` (`system_account_turnover`, `stock_overview`, `production_variance_overview`) needs an assignment with owner scope `branch` or `company`, else `analysis_not_permitted`. Member lookups return only members of a fact's rows within its scope (rules 10, 13, 14).
+
 **Agents and integrations**
 
 16. Agents and integrations:
@@ -388,6 +390,8 @@ ADR-0017 fixed the envelope: permissions are the names of registered commands, q
     | `ReplayEvents` | `event_delivery` | `full` | `human_only` |
 
     Note ([ADR-0061](0061-barcodes.md), proposed 2026-11-15): `EvaluateBarcode` is one more member of `general_access` at `read`: it checks each candidate's own read permission and answers `barcode_unknown` when none is readable (rule 12). `RunRetiredSsccCleanup`, leaf `product`, is registered `is_internal_only` beside `RunApprovalEscalation`: no level grants it and no role holds it (rule 7).
+
+    Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), proposed 2026-11-15): the analysis queries over facts, and private saved analyses (`CreateSavedAnalysis`, `UpdateSavedAnalysis` at `edit`, `ListSavedAnalysis`, `GetSavedAnalysis` at `read`), sit on `general_access` and check each fact view's own permission. New leaves: `analysis_question` below `reports` (questions, feedback and the run's answer at `edit`, the asker's own questions at `read`); `saved_analysis` below `reports` (examples at `read` and `edit`, the capability `share_saved_analysis` for company-wide analyses and KPIs at `edit`, releases at `post`); `analysis_debug` below `administration` (capability `read_analysis_debug` at `full`, `none` in every template except `owner`); `agent_analysis` below `agent`. Interim rows give `analysis_question` and `agent_analysis` at `edit` and `saved_analysis` at `post` (chief accountant) or `edit` to the chief accountant, accountant, sales manager, purchasing manager and production planner (rule 36).
 
 **Catalogs and lab**
 

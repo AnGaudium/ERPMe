@@ -42,6 +42,8 @@ Six agent types are designed now, each as a code-orchestrated workflow on the ru
    - **Data migration** is the stated exception: it runs before go-live, so its evidence is a staging rehearsal (rule 28).
 
    Note ([ADR-0059](0059-ai-tuning-and-development-of-deterministic-functions.md), proposed 2026-11-15): the same ladder, generalized to configuration and decision artifacts, is rule 12 there.
+
+   Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), proposed 2026-11-15): the `analysis` agent type is a second stated exception: it drafts nothing a person resolves, so its promotion evidence is the version's CI evaluation report and, from 30 verified examples, the shadow evaluation over them; below 30 examples the CI report alone is flagged for the author (rule 25).
 5. Quality monitor:
    - **The job.** `RunAgentQualityCheck` (daily system job, `agents`) computes, per company and assisted agent type, the 30-day share of drafts accepted unedited and of drafts rejected or canceled (rule 6).
    - **The signal.** When agreement falls 10 points below the workflow's threshold, it raises `agent_quality_below_threshold` (owner `company_owner`) with the figures. It does not demote by itself; a person decides.
@@ -69,6 +71,8 @@ Six agent types are designed now, each as a code-orchestrated workflow on the ru
 
    Note ([ADR-0057](0057-document-intake-and-extraction.md), proposed 2026-11-15): two more rows: `document_reader`, golden set 95% of aligned fields, shadow agreement 95%, 50 documents per purpose, and a company golden set of 50 real documents per purpose before `assisted` ([ADR-0057](0057-document-intake-and-extraction.md) rule 34); `product_engineering`, 90%, 90%, 30 cases ([ADR-0062](0062-product-engineering-workflow.md) rule 20).
 
+   Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), proposed 2026-11-15): the `analysis` agent type's thresholds are rule 29's: 90% of cases equal, at most 2% wrong, and 90% of abstention cases abstaining as expected.
+
 8. Drafts and keys:
    - **One batch per output.** Each document or proposal is created in one command (or one command batch) at the end of its step, simulated and checked first (ADR-0050 rule 32). A run never leaves half a document.
    - **Draft keys** (ADR-0030 rule 11): `workflow_step` is `<agent_type>.<step_code>` as named below; `draft_ordinal` is 1 unless stated.
@@ -87,6 +91,8 @@ Six agent types are designed now, each as a code-orchestrated workflow on the ru
    | `data_migration` | 400 | 3,000 | 3,000,000 | 200,000 | 15.00 | 3,600 | 200,000 | 40 | 20 |
 
    Note ([ADR-0057](0057-document-intake-and-extraction.md), proposed 2026-11-15): two more rows: `document_reader` 12 LLM calls, 10 tool calls, 150,000 input and 8,000 output tokens, USD 0.80, 300 seconds, 500 rows, USD 10 and 300 runs a day ([ADR-0057](0057-document-intake-and-extraction.md) rule 34); `product_engineering` 30, 150, 300,000, 20,000, USD 2.00, 900 seconds, 5,000 rows, USD 15 and 50 runs a day ([ADR-0062](0062-product-engineering-workflow.md) rule 20).
+
+   Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), proposed 2026-11-15): the `analysis` agent type's budgets: 14 LLM calls, 40 tool calls, 140,000 input and 12,000 output tokens, USD 0.95, 180 seconds and 2,000 rows read per run; USD 18 and 300 runs per company and business date (rule 20).
 
 10. The literal read scope (ADR-0050 rule 27; ADR-0029 rule 14) in these workflows:
     - **Tainted runs choose among related items only.** A tainted `quotation` run reads items only through the partner's `partner_item_overview` rows and its earlier document lines. A tainted `purchase_invoice` run reads the supplier's `partner_item` and `supplier_item` rows and its open purchase order lines. Lines that need anything else stay unresolved and go to a person.
@@ -279,6 +285,8 @@ Six agent types are designed now, each as a code-orchestrated workflow on the ru
     - **Others:** the warehouse agent's proposals for putaway rules, pick-face levels and count plans (ADR-0023 rule 21), repeat-sales suggestions and quotation follow-ups (spec 13).
 
     Note ([ADR-0062](0062-product-engineering-workflow.md), proposed 2026-11-15): the master-data part of the production agents is designed: `product_engineering` ([ADR-0062](0062-product-engineering-workflow.md)).
+
+    Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), proposed 2026-11-15): the period-close assistant and the variance agent will be workflows on the analysis layer: their figures come from `EvaluateAnalysisPlan`, contributions and the stored production variance split, rendered as key facts by code, and their explanations are narrative plans of checked claim templates (rules 18, 19, 23, 38).
 
 **Catalogs**
 

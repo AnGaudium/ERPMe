@@ -125,6 +125,8 @@ The retention periods and the strictness of scanning are flagged for the author.
     - **Tool choices.** The backend and the attachment scanner are new tool categories, chosen by ADR in DS-37, not from ADR-0002's list of tools not used. The byte-level media detection library is chosen by ADR at the first step that builds upload.
     - **Dashboard.** In Phase 1 the operations dashboard is the backend's, with panels generated from the metric names. Held deliveries and their `last_error` (ADR-0013 rule 8) are read through the delivery query, not the dashboard, because they carry values. An ERPMe screen comes later.
 
+    Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), proposed 2026-11-15): management dashboards are not this operations dashboard: they are saved analyses and KPI tiles of the analysis layer, run through `EvaluateAnalysisPlan` under the viewer's rights. Metrics add analysis answers by outcome and badge, abstentions by code and model cost per answer, with codes as labels (rules 26, 27, 32).
+
 **Attachments**
 
 13. Upload:

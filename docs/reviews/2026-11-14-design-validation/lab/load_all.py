@@ -10,7 +10,8 @@ The combined loader of the catalog review (check 12), used by the final simulati
 3. All DDL files are split into statements and ordered in one pass, as load_ds06.py does: every CREATE TABLE in
    dependency order (REFERENCES and PARTITION OF), then every other statement in file order. The files are taken in
    the order of FILE_ORDER, then any other design/*.sql file by name. A table defined twice is an error.
-4. SET search_path = erpme, then each statement runs, all in one transaction after the stubs' own; a failure names
+4. SET search_path = erpme, then each statement runs, in transactions of LOAD_BATCH statements after the stubs' own
+   (one transaction for all of them exceeds max_locks_per_transaction at about 300 tables); a failure names
    the file and line.
 
 Guard: a line whose code ends in ';' followed by a trailing comment is refused. load_ds06.py splits statements at lines
@@ -18,6 +19,9 @@ ending in ';', and such a line silently merges two statements there (lab finding
 
 Usage:  python3 load_all.py <dsn> <docs dir>      prints the number of tables in schema erpme
 Module: from load_all import load_all; load_all(dsn, docs_dir) -> int
+
+Reloading: the tables already in schema erpme are dropped in batches of DROP_BATCH, each in its own transaction, before
+the stubs drop the schema, so no transaction needs more locks than max_locks_per_transaction allows.
 
 Tables of DS-05-platform.sql get FORCE ROW LEVEL SECURITY; a role without BYPASSRLS (or not the superuser) must set
 erpme.company_id before it reads or writes them (ADR-0017 rule 19).
@@ -33,6 +37,8 @@ FILE_ORDER = ("DS-20-master-data.sql", "DS-06-universal-journal.sql", "DS-15-acc
               "DS-56-product-configuration.sql", "DS-43-54-planning-production.sql",
               "DS-22-09-42-commercial-inventory.sql", "DS-05-platform.sql")
 EXTENSIONS = ("btree_gist", "pg_trgm")
+DROP_BATCH = 40
+LOAD_BATCH = 150
 LAB = os.path.join("reviews", "2026-11-14-design-validation", "lab")
 
 
@@ -162,11 +168,22 @@ def build(docs_dir):
     return stubs, [tables[t] for t in order] + others
 
 
+def drop_in_batches(cx):
+    """Drop the tables of schema erpme in batches, each in its own transaction (partitions go with their parent)."""
+    names = [r[0] for r in cx.execute("select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace"
+                                      " where n.nspname = 'erpme' and c.relkind in ('r', 'p') and not c.relispartition"
+                                      " order by c.relname").fetchall()]
+    for i in range(0, len(names), DROP_BATCH):
+        with cx.transaction():
+            cx.execute("DROP TABLE IF EXISTS " + ", ".join(f"erpme.{n}" for n in names[i:i + DROP_BATCH]) + " CASCADE")
+
+
 def load_all(dsn, docs_dir):
     """Load stubs, extensions and every DDL file of docs_dir/design into the database at dsn; returns the table count."""
     docs_dir = os.path.abspath(os.path.expanduser(docs_dir))
     stubs, ordered = build(docs_dir)
-    with psycopg.connect(dsn) as cx:
+    with psycopg.connect(dsn, autocommit=True) as cx:      # autocommit: each transaction() block is a real transaction
+        drop_in_batches(cx)
         with cx.transaction():                             # its own transaction: dropping a loaded schema takes many locks
             for s in stubs:
                 cx.execute(s)
@@ -179,12 +196,14 @@ def load_all(dsn, docs_dir):
                 elif row[0] != "erpme":
                     print(f"note: extension {ext} moved from schema {row[0]} to erpme", file=sys.stderr)
                     cx.execute(f"ALTER EXTENSION {ext} SET SCHEMA erpme")
-            cx.execute("SET LOCAL search_path = erpme")
-            for stmt, where in ordered:
-                try:
-                    cx.execute(stmt)
-                except psycopg.Error as e:
-                    raise SystemExit(f"{where}: {str(e).splitlines()[0]}") from None
+        for i in range(0, len(ordered), LOAD_BATCH):
+            with cx.transaction():
+                cx.execute("SET LOCAL search_path = erpme")
+                for stmt, where in ordered[i:i + LOAD_BATCH]:
+                    try:
+                        cx.execute(stmt)
+                    except psycopg.Error as e:
+                        raise SystemExit(f"{where}: {str(e).splitlines()[0]}") from None
         return cx.execute("select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace"
                           " where n.nspname = 'erpme' and c.relkind in ('r', 'p')").fetchone()[0]
 

@@ -40,6 +40,8 @@ Status: accepted (2026-11-15) under ADR-0005, reviewed by Claude Fable 5.2 (buil
 
    Note ([ADR-0057](0057-document-intake-and-extraction.md), proposed 2026-11-15): `agent_runs` also owns `data_processing_permission` and its contract function; `agents` holds its commands `SetDataProcessingPermission` and `EndDataProcessingPermission` and the agent types `document_reader` and `product_engineering` ([ADR-0057](0057-document-intake-and-extraction.md) rules 1, 11, 20; [ADR-0062](0062-product-engineering-workflow.md)).
 
+   Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), proposed 2026-11-15): `query` also owns the analysis catalog, validator, compiler and executor, the analysis queries and the tables of DS-33-analysis.sql, and now imports the `work` contract to raise its two work item kinds; `agents` owns the `analysis` workflow (rule 1).
+
 **LLM gateway**
 
 2. The gateway interface is one function, `agents.gateway.complete(request) -> response`.
@@ -111,6 +113,8 @@ Status: accepted (2026-11-15) under ADR-0005, reviewed by Claude Fable 5.2 (buil
     Note: an agent type version also declares `field_classes` (default none), so a run sees a `cost` or `margin` field only when both its agent type and its human have the class; it declares no record scope, which comes from the human alone and is narrowed by the tainted scope. Its declared permissions are its tool list: one set, which ADR-0017 rule 11 calls the declared permissions and rule 29 the tool list, so rule 31's intersection is the tool list with the human's rights ([ADR-0054](0054-users-roles-and-authorizations.md) rule 16 note).
 
     Note ([ADR-0058](0058-configurable-workflows.md), proposed 2026-11-15): each claimable kind carries `wake_up`: `always`, or `configurable` (started only by a company's automation rule with action `start_agent`). A version may declare `configurable_triggers` (event type, subject table). The six agent types of [ADR-0051](0051-agent-workflows.md) keep every kind `always` and declare no trigger until the author decides (rule 7).
+
+    Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), proposed 2026-11-15): the agent type `analysis` (scope kind `subject` on `analysis_question`, or on `analysis_example` for evaluation runs; `may_read_untrusted: false`; field classes `cost` and `margin`) also declares the analysis catalog hash it was evaluated with, so a catalog change is a new version (rules 20, 25).
 13. Prompt templates:
     - **Files.** `backend/erpme/agents/prompts/<agent_type>/<template_code>.md`, Markdown with front matter: `code`, `version` (semver), `seat`, `inputs` (field paths, with `required`), `output_schema` (pydantic model path and its version).
     - **Overlays.** Provider-specific wording is a small overlay file `<template_code>.<provider>.md` (spec 17). The base and overlay are hashed together.
@@ -127,6 +131,8 @@ Status: accepted (2026-11-15) under ADR-0005, reviewed by Claude Fable 5.2 (buil
     Note: `UpdateAgentTypeSetting` needs `full` on the leaf `agent` (a declared minimum level), so `edit` there no longer gives it, and a change whose resulting `workflow_owner_id` does not hold `start_agent:<agent_type>` in the company is refused with `workflow_owner_not_permitted`. The leaf `agent` belongs to module `agents`, and each agent type has its own leaf `agent_<agent_type>` below it for `start_agent:<agent_type>` ([ADR-0054](0054-users-roles-and-authorizations.md) rule 24 note). "The interim, which otherwise lets a person approve their own document" is superseded by [ADR-0055](0055-approval-pools-and-stages.md) rule 7, condition 5, which excludes writers; `approver_is_submitter` stays, also in the small-company mode.
 
     Note ([ADR-0059](0059-ai-tuning-and-development-of-deterministic-functions.md), proposed 2026-11-15): this ladder is the pattern that [ADR-0059](0059-ai-tuning-and-development-of-deterministic-functions.md) rule 12 generalizes to every L1 and L2 artifact. An agent type version that declares its constants as a tunable parameter set includes the current version's `parameters_hash` in its behavior hash, so a promoted parameter set makes it run as `shadow` until it is promoted again (rule 7).
+
+    Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), proposed 2026-11-15): the `analysis` agent type is a stated exception to the shadow comparison: in `shadow` it answers nobody and the daily job `RunAnalysisEvaluation` runs it on the company's verified examples, acting for each example's releaser; its promotion evidence is the version's CI evaluation report and, from 30 verified examples, that shadow evaluation (rule 25).
 
 **Runs**
 
@@ -175,6 +181,8 @@ Status: accepted (2026-11-15) under ADR-0005, reviewed by Claude Fable 5.2 (buil
     - **Cancel.** `CancelAgentRun` (a person with `start_agent:<agent_type>`, or the company's owner) stops a run between steps. The runner checks the state before every step.
 
     Note: `CancelAgentRun` needs `start_agent:<agent_type>` of the run's agent type or the capability `cancel_agent_runs` (`full` on `agent`), which replaces "or the company's owner" ([ADR-0054](0054-users-roles-and-authorizations.md) rule 24 note).
+
+    Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), proposed 2026-11-15): the `analysis` agent type adds the outcome `answered` and the abstentions `ambiguous_term`, `ambiguous_member`, `out_of_coverage`, `not_permitted`, `data_not_ready` and `too_broad`, all in state `completed`, which `ck_agent_run_outcome` of DS-05-platform.sql allows; the run's `agent_task` item is resolved, and a stopped run sets its question to `failed` (rules 21, 24).
 18. `agent_run` columns (company data, not partitioned, never deleted while a version or event refers to it):
     - **Identity:** `id`, `company_id`, `agent_type_code`, `agent_type_version`, `seatmap_hash`, `mode` (`live`, `shadow`, `replay`, `evaluation`), `replay_of_run_id`.
     - **Trigger and actor:** `trigger_kind` (`work_item`, `person`, `schedule`), `work_item_id`, `subject_table`, `subject_id`, `started_by_kind` and `started_by_id`, `on_behalf_of_id`.
@@ -240,6 +248,8 @@ Status: accepted (2026-11-15) under ADR-0005, reviewed by Claude Fable 5.2 (buil
     - **`is_draft_only`** is a new registry attribute (ADR-0008 rule 1) of commands that only create or update drafts, change proposals, work item notes or suggestion fields. Such a command is never of effect class `posting`, `master_data_change` or `outbound_send`, and never a `Submit`, `Post` or `Issue`; CI checks this.
     - **What it may run:** only commands registered `is_draft_only`. The dispatcher rejects any other command from a tainted run with `tainted_run_not_allowed`, before policy, with a denial record. This adds to the structural guards: such commands are not on agent tool lists (rule 30), agents' posts are `human_post` (ADR-0043 rule 9, floor 4) and master data needs a proposal (ADR-0029 rule 4).
     - **Its writes are tainted:** document versions (INV-88), events (ADR-0013 rule 11), work item raises and notes (INV-210).
+
+    Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), proposed 2026-11-15): `UpdateAnalysisAnswer` is registered `is_draft_only` although it writes no draft: it writes once to the run's own question row, which only the asker reads, and changes no document, master data or outside party, so it carries no more risk than a work item note (rule 21).
 27. Tainted read scope, the literal spec 03 rule 1 (ADR-0029 rule 14):
     - **A tainted run reads only:**
       1. rows in its scope: rows whose partner column equals `scope_partner_id` (scope `partner`), rows of `scope_import_batch_id` (scope `import_batch`), or the run's subject row (scope `subject`);
@@ -255,6 +265,8 @@ Status: accepted (2026-11-15) under ADR-0005, reviewed by Claude Fable 5.2 (buil
     - **Omitted by default.** Views and query result models omit `is_untrusted` columns unless the request sets `include_untrusted: true` (ADR-0029 rule 10). Listing documents therefore does not taint.
     - **Agent types that must stay clean** declare `may_read_untrusted: false` (for example `planning`). For their runs, `include_untrusted` returns `untrusted_read_not_allowed`, and rows that would taint them are left out, with `is_taint_filtered: true` in the response.
     - **Numeric projections.** `ListPegging` and `demand_supply_overview` return rows of tainted versions as a numeric-only projection: IDs, quantities, dates and states, no free text. Like aggregates (rule 25), such rows do not taint, so the clean planning agent is not filtered on them (flagged, open question). The projection applies only to agent-run callers; people see full rows within their permissions.
+
+    Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), proposed 2026-11-15): `ListAnalysisCellRow` returns a numeric projection to agent runs as `ListPegging` does: IDs, document numbers and types, dates, accounts and contributions, no free text; such rows do not taint and are not filtered from a clean run, so a cell still equals its drill rows (rule 16).
 
 **Tools and permissions**
 
@@ -276,9 +288,13 @@ Status: accepted (2026-11-15) under ADR-0005, reviewed by Claude Fable 5.2 (buil
     Note ([ADR-0057](0057-document-intake-and-extraction.md), proposed 2026-11-15): also never on a tool list: `SetDataProcessingPermission` and `EndDataProcessingPermission`; `CreateExtractionFields` is on `document_reader`'s list for workflow code only ([ADR-0057](0057-document-intake-and-extraction.md) rules 11, 20).
 
     Note ([ADR-0059](0059-ai-tuning-and-development-of-deterministic-functions.md), proposed 2026-11-15): also `CreateArtifactEvidence`, `SetArtifactVersionState`, `SetArtifactCurrentVersion`, `RecordGoldenCaseLabel`, `ListGoldenCaseLabel`, `CreateAutomationRule`, `UpdateAutomationRule`, `ConfirmAutomationRuleOwnership`, `CreateDecisionTable`, `CreateParameterSet`, `DisableAutomationRule` and `EnableAutomationRule`. Agents draft artifact versions only (rule 27; [ADR-0058](0058-configurable-workflows.md) rule 27).
+
+    Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), proposed 2026-11-15): `ListAnalysisResultRow`, the list query through which people export analysis results, and `ListAnalysisQuestion` are on no tool list either (rules 14, 17).
 31. Effective permissions are the intersection of the agent type's declared permissions and those of the human acted for, re-evaluated at every call against current assignments, for permissions, record scope and field classes (ADR-0017 rule 11). A tainted run's read scope (rule 27) narrows that further. The tool list is a third limit: a tool must be on the list and allowed by the intersection.
 
     Note: agent types get no role assignments, so no further set of rights joins this intersection; the human's owner scope binds the run as their record scope does ([ADR-0054](0054-users-roles-and-authorizations.md) rule 16).
+
+    Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), proposed 2026-11-15): for analysis plans the fact-view permissions and their read grants are those of the run's human alone: the `analysis` agent type holds no `List<fact view>` permission, and its limit on facts is that `EvaluateAnalysisPlan`, `GetAnalysisPlanExplanation`, `ListAnalysisCellRow` and `ListAnalysisDimensionMember` are on its tool list; field classes stay the intersection (rule 13).
 32. LLM steps read, code writes:
     - **Read tools only.** An LLM step's tools are a subset of the tool list holding only queries. Commands on the list are called by workflow code, never chosen by the model.
     - **Every command** is built by workflow code from a validated output (rules 35–36), sent in simulate mode, checked against the step's deterministic expectations, then executed with the simulated `plan_hash` (Principle 2). In `shadow` mode the execute call is skipped.
@@ -303,6 +319,8 @@ Status: accepted (2026-11-15) under ADR-0005, reviewed by Claude Fable 5.2 (buil
     - **Stated values.** A value extracted from a document (a quantity in a request, a reference token in a bank description) must appear in its quoted source span in the input after normalization; otherwise it is dropped.
     - **No computation.** No output value becomes a price, tax, quantity to post, account or match score. Prices, taxes and accounts come from the deterministic functions that own them (ADR-0045 rule 4, ADR-0047 rule 16, ADR-0041, ADR-0015); a requested quantity is shown as stated by the customer.
     - **Free text** an output carries (an explanation, a quotation text) is checked: every number in it must equal a number of the step's input or of the draft. Customer-facing text is also checked by the outbound content check of ADR-0029 rule 14. Module `crm` owns that check (ADR-0029 rule 14) and exposes it as the query `GetOutboundContentCheck`. A module that owns customer-facing drafts, such as `sales`, may not import `crm` (same layer), so it declares an outbound-check hook that `crm` registers and `app` (layer 6) wires, the pattern of the policy evidence hook (ADR-0051 rule 18). The handler of every command that creates or updates a customer-facing draft calls the hook, so a finding is the check result `outbound_content_flagged` in that command's plan. The workflow treats it as a failed check. The check never runs through a send command.
+
+    Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), proposed 2026-11-15): analysis explanations hold this by construction: in Phase 1 the model writes no text that reaches the person. Code renders every number as a key fact from fixed templates, and the model returns only a narrative plan of claim template codes with fact handles, and code renders the members from each fact's row; code checks each claim's precondition on the served cells, drops the steps that fail, and renders the rest from the claim catalog (rule 23; INV-413).
 
 **Replay and evaluation**
 
@@ -340,6 +358,8 @@ Status: accepted (2026-11-15) under ADR-0005, reviewed by Claude Fable 5.2 (buil
 44. `SELECT` only (ADR-0040 rule 13):
     - **The builder** composes each statement from the view declaration and the request: one `SELECT` with bound parameters. No client sends SQL, and agents never write SQL (Principle 7). A CI test checks that every built statement is a single `SELECT`.
     - **No side effects.** Views call no volatile function. `EXECUTE` on `pg_notify` is revoked from `PUBLIC` and granted to `erpme_app` and `erpme_worker`.
+
+    Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), proposed 2026-11-15): the analysis compiler emits one statement whose top level is a `SELECT`, with read-only common table expressions, over declared views only and with every value bound; the same CI test covers it (rule 12).
 45. View declarations, beside the SQL:
     - **Columns:** meaning (English, translated), type, data label or row condition (ADR-0019 rule 7), field class, `is_untrusted`. A column with `is_secret` is refused by CI.
     - **Scope columns:** record scope (`branch_id`, `warehouse_id`, ADR-0017 rule 9), the partner column and the import batch column for taint scope (rule 27), and for document rows the effective `is_tainted`.
@@ -349,6 +369,8 @@ Status: accepted (2026-11-15) under ADR-0005, reviewed by Claude Fable 5.2 (buil
 46. Exposure:
     - **Queries.** Each view gives `List<View>` and, where keyed, `Get<View>`, registered by `query` (ADR-0004 rule 21). REST and MCP are generated (Principle 10). Their names are the view's noun in `PascalCase`: `ListPartnerOverview`, `ListSystemAccountTurnover`.
     - **MCP resources** (Principle 7): `erpme://query/views` lists the views, and `erpme://query/views/<name>` returns a declaration (columns, meanings, labels, field classes, untrusted flags, filters). They hold metadata only; data comes through the queries.
+
+    Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), proposed 2026-11-15): the analysis catalog adds the resources `erpme://query/measures`, `erpme://query/measures/<code>`, `erpme://query/dimensions` and `erpme://query/dimensions/<code>`, metadata only (rule 14).
 47. Filters and pages:
     - **Operators:** equality; `in` (at most 100 values); ranges on dates, amounts and quantities; `contains` on declared text columns (case and diacritics folded). Sorting only on declared columns, with `id` as the tiebreak.
     - **Pages.** Cursor paging (ADR-0008 rule 22): `limit` default 100, maximum 1,000. For agent runs the maximum is 200, and `max_rows_read` caps a run's total (rule 22).
@@ -360,6 +382,10 @@ Status: accepted (2026-11-15) under ADR-0005, reviewed by Claude Fable 5.2 (buil
     Note: the builder also sets `erpme.read_grants`: the actor's assignments in force that grant the query's permission, for an agent run those of its human, as a list of (branch IDs, warehouse IDs, owner scope, the employee IDs of the organization resolver's set, user ID). A view's `is_in_scope` is true for a document row when one grant passes both record scope and owner scope, and for other rows when one passes record scope ([ADR-0054](0054-users-roles-and-authorizations.md) rules 13–15).
 
     Note ([ADR-0059](0059-ai-tuning-and-development-of-deterministic-functions.md), proposed 2026-11-15): for a run of a drafting agent type (one whose tool list holds an artifact draft command), the builder also excludes the held-out cases, by the hash rule, from every row query and aggregate: rows of the declared case tables and rows whose declared case-reference columns point at a held-out case. An aggregate it cannot filter is refused with `held_out_filter_unavailable`. Only queries registered held-out filtered may be on such a tool list, and reads of evidence, shadow outcomes, monitor snapshots, automation executions and `GetAutoPostShadowEvaluation` never are (rule 16).
+
+    Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), proposed 2026-11-15): for analysis plans, which read several fact views in one statement, `erpme.read_grants` is a map keyed by view name: each fact view's entry holds the assignments that grant that view's `List` permission, and each view's `is_in_scope` reads its own entry, so one fact's grant never widens another's. The builder also sets `erpme.business_date` for views that compare dates with it (rule 13).
+
+    Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), proposed 2026-11-15): this note replaces the list format of the first note above: `erpme.read_grants` is always a map keyed by view name, for every query of the read-only layer, so each view's `is_in_scope` reads one format; a `List<View>` query sets a one-entry map, and an analysis plan one entry per fact view it reads (ADR-0060 rule 13).
 49. Taint in the views: the builder applies rules 25–28. It omits untrusted columns unless asked and reads the effective `is_tainted` column of returned rows. Each view computes `is_in_taint_scope` as rule 27 defines the scope: its partner or import batch column equals the run's scope, or the row is the run's subject, its work item or one of `erpme.taint_document_ids`. Views of reference data are declared `is_reference` and always pass. For tainted runs the builder filters on `is_in_taint_scope`, and refuses a view that has none of these columns and is not `is_reference`.
 50. Never in an agent's reach:
     - **Audit.** No view over `audit_record`, `audit_change`, `audit_denial`, `policy_decision`, `agent_run_step` or `personal_data_processing_log` is registered for agents. Tainted runs never read audit data (ADR-0038 rule 7). People read these through their own queries.
@@ -392,12 +418,16 @@ Status: accepted (2026-11-15) under ADR-0005, reviewed by Claude Fable 5.2 (buil
     Note: the document views (`document_overview`, `document_line_overview`, `open_item_overview` through its origin document, `demand_supply_overview` through its source document) apply owner scope. `system_account_turnover`, `forecast_accuracy` and `stock_overview` total over documents without returning them and are registered `is_owner_scoped: false`, so they need an assignment with owner scope `branch` or `company` ([ADR-0054](0054-users-roles-and-authorizations.md) rule 15).
 
     Note ([ADR-0058](0058-configurable-workflows.md), proposed 2026-11-15): new views `automation_execution_overview` (no partner column, so closed to tainted runs) and `decision_artifact_overview` (agent types with their settings, and every artifact with its kind, owner, state, version in force and last monitor result, the one registry of X9). Both return only rows inside the reader's record and owner scope and replace values of field classes the reader lacks by their hashes (rule 11; [ADR-0059](0059-ai-tuning-and-development-of-deterministic-functions.md) rule 26).
+
+    Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), proposed 2026-11-15): the analysis layer adds the views `journal_line_overview` (with `is_closing_entry`, `is_migration_entry`, `is_special_period` and the `opening_turnover` rows, which only a company-wide grant sees), `sales_line_overview`, `purchase_line_overview`, `stock_movement_overview`, `production_output_overview` and `production_variance_overview`, with the label views of its dimensions and the helper views `posting_period_dimension` and `open_item_line_dimension`, which carry no scope and are joined only on keys of in-scope fact rows. Each declares its grain and omits untrusted columns; `production_variance_overview` is registered `is_owner_scoped: false` (rule 3).
 52. Computed module queries stay with their modules and are allowed on tool lists: `GetPrice` (ADR-0045 rule 4), `EvaluateConfiguration` (ADR-0046 rule 8), `GetConfigurationEstimate`, `GetCreditExposure` (ADR-0047 rule 18), `GetAvailableToPromise` (ADR-0023), `GetProjectedAvailability`, `ListPegging`, `ListCapacityLoad`, `GetCapacityLevelingProposal` (ADR-0024, ADR-0036), `GetAllocationProposal` (ADR-0048 rule 6), `GetOutboundContentCheck` (`crm`, ADR-0029 rule 14; rule 36), `ListWorkItem` and `GetWorkItem` (ADR-0042). A view never re-implements a figure a module computes: exposure, availability and prices come only from these queries. They run in read-only transactions under the same timeouts, and rules 25–28 apply to their results.
 
     Note: the reporting queries are computed module queries too: `GetStatutoryReport`, `ListBookRow`, `ListReportLineContribution`, and the definition, filing, comparative value and render job queries of `reporting`. For agent runs they run under the 10-second statement timeout for agent runs (rule 43), so an agent reads a large book by cursor ([ADR-0049](0049-statutory-reporting-and-printing.md) rule 15).
 53. Management reporting (ADR-0027 rule 8):
     - **`system_account_turnover`:** per company, posting period, system account (ADR-0010), branch, cost center, project and transaction currency: debit and credit turnover and closing balance in company currency, and in group currency where set. It reads `account_period_balance` for locked periods and journal lines for open ones (ADR-0014 rule 18), so figures agree with the books.
     - **Statutory reports** stay DS-26's. Management reports are views and exports, never documents.
+
+    Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), proposed 2026-11-15): management reports are analysis plans over the facts of the analysis catalog, `system_account_turnover` among them; saved analyses and KPIs keep them as company data (rules 3, 26, 27).
 54. List export (ADR-0040 rule 6):
     - **`CreateListExport`** (module `query`, effect class `other`): a `List<…>` query, its filters, columns and language. It creates a `list_export` record (`state`: `queued`, `running`, `done`, `failed`) and emits `ListExportCreated`. A long-job consumer of that event on queue `jobs` (ADR-0031 rule 15) writes the file, so no job is enqueued on a handler's path (ADR-0013 rule 13).
     - **The consumer** pages through the query as the requester, so field classes and scope apply, translates headers and enumerations on the server, and writes an `.xlsx` with XlsxWriter (ADR-0002). More rows than `list_export_max_rows` (installation setting, default 100,000) fail with `list_export_too_large`.
@@ -405,6 +435,8 @@ Status: accepted (2026-11-15) under ADR-0005, reviewed by Claude Fable 5.2 (buil
     - **Agents** never export (rule 30).
 
     Note: `CreateListExport` refuses every query of module `reporting` with `list_export_query_not_allowed`. Statutory reports and books leave only through `RenderReport`, which carries the opening, totals and closing rows and the full-scope check ([ADR-0049](0049-statutory-reporting-and-printing.md) rule 20).
+
+    Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), proposed 2026-11-15): people export analysis results through `ListAnalysisResultRow`, which reruns the plan as the requester; agents still never export (rule 17).
 
 **Catalogs and checks**
 

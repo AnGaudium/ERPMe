@@ -1358,6 +1358,11 @@ CREATE TABLE production_order_period_cost (                -- written only by th
     CONSTRAINT ck_production_order_period_cost_balance CHECK (closing_amount = opening_amount + incurred_amount - abnormal_amount - residual_amount - to_output_amount)
 );
 
+-- production_order_variance (ADR-0060 rule 19; ADR-0035 rule 15 note), DDL to come with the DS-53 costing tables: one row per
+-- production order, period and variance category (input_price, input_quantity, resource_usage, scrap, lot_size,
+-- remaining), with the order's output item, warehouse and branch, written by the costing run when it settles the
+-- order's period cost from the function behind GetProductionOrderVariance; read by query.production_variance_overview.
+
 -- ===== Revision immutability (ADR-0033 rules 3, 9; ADR-0035 rule 14) =====
 CREATE FUNCTION production_revision_guard() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN

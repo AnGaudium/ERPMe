@@ -286,8 +286,23 @@ for n, spec in BARCODES.items():
 for n, leaf in BARCODE_QUERIES.items():
     REG.append((n, leaf, "query", verb_of(n), None))
 # Agent and platform commands of ADR-0054 rule 24's table note (holistic platform review).
-AGENT_TYPES = ("customer_onboarding", "quotation", "bank_matching", "purchase_invoice", "planning", "data_migration")
+AGENT_TYPES = ("customer_onboarding", "quotation", "bank_matching", "purchase_invoice", "planning", "data_migration", "analysis")   # analysis: ADR-0060
 REG += [(f"start_agent:{a}", f"agent_{a}", "capability", None, "edit") for a in AGENT_TYPES]
+# Agent-assisted analysis (ADR-0060 rules 14, 21, 26, 28, 36).
+ANALYSIS = {"CreateAnalysisQuestion": ("analysis_question", "other"), "UpdateAnalysisFeedback": ("analysis_question", "other"),
+            "UpdateAnalysisAnswer": ("analysis_question", "other"), "CreateSavedAnalysis": ("general_access", "master_data_change"),
+            "UpdateSavedAnalysis": ("general_access", "master_data_change"), "CreateAnalysisExample": ("saved_analysis", "master_data_change"),
+            "UpdateAnalysisExample": ("saved_analysis", "master_data_change"), "ReleaseSavedAnalysis": ("saved_analysis", "master_data_change"),
+            "ReleaseAnalysisExample": ("saved_analysis", "master_data_change")}
+ANALYSIS_QUERIES = {"EvaluateAnalysisPlan": "general_access", "GetAnalysisPlanExplanation": "general_access", "ListAnalysisCatalog": "general_access",
+                    "ListAnalysisDimensionMember": "general_access", "ListAnalysisCellRow": "general_access", "ListAnalysisResultRow": "general_access",
+                    "ListSavedAnalysis": "general_access", "GetSavedAnalysis": "general_access", "ListAnalysisExample": "saved_analysis",
+                    "ListAnalysisQuestion": "analysis_question", "GetAnalysisQuestion": "analysis_question"}
+for n, spec in ANALYSIS.items():
+    REG.append((n, spec[0], "command", verb_of(n), spec[1]))
+for n, leaf in ANALYSIS_QUERIES.items():
+    REG.append((n, leaf, "query", verb_of(n), None))
+REG += [("read_analysis_debug", "analysis_debug", "capability", None, "full"), ("share_saved_analysis", "saved_analysis", "capability", None, "edit")]
 # The lead-time update of ADR-0024 rule 23 (simulation review 2026-11-15).
 REG += [("CreateSupplierItem", "supplier_item", "command", "Create", "master_data_change"),
         ("UpdateSupplierItem", "supplier_item", "command", "Update", "master_data_change")]
@@ -498,8 +513,9 @@ check("C27 is_internal_only commands are in no template's expansion, owner inclu
       INTERNAL <= set(by_name) and not any(INTERNAL & EXP[t] for t in TEMPLATES) and not (INTERNAL & set(expand(ALL_ROOTS_FULL))))
 starts = lambda t: {p.split(":", 1)[1] for p in EXP[t] if p.startswith("start_agent:")}
 # simulation review 2026-11-15: workflow owners are not the planned approvers (ADR-0054 rule 11 note)
-SEED = {"sales_clerk": {"quotation", "customer_onboarding"}, "accountant": {"bank_matching", "purchase_invoice"},
-        "production_planner": {"planning"}, "owner": set(AGENT_TYPES), "it_administrator": set(AGENT_TYPES)}
+SEED = {"sales_clerk": {"quotation", "customer_onboarding"}, "accountant": {"bank_matching", "purchase_invoice", "analysis"},
+        "production_planner": {"planning", "analysis"}, "owner": set(AGENT_TYPES), "it_administrator": set(AGENT_TYPES),
+        "chief_accountant": {"analysis"}, "sales_manager": {"analysis"}, "purchasing_manager": {"analysis"}}   # analysis seed: ADR-0060 rule 36
 check("C28 start_agent follows the interim seed per agent type leaf; UpdateAgentTypeSetting and cancel_agent_runs need full on agent",
       all(starts(t) == SEED.get(t, set()) for t in TEMPLATES) and all(f"agent_{a}" in PARENT and PARENT[f"agent_{a}"] == "agent" for a in AGENT_TYPES)
       and {t for t in TEMPLATES if "UpdateAgentTypeSetting" in EXP[t]} == {"owner", "it_administrator"}
@@ -520,6 +536,12 @@ check("C29 general_access at edit for every template but the auditor (uploads, l
       and "CreateAttachment" not in EXP["auditor"] and "GetApprovalProgress" in EXP["auditor"]
       and {t for t in TEMPLATES if "RetryEventDelivery" in EXP[t]} == {"owner", "it_administrator"}
       and {t for t in TEMPLATES if "ClearTaint" in EXP[t]} == {"owner", "chief_accountant"})
+FIVE_AN = {"chief_accountant", "accountant", "sales_manager", "purchasing_manager", "production_planner"}
+check("C29b agent-assisted analysis (ADR-0060 rule 36): every template runs plans; every template but the auditor saves private analyses; sharing and examples for the owner and the five; release for the owner and the chief accountant; questions for the owner and the five; read_analysis_debug for the owner alone",
+      all("EvaluateAnalysisPlan" in EXP[t] for t in TEMPLATES) and {t for t in TEMPLATES if "CreateSavedAnalysis" in EXP[t]} == TEMPLATES - {"auditor"}
+      and {t for t in TEMPLATES if "share_saved_analysis" in EXP[t]} == FIVE_AN | {"owner"} and {t for t in TEMPLATES if "ReleaseSavedAnalysis" in EXP[t]} == {"owner", "chief_accountant"}
+      and {t for t in TEMPLATES if "CreateAnalysisQuestion" in EXP[t]} == FIVE_AN | {"owner"}
+      and [t for t in TEMPLATES if "read_analysis_debug" in EXP[t]] == ["owner"] and "ListAnalysisQuestion" in EXP["auditor"])
 # stored expansion and INV-220
 perms = expand(TPL["sales_manager"])
 X("update role set expansion_hash=%s, registry_version='lab' where id=%s", (ehash(perms), I["role"]))

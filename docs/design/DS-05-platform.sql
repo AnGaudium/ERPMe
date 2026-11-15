@@ -201,7 +201,9 @@ CREATE TABLE agent_run (                                   -- company data, not 
     CONSTRAINT ck_agent_run_taint CHECK ((tainted_at IS NULL) = (taint_source_kind IS NULL)),
     -- Rule 17's table of outcomes by state.
     CONSTRAINT ck_agent_run_outcome CHECK (CASE state
-        WHEN 'completed' THEN outcome IN ('drafted', 'no_action', 'not_applicable', 'routing_blocked')
+        WHEN 'completed' THEN outcome IN ('drafted', 'no_action', 'not_applicable', 'routing_blocked',
+                                          'answered', 'ambiguous_term', 'ambiguous_member', 'out_of_coverage', 'not_permitted',
+                                          'data_not_ready', 'too_broad')   -- the analysis outcomes (ADR-0060 rule 24)
         WHEN 'stopped' THEN outcome IN ('claim_lost', 'budget_exceeded', 'time_exceeded', 'output_invalid', 'provider_unavailable',
                                         'resume_diverged', 'crashed', 'denials_repeated')
         WHEN 'canceled' THEN outcome = 'canceled'

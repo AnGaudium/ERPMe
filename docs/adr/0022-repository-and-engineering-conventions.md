@@ -71,6 +71,8 @@ Checks:
 
    Note ([ADR-0059](0059-ai-tuning-and-development-of-deterministic-functions.md), proposed 2026-11-15): a module that owns a tunable function or an artifact kind registers, with its declaration, the pure functions `backtest`, `compare` and `monitor` in its contract; `automation` calls them. `policy`'s auto-post evidence hook gains `auto_post_eligibility`, which `cash` registers, so the policy floor for cascade drafts needs no import of `cash`. `configuration` declares the hook `artifact_in_force_changed`, which `policy` registers (calling its contract function `mark_auto_post_evidence_outdated`) and `app` wires (rule 2).
 
+   Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), proposed 2026-11-15): `query` also owns the analysis layer: the catalog of facts, measures and dimensions, the plan validator, compiler and executor, and the tables `analysis_question`, `saved_analysis`, `saved_analysis_version` and `analysis_example`. Besides `db`, `registry` and `agent_runs` it now imports the `work` contract, downward, to raise `analysis_answer_disputed` and `analysis_catalog_request`. `agents` adds the `analysis` workflow, which reaches `query` only through the dispatcher. No external semantic engine runs in the core (rule 1).
+
 3. Shape of each module:
    - A module that owns tables or commands has:
      - `contract.py`, the only part other modules import (rule 4);

@@ -163,6 +163,8 @@ Statutory reports, books and printed documents are produced by one new layer-4 m
     - **Formula lines** list the lines they refer to, each drillable in turn.
     - **Values from migration data** (`opening_turnover`, `report_comparative_value`) appear as such, with their source.
     - **The sum** of contributions equals the figure (INV-401).
+
+    Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), proposed 2026-11-15): the analysis layer's drill-down to the rows behind a cell keeps this contract for its facts over journal lines (the query is owned by `query`, not by this module): the rows behind a cell are journal lines with their contributions, and the cell equals their sum, or for a balance an opening row plus the lines, as the books of rule 10 (INV-410) (rule 16).
 17. Scope, field classes and permissions:
     - **Full scope.** Statements and books need the whole company. An actor whose record scope (ADR-0017 rule 9) is limited gets `report_scope_incomplete`, never totals with rows left out. Scoped views of the same data are ordinary DS-33 lists with `is_scope_filtered`.
     - **Field classes.** A definition that reads fields with a field class (e.g. unit costs in an inventory book, the product cost sheet) lists them in `field_classes`. An actor without them gets `permission_denied`. Statements built from journal amounts list none.
@@ -172,6 +174,8 @@ Statutory reports, books and printed documents are produced by one new layer-4 m
 18. Agents may read statements, books and drill-downs through the query layer, to answer questions and explain figures.
     - **The tension with ADR-0010 rule 14.** That rule makes agents reason in system accounts. Statements and books are operational-account views. Reading them is allowed; using an operational code to choose an account, a policy input or a posting is not. A note on ADR-0010 rule 14 says so.
     - **No filing.** Agents never file (rule 19).
+
+    Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), proposed 2026-11-15): agents also answer questions through the analysis layer, whose ledger measures select system accounts and follow rules 6, 7 and 13: migration entries never in turnover, `closing_entries=exclude` on profit-and-loss measures, and the `special_periods` option. At full scope each equals this ADR's turnover measure over the operational accounts mapped to the subtree (INV-411); statement lines are not claimed, since a line may split a measure by side or partner (rule 35).
 
 **Filing**
 
@@ -335,6 +339,8 @@ Statutory reports, books and printed documents are produced by one new layer-4 m
     Note: error `document_not_approved` (precondition; rule 28 note), shared with [ADR-0052](0052-minimal-crm.md) rule 28.
 
     Note (catalog review, 2026-11-15): the loader error `report_definition_in_use` is catalogued in [DS-14](../design/DS-14-localization-package.md) (Loader errors), not in DS-04; the job outcome codes are this ADR's own enumeration, not error codes (DS-04 says so).
+
+    Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), proposed 2026-11-15): INV-410 to INV-414 of the reporting block are agent-assisted analysis's, INV-413 and INV-414 with area `safety` (rule 35).
 32. CI and golden figures:
     - **Golden kind.** DS-16 gains the kind `report_line` (keys `report`, `line`, `from`, `to`; company amounts), compared through `GetStatutoryReport`. The naive recomputation of step 8 adds report lines from the definitions in the regime snapshot.
     - **Package CI** (ADR-0016 rule 15). Every definition parses; its selectors name accounts of the regime's chart template; formulas and `report:` terms refer to existing lines and have no cycle; book fields exist in the row source. Every statement with `is_fileable` has at least one golden scenario with `report_line` rows for it, as "statutory reports matching their sample figures".

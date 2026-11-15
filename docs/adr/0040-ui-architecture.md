@@ -31,6 +31,8 @@ The web UI is one more client of the command and query layer. It writes data onl
    - **The live stream** is a signal to refetch. It carries no data that a query would not give.
 2. The client does no business arithmetic. Totals, taxes, prices, conversions and stock effects come from simulation; the client only formats them.
    - **Decimals.** They travel as canonical decimal strings (ADR-0006 rule 13) and are never parsed into floating-point numbers. A small self-written decimal-string module formats them by locale, at the scale of the field's currency or unit (`x-erpme-scale-from`, rule 4; ADR-0006 rule 14). It parses localized input back to the canonical form. Input with too many decimals is shown as the server's `too_many_decimal_places`, never rounded.
+
+   Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), proposed 2026-11-15): analysis charts and tables plot server cells only: totals, subtotals, other rows, shares, changes and contributions are cells of `EvaluateAnalysisPlan`; every figure of an answer is a key fact, and every sentence of its narrative, rendered by code with the formatter of this rule from fixed templates (rules 15, 23, 32).
 3. Times and dates:
    - **Business dates.** Shown as stored (`YYYY-MM-DD`, formatted by locale).
    - **Instants.** Shown in the user's time zone (ADR-0007 rule 14).
@@ -80,6 +82,8 @@ The web UI is one more client of the command and query layer. It writes data onl
    The export is `CreateListExport`, with at most `list_export_max_rows` rows ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 54).
 
    Note ([ADR-0057](0057-document-intake-and-extraction.md), proposed 2026-11-15): the extraction verification screen is a hand-built screen: the page beside the fields with evidence boxes, risky fields first, keyboard first, machine-checked fields apart from human-confirmed ones, unaligned values greyed and duplicates and flags at the top ([ADR-0057](0057-document-intake-and-extraction.md) rule 22).
+
+   Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), proposed 2026-11-15): a further screen kind, the analysis view: the builder with measure, dimension and filter chips from `ListAnalysisCatalog`; the answer view (restatement, table or chart, key facts with clickable figures, narrative sentences rendered by code with member chips and citation markers, plan chips and SQL, scope and truncation notes, badge, `as_of`); saved analyses with KPI tiles. Saved analyses are analysis plans, not saved list filters, which stay after Phase 1; results are exported through `ListAnalysisResultRow` and `CreateListExport` (rules 17, 32).
 7. Navigation:
    - **The menu** is generated from the registry. Modules are grouped by area: accounting, inventory, sales, purchasing, production, warehouse, planning, work, settings. The user sees only nouns they may list, from `GetSessionContext`.
    - **The command palette** (`Ctrl/Cmd+K`) finds any permitted command, query, list or record by English or translated name.

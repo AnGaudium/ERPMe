@@ -91,6 +91,8 @@ Before step 1 code freezes the platform modules, every entity that several modul
 
    ADR-0012 rule 17's "DS-26" for these computations is corrected.
 
+   Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), proposed 2026-11-15): management reporting is the analysis layer of `query`: declared measures over the semantic views, plans compiled to one `SELECT`, saved analyses and KPIs as company data, still never documents. Measures over accounts use system accounts and ADR-0049's turnover rules for closing and migration entries, and equal ADR-0049's turnover for the same scope and range (INV-411) (rules 3, 4, 26, 35).
+
 **Read models**
 
 9. Read models and when they update:
