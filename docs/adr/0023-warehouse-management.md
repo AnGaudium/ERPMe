@@ -77,6 +77,8 @@ A small shop and a managed distribution warehouse run on the same model.
      | Booleans | `is_mixed_item_allowed`, `is_mixed_lot_allowed`, `is_blocked_for_putaway`, `is_blocked_for_picking` (manual blocks only), `is_active` |
 
    - Bins are created and changed in batches (ADR-0008). A bin with stock cannot be deactivated (`bin_not_empty`). Every warehouse also has a default zone and a default bin (code `DEFAULT`, barcode `<warehouse code>-DEFAULT`), which cannot be deactivated while the warehouse is not bin-managed ([ADR-0031](0031-design-simplifications.md) rule 7).
+
+   Note ([ADR-0061](0061-barcodes.md), proposed 2026-11-15): the bin barcode is an internal code in normalized (upper-case) form, registered in the company's barcode registry: unique across bins, item units, handling units, lots, serials and barcoded documents, so a bin code equal to an item barcode is refused (`barcode_taken`). The default "the code" applies when the code fits the internal code format; an old system's numeric label may be kept as a legacy code (`is_legacy_barcode`). A changed barcode stays reserved: an old label resolves to `barcode_retired`, and the bin may take its old code back (rules 7, 8).
 3. Product and partner fields:
    - The product (ADR-0018 rule 3) gets:
      - `is_inspection_required`;
@@ -113,6 +115,8 @@ A small shop and a managed distribution warehouse run on the same model.
    - **Packing.** `PackHandlingUnit` and `UnpackHandlingUnit` are warehouse movements.
 
    Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): handling unit types stay physical containers, unrelated to product units in Phase 1; a quantity per handling unit type and packaging dimensions come after Phase 1 (rule 15).
+
+   Note ([ADR-0061](0061-barcodes.md), proposed 2026-11-15): a handling unit's barcode is an SSCC (18 digits, valid check digit) or an internal code (default prefix `HU-`), registered in the barcode registry. A receipt scan of a supplier's (00) gives a new handling unit that SSCC in a handling-unit-managed warehouse. A supplier's retired SSCC is deleted by the daily job `RunRetiredSsccCleanup` once `barcode.sscc_reuse_months` have passed (a company setting, default 12, unverified), so the pallet may come back; an SSCC under the company's own prefixes, active or not, needs a person, ERPMe never reissues one, and SSCC assignment comes after Phase 1 (rules 7, 17, 25).
 
 **Movements**
 
@@ -220,6 +224,8 @@ A small shop and a managed distribution warehouse run on the same model.
     - A short confirmation creates a count task for the source bin, which blocks it until counted (rule 18), and an exception. The demand line keeps the unpicked rest, which the next `RunPickRelease` takes up.
     - What happens to the order after a short pick is an open question. Interim, flagged: ship what is picked, and leave the rest as backorder on the demand line.
     - Every scan carries a device idempotency key (ADR-0008); the PWA chains simulate and execute in one call sequence.
+
+    Note ([ADR-0061](0061-barcodes.md), proposed 2026-11-15): every scanned field is confirmed: the handler evaluates the raw scan with `EvaluateBarcode` against what the step expects (the source bin, the handling unit, the task's item, a lot or serial of that item, the proposed or a changed target bin) and refuses anything else with `scan_mismatch`, or `scan_unresolved` when the scan has a typed issue; overrides are command fields with a reason. Serials are scanned per unit with a running count, a serial scanned twice is refused (`serial_already_scanned`), and scanning a closed handling unit that the task takes whole confirms all its serials (rules 15, 19).
 16. Deliveries are created from confirmed picks:
     - `CreateDelivery` takes the picked stock (lots, serials, bins, handling units) of one or more demand lines. The delivery never needs updating after approval (ADR-0009 rule 9), and a short pick simply yields a partial delivery.
     - In the `staged` flow, picks go to `staging`; packing closes handling units in `packing`; `PostDelivery` posts the goods issue from the `shipping` bin.
@@ -260,6 +266,8 @@ A small shop and a managed distribution warehouse run on the same model.
 22. Printing (DS-27) covers bin labels, handling-unit labels, putaway and pick lists on paper, and confirmation from a desktop screen, so warehouses without phones work from step 5. The PWA (DS-31) comes at step 9; offline scanning after Phase 1.
 
     Note: labels and lists are print subjects over registered queries. The print contract, the worker and their templates come at step 5, interim until the author decides the build order ([ADR-0049](0049-statutory-reporting-and-printing.md) rules 25, 30).
+
+    Note ([ADR-0061](0061-barcodes.md), proposed 2026-11-15): label subjects also cover item units, lots and serials (`ListItemLabel`, `ListLotLabel`, `ListSerialLabel`), with Code 128 for bins and documents, GS1-128 with (00) for handling units that carry an SSCC, and GS1 DataMatrix for item units, lots and serials that have a GTIN; barcoded document prints carry `document.barcode`. ZPL and a print agent come after Phase 1 (rules 20, 21, 25).
 23. Queries and reports (DS-33):
     - `GetStockBalance`, extended by bin, status and handling unit;
     - `GetAvailableToPromise`;

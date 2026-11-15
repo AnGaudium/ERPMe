@@ -387,6 +387,8 @@ ADR-0017 fixed the envelope: permissions are the names of registered commands, q
     | `RetryEventDelivery`, `SkipEventDelivery` | `event_delivery` | `post` | `human_only`; deliveries with a company; installation deliveries stay the operator's |
     | `ReplayEvents` | `event_delivery` | `full` | `human_only` |
 
+    Note ([ADR-0061](0061-barcodes.md), proposed 2026-11-15): `EvaluateBarcode` is one more member of `general_access` at `read`: it checks each candidate's own read permission and answers `barcode_unknown` when none is readable (rule 12). `RunRetiredSsccCleanup`, leaf `product`, is registered `is_internal_only` beside `RunApprovalEscalation`: no level grants it and no role holds it (rule 7).
+
 **Catalogs and lab**
 
 25. Catalog rows:
@@ -409,6 +411,8 @@ ADR-0017 fixed the envelope: permissions are the names of registered commands, q
     Note: INV-216 is now [ADR-0050](0050-agent-runtime-and-query-layer.md)'s (rule 55 note); INV-217 to INV-219 stay unused.
 
     Note (catalog review, 2026-11-15): corrected: the reporting block of [ADR-0049](0049-statutory-reporting-and-printing.md) is EC-92 to EC-98; EC-99 and EC-100 are CRM rows of [ADR-0052](0052-minimal-crm.md); EC-101 to EC-109 are unused. This ADR's block is EC-110 to EC-129, of which EC-110 to EC-118 are taken (with ADR-0055's).
+
+    Note ([ADR-0061](0061-barcodes.md), proposed 2026-11-15): EC-119 to EC-129 are barcode edge cases of ADR-0061 (its rule 27), which fills this block.
 26. Lab check `t12_access.py` ([validation lab](../reviews/2026-11-14-design-validation/README.md)), on DS-15-access.sql loaded with DS-20 and DS-06:
     - the field counts of every catalog file it reads, and every glossary verb against the verb catalog;
     - level expansion: inheritance and overrides, verbs against effect classes, declared minimum levels, the approval flag, capabilities, the templates' delegation and agent run body rights, and the same set for shuffled inputs;

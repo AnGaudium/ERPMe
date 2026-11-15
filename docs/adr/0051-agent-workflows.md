@@ -134,6 +134,8 @@ Six agent types are designed now, each as a code-orchestrated workflow on the ru
     Note (simulation review, 2026-11-15): in L4, a value that the span check drops fails the round: it is fed back to the model with the reason, like a violation, and the round counts toward the 3. It is never replaced by a model or characteristic default: the final check also requires that no characteristic whose value was dropped got its value from a default in `EvaluateConfiguration`. After the last round such a characteristic is missing, and the line is drafted with the values that passed and a note, as above.
 
     Note (simulation review, 2026-11-15): L1 is skipped in a run that a person starts on their own note (rule 14 and its note): the person classified the request by starting the run, so the run begins at L2 with intent `quotation_request`. A run on an inbound e-mail always runs L1.
+
+    Note ([ADR-0061](0061-barcodes.md), proposed 2026-11-15): a barcode found as a whole token resolves through `EvaluateBarcode` in `search` mode, keeping only `item_unit` candidates; a typed issue (`barcode_unknown`, `barcode_ambiguous`, `barcode_retired`) leaves the line unresolved, never guessed. An unknown supplier GTIN may only be drafted as a `CreateItemBarcode` proposal (rules 13, 14).
 16. Outputs, gates and the rest:
     - **Outputs:** the quotation draft, the reply draft, a note listing unresolved lines and findings, and the links.
     - **Human gates.** A salesperson reviews, completes the unresolved lines, and submits the quotation (a policy point with discount, margin, below-cost and credit conditions, ADR-0043 rule 3). A person sends the reply; the gate checks consent and content (ADR-0019 rule 17).

@@ -394,6 +394,7 @@ CREATE TABLE document (
                               'draft', 'pending_approval', 'approved', 'issuing', 'sending', 'posted', 'reversed', 'closed', 'canceled')),
     version               integer NOT NULL CONSTRAINT ck_document_version CHECK (version >= 1),   -- the version in force (ADR-0028 rule 4)
     number                text,                            -- null until numbered (rules 8, 13)
+    is_barcoded           boolean NOT NULL DEFAULT false,  -- from the type's registry flag at Create, never changed; numbered: the number is a barcode (ADR-0061 rule 9)
     branch_id             uuid,
     reversal_of_id        uuid,
     correction_of_id      uuid,                            -- set at Create, never changed (rule 23)
@@ -1184,8 +1185,9 @@ BEGIN
         END IF;
         RAISE EXCEPTION 'document in state % is immutable (ADR-0009 rule 14)', OLD.state USING ERRCODE = 'restrict_violation';
     END IF;
-    IF (NEW.company_id, NEW.document_type, NEW.reversal_of_id, NEW.correction_of_id, NEW.created_by_user_id)
-       IS DISTINCT FROM (OLD.company_id, OLD.document_type, OLD.reversal_of_id, OLD.correction_of_id, OLD.created_by_user_id)
+    -- is_barcoded is fixed at Create too (ADR-0061 rule 9)
+    IF (NEW.company_id, NEW.document_type, NEW.reversal_of_id, NEW.correction_of_id, NEW.created_by_user_id, NEW.is_barcoded)
+       IS DISTINCT FROM (OLD.company_id, OLD.document_type, OLD.reversal_of_id, OLD.correction_of_id, OLD.created_by_user_id, OLD.is_barcoded)
        OR (OLD.number IS NOT NULL AND NEW.number IS DISTINCT FROM OLD.number) THEN
         RAISE EXCEPTION 'document identity and number are immutable (ADR-0009 rules 15, 23)' USING ERRCODE = 'restrict_violation';
     END IF;
@@ -1457,3 +1459,7 @@ BEGIN
     END LOOP;
 END
 $$;
+-- The company's barcode registry (DS-20, ADR-0061 rule 9): the number of a barcoded document is registered in upper case
+-- when it is set, so it is unique across every barcode type of the company.
+CREATE TRIGGER trg_document_register AFTER INSERT OR UPDATE OF number, is_barcoded OR DELETE ON document
+    FOR EACH ROW EXECUTE FUNCTION barcode_register('document', 'number', 'id');

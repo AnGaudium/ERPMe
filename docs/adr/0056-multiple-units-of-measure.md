@@ -180,6 +180,8 @@ Catch weight, batch-specific factors, an order price unit, handling-unit quantit
 
     Bill of materials lines set their own unit. Count lines propose the inventory unit and accept the product's counting units (rule 15). The command response names the proposed unit's source in `proposed_uom_source`: `source_line`, `barcode`, `partner_item`, `supplier_item`, `product_default` or `inventory_unit`. A unit typed by the person or agent always wins and is not reported as proposed.
 
+    Note ([ADR-0061](0061-barcodes.md), proposed 2026-11-15): a GS1 scan that carries a variable-measure AI (310n net weight, 311n length, 314n area, 315n and 316n net volume) proposes the AI's unit and quantity instead of the barcode's unit: the measure enters in its own unit as the line's entered unit, which must be an allowed unit of the item (`uom_not_allowed`, rule 6), and converts by `convert_quantity` as rule 8 says for receipts; `proposed_uom_source` stays `barcode`. The measure itself is never rounded: extra decimals that are zeros are dropped, any other extra decimal is `too_many_decimal_places` (rule 8; ADR-0006 rule 14). A count AI, (30) or (37), keeps the barcode's unit (rules 17-18).
+
 **Purchasing and planning**
 
 14. **The supplier's order unit.** `supplier_item` gains `order_uom_id`, NOT NULL: any unit the item resolves (rule 6). The command proposes the product's purchase unit when the row is created. `minimum_order_quantity` and `order_multiple` are in that unit.

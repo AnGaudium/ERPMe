@@ -30,7 +30,7 @@ zn, bn = new(), new()
 with c.transaction():                                   # warehouse, default zone and bin in one command (ADR-0031 rule 8)
     X("insert into warehouse (id, company_id, code, name, kind, default_bin_id) values (%s,%s,'WH1','WH1','physical',%s)", (ids["wh"], ids["co"], bn))
     X("insert into zone (id, company_id, warehouse_id, code, name) values (%s,%s,%s,'DEFAULT','Default')", (zn, ids["co"], ids["wh"]))
-    X("insert into bin (id, company_id, warehouse_id, zone_id, code, barcode, bin_type) values (%s,%s,%s,%s,'DEFAULT',%s,'storage')", (bn, ids["co"], ids["wh"], zn, 'WH1-' + str(bn)[-12:]))
+    X("insert into bin (id, company_id, warehouse_id, zone_id, code, barcode, bin_type) values (%s,%s,%s,%s,'DEFAULT',%s,'storage')", (bn, ids["co"], ids["wh"], zn, ('WH1-' + str(bn)[-12:]).upper()))   # normalized form (ADR-0061 rule 7)
 c.close()
 
 def doc(cx, t="sales_invoice"):

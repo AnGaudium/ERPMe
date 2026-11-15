@@ -127,7 +127,7 @@ def wh_bins(cx, foreign_default=False, foreign_zone=False, same_barcode=False, b
     for k in range(n):
         z = zs[(k + 1) % n] if (foreign_zone and k == 0) else zs[k]
         cx.execute("insert into bin (id, company_id, warehouse_id, zone_id, code, barcode, bin_type) values (%s,%s,%s,%s,'DEFAULT',%s,'storage')",
-                   (bs[k], I["co"], ws[k], z, 'BC-' + t if same_barcode else 'BC-' + str(bs[k])[-12:]))
+                   (bs[k], I["co"], ws[k], z, ('BC-' + t if same_barcode else 'BC-' + str(bs[k])[-12:]).upper()))   # normalized form (ADR-0061 rule 7)
 trial("M20 a warehouse with its own default bin is accepted (deferred link)", lambda cx: wh_bins(cx), False)
 trial("M21 a warehouse's default bin cannot be another warehouse's bin", lambda cx: wh_bins(cx, foreign_default=True), True, "fk_warehouse_default_bin")
 trial("M22 a bin's zone must be in the bin's warehouse", lambda cx: wh_bins(cx, foreign_zone=True), True, "fk_bin_zone")

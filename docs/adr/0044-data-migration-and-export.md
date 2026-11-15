@@ -63,6 +63,8 @@ The migration period is then locked.
 
    Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): phase 2 loads company units, unit aliases for every unit text of the old system, product and item units (classified exact or inexact at load, never imported) and barcodes before products' documents; sales history (phase 6) is in the inventory unit (rule 21).
 
+   Note ([ADR-0061](0061-barcodes.md), proposed 2026-11-15): phase 2 loads the old system's barcodes. A code that is a valid GTIN loads as one; any other old code of 1 to 48 characters of `A-Z 0-9 - . / _`, starting with a letter or a digit, numeric ones included, loads with `is_legacy_barcode` on item barcodes, bins and handling units, so existing labels stay readable. Codes with other characters (a space, `+`, `$`, `%`) are listed for relabelling. Legacy codes are unique in the barcode registry, numeric ones also on their digits padded to 14, never parsed as GS1, and a numeric one that passes a GTIN check digit is listed with `legacy_code_gtin_like`. Lot and serial codes load as they are (rule 8).
+
 **Formats and identities**
 
 4. The template is one workbook, generated from the registry:

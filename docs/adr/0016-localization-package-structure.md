@@ -68,6 +68,8 @@ Note: the formats of print templates (DS-27) and of statutory reports and books 
 
     Note: `AmountInWords` (`amount_in_words(amount, currency, language) -> str`) is one more published interface; the core ships English. Where no installed implementation covers the print language, the print shows the amount in numerals only, formatted for that language ([ADR-0049](0049-statutory-reporting-and-printing.md) rule 25).
 
+    Note ([ADR-0061](0061-barcodes.md), proposed 2026-11-15): `TraceabilityCodeProvider` (`traceability_code(item, lot or serial, location, business date) -> {code, label_fields} | None`) is one more published interface. The core ships none; label subjects add the optional field `traceability` when the company's package implements it. A country's traceability codes or digital product passports are package code behind it, never core (rule 24).
+
 **Translations and terminology**
 
 18. English is the source of every string (D8). The core ships catalogs for its own strings and for the names and meanings of system accounts and transaction keys, in English and Vietnamese (D8), in i18next JSON maintained through Weblate (ADR-0002). A package ships catalogs in the same format for its own strings (report lines, template texts, tax code names) and a terminology catalog that overrides core terms for its companies (e.g. `income_summary` shown as "Xác định kết quả kinh doanh"). Chart templates carry each account's name in English and in the package's languages. Note: the core catalog keeps the UI strings, Vietnamese included (D8), and plain translations of system account and key names; Vietnamese accounting names for system accounts and keys belong to `l10n_vn`'s terminology catalog ([ADR-0053](0053-core-neutrality.md) rule 16).

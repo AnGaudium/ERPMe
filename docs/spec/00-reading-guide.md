@@ -264,6 +264,24 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Unit conversion | uom\_conversion | Exact global conversion between two units of one kind: one from-unit = numerator / denominator to-units |
 | Product unit | product\_uom | Another unit a product may use, with its exact conversion to the inventory unit; with the inventory unit, the spec's UoM group |
 | Item barcode | item\_barcode | Barcode of an item in one unit (e.g. a carton) |
+| Barcode | barcode | A code printed as bars or a matrix that a scanner reads; in ERPMe a GS1 key, an internal code or a legacy code, registered once per company ([ADR-0061](../adr/0061-barcodes.md)) |
+| Barcode registry | barcode | One row per barcode of a company, unique across item units, bins, handling units, lots, serials, barcoded documents and reserved codes, and for numeric codes on their digits padded to 14; written by a trigger on the typed tables |
+| Barcode type | barcode.barcode\_type | item\_unit, bin, handling\_unit, lot, serial, document, or internal (a reserved code with no owner) |
+| Internal code | — | A barcode that is not a GS1 key: one upper-case letter, then up to 47 of A–Z, 0–9, - . / \_ |
+| Reserved barcode | barcode.retired\_type, barcode.retired\_owner\_id | A code retired from its object or reserved by the company; it never resolves to another object, and its own owner may take it back |
+| Legacy barcode | is\_legacy\_barcode, barcode.is\_legacy | An old system's label code kept on migration: unique in the registry, may start with a digit, never parsed as GS1 or treated as a GTIN |
+| GS1 element string, application identifier (AI) | erpme.gs1 | GS1 data as AIs of two to four digits, each followed by its value, separated by FNC1 (GS) after variable-length values |
+| GTIN, SSCC | — | GS1 keys of a trade item (stored as 14 digits) and of a logistic unit (18 digits), each with a mod-10 check digit |
+| GS1 company prefix | gs1\_company\_prefix | A prefix licensed from GS1; a company may hold several, one of which generates new GTINs |
+| GS1 Digital Link | — | A URI form of GS1 keys and attributes; parsed like an element string, never fetched |
+| Symbology identifier | scan.symbology\_identifier | The three characters a scanner sends before the data (]C1 for GS1-128), which tell GS1 data from plain data |
+| Scan | scan | One read of a barcode, sent in a command or query as raw text with its identifier, source and decoder; the server evaluates it again |
+| Scan-to-confirm, scan-to-search | EvaluateBarcode | A posting step accepts only the object or type it expects; search only opens records |
+| Keyboard wedge | scan.source | A scanner that types its data into the focused field, recognized by prefix, suffix and speed |
+| Barcoded document type | document.is\_barcoded | A printable type whose numbers are registered as barcodes behind a reserved prefix |
+| Item label, lot label, serial label | ListItemLabel, ListLotLabel, ListSerialLabel | Print subjects that put an item unit's, a lot's or a serial's barcode on a label, with GS1 data when it has a GTIN |
+| Traceability code provider | TraceabilityCodeProvider | A package interface for a country's traceability codes on labels; the core ships none |
+| Set (single-value form) | Set\<Record\>\<Field\> | A command that replaces one field's value of a record that has no update command, e.g. a lot's label code (`SetLotBarcode`); the verb Set otherwise replaces a whole list of values |
 | Item-level unit | product\_uom.item\_id | A product unit row for one item (a variant or configured item), resolved before the product's rows ([ADR-0056](../adr/0056-multiple-units-of-measure.md)) |
 | Conversion snapshot | uom\_numerator, uom\_denominator, uom\_factor\_source | The factor a line used to convert its entered quantity to the inventory unit, and its source (identity, item, product, global); stored on the line, never re-read |
 | Line unit block | quantity, uom\_id, snapshot, inventory\_quantity | The six fields every quantity line stores |

@@ -426,7 +426,8 @@ CREATE TABLE handling_unit (
     id                       uuid PRIMARY KEY,
     company_id               uuid NOT NULL,
     code                     text NOT NULL,
-    barcode                  text NOT NULL,
+    barcode                  text NOT NULL,                  -- an SSCC (18 digits) or an internal code, registered across types (ADR-0061 rule 7)
+    is_legacy_barcode        boolean NOT NULL DEFAULT false, -- an old system's label code kept on migration; set at creation (ADR-0061 rule 8)
     handling_unit_type_id    uuid NOT NULL REFERENCES handling_unit_type (id),
     parent_handling_unit_id  uuid,                           -- one nesting level in Phase 1 (handling_unit_nesting_exceeded, command)
     warehouse_id             uuid NOT NULL,
@@ -1519,3 +1520,7 @@ CREATE TRIGGER trg_material_document_line_no_truncate
 -- Layers never change once written: a position keeps its first price (ADR-0047 rule 13).
 CREATE TRIGGER trg_purchase_order_line_gr_ir_layer_append_only
     BEFORE UPDATE OR DELETE ON purchase_order_line_gr_ir_layer FOR EACH ROW EXECUTE FUNCTION inventory_reject_change();
+-- The company's barcode registry (DS-20, ADR-0061 rule 7): a handling unit's barcode is unique across every barcode type,
+-- and stays reserved when the unit goes; a supplier's SSCC may be released only after the GS1 reuse period.
+CREATE TRIGGER trg_handling_unit_register AFTER INSERT OR UPDATE OF barcode, is_legacy_barcode OR DELETE ON handling_unit
+    FOR EACH ROW EXECUTE FUNCTION barcode_register('handling_unit', 'barcode', 'id');

@@ -272,6 +272,19 @@ for n, spec in REPORTING.items():
     REG.append((n, spec[0], "command", verb_of(n), spec[1]) + tuple(spec[2:]))
 for n, leaf in REPORTING_QUERIES.items():
     REG.append((n, leaf, "query", verb_of(n), None))
+# Barcodes (ADR-0061 rule 10): leaf, effect and declared minimum; the human_only commands among them.
+BARCODES = {"CreateItemBarcode": ("product", "master_data_change"), "UpdateItemBarcode": ("product", "master_data_change"),
+            "DeleteItemBarcode": ("product", "master_data_change"), "CreateBarcodeReservation": ("product", "master_data_change"),
+            "DeleteBarcodeReservation": ("product", "master_data_change", "full"), "CreateGs1CompanyPrefix": ("product", "master_data_change"),
+            "UpdateGs1CompanyPrefix": ("product", "master_data_change"), "DeleteGs1CompanyPrefix": ("product", "master_data_change"),
+            "SetLotBarcode": ("warehouse", "master_data_change"), "SetSerialNumberBarcode": ("warehouse", "master_data_change"),
+            "RunRetiredSsccCleanup": ("product", "other")}
+BARCODE_HUMAN_ONLY = {"DeleteBarcodeReservation"}
+BARCODE_QUERIES = {"EvaluateBarcode": "general_access", "ListItemLabel": "product", "ListLotLabel": "warehouse", "ListSerialLabel": "warehouse"}
+for n, spec in BARCODES.items():
+    REG.append((n, spec[0], "command", verb_of(n), spec[1]) + tuple(spec[2:]))
+for n, leaf in BARCODE_QUERIES.items():
+    REG.append((n, leaf, "query", verb_of(n), None))
 # Agent and platform commands of ADR-0054 rule 24's table note (holistic platform review).
 AGENT_TYPES = ("customer_onboarding", "quotation", "bank_matching", "purchase_invoice", "planning", "data_migration")
 REG += [(f"start_agent:{a}", f"agent_{a}", "capability", None, "edit") for a in AGENT_TYPES]
@@ -294,7 +307,7 @@ REG += [("cancel_agent_runs", "agent", "capability", None, "full"),
         ("ReplayEvents", "event_delivery", "command", "Replay", "other"),
         ("RecordSalesInvoiceEInvoiceOutcome", "sales_invoice", "command", "Record", "other")]
 # Commands registered is_internal_only (ADR-0008 rule 1 note; ADR-0054 rule 8 note): outside the level expansion.
-INTERNAL = {"CompleteAgentRun", "RunAgentQualityCheck", "RunApprovalEscalation", "RecordSalesInvoiceEInvoiceOutcome",
+INTERNAL = {"RunRetiredSsccCleanup", "CompleteAgentRun", "RunAgentQualityCheck", "RunApprovalEscalation", "RecordSalesInvoiceEInvoiceOutcome",
             "RecordInboundMessage", "RecordMailboxIntakeOutcome", "RecordMailboxAuthenticationCheck", "RecordOutboundMessageOutcome",
             "RecordPartnerTaxLookup", "RecordRenderOutcome", "RunPartnerDuplicateScan", "RunPartnerInsightComputation"}
 
@@ -371,7 +384,7 @@ check("C9 IT administrator: roles and assignments, no finance or banking posting
       "CreateRoleAssignment" in it and not any(p.startswith(("Post", "Reverse")) for p in it))
 aud = expand(TPL["auditor"])
 check("C10 auditor: only queries and Render (a file of what they may read), no File or Send",
-      aud and all(p.startswith(("Get", "List", "Render")) for p in aud) and "RenderReport" in aud and "FileStatutoryReport" not in aud)
+      aud and all(p.startswith(("Get", "List", "Evaluate", "Render")) for p in aud) and "RenderReport" in aud and "FileStatutoryReport" not in aud)
 try:
     need(("FrobnicateSomething", "dunning", "command", "Frobnicate", "other")); unknown = False
 except KeyError:
@@ -424,7 +437,7 @@ a49 = open(os.path.join(DOCS, "adr/0049-statutory-reporting-and-printing.md"), e
 a49_rules = a49.split("### Rules", 1)[1].split("\n## ", 1)[0]
 FOREIGN_49 = {"AmountInWords": "package interface", "CompleteMigration": "ADR-0044", "CreateListExport": "ADR-0050", "CreateOpeningTurnover": "ADR-0044",
               "FileTaxReturn": "ADR-0041", "GetBankReconciliation": "ADR-0048", "GetDocumentTaxes": "ADR-0041", "GetTaxReturn": "ADR-0041",
-              "ListBin": "ADR-0023", "RecordEInvoiceOutcome": "ADR-0028", "RunBalanceCarryForward": "ADR-0012"}
+              "ListBin": "ADR-0023", "ListItemLabel": "ADR-0061", "ListLotLabel": "ADR-0061", "ListSerialLabel": "ADR-0061", "RecordEInvoiceOutcome": "ADR-0028", "RunBalanceCarryForward": "ADR-0012"}
 names49 = {n for n in re.findall(r"`([A-Z][a-z]+[A-Z][A-Za-z]+)`", a49_rules)
            if not re.search(r"(Requested|Recorded|Completed|Created|Updated|Posted)$", n) and n not in FOREIGN_49}
 missing49 = []
@@ -438,6 +451,19 @@ for n in sorted(names49):
         missing49.append(n)
 check(f"C23 every one of the {len(names49)} reporting and printing commands and queries of ADR-0049 has a leaf and a verb level",
       len(names49) >= 25 and missing49 == [], missing49)
+# Every barcode command and query of ADR-0061 rule 10 is named there and has a leaf and a verb level; human_only ones declare full.
+a61 = open(os.path.join(DOCS, "adr/0061-barcodes.md"), encoding="utf-8").read()
+missing61 = []
+for n in list(BARCODES) + list(BARCODE_QUERIES):
+    try:
+        ok_ = f"`{n}`" in a61 and by_name[n][1] in PARENT and need(by_name[n]) is not None
+        ok_ = ok_ and (n not in BARCODE_HUMAN_ONLY or (len(by_name[n]) > 5 and by_name[n][5] == "full" and "human_only" in a61))
+    except KeyError:
+        ok_ = False
+    if not ok_:
+        missing61.append(n)
+check(f"C23b every one of the {len(BARCODES) + len(BARCODE_QUERIES)} barcode commands and queries of ADR-0061 has a leaf and a verb level; DeleteBarcodeReservation declares full",
+      missing61 == [], missing61)
 check("C24 UpdatePrintProfile only for the owner; every other template sets print_profile to none",
       [t for t in TEMPLATES if "UpdatePrintProfile" in EXP[t]] == ["owner"]
       and all(TPL[t].get("print_profile") == ("none", False) for t in TEMPLATES - {"owner"}))

@@ -193,6 +193,8 @@ The web UI is one more client of the command and query layer. It writes data onl
     - **Forms:** `Enter` moves to the next field and `Shift+Enter` back. `F2` or typing opens a lookup. `Alt+N` adds a line and `Alt+Delete` removes one. `Ctrl+Enter` reviews, then confirms.
     - **Grids:** AG Grid's model, with the same `Alt` keys.
     - **Registration.** All shortcuts are registered in one map with translated labels, and every action works without a mouse.
+
+    Note ([ADR-0061](0061-barcodes.md), proposed 2026-11-15): a keyboard-wedge scan into a focused code field ends with the scanner's Enter suffix, which moves to the next field as above. Every code field on desktop screens accepts wedge scans and resolves them with `EvaluateBarcode` for the field's expected type; a scan is told from typing by the AIM prefix, the suffix and its speed (rule 22).
 17. Display and targets:
     - **Untrusted fields.** Shown as plain text in a marked "external content" style, never rendered as HTML, with links not clickable.
     - **Taint.** A badge on tainted versions and proposals, with the clearance record.
@@ -233,6 +235,8 @@ The web UI is one more client of the command and query layer. It writes data onl
     - **Hand-built screens.** The UX spec of the six hand-built screens (sales invoice, goods receipt, goods issue, cash receipt, cash payment, journal entry) is written before step 9. It builds on DS-22 and DS-25, which define those documents. It follows these rules: header fields in keyboard order, the AG Grid line editor, the review shortcut, and lookups that type ahead.
     - **Production and planning screens** are generated over their queries (ADR-0034 rule 18; ADR-0024).
     - **Elsewhere:** shop-floor and warehouse flows (DS-31), print (DS-27), list export (DS-33).
+
+    Note ([ADR-0061](0061-barcodes.md), proposed 2026-11-15): DS-31 builds the PWA's scanning on ADR-0061: BarcodeDetector for EAN/UPC and ITF only, until the scanner check page proves on a device that it passes GS through, and a WebAssembly decoder for Code 128, GS1-128, DataMatrix and QR; wedge capture, the shipped scanner profiles and the check page. The WebAssembly modules load on first use and are measured apart from the JavaScript budget of rule 17 (rules 22, 23).
 
 ## Context
 

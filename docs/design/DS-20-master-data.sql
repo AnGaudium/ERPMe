@@ -558,6 +558,7 @@ CREATE TABLE item_barcode (                              -- one barcode per pack
     item_id     uuid NOT NULL,
     uom_id      uuid NOT NULL REFERENCES uom (id),
     barcode     text NOT NULL,
+    is_legacy_barcode  boolean NOT NULL DEFAULT false,   -- an old system's code kept on migration; set at creation (ADR-0061 rule 8)
     CONSTRAINT uq_item_barcode_barcode UNIQUE (company_id, barcode),
     FOREIGN KEY (company_id, item_id) REFERENCES item (company_id, id)
 );
@@ -648,6 +649,7 @@ CREATE TABLE bin (
     zone_id                  uuid NOT NULL,
     code                     text NOT NULL,
     barcode                  text NOT NULL,
+    is_legacy_barcode        boolean NOT NULL DEFAULT false,   -- an old system's label code kept on migration; set at creation (ADR-0061 rule 8)
     bin_type                 text NOT NULL CONSTRAINT ck_bin_type CHECK (bin_type IN ('receiving', 'storage', 'picking', 'shipping', 'quality', 'returns', 'damage', 'production')),
     pick_sequence            integer NOT NULL DEFAULT 0,
     maximum_weight           types.quantity,
@@ -670,12 +672,16 @@ ALTER TABLE warehouse ADD CONSTRAINT fk_warehouse_default_shipping_bin FOREIGN K
 CREATE TABLE lot (                                         -- ADR-0020 rule 17 [inventory]
     id uuid PRIMARY KEY, company_id uuid NOT NULL, item_id uuid NOT NULL,
     code text NOT NULL, expiry_date date, manufacture_date date, UNIQUE (item_id, code),
+    barcode text, UNIQUE (company_id, barcode),            -- the lot's own internal label code, registered across types (ADR-0061 rules 7-8)
+    CONSTRAINT ck_lot_code_not_empty CHECK (code <> ''),   -- any code is kept as it comes, but never an empty one (ADR-0061 rule 8)
     FOREIGN KEY (company_id, item_id) REFERENCES item (company_id, id),
     CONSTRAINT ck_lot_dates CHECK (expiry_date IS NULL OR manufacture_date IS NULL OR expiry_date >= manufacture_date)
 );
 CREATE TABLE serial_number (                               -- ADR-0020 rule 17 [inventory]
     id uuid PRIMARY KEY, company_id uuid NOT NULL, item_id uuid NOT NULL,
     code text NOT NULL, UNIQUE (item_id, code),
+    barcode text, UNIQUE (company_id, barcode),            -- the serial's own internal label code (ADR-0061 rules 7-8)
+    CONSTRAINT ck_serial_number_code_not_empty CHECK (code <> ''),   -- any code is kept as it comes, but never an empty one (ADR-0061 rule 8)
     FOREIGN KEY (company_id, item_id) REFERENCES item (company_id, id)
 );
 
@@ -723,3 +729,137 @@ CREATE TABLE price_list_option_extra (                     -- extra per inventor
         price_list_id WITH =, (coalesce(product_id, '00000000-0000-0000-0000-000000000000'::uuid)) WITH =,
         variant_attribute_value_id WITH =, daterange(start_date, end_date, '[]') WITH &&)
 );
+
+-- ===== Barcode registry [master_data] (ADR-0061 rules 7-9, 11) =====
+-- One row per barcode of a company across every type, so a scan never means two things. Rows are written only by the
+-- trigger barcode_register on the typed tables (item_barcode, bin, lot and serial_number here; handling_unit in
+-- DS-22-09-42-commercial-inventory.sql; document numbers of barcoded types in DS-05-platform.sql). Commands insert only
+-- reserved rows (type internal without retired_type: CreateBarcodeReservation) and delete only reserved or retired rows
+-- (DeleteBarcodeReservation). The registry is derived from the typed rows, so it has no surrogate ID. A barcode whose
+-- owner row is deleted or changes its barcode stays as type internal with retired_type and retired_owner_id, so a stale
+-- label never resolves to another object, and the same owner may take it back.
+CREATE TABLE barcode (
+    company_id        uuid NOT NULL REFERENCES company (id),
+    barcode           text NOT NULL,                       -- normalized: a GTIN as 14 digits, an SSCC as 18, an internal code in upper case
+    barcode_type      text NOT NULL CONSTRAINT ck_barcode_type CHECK (barcode_type IN ('item_unit', 'bin', 'handling_unit', 'lot', 'serial', 'document', 'internal')),
+    encoding          text NOT NULL CONSTRAINT ck_barcode_encoding CHECK (encoding IN ('gtin', 'sscc', 'internal')),
+    is_legacy         boolean NOT NULL DEFAULT false,      -- an old system's code: encoding internal, may start with a digit, never read as GS1 (rule 8)
+    retired_type      text CONSTRAINT ck_barcode_retired_type CHECK (retired_type IN ('item_unit', 'bin', 'handling_unit', 'lot', 'serial', 'document')),
+    retired_owner_id  uuid,                                -- the item of an item barcode, else the owner row itself; it may take the code back
+    retired_at        timestamptz,
+    recorded_at       timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (company_id, barcode),
+    -- GS1 keys are digits (check digits: the trigger); internal codes start with an upper-case letter; legacy codes with
+    -- a letter or a digit (rule 8)
+    CONSTRAINT ck_barcode_format CHECK ((encoding = 'gtin' AND NOT is_legacy AND barcode ~ '^[0-9]{14}$')
+        OR (encoding = 'sscc' AND NOT is_legacy AND barcode ~ '^[0-9]{18}$')
+        OR (encoding = 'internal' AND NOT is_legacy AND barcode ~ '^[A-Z][A-Z0-9./_-]{0,47}$')
+        OR (encoding = 'internal' AND is_legacy AND barcode ~ '^[A-Z0-9][A-Z0-9./_-]{0,47}$')),
+    CONSTRAINT ck_barcode_type_encoding CHECK (encoding = 'internal' OR barcode_type = 'internal'
+        OR (barcode_type = 'item_unit' AND encoding = 'gtin') OR (barcode_type = 'handling_unit' AND encoding = 'sscc')),
+    CONSTRAINT ck_barcode_retired CHECK ((retired_type IS NULL) = (retired_at IS NULL) AND (retired_type IS NULL) = (retired_owner_id IS NULL)
+        AND (retired_type IS NULL OR barcode_type = 'internal'))
+);
+-- Codes of 1 to 14 digits are one code when their digits padded to 14 agree: a GTIN and a numeric legacy code, or two
+-- numeric legacy codes, never mean the same digits. An index, not a test in the trigger, so concurrent inserts are held
+-- too; the trigger maps its violation to barcode_taken (rule 7).
+CREATE UNIQUE INDEX ux_barcode_numeric_padded ON barcode (company_id, lpad(barcode, 14, '0')) WHERE barcode ~ '^[0-9]{1,14}$';
+CREATE TABLE gs1_company_prefix (                          -- the company's GS1 company prefixes (ADR-0061 rule 11)
+    id                    uuid PRIMARY KEY,
+    company_id            uuid NOT NULL REFERENCES company (id),
+    prefix                text NOT NULL CONSTRAINT ck_gs1_company_prefix_prefix CHECK (prefix ~ '^[0-9]{4,12}$'),   -- the valid length range is unverified (rule 11)
+    is_active             boolean NOT NULL DEFAULT true,   -- false: generates nothing new, stays the company's own (the SSCC cleanup job)
+    is_generation_prefix  boolean NOT NULL DEFAULT false,  -- new GTIN-13s take this prefix; at most one per company, and active
+    next_item_reference   bigint NOT NULL DEFAULT 0,       -- of the next generated GTIN-13; a prefix that generated one is never deleted
+    recorded_at           timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (company_id, prefix),
+    CONSTRAINT ck_gs1_company_prefix_reference CHECK (next_item_reference >= 0 AND next_item_reference <= 10 ^ (12 - length(prefix))),
+    CONSTRAINT ck_gs1_company_prefix_generation_active CHECK (is_active OR NOT is_generation_prefix),
+    -- no prefix starts another (rule 11; INV-624): each prefix covers a range of 12-digit numbers, and the ranges of one
+    -- company never overlap, at every isolation level; btree_gist is installed (ADR-0022 rule 8). Commands report it as
+    -- gs1_prefix_invalid. A prefix has at most 12 digits, so both bounds fit bigint.
+    CONSTRAINT ex_gs1_company_prefix_overlap EXCLUDE USING gist (company_id WITH =,
+        int8range(rpad(prefix, 12, '0')::bigint, rpad(prefix, 12, '9')::bigint, '[]') WITH &&)
+);
+CREATE UNIQUE INDEX ux_gs1_company_prefix_generation ON gs1_company_prefix (company_id) WHERE is_generation_prefix;
+-- GS1 mod-10 check over the whole key, check digit included: weights 3, 1, 3, ... from the rightmost data digit (rule 4).
+CREATE FUNCTION gs1_check_digit_valid(digits text) RETURNS boolean LANGUAGE sql IMMUTABLE AS $$
+    SELECT digits ~ '^[0-9]{8,18}$' AND (SELECT sum(substr(digits, i, 1)::int * CASE WHEN (length(digits) - i) % 2 = 1 THEN 3 ELSE 1 END)
+                                           FROM generate_series(1, length(digits)) AS i) % 10 = 0
+$$;
+-- The normalized form (rule 7): GTIN-8, GTIN-12 and GTIN-13 padded to 14 digits; other digits as they are; letters upper case.
+CREATE FUNCTION barcode_normalize(value text) RETURNS text LANGUAGE sql IMMUTABLE AS $$
+    SELECT CASE WHEN value ~ '^([0-9]{8}|[0-9]{12}|[0-9]{13})$' THEN lpad(value, 14, '0') WHEN value ~ '^[0-9]+$' THEN value ELSE upper(value) END
+$$;
+-- AFTER trigger of every typed table: TG_ARGV[0] is the barcode type, TG_ARGV[1] the column, TG_ARGV[2] the owner column
+-- (item_id for an item barcode, id otherwise). A document registers its number in upper case, and only while
+-- is_barcoded (rule 9); every other table must store the normalized form. A row with is_legacy_barcode registers a
+-- legacy code: upper case, never padded or checked as a GTIN (rule 8); the flag never changes. A code retired from the
+-- same type and owner comes back to it; any other collision is barcode_taken (rule 7).
+CREATE FUNCTION barcode_register() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE
+    v_type   text := TG_ARGV[0];
+    v_col    text := TG_ARGV[1];
+    v_ocol   text := TG_ARGV[2];
+    v_old    text;
+    v_new    text;
+    v_enc    text;
+    v_norm   text;
+    v_owner  uuid;
+    v_legacy boolean := false;
+BEGIN
+    IF TG_OP = 'UPDATE' AND (to_jsonb(OLD) ->> 'is_legacy_barcode') IS DISTINCT FROM (to_jsonb(NEW) ->> 'is_legacy_barcode') THEN
+        RAISE EXCEPTION 'is_legacy_barcode is set at creation and never changes (ADR-0061 rule 8)' USING ERRCODE = 'restrict_violation';
+    END IF;
+    IF TG_OP <> 'INSERT' THEN
+        v_old := to_jsonb(OLD) ->> v_col;
+        IF v_type = 'document' THEN
+            v_old := CASE WHEN (to_jsonb(OLD) ->> 'is_barcoded')::boolean THEN upper(v_old) END;
+        END IF;
+    END IF;
+    IF TG_OP <> 'DELETE' THEN
+        v_new := to_jsonb(NEW) ->> v_col;
+        v_legacy := coalesce((to_jsonb(NEW) ->> 'is_legacy_barcode')::boolean, false);
+        IF v_type = 'document' THEN
+            v_new := CASE WHEN (to_jsonb(NEW) ->> 'is_barcoded')::boolean THEN upper(v_new) END;
+        END IF;
+    END IF;
+    IF v_old IS NOT DISTINCT FROM v_new THEN
+        RETURN NULL;
+    END IF;
+    IF v_old IS NOT NULL THEN
+        UPDATE barcode SET barcode_type = 'internal', retired_type = v_type, retired_owner_id = (to_jsonb(OLD) ->> v_ocol)::uuid, retired_at = now()
+         WHERE company_id = OLD.company_id AND barcode = v_old AND barcode_type = v_type;
+    END IF;
+    IF v_new IS NOT NULL THEN
+        v_norm := CASE WHEN v_legacy THEN upper(v_new) ELSE barcode_normalize(v_new) END;
+        IF v_new <> v_norm THEN
+            RAISE EXCEPTION 'barcode_not_normalized: % is stored as %', v_new, v_norm USING ERRCODE = 'check_violation';
+        END IF;
+        v_enc := CASE WHEN v_legacy THEN 'internal' WHEN v_new ~ '^[0-9]{14}$' THEN 'gtin' WHEN v_new ~ '^[0-9]{18}$' THEN 'sscc' ELSE 'internal' END;
+        IF v_enc <> 'internal' AND NOT gs1_check_digit_valid(v_new) THEN
+            RAISE EXCEPTION 'barcode_format_invalid: wrong check digit in %', v_new USING ERRCODE = 'check_violation';
+        END IF;
+        v_owner := (to_jsonb(NEW) ->> v_ocol)::uuid;
+        UPDATE barcode SET barcode_type = v_type, retired_type = NULL, retired_owner_id = NULL, retired_at = NULL
+         WHERE company_id = NEW.company_id AND barcode = v_new AND barcode_type = 'internal' AND retired_type = v_type
+           AND retired_owner_id = v_owner AND is_legacy = v_legacy;
+        IF NOT FOUND THEN
+            BEGIN
+                INSERT INTO barcode (company_id, barcode, barcode_type, encoding, is_legacy) VALUES (NEW.company_id, v_new, v_type, v_enc, v_legacy);
+            EXCEPTION WHEN unique_violation THEN
+                RAISE EXCEPTION 'barcode_taken: % or its digits padded to 14 are registered in the company already', v_new USING ERRCODE = 'unique_violation';
+            END;
+        END IF;
+    END IF;
+    RETURN NULL;
+END
+$$;
+CREATE TRIGGER trg_item_barcode_register AFTER INSERT OR UPDATE OF barcode, is_legacy_barcode OR DELETE ON item_barcode
+    FOR EACH ROW EXECUTE FUNCTION barcode_register('item_unit', 'barcode', 'item_id');
+CREATE TRIGGER trg_bin_register AFTER INSERT OR UPDATE OF barcode, is_legacy_barcode OR DELETE ON bin
+    FOR EACH ROW EXECUTE FUNCTION barcode_register('bin', 'barcode', 'id');
+CREATE TRIGGER trg_lot_register AFTER INSERT OR UPDATE OF barcode OR DELETE ON lot
+    FOR EACH ROW EXECUTE FUNCTION barcode_register('lot', 'barcode', 'id');
+CREATE TRIGGER trg_serial_number_register AFTER INSERT OR UPDATE OF barcode OR DELETE ON serial_number
+    FOR EACH ROW EXECUTE FUNCTION barcode_register('serial', 'barcode', 'id');
