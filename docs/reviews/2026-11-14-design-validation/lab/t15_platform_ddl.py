@@ -466,10 +466,10 @@ AR = {}
 def audit(cx, command="CreateBankMatchingRule", effect="master_data_change", draft_only=False, run_=None, aid=None, company="co", **kw):
     aid = aid or new()
     cx.execute("""insert into audit_record (id, company_id, business_date, command_type, schema_version, effect_class, is_human_only, is_proposal_bound,
-                  is_draft_only, is_internal_only, actor_kind, actor_id, on_behalf_of_id, agent_run_id, reason, idempotency_key, recorded_at)
-                  values (%s,%s,%s,%s,1,%s,false,true,%s,false,%s,%s,%s,%s,%s,%s,now())""",
+                  is_draft_only, is_internal_only, actor_kind, actor_id, on_behalf_of_id, agent_run_id, reason, idempotency_key, causation_chain_id, causation_depth, recorded_at)
+                  values (%s,%s,%s,%s,1,%s,false,true,%s,false,%s,%s,%s,%s,%s,%s,%s,0,now())""",
                (aid, I[company] if company else None, TODAY, command, effect, draft_only, kw.get("actor_kind", "system"), kw.get("actor", new()), I["uOwner"], run_,
-                kw.get("reason"), kw.get("key")))
+                kw.get("reason"), kw.get("key"), new()))
     return aid
 
 
@@ -647,8 +647,8 @@ trial("G19 ... and with the run it is accepted", lambda cx: cx.execute(
 X("insert into event_consumer (consumer, kind, queue, is_paused, recorded_at) values ('cash_bank_matching','transactional','events',false,now()) on conflict do nothing")
 EV = new()
 X("""insert into outbox_event (id, company_id, event_type, schema_version, subject_table, subject_id, subject_sequence, payload, actor_kind, actor_id,
-     business_date, command_type, recorded_at) values (%s,%s,'BankStatementImported',1,'bank_statement',%s,1,'{}','human',%s,%s,'ImportBankStatement',now())""",
-  (EV, I["co"], ST, I["uChief"], TODAY))
+     business_date, command_type, causation_chain_id, causation_depth, recorded_at) values (%s,%s,'BankStatementImported',1,'bank_statement',%s,1,'{}','human',%s,%s,'ImportBankStatement',%s,0,now())""",
+  (EV, I["co"], ST, I["uChief"], TODAY, new()))
 X("insert into event_subject values ('bank_statement',%s,1,now())", (ST,))
 X("""insert into event_delivery (id, consumer, event_id, subject_table, subject_id, subject_sequence, company_id, next_attempt_at, recorded_at)
      values (%s,'cash_bank_matching',%s,'bank_statement',%s,1,%s,now(),now())""", (new(), EV, ST, I["co"]))

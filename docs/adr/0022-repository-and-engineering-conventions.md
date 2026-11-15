@@ -67,6 +67,10 @@ Checks:
 
    Note ([ADR-0057](0057-document-intake-and-extraction.md), proposed 2026-11-15): `attachments` declares the hook `document_reader`; modules and packages register pure readers on it and `app` wires them, so `attachments` imports no module and no package. No new module: the extraction tables belong to `attachments`, mapping rules to `master_data`, the data-processing permission's table to `agent_runs` and its commands to `agents` ([ADR-0057](0057-document-intake-and-extraction.md) rule 1).
 
+   Note ([ADR-0058](0058-configurable-workflows.md), proposed 2026-11-15): new modules `configuration` (layer 2: the configuration and artifact tables, the pure evaluators, validators and graph check, `get_parameters`; it imports the `registry` contract and `work`) and `automation` (layer 5: the automation consumer, replay, evidence, the monitor and the upgrade check; it imports `registry`, the `configuration`, `work` and `permissions` contracts and the contracts of the layer 3–4 modules whose tunable functions it evaluates, and none of its layer-5 peers). `configuration` declares the hook `artifact_checks`, which `automation` registers and `app` wires, for the checks that read layer 3–5 data (rule 1; [ADR-0059](0059-ai-tuning-and-development-of-deterministic-functions.md) rule 2).
+
+   Note ([ADR-0059](0059-ai-tuning-and-development-of-deterministic-functions.md), proposed 2026-11-15): a module that owns a tunable function or an artifact kind registers, with its declaration, the pure functions `backtest`, `compare` and `monitor` in its contract; `automation` calls them. `policy`'s auto-post evidence hook gains `auto_post_eligibility`, which `cash` registers, so the policy floor for cascade drafts needs no import of `cash`. `configuration` declares the hook `artifact_in_force_changed`, which `policy` registers (calling its contract function `mark_auto_post_evidence_outdated`) and `app` wires (rule 2).
+
 3. Shape of each module:
    - A module that owns tables or commands has:
      - `contract.py`, the only part other modules import (rule 4);

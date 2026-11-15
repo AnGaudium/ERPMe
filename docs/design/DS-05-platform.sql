@@ -18,6 +18,8 @@
 -- under the setting value `installation` (ADR-0017 rule 19; ADR-0013 rule 14).
 -- Installation tables, without company_id: event_subject, event_consumer, agent_type, agent_type_version. The lab
 -- checks this list.
+-- The configuration and artifact tables (ADR-0058, ADR-0059) are in DS-28-34-configuration-artifacts.sql; this file carries
+-- only their causation columns on outbox_event and audit_record and the match parameter columns of bank_statement_line.
 -- Referenced tables defined elsewhere: company, branch, partner, partner_bank_account, warehouse, cost_center, project,
 -- currency (DS-20); user_account, role, approval_pool, approval_stage, segregation_exception (DS-15); inbound_message,
 -- interaction_summary (DS-35); journal_entry, open_item, derivation_trace (DS-06); account, fiscal_year, posting_period,
@@ -344,6 +346,9 @@ CREATE TABLE policy_rule_version (
     owner_user_id           uuid REFERENCES user_account (id),
     is_enabled              boolean NOT NULL DEFAULT false,
     shadow_evidence         jsonb,                         -- stored on the rule version by EnablePolicyRule (rule 14)
+    -- ADR-0059 rule 6: the demotion, rollback, invalidation or failed re-evaluation of the cascade's parameter set that made the
+    -- stored evidence outdated, set once in that transaction; no key: the configuration file is loaded after this one.
+    shadow_evidence_outdated_by uuid CONSTRAINT ck_policy_rule_version_outdated CHECK (shadow_evidence_outdated_by IS NULL OR shadow_evidence IS NOT NULL),
     recorded_at             timestamptz NOT NULL,
     UNIQUE (policy_rule_id, version),
     UNIQUE (company_id, id),
@@ -687,6 +692,9 @@ CREATE TABLE outbox_event (                                -- partitioned by mon
     on_behalf_of_id      uuid,
     agent_run_id         uuid,
     origin_agent_run_id  uuid,
+    causation_chain_id   uuid NOT NULL,                    -- ADR-0058 rule 12: new at a transport's, person's or scheduled job's command; inherited by consumers, automation actions and agent runs started from an event
+    causation_depth      smallint NOT NULL CONSTRAINT ck_outbox_event_causation_depth CHECK (causation_depth BETWEEN 0 AND 3),   -- automation actions in the chain so far; no default, the writer sets it
+    automation_rule_version_id uuid CONSTRAINT ck_outbox_event_automation_depth CHECK (automation_rule_version_id IS NULL OR causation_depth >= 1),   -- the rule version whose action emitted it (no key: the configuration file is loaded after)
     is_tainted           boolean NOT NULL DEFAULT false,   -- rule 11
     business_date        date NOT NULL,
     command_type         text NOT NULL,
@@ -738,6 +746,9 @@ CREATE TABLE audit_record (                                -- one per executed c
     on_behalf_of_id         uuid,
     agent_run_id            uuid,
     origin_agent_run_id     uuid,
+    causation_chain_id      uuid NOT NULL,                 -- ADR-0058 rule 12, as on outbox_event
+    causation_depth         smallint NOT NULL CONSTRAINT ck_audit_record_causation_depth CHECK (causation_depth BETWEEN 0 AND 3),
+    automation_rule_version_id uuid CONSTRAINT ck_audit_record_automation_depth CHECK (automation_rule_version_id IS NULL OR causation_depth >= 1),   -- an automation action's rule version (INV-670)
     policy_decision_id      uuid,
     delegated_from_user_id  uuid,                          -- ADR-0054 rule 21
     subject_table           text,
@@ -1006,6 +1017,14 @@ CREATE TABLE bank_statement_line (
     -- The cascade's proposal (flows review A9): a draft or posted document, its score and basis; matched only at Post.
     proposed_document_id          uuid,
     proposal_score                smallint CONSTRAINT ck_bank_statement_line_proposal_score CHECK (proposal_score BETWEEN 0 AND 100),
+    -- ADR-0059 rule 6: the parameters of cash.match_bank_line the proposal was made under, the function version, the parameter
+    -- set version and its state (core_default, assisted, active); a tied match never acts. No key to parameter_set_version: the
+    -- configuration file is loaded after this one.
+    match_parameters_hash         text CONSTRAINT ck_bank_statement_line_match_parameters_hash CHECK (match_parameters_hash ~ '^[0-9a-f]{64}$'),
+    match_function_version        text,
+    match_parameter_set_version_id uuid,
+    match_parameter_state         text CONSTRAINT ck_bank_statement_line_match_parameter_state CHECK (match_parameter_state IN ('core_default', 'assisted', 'active')),
+    match_is_tied                 boolean NOT NULL DEFAULT false,
     match_basis                   text CONSTRAINT ck_bank_statement_line_match_basis CHECK (match_basis IN (
                                       'already_posted', 'reference', 'account_amount', 'account_subset', 'company_rule', 'llm_suggestion', 'manual')),   -- interim: values not stated in ADR-0048 (cascade steps of rule 9)
     -- RecordBankLineSuggestion (ADR-0051 rule 17): tokens, name, purpose and run, all is_untrusted. interim: column names not stated in ADR-0051.
@@ -1031,7 +1050,11 @@ CREATE TABLE bank_statement_line (
     CONSTRAINT ck_bank_statement_line_proposal CHECK ((proposed_document_id IS NULL) = (match_basis IS NULL)
         AND (proposal_score IS NULL OR proposed_document_id IS NOT NULL)
         AND (match_basis IS DISTINCT FROM 'llm_suggestion' OR proposal_score IS NULL)),
-    CONSTRAINT ck_bank_statement_line_suggestion CHECK ((suggestion_agent_run_id IS NULL) = (suggested_purpose IS NULL))
+    CONSTRAINT ck_bank_statement_line_suggestion CHECK ((suggestion_agent_run_id IS NULL) = (suggested_purpose IS NULL)),
+    -- ADR-0059 rule 6: the match parameters are recorded together, and a set version exactly when one was in force.
+    CONSTRAINT ck_bank_statement_line_match_parameters CHECK ((match_parameters_hash IS NULL) = (match_function_version IS NULL)
+        AND (match_parameters_hash IS NULL) = (match_parameter_state IS NULL)
+        AND (match_parameter_set_version_id IS NULL) = (match_parameter_state IS DISTINCT FROM 'assisted' AND match_parameter_state IS DISTINCT FROM 'active'))
 );
 -- ADR-0030 rule 10: bank account, bank reference, value date and amount; without a reference no key applies.
 CREATE UNIQUE INDEX ux_bank_statement_line_natural_key ON bank_statement_line (company_id, money_account_id, bank_reference, value_date, transaction_amount)
@@ -1376,7 +1399,7 @@ CREATE TRIGGER trg_posting_intent_check_change BEFORE UPDATE OR DELETE ON postin
 CREATE TRIGGER trg_change_proposal_execution_immutable BEFORE UPDATE OR DELETE ON change_proposal_execution FOR EACH ROW EXECUTE FUNCTION platform_reject_change();
 CREATE TRIGGER trg_change_proposal_execution_item_immutable BEFORE UPDATE OR DELETE ON change_proposal_execution_item FOR EACH ROW EXECUTE FUNCTION platform_reject_change();
 CREATE TRIGGER trg_policy_rule_version_append_only BEFORE UPDATE OR DELETE ON policy_rule_version FOR EACH ROW
-    EXECUTE FUNCTION platform_check_append_only('{is_enabled}', '{shadow_evidence}', '{}');
+    EXECUTE FUNCTION platform_check_append_only('{is_enabled}', '{shadow_evidence,shadow_evidence_outdated_by}', '{}');
 CREATE TRIGGER trg_change_proposal_frozen BEFORE INSERT OR UPDATE OR DELETE ON change_proposal FOR EACH ROW EXECUTE FUNCTION document_check_frozen('id');
 CREATE TRIGGER trg_change_proposal_item_frozen BEFORE INSERT OR UPDATE OR DELETE ON change_proposal_item FOR EACH ROW EXECUTE FUNCTION document_check_frozen('change_proposal_id');
 CREATE TRIGGER trg_period_unlock_request_frozen BEFORE INSERT OR UPDATE OR DELETE ON period_unlock_request FOR EACH ROW EXECUTE FUNCTION document_check_frozen('id');
@@ -1392,7 +1415,7 @@ CREATE TRIGGER trg_audit_change_append_only BEFORE UPDATE OR DELETE ON audit_cha
 CREATE TRIGGER trg_audit_denial_check_change BEFORE UPDATE OR DELETE ON audit_denial FOR EACH ROW EXECUTE FUNCTION audit_denial_check_change();
 CREATE TRIGGER trg_attachment_check_change BEFORE UPDATE OR DELETE ON attachment FOR EACH ROW EXECUTE FUNCTION attachment_check_change();
 CREATE TRIGGER trg_bank_statement_line_append_only BEFORE UPDATE OR DELETE ON bank_statement_line FOR EACH ROW
-    EXECUTE FUNCTION platform_check_append_only('{match_state,ignore_reason,matched_document_id,proposed_document_id,proposal_score,match_basis,suggested_reference_tokens,suggested_payer_name_text,suggested_stable_payer_token,suggested_purpose,suggestion_agent_run_id}', '{}', '{description,counterparty_name,counterparty_account_number,suggested_payer_name_text}');
+    EXECUTE FUNCTION platform_check_append_only('{match_state,ignore_reason,matched_document_id,proposed_document_id,proposal_score,match_parameters_hash,match_function_version,match_parameter_set_version_id,match_parameter_state,match_is_tied,match_basis,suggested_reference_tokens,suggested_payer_name_text,suggested_stable_payer_token,suggested_purpose,suggestion_agent_run_id}', '{}', '{description,counterparty_name,counterparty_account_number,suggested_payer_name_text}');
 CREATE TRIGGER trg_bank_statement_line_check_match BEFORE INSERT OR UPDATE ON bank_statement_line FOR EACH ROW EXECUTE FUNCTION bank_statement_line_check_match();
 CREATE TRIGGER trg_bank_statement_append_only BEFORE UPDATE OR DELETE ON bank_statement FOR EACH ROW
     EXECUTE FUNCTION platform_check_append_only('{}', '{}', '{}');

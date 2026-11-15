@@ -305,11 +305,12 @@ REG += [("cancel_agent_runs", "agent", "capability", None, "full"),
         ("CreateListExport", "general_access", "command", "Create", "other"),
         ("RetryEventDelivery", "event_delivery", "command", "Retry", "other"), ("SkipEventDelivery", "event_delivery", "command", "Skip", "other"),
         ("ReplayEvents", "event_delivery", "command", "Replay", "other"),
-        ("RecordSalesInvoiceEInvoiceOutcome", "sales_invoice", "command", "Record", "other")]
+        ("RecordSalesInvoiceEInvoiceOutcome", "sales_invoice", "command", "Record", "other"),
+        ("RunAutomationOwnerScopeCheck", "automation", "command", "Run", "other")]   # ADR-0058 rule 9: a daily system job
 # Commands registered is_internal_only (ADR-0008 rule 1 note; ADR-0054 rule 8 note): outside the level expansion.
 INTERNAL = {"RunRetiredSsccCleanup", "CompleteAgentRun", "RunAgentQualityCheck", "RunApprovalEscalation", "RecordSalesInvoiceEInvoiceOutcome",
             "RecordInboundMessage", "RecordMailboxIntakeOutcome", "RecordMailboxAuthenticationCheck", "RecordOutboundMessageOutcome",
-            "RecordPartnerTaxLookup", "RecordRenderOutcome", "RunPartnerDuplicateScan", "RunPartnerInsightComputation"}
+            "RecordPartnerTaxLookup", "RecordRenderOutcome", "RunPartnerDuplicateScan", "RunPartnerInsightComputation", "RunAutomationOwnerScopeCheck"}
 
 def need(entry):
     perm, leaf, kind, verb, effect = entry[:5]

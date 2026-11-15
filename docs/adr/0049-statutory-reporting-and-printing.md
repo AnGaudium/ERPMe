@@ -123,6 +123,8 @@ Statutory reports, books and printed documents are produced by one new layer-4 m
     - **Not fileable.** Company definitions cannot be filed (`report_not_fileable`).
     - **Commands.** `CreateReportDefinition` and `UpdateReportDefinition`, effect class `master_data_change`, so agents reach them only through change proposals (ADR-0029 rules 1, 5). They validate the grammar of rules 4 to 10 (`report_definition_invalid`).
 
+    Note ([ADR-0059](0059-ai-tuning-and-development-of-deterministic-functions.md), proposed 2026-11-15): `CreateReportDefinition` and `UpdateReportDefinition` write a draft version of a `report_definition` artifact (effect class `other`, `is_draft_only`). Its evidence is a render of the draft on a closed period compared with at least one cell a person checked by hand, given when the evidence is created; activation raises the version through a change proposal (rule 11).
+
 **Cash flow**
 
 12. The package declares the method in the cash flow statement's header. The engine supports both:

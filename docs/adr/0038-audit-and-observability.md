@@ -37,6 +37,8 @@ The retention periods and the strictness of scanning are flagged for the author.
    Note: `delegated_from_user_id` when a substitute acts ([ADR-0054](0054-users-roles-and-authorizations.md) rule 21).
 
    Note: the command columns also hold `is_draft_only` as registered at the time, read by INV-216 ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 55 note).
+
+   Note ([ADR-0058](0058-configurable-workflows.md), proposed 2026-11-15): `audit_record` gains `causation_chain_id`, `causation_depth` (0 to 3, no default, a database check) and `automation_rule_version_id`, with a depth of at least 1 where a rule version is named (rule 12).
 3. Field changes, in `audit_change` (`id`, `company_id`, `audit_record_id`, `subject_table`, `row_id`, `field`, `before`, `after`, `erased_at`):
    - **Which tables.** A closed set, `is_change_tracked` in each module's table declarations and checked by CI: master data, settings including enabled regime settings (ADR-0016), role assignments, period area state and production structures. Documents rely on `document_version`. Balances, counters, open items and other derived rows are not tracked.
    - **How it is captured.** Only `context`'s write helpers capture it. They read the before row and compute the diff with the canonical forms and diff code of ADR-0029 rule 1. Handlers never build changes by hand.
@@ -109,6 +111,8 @@ The retention periods and the strictness of scanning are flagged for the author.
     - **Logs.** structlog JSON with `trace_id` and `request_id`.
 
     Gateway and tool-call spans and the agent metrics: [ADR-0050](0050-agent-runtime-and-query-layer.md) rule 21.
+
+    Note ([ADR-0059](0059-ai-tuning-and-development-of-deterministic-functions.md), proposed 2026-11-15): spans of agent runs, LLM calls, tool calls and automation executions use the OpenTelemetry GenAI attribute names where they exist, and carry the command request ID, agent run ID, work item ID and automation execution ID, never values (X8). Decision records that name an artifact version, and the artifact tables, follow this ADR's retention: never deleted in Phase 1; a regime may only lengthen it (rules 23, 26).
 11. No values in telemetry, enforced:
     - **Allow-lists.** Span attributes and log fields come from an allow-list of keys (codes, types, counts, hashes). A structlog processor and a span processor drop everything else.
     - **Exceptions** are recorded as type and error code only.

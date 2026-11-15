@@ -127,6 +127,8 @@ Before step 1 code freezes the platform modules, every entity that several modul
 
     Note: `money_account_balance` rows ([ADR-0048](0048-cash-bank-receivables-payables.md) rule 12's note) are a class of their own between partner rows (9) and open item rows (10), in ascending ID (holistic review, 2026-11-15).
 
+    Note ([ADR-0058](0058-configurable-workflows.md), proposed 2026-11-15): class 3 also holds the company's `configuration_state` row, locked by every activation, enable, rollback and demotion of a configuration artifact, so parallel activations cannot together form a cycle in the rule graph (rule 15).
+
 **Catalog and glossary consistency**
 
 11. ADR-0015 rule 2 gets one exception, kept as data: a column `has_regime_alternatives` in `transaction-keys.csv` marks keys that share a system account's code while listing alternatives that are a regime choice under rule 4 (`price_difference`, `fx_gain_unrealized`, `fx_loss_unrealized`). CI reads that column. ADR-0015's key count becomes 38. Note: the column also marks keys that do not share a system account's code, whenever the listed accounts are alternatives a regime or company chooses between (`cash_surplus`, `cash_shortage`, `bank_charge`, `production_abnormal_cost`, `production_unabsorbed_overhead`) ([ADR-0053](0053-core-neutrality.md) rule 6).

@@ -62,4 +62,6 @@ One file per decision, named `NNNN-short-title.md`, using [template.md](template
 | [ADR-0056](0056-multiple-units-of-measure.md) | Multiple units of measure (DS-20, DS-22, DS-43) | Accepted (2026-11-15) |
 | [ADR-0061](0061-barcodes.md) | Barcodes (DS-20, DS-27, DS-31, DS-42) | Accepted (2026-11-15) |
 | [ADR-0057](0057-document-intake-and-extraction.md) | Document intake and extraction (DS-36, DS-34) | Accepted (2026-11-15) |
+| [ADR-0058](0058-configurable-workflows.md) | Configurable workflows (spec 16 levels 1 and 3; DS-28) | Accepted (2026-11-15) |
+| [ADR-0059](0059-ai-tuning-and-development-of-deterministic-functions.md) | AI tuning and development of deterministic functions (DS-34) | Accepted (2026-11-15) |
 | [ADR-0062](0062-product-engineering-workflow.md) | Product engineering workflow (DS-57, master-data part) | Accepted (2026-11-15) |

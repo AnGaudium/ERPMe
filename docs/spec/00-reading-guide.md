@@ -433,6 +433,37 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Effective agent mode | promoted\_version, promoted\_seat\_models | The mode a run uses: an assisted agent type whose version behavior or seat models differ from the promoted ones runs as shadow; the stored mode stays the person's choice |
 | Shape mask | shape mask (`maskable` template input) | A personal value replaced by its shape before it reaches a model with the routing switch on: upper-case letters become `A`, other letters `a`, Unicode digits `9`, other characters kept |
 | Promotion evidence | agent\_promotion\_evidence | Immutable snapshot of the shadow or rehearsal evidence for promoting an agent type: date range, behavior hash, seat models, figures and thresholds; the promotion proposal names it |
+| Automation rule | automation\_rule, automation\_rule\_version | A company's "on this event, if these conditions hold, do these actions" over the registry's vocabulary; versioned, immutable once out of draft, run for a consenting owner ([ADR-0058](../adr/0058-configurable-workflows.md)) |
+| Automation execution | automation\_execution | The record of one matched rule version on one event: the conditions read, each action's outcome and key; readers see it within their own scope and classes |
+| Automation-allowed command | is\_automation\_allowed | A draft-creating command that an automation rule may run |
+| Watched fields | watched\_fields | The fields of an update event whose change triggers a rule; there is no trigger on any write |
+| Hold interface | is\_hold | A registered command that sets a block a person releases; an automation rule's `set_hold` |
+| Configurable trigger | wake\_up, configurable\_triggers | A work item kind or event on which a company starts an agent type through an automation rule, instead of a hard-wired wake-up |
+| Causation chain, causation depth | causation\_chain\_id, causation\_depth | The commands and events that one outside, personal or scheduled command started, and the number of automation actions in them so far, at most 3 |
+| Circuit breaker (automation) | automation.breaker\_failures | Disables a rule after repeated refusals or failures, in a window or in a row, with a work item |
+| Decision table | decision\_table, decision\_table\_version, decision\_table\_row | Typed rows mapping declared inputs to outputs under hit policy `unique` or `monotone`; rules pin a version |
+| Hit policy | hit\_policy | `unique`: at most one row matches; `monotone`: every matching row contributes through an order-free aggregator |
+| Decision no match | decision\_no\_match | The typed outcome of an input no row matches, which every rule using the table handles |
+| Replay diff | GetAutomationReplay | A candidate version evaluated on recorded events beside the version in force, listing each subject whose outcome differs |
+| Gate field | is\_gate\_field | A deterministic field that conditions, decision inputs and gates may read; never one an LLM step's output fills |
+| L1, L2, L3 | — | Parameter sets; rules as data; new code. AI drafts L1 and L2; L3 goes only through repository review in Phase 1 ([ADR-0059](../adr/0059-ai-tuning-and-development-of-deterministic-functions.md)) |
+| Parameter set | parameter\_set, parameter\_set\_version, parameter\_set\_value | Versioned values, within declared bounds and order constraints, of a deterministic function's tunable parameters |
+| Parameters hash | parameters\_hash, match\_parameters\_hash | SHA-256 of a function's code and effective parameter values, recorded with the function version by each decision made under them |
+| Safety cap | is\_safety\_cap | A tunable parameter whose maximum is its core default, so a company can only lower it, never switch it off |
+| Decision artifact | artifact\_kind | A parameter set, decision table, automation rule, matching rule, report or analysis definition, or extraction mapping, on the one lifecycle |
+| Artifact lifecycle | draft, backtested, shadow, assisted, active, retired | Drafted, proven on a later window, computed beside the version in force, used where people decide, used everywhere, or out of use |
+| Version in force | current\_version\_id | The pointer to the assisted or active version an artifact uses; rollback moves it |
+| Artifact evidence | artifact\_promotion\_evidence | Frozen backtest, preview, live or re-evaluation figures of a version against the version in force, with hashes; a promotion names it |
+| Drafting window | drafting\_window\_from, drafting\_window\_to | The history a version was drafted from, required for every draft; its backtest starts after it |
+| Golden case label, held-out case | golden\_case\_label, is\_held\_out | A company's labelled correct outcome for a case; about one in five, chosen by hash, is filtered from drafting runs |
+| Override rate | artifact\_monitor\_snapshot | The share of an artifact's decisions that people changed, reversed or discarded in 30 days; beyond its threshold the artifact is demoted |
+| Show threshold, act threshold | show\_min\_score | A scorer's two thresholds: make a suggestion; act without a person (off by default) |
+| Match mode | match\_mode | `suggest` or `confirm`, for a matching rule pass; ambiguity and tied matches never act |
+| Scope skip count | automation\_scope\_skip | A value-free count per rule and business date of subjects outside the owner's scope, which the rule did not evaluate |
+| Outdated evidence | shadow\_evidence\_outdated\_by | Auto-post evidence that a demotion, rollback, invalidation or failed re-evaluation of the parameter set marked in the same transaction; re-arming needs a new rule version |
+| Case-reference column | — | A column of another table that points at a case of a tunable function (a payment's link to its bank line); held-out filtering follows it |
+| Account rule | bank\_matching\_rule | A matching rule that maps a token to an account, scored only for a whole, reference-shaped token on the account's natural side |
+| Matching rule version | bank\_matching\_rule version | A bank matching rule as a `matching_rule` artifact: written as a draft version, raised by `SetArtifactVersionState`; this supersedes "proposal-bound" in the row Bank matching rule |
 | Outbound content check | query `GetOutboundContentCheck` (check result `outbound_content_flagged`) | The check that a customer-facing draft names no other partner's records and carries no cost or margin fields; evaluated in the plan of the command that creates or updates the draft |
 | Outside subject | (registry mark on subject tables) | A run subject that is outside content (an inbound interaction, an incoming e-invoice record, a bank statement line, an import batch or row, or any row whose `is_untrusted` is true); a run on it starts tainted, whoever starts it |
 | Work item | work\_item | Business work for a person or agent, with claim and due date; module `work`, layer 2 (DS-29); kinds registered in [work-item-kinds.csv](../catalogs/work-item-kinds.csv) ([ADR-0042](../adr/0042-work-queue.md)) (see also Work queue item) |

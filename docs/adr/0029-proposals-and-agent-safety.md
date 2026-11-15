@@ -84,6 +84,8 @@ The hard floor on what a tainted run may read stays the literal spec 03 rule 1 u
 
    Note: for price lists the carrier binds agents and chains carrying an origin agent run (rule 4). A person with the permission runs `SetPriceListEntries` and the other price-list commands directly, unless the company adds a `direct_master_data_change` deny rule for them ([ADR-0043](0043-policy-and-approval.md) rule 12); the core seeds only the bank-account rule ([ADR-0043](0043-policy-and-approval.md) rule 15). Dual control on prices is an open question for the author.
 
+   Note ([ADR-0058](0058-configurable-workflows.md), proposed 2026-11-15): also the activation and promotion of configuration and decision artifacts: `SetArtifactVersionState` raising a version, with frozen evidence; and the owner change of an automation rule with a version in force. The approver is neither the submitter (`approver_is_submitter`) nor the version's drafter nor the human the drafting run acted for (rules 9, 24; [ADR-0059](0059-ai-tuning-and-development-of-deterministic-functions.md) rule 13).
+
 **Policy hook**
 
 6. The dispatcher evaluates policy (DS-28) once per command at these policy points, and the handler stores the `policy_decision`: Also a policy point: `Post` of an approved document by an actor of another kind than its decision's ([ADR-0043](0043-policy-and-approval.md) rule 9).

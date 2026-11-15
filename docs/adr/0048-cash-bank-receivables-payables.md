@@ -154,6 +154,8 @@ Allocation is always explicit. A deterministic query proposes it, and a person o
 
    Note (catalog review, 2026-11-15): the flag `paid_by_third_party` is the column `is_paid_by_third_party` of `payment_line` (DS-05-platform.sql; ADR-0004 rule 13).
 
+   Note ([ADR-0059](0059-ai-tuning-and-development-of-deterministic-functions.md), proposed 2026-11-15): the cascade's constants (the 5-day window, the subset size of 6, the scores 95, 100, 80, 90, 60 and 70, the caps 85, 65 and 60) are the defaults of the tunable function `cash.match_bank_line`, with `cap_company_rule` 90 and `show_min_score` 0 added; the tied score 60 is a safety cap, and exact > partial > subset is an order constraint. A tied match is marked on its line and never auto-posted, outside tuning. A company changes the parameters only by a parameter set version through the lifecycle, and every proposal records the parameters hash, the function version, the parameter set version and its state. Company rules (`bank_matching_rule`) become artifacts of kind `matching_rule`, written as draft versions, with `match_mode`: a partner rule names the partner only and steps 3–4 score the match; an account rule drafts to its account and scores `cap_company_rule` in confirm mode only for a whole, reference-shaped token and an amount on the account's natural side, and like every draft under the unverified or third-party cap it keeps that flag and is never auto-posted; suggest in `assisted` (no score), confirm in `active` (capped by `cap_company_rule` and the counterparty caps); several rules on a line, or any ambiguity, suggest (rules 5, 6, 10).
+
 **Netting and write-offs**
 
 10. `partner_netting`:

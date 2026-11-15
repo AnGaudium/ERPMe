@@ -183,6 +183,8 @@ Leads, opportunities, marketing automation, appointments, chat connectors and se
 
     Note (simulation review, 2026-11-15): the threshold of [ADR-0019](0019-partners-and-crm-foundation.md) rule 19 is this setting, `crm.duplicate_name_threshold`: a `pg_trgm` similarity of the normalized names, between 0 and 1, default 0.6. The simulation used a token-set ratio of 50 on a 0–100 scale as a stand-in measure; it changes no default.
 
+    Note ([ADR-0059](0059-ai-tuning-and-development-of-deterministic-functions.md), proposed 2026-11-15): the threshold stays the setting `crm.duplicate_name_threshold`. Once `crm` registers `backtest`, `compare` and `monitor` for `crm.find_partner_duplicates`, a company may opt in to tuning by creating its parameter set, seeded from the setting (rule 8).
+
 **Partner timeline**
 
 18. `ListPartnerTimeline`, a query of `crm`:
