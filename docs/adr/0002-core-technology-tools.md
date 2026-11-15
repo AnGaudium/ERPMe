@@ -1,6 +1,6 @@
 # ADR-0002: Core technology tools
 
-Status: accepted (2026-11-14). Design item: —. Related decisions: D14.
+Status: accepted (2026-11-14). Design item: —. Related decisions: D14. The sentence on choosing the primary key for partitioning by fiscal year, and the revisit line "partition by fiscal year", are replaced by [ADR-0006](0006-id-and-numeric-model.md) rules 22–23.
 
 ## Decision
 
@@ -30,6 +30,8 @@ One developer, most code written by AI. Popular libraries help AI write correct 
 | LLM | Anthropic SDK behind a thin self-written gateway interface | Workflows are code-orchestrated, so no agent framework is needed |
 | Logging, observability | structlog, OpenTelemetry |  |
 
+Note ([ADR-0061](0061-barcodes.md), proposed 2026-11-15): the PDF worker draws barcodes as SVG with Zint's command-line program (GS1 mode, SVG to standard output), run in the worker's sandbox, so no Python binding is needed; libzint is BSD-3-Clause and the command-line program GPL-3.0, both compatible with the core's AGPL-3.0 (spec 18), to verify at build. GS1 data is parsed and built by the core's own `erpme.gs1`, whose Application Identifier table is generated from the GS1 Barcode Syntax Dictionary (rules 1, 21).
+
 **Testing:** pytest on real PostgreSQL via testcontainers, never SQLite; Hypothesis stateful testing generates random business sequences and checks invariants after each step; golden scenarios read from hand-built spreadsheets; concurrency tests for stock posting.
 
 **Frontend:**
@@ -45,11 +47,15 @@ One developer, most code written by AI. Popular libraries help AI write correct 
 | i18n | i18next; community translations via Weblate |
 | Warehouse app | Same app as a PWA; scanning with the browser BarcodeDetector API, fallback @zxing/browser |
 
+Note ([ADR-0061](0061-barcodes.md), proposed 2026-11-15): the fallback is a WebAssembly decoder based on ZXing-C++ (Apache-2.0), which reports the symbology identifier and FNC1; it reads Code 128, GS1-128, DataMatrix and QR, while BarcodeDetector reads only EAN/UPC and ITF until a device proves it passes GS through. The PWA also runs the GS1 Syntax Engine (Apache-2.0) in WebAssembly for instant feedback; both load on first use. Apache-2.0 code may be used in the AGPL-3.0 core (spec 18) (rules 1, 22).
+
 **Infrastructure and docs:** Docker Compose, Caddy, pgBackRest, GitHub Actions; MkDocs Material; the repo has CLAUDE.md and coding-agent skills from the start.
 
 **Performance and resources:**
 
 1. **PDF generation always runs in its own queue**, never in the web process, because WeasyPrint is heavy on RAM and CPU. The PDF worker is a separate process with limited concurrency, restarted periodically to release memory. PDFs of posted documents are stored by hash of document version and template version: posted documents are immutable, so each is generated once. The UI receives PDFs asynchronously.
+
+   Note: the key also covers the document's state and e-invoice state, the print data contract version, the language and the marker, and a file is reused only for documents in a final state ([ADR-0049](0049-statutory-reporting-and-printing.md) rule 28).
 2. **Dead tuples are handled per table type**, not with one strategy for all:
    - The journal and material documents are append-only and produce almost no dead tuples. Not partitioned in Phase 1, but the primary key is chosen so the tables can later be partitioned by fiscal year without restructuring.
    - Fast-cycling tables (outbox, technical queue, agent run logs) are partitioned by month; when retention expires, drop the whole partition instead of deleting rows. Accounting and audit data are never deleted this way.

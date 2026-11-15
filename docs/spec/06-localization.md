@@ -36,4 +36,4 @@ The core contains no country's rules. Everything governed by one country's law l
 - Mandatory tests: core invariants, the country's golden scenarios, statutory reports matching sample figures.
 - Conventions for naming, terminology translation and annotating uncertain parts.
 
-CI rejects a package that lacks legal sources or tests. The basic US package is built with this skill as its first test. The basic US package contains the chart, default account determination and basic tax codes; no state tax returns.
+CI rejects a package that lacks legal sources or tests. Structure, loading and CI checks: [ADR-0016](../adr/0016-localization-package-structure.md). The basic US package is built with this skill as its first test. The basic US package contains the chart, default account determination and basic tax codes; no state tax returns.

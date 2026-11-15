@@ -22,7 +22,7 @@ An accounting regime (`accounting_regime`) is part of a localization package (se
   - Rate and accounts used for period-end revaluation.
   - Rate source: the commercial bank the company uses, fetched daily.
 - **Balancing:** every journal entry balances in each transaction currency, in company currency and in group currency. Rounding differences from conversion go to a rounding line on a defined system account (DS-02 and DS-06 decide which).
-- **Realized FX differences** on payment post to 515 or 635 (Vietnam).
+- **Realized FX differences** on payment post to the realized FX keys (e.g. 515/635 in TT99).
 - **Period-end revaluation** of foreign-currency monetary items. Receivables and payables are revalued per open item; cash, bank and loan balances are revalued at balance level. Advances to suppliers and from customers are non-monetary and are not revalued. **Verify against the original TT99 text** (Appendix II, accounts 413, 515, 635): secondary sources disagree on whether buy and sell rates are still separated or an average transfer rate is used, and whether differences still pass through 413 or go straight to 515/635. This rule must therefore live in the package configuration.
 - **Inventory cost is always in company currency.** Foreign purchase prices convert at recognition. Import costs: see [Imports and purchase costs](08-l10n-vn.md#imports-and-purchase-costs).
 - **Rate types are separate:** a foreign-currency invoice stores its invoice rate separately from the book rate; the customs duty rate is separate from the accounting rate.
@@ -30,13 +30,13 @@ An accounting regime (`accounting_regime`) is part of a localization package (se
 
 ## Units of measure
 
-- (Phase 1) **UoM group per item**, in the style of Business One: stock unit, purchase unit, sales unit, with fixed item-specific factors (a carton is 24 bottles for one item and 12 for another).
+- (Phase 1) **UoM group per item** ([ADR-0018](../adr/0018-product-and-item-model.md): inventory unit and product units per product), in the style of Business One: stock unit, purchase unit, sales unit, with fixed item-specific factors (a carton is 24 bottles for one item and 12 for another).
 - (After Phase 1) **Independent second unit (catch weight):** record the actual quantity in the second unit (e.g. kg) per movement, with no fixed conversion; price may be per second unit.
 - **Convention:** stock and cost are always in the stock unit. Conversion happens in the command layer on document intake, so the costing engine never knows other units.
 - **Barcode per packaging unit:** scanning a carton barcode converts to the stock unit.
 - **Rounding:** rules per unit. Rounding differences must never silently land in cost.
 - (Phase 1) **Lots and serials** are tracked in stock movements and carry no cost of their own.
-- (After Phase 1) **Bins.**
+- (Phase 1) **Bins and warehouse management** (author's decision 2026-11-14; [ADR-0023](../adr/0023-warehouse-management.md)).
 
 ## Approval engine
 

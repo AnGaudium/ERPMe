@@ -1,0 +1,212 @@
+# Regime settings of l10n_vn, regime tt99 (ADR-0016 rules 9-12; ADR-0039 rule 9).
+# All unverified: allowed in test and simulation, refused in production until the author verifies them.
+
+- key: fx.transaction_rate.date_basis
+  value: posting_date
+  effective_from: 2026-01-01
+  status: unverified
+  open_question: "(DS-10, DS-19) Which business date selects the transaction rate under TT99"
+
+- key: fx.transaction_rate.quote
+  value: {debit_items: buy_transfer, credit_items: sell_transfer, max_rate_age_days: 7}
+  effective_from: 2026-01-01
+  status: unverified
+  open_question: "(DS-10, DS-19) Which published quote (buy, sell, transfer or average) does each rate type use under TT99"
+
+- key: fx.revaluation_rate.date_basis
+  value: period_end_date
+  effective_from: 2026-01-01
+  status: unverified
+  open_question: "(DS-10, DS-19) Which published quote (buy, sell, transfer or average) does each rate type use under TT99"
+
+- key: fx.revaluation_rate.quote
+  value: {debit_items: buy_transfer, credit_items: sell_transfer, max_rate_age_days: 7}
+  effective_from: 2026-01-01
+  status: unverified
+  open_question: "(DS-10, DS-19) Which published quote (buy, sell, transfer or average) does each rate type use under TT99"
+
+- key: fx.document_rate.allowed
+  value: {options: [never, within_tolerance, always], default: never, tolerance_percent: "1", per_group: {cash_and_bank: always}}
+  effective_from: 2026-01-01
+  status: unverified
+  open_question: "(DS-25, DS-40) Cash, bank, receivable and payable choices"
+
+- key: fx.book_rate_method
+  value: {open_item_accounts: specific, balance_accounts: moving_average}
+  effective_from: 2026-01-01
+  status: unverified
+  open_question: "(DS-10, DS-19, DS-25, DS-44) Book rate method for foreign-currency cash and bank balances under TT99"
+
+- key: fx.realized_fx_basis
+  value: original
+  effective_from: 2026-01-01
+  status: unverified
+  open_question: "(DS-10) Period-end FX revaluation: reverse at the start of the next period and repost, or post only the delta?"
+
+- key: fx.revaluation.frequency
+  value: fiscal_year_end
+  effective_from: 2026-01-01
+  status: unverified
+  open_question: "(DS-10, DS-12, DS-19) Under TT99, are foreign-currency items revalued at every period end or only at fiscal year end"
+
+- key: fx.revaluation.method
+  value: reverse_and_repost
+  effective_from: 2026-01-01
+  status: unverified
+  open_question: "(DS-10) Period-end FX revaluation: reverse at the start of the next period and repost, or post only the delta?"
+
+- key: fx.revaluation.target
+  value: profit_or_loss
+  effective_from: 2026-01-01
+  status: unverified
+  open_question: "(DS-10, DS-19) If the TT99 regime holds revaluation differences in 413 first"
+
+- key: fx.revaluation.scope
+  value:
+    per_open_item: [receivable_trade, receivable_intercompany, receivable_employee_advance, receivable_loan, payable_trade, payable_intercompany]
+    # financial_investment_other also holds equity securities (121, 2281), which are not monetary: they are excluded per item (open question).
+    per_balance: [cash_on_hand, cash_in_bank, cash_in_transit, financial_investment_other, deposit_paid, receivable_other, payable_deposit, payable_other, payable_employee, accrued_expense, borrowing, liability_other]
+    default: none
+    # Open item kind advance is never revalued, employee advances on 141 included (ADR-0011 rule 18 note; open question).
+    excluded_open_item_kinds: [advance]
+  effective_from: 2026-01-01
+  status: unverified
+  open_question: "(DS-10, DS-12, DS-19) Under TT99, are foreign-currency items revalued at every period end or only at fiscal year end; (DS-10, DS-19, DS-25) Is an employee advance a monetary item"
+
+- key: fx.import_receipt.rate
+  value: transaction
+  effective_from: 2026-01-01
+  status: unverified
+  open_question: "(DS-09, DS-10, DS-11, DS-19) Which rate values an import goods receipt?"
+
+- key: fx.import_receipt.invoice_difference
+  value: fx_gain_loss
+  effective_from: 2026-01-01
+  status: unverified
+  open_question: "(DS-09, DS-10, DS-11, DS-19) Does the rate difference between goods receipt and purchase invoice go to FX gain or loss"
+
+- key: closing.method
+  value: {by: entries, every: period, income_summary_key: income_summary_transfer, retained_earnings_key: retained_earnings_transfer}
+  effective_from: 2026-01-01
+  status: unverified
+  open_question: "(DS-12, DS-19) Verify against the TT99 text the agent's interim decision to close income and expenses to 911 and 421"
+
+- key: journal.manual_posting_to_control_accounts
+  value: false
+  effective_from: 2026-01-01
+  status: unverified
+  open_question: "(DS-06, DS-25, DS-44) May manual journal entries (`general_journal`) post to receivable, payable, inventory or GR/IR accounts"
+
+- key: movement_type.purchase_return.value_source
+  value: document
+  effective_from: 2026-01-01
+  status: unverified
+  open_question: "(DS-09, DS-19) Value of a purchase return"
+
+- key: movement_type.purchase_return.costing_role
+  value: receipt
+  effective_from: 2026-01-01
+  status: unverified
+  open_question: "(DS-09, DS-19) Value of a purchase return"
+
+- key: movement_type.sales_return_receipt.value_source
+  value: document
+  effective_from: 2026-01-01
+  status: unverified
+  open_question: "(DS-09, DS-22) Cost of a sales return"
+
+- key: movement_type.sales_return_receipt.costing_role
+  value: receipt
+  effective_from: 2026-01-01
+  status: unverified
+  open_question: "(DS-09, DS-22) Cost of a sales return"
+
+- key: movement_type.stock_count_shortage.value_source
+  value: preliminary_price
+  effective_from: 2026-01-01
+  status: unverified
+  open_question: "(DS-09, DS-19) Valuation of stock count differences"
+
+- key: movement_type.stock_count_shortage.costing_role
+  value: revalued_issue
+  effective_from: 2026-01-01
+  status: unverified
+  open_question: "(DS-09, DS-19) Valuation of stock count differences"
+
+- key: movement_type.stock_count_surplus.value_source
+  value: preliminary_price
+  effective_from: 2026-01-01
+  status: unverified
+  open_question: "(DS-09, DS-19) Valuation of stock count differences"
+
+- key: movement_type.stock_count_surplus.costing_role
+  value: receipt
+  effective_from: 2026-01-01
+  status: unverified
+  open_question: "(DS-09, DS-19) Valuation of stock count differences"
+
+- key: movement_type.by_product_receipt.value_source
+  value: by_product_price
+  effective_from: 2026-01-01
+  status: unverified
+  open_question: "(DS-53) Production costing choices, interim and flagged"
+
+- key: landed_cost.closed_period_method
+  value: consumer_split
+  effective_from: 2026-01-01
+  status: unverified
+  open_question: "(DS-11) VAS treatment of landed cost that belongs to an earlier, closed period"
+
+- key: stock_count.bin_difference_method
+  value: net
+  effective_from: 2026-01-01
+  status: unverified
+  open_question: "(DS-42, DS-19) Count differences of the same item and lot across bins"
+
+- key: production.wip_method
+  value: direct_material
+  effective_from: 2026-01-01
+  status: unverified
+  open_question: "(DS-53) Production costing choices, interim and flagged"
+
+- key: production.abnormal_cost.applies
+  value: true
+  effective_from: 2026-01-01
+  status: unverified
+  open_question: "(DS-53) Production costing choices, interim and flagged"
+
+- key: production.abnormal_cost.tolerance_percent
+  value: "0"
+  effective_from: 2026-01-01
+  status: unverified
+  open_question: "(DS-53) Production costing choices, interim and flagged"
+
+- key: production.normal_capacity.applies
+  value: true
+  effective_from: 2026-01-01
+  status: unverified
+  open_question: "(DS-53) Production costing choices, interim and flagged"
+
+- key: production.co_product_split
+  value: cost_coefficient
+  effective_from: 2026-01-01
+  status: unverified
+  open_question: "(DS-53) Production costing choices, interim and flagged"
+
+- key: production.estimate_price_basis
+  value: actual_average
+  effective_from: 2026-01-01
+  status: unverified
+  open_question: "(DS-53) Production costing choices, interim and flagged"
+
+- key: cash.netting_requires_agreement
+  value: true
+  effective_from: 2026-01-01
+  status: unverified
+  open_question: "(DS-25, DS-40) Cash, bank, receivable and payable choices"
+
+- key: cash.bad_debt_provision.buckets
+  value: [{from_days: 180, to_days: 365, percent: "30"}, {from_days: 365, to_days: 730, percent: "50"}, {from_days: 730, to_days: 1095, percent: "70"}, {from_days: 1095, percent: "100"}]
+  effective_from: 2026-01-01
+  status: unverified
+  open_question: "(DS-25, DS-40) Cash, bank, receivable and payable choices"

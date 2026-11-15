@@ -1,0 +1,5 @@
+system_account,reason
+inventory_other,TT99 has no other-inventory account; every stock fits 151-158
+income_other,TT99 711 covers other income; it maps to non_operating_income
+expense_other,TT99 811 covers other expenses; it maps to non_operating_expense
+revenue_deduction_other,"TT99 521 has only trade discounts, returns and allowances"

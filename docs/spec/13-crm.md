@@ -28,5 +28,5 @@ Vietnam-specific notes:
   - A process for access, correction and deletion requests. Deletion must propagate to pgvector embeddings, summaries and agent logs. Data that belongs to accounting documents is retained for the accounting-law retention period.
   - Sending data to a foreign LLM provider is a cross-border transfer: the system has a switch that keeps personal-labeled data (contacts and similar fields) away from cloud models. In Phase 1, when the switch is on, those fields are removed from every LLM request; after Phase 1 they can be processed by local models. Whether to turn it on is the customer's decision; it is off by default. See [Data classification and routing](17-seatmap-data-classification.md#data-classification-and-routing).
   - A processing log, a breach-notification process and a data-protection role.
-  - Looking up the tax ID of household businesses and individuals is also personal-data processing.
+  - Looking up the tax ID of sole proprietorships (in Vietnam, household businesses) and individuals is also personal-data processing.
 - **Call recording and transcription** require notifying the person called, so they come after the MVP.

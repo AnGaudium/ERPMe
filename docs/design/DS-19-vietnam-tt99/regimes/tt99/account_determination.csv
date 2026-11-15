@@ -1,0 +1,91 @@
+transaction_key,valuation_class,warehouse,item_group,partner_group,tax_code,currency,account_code,basis,basis_document,basis_article,basis_date,verified_by,verified_on,note
+inventory_posting,raw_material,,,,,,152,unverified,(DS-19) TT99 default account determination,,,,,
+inventory_at_processor_posting,raw_material,,,,,,152,unverified,(DS-19) TT99 default account determination,,,,,Interim: stock at a processor stays on its own account (ADR-0037 rule 1)
+price_difference,raw_material,,,,,,152,unverified,(DS-19) TT99 default account determination,,,,,Interim: to stock through purchase_cost_clearing and a landed cost (VAS 02); alternative 6324
+inventory_posting,tools_supplies,,,,,,153,unverified,(DS-19) TT99 default account determination,,,,,
+inventory_at_processor_posting,tools_supplies,,,,,,153,unverified,(DS-19) TT99 default account determination,,,,,Interim: stock at a processor stays on its own account (ADR-0037 rule 1)
+price_difference,tools_supplies,,,,,,153,unverified,(DS-19) TT99 default account determination,,,,,Interim: to stock through purchase_cost_clearing and a landed cost (VAS 02); alternative 6324
+inventory_posting,semi_finished,,,,,,155,unverified,(DS-19) TT99 default account determination,,,,,
+inventory_at_processor_posting,semi_finished,,,,,,155,unverified,(DS-19) TT99 default account determination,,,,,Interim: stock at a processor stays on its own account (ADR-0037 rule 1)
+price_difference,semi_finished,,,,,,155,unverified,(DS-19) TT99 default account determination,,,,,Interim: to stock through purchase_cost_clearing and a landed cost (VAS 02); alternative 6324
+inventory_posting,finished_goods,,,,,,155,unverified,(DS-19) TT99 default account determination,,,,,
+inventory_at_processor_posting,finished_goods,,,,,,155,unverified,(DS-19) TT99 default account determination,,,,,Interim: stock at a processor stays on its own account (ADR-0037 rule 1)
+price_difference,finished_goods,,,,,,155,unverified,(DS-19) TT99 default account determination,,,,,Interim: to stock through purchase_cost_clearing and a landed cost (VAS 02); alternative 6324
+inventory_posting,merchandise,,,,,,156,unverified,(DS-19) TT99 default account determination,,,,,
+inventory_at_processor_posting,merchandise,,,,,,156,unverified,(DS-19) TT99 default account determination,,,,,Interim: stock at a processor stays on its own account (ADR-0037 rule 1)
+price_difference,merchandise,,,,,,156,unverified,(DS-19) TT99 default account determination,,,,,Interim: to stock through purchase_cost_clearing and a landed cost (VAS 02); alternative 6324
+price_difference,,,,,,,6324,unverified,(DS-19) TT99 default account determination,,,,,"Postings without a valuation class: service invoice differences after order close (ADR-0037 rule 6), order lines closed with quantity never received (ADR-0030 rule 4)"
+inventory_in_transit_posting,,,,,,,151,unverified,(DS-19) TT99 default account determination,,,,,
+inventory_goods_sent_posting,,,,,,,157,unverified,(DS-19) TT99 default account determination,,,,,
+gr_ir_clearing,,,,,,,33881,unverified,(DS-19) TT99 default account determination,,,,,
+purchase_cost_clearing,,,,,,,33882,unverified,(DS-19) TT99 default account determination,,,,,
+cost_of_goods_sold,,,,,,,6321,unverified,(DS-19) TT99 default account determination,,,,,
+free_goods_cost,,,,,,,6321,unverified,(DS-19) TT99 default account determination,,,,,"Interim: cost of goods sold, like other goods sold (ADR-0047 rule 17); the alternative is a selling expense (641)."
+consumption,,,,,,,6422,unverified,(DS-19) TT99 default account determination,,,,,Interim: administrative materials; 641 or 627 by a row the company adds (open question on purpose)
+consumption,tools_supplies,,,,,,6423,unverified,(DS-19) TT99 default account determination,,,,,Interim: office tools and supplies
+inventory_count_shortage,,,,,,,1381,unverified,(DS-19) TT99 default account determination,,,,,Interim: pending decision; alternative 6323
+inventory_count_surplus,,,,,,,3381,unverified,(DS-19) TT99 default account determination,,,,,"Interim: pending decision; alternatives 6323, 711"
+inventory_revaluation_offset,,,,,,,6323,unverified,(DS-19) TT99 default account determination,,,,,
+inventory_write_down,,,,,,,6322,unverified,(DS-19) TT99 default account determination,,,,,
+inventory_write_down_allowance,,,,,,,2294,unverified,(DS-19) TT99 default account determination,,,,,
+opening_balance,,,,,,,999,unverified,(DS-19) TT99 default account determination,,,,,
+opening_group_translation,,,,,,,413,unverified,(DS-19) TT99 default account determination,,,,,Interim: group translation difference of the opening to exchange differences in equity (ADR-0044 rule 12)
+receivable_reconciliation,,,,,,,131,unverified,(DS-19) TT99 default account determination,,,,,
+receivable_reconciliation,,,,dependent_unit,,,1368,unverified,(DS-19) TT99 default account determination,,,,,Only dependent units without legal status; group companies use 131 (VAS)
+receivable_reconciliation,,,,employee,,,141,unverified,(DS-19) TT99 default account determination,,,,,
+payable_reconciliation,,,,,,,331,unverified,(DS-19) TT99 default account determination,,,,,Also employees as suppliers: no payable-control account fits them (open question)
+payable_reconciliation,,,,dependent_unit,,,3368,unverified,(DS-19) TT99 default account determination,,,,,Only dependent units without legal status; group companies use 331
+revenue_posting,,,merchandise,,,,5111,unverified,(DS-19) TT99 default account determination,,,,,
+revenue_posting,,,product,,,,5112,unverified,(DS-19) TT99 default account determination,,,,,
+revenue_posting,,,service,,,,5113,unverified,(DS-19) TT99 default account determination,,,,,
+revenue_posting,,,other,,,,5118,unverified,(DS-19) TT99 default account determination,,,,,
+revenue_deduction_trade_discount,,,,,,,5211,unverified,(DS-19) TT99 default account determination,,,,,
+revenue_deduction_return,,,,,,,5212,unverified,(DS-19) TT99 default account determination,,,,,
+revenue_deduction_allowance,,,,,,,5213,unverified,(DS-19) TT99 default account determination,,,,,
+input_tax,,,,,,,1331,unverified,(DS-19) TT99 default account determination,,,,,
+input_tax,,,,,vat_in_fa_10,,1332,unverified,(DS-19) TT99 default account determination,,,,,Fixed-asset input VAT (ADR-0041 rule 1)
+input_tax,,,,,vat_in_fa_reducible,,1332,unverified,(DS-19) TT99 default account determination,,,,,Fixed-asset input VAT (ADR-0041 rule 1)
+input_tax,,,,,vat_in_fa_5,,1332,unverified,(DS-19) TT99 default account determination,,,,,Fixed-asset input VAT (ADR-0041 rule 1)
+input_tax,,,,,import_vat_fa_10,,1332,unverified,(DS-19) TT99 default account determination,,,,,Fixed-asset input VAT (ADR-0041 rule 1)
+input_tax,,,,,import_vat_fa_reducible,,1332,unverified,(DS-19) TT99 default account determination,,,,,Fixed-asset input VAT (ADR-0041 rule 1)
+input_tax,,,,,import_vat_fa_5,,1332,unverified,(DS-19) TT99 default account determination,,,,,Fixed-asset input VAT (ADR-0041 rule 1)
+input_tax_non_deductible,,,,,,,6425,unverified,(DS-19) TT99 default account determination,,,,,Interim: non-deductible input VAT to administrative taxes and fees; alternatives the cost of the goods or 811 (ADR-0041 rule 11)
+other_tax,,,,,,,33382,unverified,(DS-19) TT99 default account determination,,,,,Interim: taxes without a key of their own go to other taxes (ADR-0053 rule 5)
+other_tax,,,,,import_environmental_protection,,33381,unverified,(DS-19) TT99 default account determination,,,,,Environmental protection tax (ADR-0053 rule 5)
+trade_remedy_duty,,,,,,,3333,unverified,(DS-19) TT99 default account determination,,,,,"Interim: with import duties, as practice books them; alternative 33382"
+output_tax,,,,,,,33311,unverified,(DS-19) TT99 default account determination,,,,,
+import_tax,,,,,,,33312,unverified,(DS-19) TT99 default account determination,,,,,
+import_export_duty,,,,,,,3333,unverified,(DS-19) TT99 default account determination,,,,,
+special_consumption_tax,,,,,,,3332,unverified,(DS-19) TT99 default account determination,,,,,
+fx_gain_realized,,,,,,,5152,unverified,(DS-19) TT99 default account determination,,,,,
+fx_loss_realized,,,,,,,6352,unverified,(DS-19) TT99 default account determination,,,,,
+fx_gain_unrealized,,,,,,,5153,unverified,(DS-19) TT99 default account determination,,,,,"Interim: straight to profit or loss; Circular 200 mechanics hold differences in 413 and transfer the net to 515/635, with the same year-end result"
+fx_loss_unrealized,,,,,,,6353,unverified,(DS-19) TT99 default account determination,,,,,Interim: see fx_gain_unrealized
+rounding_gain,,,,,,,5154,author_decision,"open-questions (DS-02, DS-07, DS-19) rounding accounts, answered by the author",,2026-11-14,,,"The author decided 515; the detail account 5154 is the package's (unverified, ADR-0039 rule 3)"
+rounding_loss,,,,,,,6354,author_decision,"open-questions (DS-02, DS-07, DS-19) rounding accounts, answered by the author",,2026-11-14,,,"The author decided 635; the detail account 6354 is the package's (unverified, ADR-0039 rule 3)"
+payment_discount_received,,,,,,,5155,unverified,(DS-19) TT99 default account determination,,,,,
+payment_discount_given,,,,,,,6355,unverified,(DS-19) TT99 default account determination,,,,,
+income_summary_transfer,,,,,,,911,unverified,(DS-19) TT99 default account determination,,,,,
+retained_earnings_transfer,,,,,,,4212,unverified,(DS-19) TT99 default account determination,,,,,
+other_receipt_offset,,,,,,,711,unverified,(DS-19) TT99 default account determination,,,,,Interim; capital contributed in kind is an open question (owner_capital is not an allowed account of the key)
+other_issue_offset,,,,,,,811,unverified,(DS-19) TT99 default account determination,,,,,Interim; samples and gifts are selling expense (641) by a company row or a dedicated movement type
+scrap,,,,,,,6323,unverified,(DS-19) TT99 default account determination,,,,,Interim: inventory losses to 632 (Circular 200 practice); alternative 811
+production_consumption,,,,,,,621,unverified,(DS-19) TT99 default account determination,,,,,
+production_output,,,,,,,154,unverified,(DS-19) TT99 default account determination,,,,,
+production_wip_transfer,,,,,,,154,unverified,(DS-19) TT99 default account determination,,,,,
+production_abnormal_cost,,,,,,,6325,unverified,(DS-19) TT99 default account determination,,,,,
+production_unabsorbed_overhead,,,,,,,6325,unverified,(DS-19) TT99 default account determination,,,,,
+production_residual_cost,,,,,,,6325,unverified,(DS-19) TT99 default account determination,,,,,
+production_external_service,,,,,,,62771,unverified,(DS-19) TT99 default account determination,,,,,
+bank_charge,,,,,,,6427,unverified,(DS-19) TT99 default account determination,,,,,"Interim (ADR-0048 rule 20)."
+cash_surplus,,,,,,,3381,unverified,(DS-19) TT99 default account determination,,,,,"Interim (ADR-0048 rule 20)."
+cash_shortage,,,,,,,1381,unverified,(DS-19) TT99 default account determination,,,,,"Interim (ADR-0048 rule 20)."
+payment_difference_income,,,,,,,711,unverified,(DS-19) TT99 default account determination,,,,,"Interim (ADR-0048 rule 20)."
+payment_difference_expense,,,,,,,811,unverified,(DS-19) TT99 default account determination,,,,,"Interim (ADR-0048 rule 20)."
+bad_debt_expense,,,,,,,6426,unverified,(DS-19) TT99 default account determination,,,,,"Interim (ADR-0048 rule 20)."
+bad_debt_allowance,,,,,,,2293,unverified,(DS-19) TT99 default account determination,,,,,"Interim (ADR-0048 rule 20)."
+bad_debt_recovery,,,,,,,711,unverified,(DS-19) TT99 default account determination,,,,,"Interim (ADR-0048 rule 20)."
+payable_release_income,,,,,,,711,unverified,(DS-19) TT99 default account determination,,,,,"Interim (ADR-0048 rule 20)."
+currency_exchange_clearing,,,,,,,998,unverified,(DS-19) TT99 default account determination,,,,,"Interim (ADR-0048 rule 20): a technical account."
+purchase_expense,,,,,,,6427,unverified,(DS-19) TT99 default account determination,,,,,"Interim: purchased services and expenses of administration (ADR-0047 rule 12); 6417 (selling), 6277 (production) or 242 (prepaid) by a row the company adds or an entered account."
+cash_in_transit,,,,,,,113,unverified,(DS-19) TT99 default account determination,,,,,"Interim (ADR-0048 rule 12, note): money transfers between money accounts."

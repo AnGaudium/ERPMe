@@ -1,0 +1,6 @@
+# Close checklist template of regime tt99 (ADR-0012; ADR-0016 rule 5). Task content is designed in step 8 (DS-26).
+period_pattern: monthly
+special_period_count: 1
+tasks: []
+status: unverified
+open_question: "(DS-19) TT99 period pattern and special period count"

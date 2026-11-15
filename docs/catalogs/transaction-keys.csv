@@ -1,0 +1,64 @@
+code,name,determinants,required_system_accounts,required_control_kind,has_regime_alternatives,added_in,meaning
+inventory_posting,Inventory posting,valuation_class;warehouse,inventory_raw_material;inventory_tools_supplies;inventory_finished_goods;inventory_merchandise;inventory_other,inventory,false,0.1.0,Value of stock received into or issued from a warehouse (SAP BSX).
+inventory_in_transit_posting,Goods in transit posting,valuation_class;warehouse,inventory_goods_in_transit,inventory,false,0.1.0,Value of stock the company owns while it is in transit.
+inventory_goods_sent_posting,Goods sent posting,valuation_class;warehouse,inventory_goods_sent,inventory,false,0.1.0,Value of stock delivered to customers or agents and still owned.
+gr_ir_clearing,GR/IR clearing,valuation_class;warehouse,gr_ir_clearing,gr_ir,false,0.1.0,"Offset of a goods receipt against a purchase order, cleared by the invoice (SAP WRX)."
+price_difference,Price difference,valuation_class;warehouse,price_difference;inventory_raw_material;inventory_tools_supplies;inventory_finished_goods;inventory_merchandise;inventory_other,,true,0.1.0,Difference between invoice and receipt value (SAP PRD); the regime sends it to inventory or to price differences; to inventory it goes through purchase_cost_clearing and a landed cost (ADR-0021 rule 12).
+cost_of_goods_sold,Cost of goods sold,valuation_class;warehouse;item_group,cost_of_goods_sold,,false,0.1.0,Value of goods issued for a sale (SAP GBB-VAX).
+consumption,Consumption,valuation_class;warehouse;item_group,expense;prepaid_expense;construction_in_progress;inventory_work_in_process;production_cost_overhead,,false,0.1.0,"Value of goods issued for internal use: to an expense, a prepaid cost, construction or production (SAP GBB-VBR)."
+inventory_count_shortage,Stock count shortage,valuation_class;warehouse,asset_shortage_pending;inventory_difference,,true,0.1.0,Value of a stock count shortage; the regime chooses pending or expense (SAP GBB-INV).
+inventory_count_surplus,Stock count surplus,valuation_class;warehouse,asset_surplus_pending;inventory_difference;non_operating_income,,true,0.1.0,"Value of a stock count surplus; the regime chooses pending, a reduction of inventory differences, or income."
+inventory_revaluation_offset,Inventory revaluation offset,valuation_class;warehouse,expense,,false,0.1.0,Offset of a period-end costing revaluation of stock (DS-09).
+inventory_write_down,Inventory write-down,valuation_class;warehouse,inventory_write_down_expense,,false,0.1.0,Expense of writing inventory down to net realizable value.
+inventory_write_down_allowance,Inventory write-down allowance,valuation_class;warehouse,inventory_write_down_allowance,,false,0.1.0,Allowance that reduces inventory to net realizable value.
+purchase_cost_clearing,Purchase cost clearing,valuation_class;warehouse,purchase_cost_clearing,,false,0.1.0,Purchase and landed costs recorded and not yet allocated (DS-11).
+opening_balance,Opening balance offset,,opening_balance_clearing,,false,0.1.0,Offset of opening balances during migration (DS-21; SAP GBB-BSA covers stock only).
+receivable_reconciliation,Receivable reconciliation,partner_group,receivable,receivable,false,0.1.0,"Customer's open item account; at posting it is read from the partner, and rows give new partners their default."
+payable_reconciliation,Payable reconciliation,partner_group,payable,payable,false,0.1.0,"Supplier's open item account; at posting it is read from the partner, and rows give new partners their default."
+revenue_posting,Revenue posting,item_group,revenue_goods;revenue_services;revenue_other,,false,0.1.0,"Revenue from a sale, by the item group (SAP VKOA)."
+revenue_deduction_trade_discount,Trade discount,item_group,revenue_deduction_trade_discount,,false,0.1.0,Trade discount granted on a sale.
+revenue_deduction_return,Sales return,item_group,revenue_deduction_return,,false,0.1.0,Revenue of goods a customer returned.
+revenue_deduction_allowance,Sales allowance,item_group,revenue_deduction_allowance,,false,0.1.0,Price reduction granted after a sale.
+input_tax,Input tax,tax_code,tax_receivable_input,,false,0.1.0,"Deductible tax on purchases, by tax code."
+output_tax,Output tax,tax_code,tax_payable_output,,false,0.1.0,"Tax charged on sales, by tax code."
+import_tax,Import tax,tax_code,tax_payable_import,,false,0.1.0,"Value-added or sales tax owed on imports, by tax code (DS-23)."
+import_export_duty,Import and export duty,tax_code,tax_payable_import_export_duty,,false,0.1.0,"Customs duty owed on imports or exports, by tax code (duty codes are tax codes; DS-11, DS-23)."
+special_consumption_tax,Excise tax,tax_code,tax_payable_special_consumption,,false,0.1.0,"Excise tax owed, by tax code."
+fx_gain_realized,Realized exchange gain,currency,fx_gain_realized,,false,0.1.0,Exchange gain on settlement (ADR-0011 rule 15; SAP OBA1 KDF).
+fx_loss_realized,Realized exchange loss,currency,fx_loss_realized,,false,0.1.0,Exchange loss on settlement.
+fx_gain_unrealized,Unrealized exchange gain,currency,fx_gain_unrealized;fx_difference_equity,,true,0.1.0,Exchange gain on revaluation; the regime chooses profit or loss or equity (ADR-0011 rule 18).
+fx_loss_unrealized,Unrealized exchange loss,currency,fx_loss_unrealized;fx_difference_equity,,true,0.1.0,Exchange loss on revaluation.
+rounding_gain,Rounding gain,,rounding_gain,,false,0.1.0,Conversion rounding difference that increases profit (ADR-0006 rule 20).
+rounding_loss,Rounding loss,,rounding_loss,,false,0.1.0,Conversion rounding difference that reduces profit.
+payment_discount_given,Payment discount given,,payment_discount_given,,false,0.1.0,Discount granted to a customer for early payment.
+payment_discount_received,Payment discount received,,payment_discount_received,,false,0.1.0,Discount granted by a supplier for early payment.
+income_summary_transfer,Income summary transfer,,income_summary,,false,0.1.0,Closing transfer of income and expenses to the income summary (ADR-0012 rule 18).
+retained_earnings_transfer,Retained earnings transfer,,retained_earnings,,false,0.1.0,Closing transfer of the period result to retained earnings.
+other_receipt_offset,Other receipt offset,valuation_class;warehouse,non_operating_income;income_other;liability_other;expense_other,,true,0.1.0,Offset of goods received without a purchase order; the regime or company chooses the account (ADR-0020).
+other_issue_offset,Other issue offset,valuation_class;warehouse;item_group,expense,,false,0.1.0,Offset of goods issued for a purpose no other movement type covers.
+scrap,Scrap,valuation_class;warehouse,expense,,false,0.1.0,Value of goods destroyed or written off.
+production_consumption,Production consumption,,production_cost_material,cost_object,false,0.1.0,Materials issued to a production order (ADR-0035).
+production_output,Production output,valuation_class,inventory_work_in_process,cost_object,false,0.1.0,"Output received from a production order against work in process, by the valuation class of the order's main output (ADR-0035)."
+production_wip_transfer,Production WIP transfer,valuation_class,inventory_work_in_process,cost_object,false,0.1.0,"Collected production cost moved into work in process at period end; the leaf side copies the source account (ADR-0035)."
+production_abnormal_cost,Abnormal production cost,,cost_of_goods_sold;expense_other,,true,0.1.0,"Consumption above norm plus tolerance at order completion, an expense of the period (IAS 2 para 16; ADR-0035); the regime chooses cost of goods sold or other expense (ADR-0053 rule 6)."
+production_unabsorbed_overhead,Unabsorbed fixed overhead,,cost_of_goods_sold;expense_other,,true,0.1.0,"Fixed production overhead above normal-capacity absorption or of an idle pool, an expense of the period (IAS 2 para 13; ADR-0035); the regime chooses cost of goods sold or other expense (ADR-0053 rule 6)."
+production_residual_cost,Residual production cost,,cost_of_goods_sold,,false,0.1.0,"Cost of a completed order with no output in the period, or a negative output value (ADR-0035)."
+production_external_service,Production external service,,production_cost_other,cost_object,false,0.1.0,"External operation service cost charged to a production order, and invoice differences while the order is open (ADR-0037)."
+inventory_at_processor_posting,Inventory at processor,valuation_class;warehouse,inventory_raw_material;inventory_tools_supplies;inventory_finished_goods;inventory_merchandise;inventory_other,inventory,false,0.1.0,"Stock we own held at a processor location; lets a regime show it on its own account (ADR-0037)."
+input_tax_non_deductible,Non-deductible input tax,tax_code,expense,,false,0.1.0,"Input VAT that is or becomes non-deductible (cash payment above the threshold, a lapsed due date, apportionment), moved from input tax to an expense (ADR-0041)."
+other_tax,Other tax,tax_code,tax_payable_other,,false,0.1.0,"Taxes, fees and charges owed that have no key of their own, by tax code (ADR-0053 rule 5)."
+trade_remedy_duty,Trade remedy duty,tax_code,tax_payable_import_export_duty;tax_payable_other,,false,0.1.0,"Anti-dumping, countervailing and safeguard duties owed on imports, by tax code (ADR-0041)."
+opening_group_translation,Opening group translation,,fx_difference_equity,,false,0.1.0,"Group-currency difference of the opening balance clearing account at migration completion, posted as group-only lines (ADR-0044)."
+free_goods_cost,Free goods cost,valuation_class;warehouse;item_group,cost_of_goods_sold;selling_expense,,true,0.1.0,"Cost of free goods delivered under a promotion; the regime chooses cost of goods sold or a selling expense (ADR-0047 rule 17)."
+bank_charge,Bank charge,,administrative_expense;financial_expense,,true,0.1.0,"Fees a bank charges on an account or a payment; the regime or company chooses administrative or financial expense (ADR-0048 rule 20; ADR-0053 rule 6)."
+cash_surplus,Cash surplus,,asset_surplus_pending;non_operating_income,,true,0.1.0,"Cash counted above the book balance; the regime chooses an account pending resolution or income (ADR-0048; ADR-0053 rule 6)."
+cash_shortage,Cash shortage,,asset_shortage_pending;non_operating_expense,,true,0.1.0,"Cash counted below the book balance; the regime chooses an account pending resolution or expense (ADR-0048; ADR-0053 rule 6)."
+payment_difference_income,Payment difference income,,non_operating_income,,false,0.1.0,"A small difference written off in the company's favor (ADR-0048)."
+payment_difference_expense,Payment difference expense,,non_operating_expense,,false,0.1.0,"A small difference written off against the company. (ADR-0048)."
+bad_debt_expense,Bad debt expense,,administrative_expense,,false,0.1.0,"Provision for doubtful receivables, and write-offs beyond the allowance. (ADR-0048)."
+bad_debt_allowance,Bad debt allowance,,receivable_allowance,,false,0.1.0,"The allowance for doubtful receivables, raised by provisions and used by write-offs. (ADR-0048)."
+bad_debt_recovery,Bad debt recovery,,non_operating_income,,false,0.1.0,"A receipt of a debt written off earlier. (ADR-0048)."
+payable_release_income,Payable release,,non_operating_income,,false,0.1.0,"A payable no longer owed, written off. (ADR-0048)."
+currency_exchange_clearing,Currency exchange clearing,,currency_exchange_clearing,,false,0.1.0,"Clearing between the two sides of a currency exchange, never revalued (ADR-0011 rule 4; ADR-0048 rule 12)."
+purchase_expense,Purchase expense,item_group,expense;prepaid_expense;construction_in_progress,,false,0.1.0,"Purchase invoice expense lines, and service lines without a service receipt, by the item group; an entered account is checked against the key (ADR-0047 rule 12)."
+cash_in_transit,Cash in transit,currency,cash_in_transit,,false,0.1.0,"Money between two money accounts of one currency, posted by both sides of a money transfer (ADR-0048 rule 12, note)."

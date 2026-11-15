@@ -1,0 +1,14 @@
+template,name,is_totp_required,suggested_owner_scope_read,suggested_owner_scope_edit,suggested_field_classes,added_in,meaning
+owner,Owner,true,company,company,cost;margin,0.1.0,"Every permission and capability (ADR-0017 rule 6 interim); approves everywhere."
+chief_accountant,Chief accountant,true,company,company,cost;margin,0.1.0,"Finance and Banking full; supplier documents and sales corrections full; files statutory reports and tax returns; policy administration; payments approved, not posted; partner bank accounts read; other areas read; approves."
+accountant,Accountant,false,company,company,cost;margin,0.1.0,"Finance and Banking post; invoices post; payments drafted and approved, not posted; partners read; posting periods and the chart read; approves."
+cashier,Cashier,false,company,own,,0.1.0,"Cash receipts, payments and counts post; bank payments post; other bank documents read; no reports (book queries cannot be narrowed to the cash book)."
+sales_clerk,Sales clerk,false,own,own,,0.1.0,"Quotations, sales orders and sales corrections edit; customers and price lists edit."
+sales_manager,Sales manager,false,department,department,margin,0.1.0,"Sales post and approve; price lists read; change proposals edit and approve."
+buyer,Buyer,false,own,own,cost,0.1.0,"Purchase requests, orders and supplier invoices edit; suppliers and planned orders edit."
+purchasing_manager,Purchasing manager,false,department,department,cost,0.1.0,"Purchasing post and approve, supplier invoices edit and approve; change proposals edit and approve; planning post."
+warehouse_keeper,Warehouse keeper,false,branch,branch,,0.1.0,"Inventory post; production issues and receipts post; orders read."
+production_planner,Production planner,false,company,company,cost,0.1.0,"Production post; planning full; production structures edit; change proposals edit and approve."
+shop_floor_lead,Shop floor lead,false,branch,branch,,0.1.0,"Confirmations, production issues and receipts post; production orders read (ADR-0034 rule 18)."
+auditor,Auditor,false,company,own,cost;margin,0.1.0,Read everywhere including audit records; nothing else.
+it_administrator,IT administrator,true,company,company,,0.1.0,"Users, roles, assignments, delegations, organization and settings full; policy and segregation read; no Finance or Banking, no data import, no agent run bodies."

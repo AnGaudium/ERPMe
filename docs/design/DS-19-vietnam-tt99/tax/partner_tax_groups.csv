@@ -1,0 +1,5 @@
+code,name_en,name_vi,directions,basis,basis_document,basis_article,basis_date,verified_by,verified_on
+domestic,Domestic,Trong nước,sale;purchase,unverified,"(DS-23) Vietnamese tax codes, matrix and 01/GTGT boxes",,,,
+export,Export and non-tariff zones,"Xuất khẩu, khu phi thuế quan",sale,unverified,"(DS-23) Vietnamese tax codes, matrix and 01/GTGT boxes",,,,
+no_vat_invoice,Sellers without VAT invoices,Người bán không có hóa đơn GTGT,purchase,unverified,"(DS-23) Vietnamese tax codes, matrix and 01/GTGT boxes",,,,
+foreign_supplier,Foreign suppliers,Nhà cung cấp nước ngoài,purchase,unverified,"(DS-23) Vietnamese tax codes, matrix and 01/GTGT boxes",,,,

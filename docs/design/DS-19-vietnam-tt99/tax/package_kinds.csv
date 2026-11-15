@@ -1,0 +1,5 @@
+code,tax_kind,name_en,name_vi,basis,basis_document,basis_article,basis_date,verified_by,verified_on
+import_duty,customs_duty,Import duty,Thuế nhập khẩu,unverified,"(DS-23) Vietnamese tax codes, matrix and 01/GTGT boxes",,,,
+special_consumption,excise,Special consumption tax,Thuế tiêu thụ đặc biệt,unverified,"(DS-23) Vietnamese tax codes, matrix and 01/GTGT boxes",,,,
+environmental_protection,excise,Environmental protection tax,Thuế bảo vệ môi trường,unverified,"(DS-23) Vietnamese tax codes, matrix and 01/GTGT boxes",,,,
+trade_remedy,customs_duty,"Anti-dumping, countervailing and safeguard duties","Thuế chống bán phá giá, chống trợ cấp, tự vệ",unverified,"(DS-23) Vietnamese tax codes, matrix and 01/GTGT boxes",,,,

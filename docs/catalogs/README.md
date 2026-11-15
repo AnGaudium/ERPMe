@@ -4,7 +4,18 @@ Versioned data the core relies on. Each catalog is owned by one design item and 
 
 | Catalog | Owner | Status |
 | --- | --- | --- |
-| System accounts | DS-07 | Not started |
-| Transaction keys and valuation classes | DS-08 | Not started |
-| Movement types | DS-09 | Not started |
-| Edge cases (EC-xx) | DS-17 | Not started |
+| System accounts | DS-07 | [system-accounts.csv](system-accounts.csv), version 0.1.0, released as 1.0.0 at the step 0 gate ([ADR-0010](../adr/0010-system-chart-of-accounts.md)) |
+| Transaction keys | DS-08 | [transaction-keys.csv](transaction-keys.csv), version 0.1.0 ([ADR-0015](../adr/0015-account-determination.md)); valuation classes and item groups are company data seeded by the localization package |
+| Movement types | DS-09 | [movement-types.csv](movement-types.csv), version 0.1.0 ([ADR-0020](../adr/0020-inventory-and-costing-model.md)) |
+| Work item kinds | DS-29 | [work-item-kinds.csv](work-item-kinds.csv), version 0.1.0, seeded now and generated from the registry once `work` exists ([ADR-0042](../adr/0042-work-queue.md)) |
+| Invariants (INV-xx) | DS-16 | [invariants.csv](invariants.csv), version 0.1.0 ([DS-16](../design/DS-16-invariants-and-harness.md)) |
+| Edge cases (EC-xx) | DS-17 | [edge-cases.csv](edge-cases.csv), version 0.1.0, released as 1.0.0 (EC v1) at the step 0 gate ([DS-17](../design/DS-17-synthetic-dataset.md)) |
+| Authorization areas | DS-15 | [authorization-areas.csv](authorization-areas.csv), version 0.1.0, seeded now and generated from the registry once it exists ([ADR-0054](../adr/0054-users-roles-and-authorizations.md) rule 7) |
+| Authorization verb levels | DS-15 | [authorization-verb-levels.csv](authorization-verb-levels.csv), version 0.1.0, one row per glossary verb ([ADR-0054](../adr/0054-users-roles-and-authorizations.md) rule 8) |
+| Role templates | DS-15 | [role-templates.csv](role-templates.csv) and [role-template-levels.csv](role-template-levels.csv), version 0.1.0, interim defaults ([ADR-0054](../adr/0054-users-roles-and-authorizations.md) rule 11) |
+| Segregation rules | DS-15 | [segregation-rules.csv](segregation-rules.csv), version 0.1.0 ([ADR-0054](../adr/0054-users-roles-and-authorizations.md) rule 17) |
+| Analysis measures | DS-33 | [analysis-measures.csv](analysis-measures.csv), version 0.1.0, the 35 core measures of Phase 1 with fact, aggregation, selectors over system accounts and ADR-0049's turnover options, additivity, basis and field class; seeded now and generated from the code once `query` exists ([ADR-0060](../adr/0060-agent-assisted-reporting-and-analysis.md) rules 4, 33) |
+| Analysis dimensions | DS-33 | [analysis-dimensions.csv](analysis-dimensions.csv), version 0.1.0, the 22 core dimensions with kind, column, hierarchy, cardinality, label class and the facts that offer them ([ADR-0060](../adr/0060-agent-assisted-reporting-and-analysis.md) rules 5, 34) |
+| Units | DS-20 | [units.csv](units.csv), version 0.1.0, core units from UN/ECE Recommendation 20 with kinds and decimal places; packaging units are company units ([ADR-0056](../adr/0056-multiple-units-of-measure.md) rule 2) |
+| Unit conversions | DS-20 | [unit-conversions.csv](unit-conversions.csv), version 0.1.0, direct pairs of core units stored once from the larger unit ([ADR-0056](../adr/0056-multiple-units-of-measure.md) rule 3) |
+| Settings | DS-28 | [settings.csv](settings.csv), version 0.1.0, the settings registry's definitions that [ADR-0063](../adr/0063-configurable-policy-settings.md) registers or touches, with scope, storage, type, core default or fail-closed, bounds, direction, leaf, change effect and outdating; seeded now and generated from the registry once `registry` exists (rule 1) |

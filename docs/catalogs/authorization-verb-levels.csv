@@ -1,0 +1,66 @@
+verb,level,added_in,meaning
+Get,read,0.1.0,Query of one record.
+List,read,0.1.0,Query of records; computed queries also need read.
+Render,read,0.1.0,"Produces a file of data the caller may read, as a job (ADR-0049 rule 20); owner and record scope apply as for the data."
+Evaluate,read,0.1.0,"Query that computes a result from given inputs and stores nothing, as in EvaluateConfiguration (ADR-0046 rule 17; ADR-0004 rule 21 note)."
+Create,edit,0.1.0,
+Update,edit,0.1.0,
+Delete,edit,0.1.0,Only never-submitted drafts and unreferenced records.
+Submit,edit,0.1.0,Sends a draft to policy; approval is separate.
+Cancel,edit,0.1.0,
+Recall,edit,0.1.0,
+Request,edit,0.1.0,
+Claim,edit,0.1.0,
+Unclaim,edit,0.1.0,
+Resolve,edit,0.1.0,
+Assign,edit,0.1.0,
+Start,edit,0.1.0,
+Reserve,edit,0.1.0,
+Pack,edit,0.1.0,
+Unpack,edit,0.1.0,
+Firm,edit,0.1.0,
+Convert,edit,0.1.0,
+Allocate,edit,0.1.0,
+Match,edit,0.1.0,
+Unmatch,edit,0.1.0,
+Ignore,edit,0.1.0,
+Validate,edit,0.1.0,
+Import,edit,0.1.0,
+Set,edit,0.1.0,As in SetPriceListEntries (ADR-0045 rule 7).
+Verify,edit,0.1.0,"Checks or confirms data and records the result: a configuration against an outside system, as in VerifyMailboxAuthentication (ADR-0052 rule 14), or extracted values and a whole extraction by a person, as in VerifyExtractionFields and VerifyDocumentExtraction (ADR-0057 rule 23)."
+Correct,edit,0.1.0,"Appends a person's correction that supersedes an earlier value, as in CorrectExtractionField (ADR-0057 rule 23)."
+Propose,edit,0.1.0,"Drafts a change proposal from verified data, as in ProposeContactFromExtraction (ADR-0057 rule 27)."
+Bind,edit,0.1.0,"Replaces a draft's reference to a proposal item by the item its execution created, as in BindProposedItems (ADR-0062 rule 14)."
+End,edit,0.1.0,"Ends or narrows a dated permission or setting; a command may declare a higher minimum, as EndDataProcessingPermission does (ADR-0057 rule 20)."
+Raise,edit,0.1.0,"The system opens a work item for an exception it found (work.contract.raise_work_item, event WorkItemRaised; ADR-0042 rule 5); no command type uses it yet."
+Post,post,0.1.0,
+Issue,post,0.1.0,
+Record,post,0.1.0,
+Complete,post,0.1.0,
+Reopen,post,0.1.0,
+Close,post,0.1.0,
+Release,post,0.1.0,
+Confirm,post,0.1.0,
+Accept,post,0.1.0,
+Transfer,post,0.1.0,
+Run,post,0.1.0,
+Resume,post,0.1.0,
+Abandon,post,0.1.0,
+Restrict,post,0.1.0,
+Open,post,0.1.0,
+Skip,post,0.1.0,
+Retry,post,0.1.0,
+Send,post,0.1.0,Hands a message to its outside channel; effect class outbound_send needs post too (ADR-0052).
+File,post,0.1.0,Records a submission to an authority (ADR-0049 rule 19).
+Reverse,full,0.1.0,
+Lock,full,0.1.0,
+Unlock,full,0.1.0,
+Clear,full,0.1.0,
+Erase,full,0.1.0,
+Activate,full,0.1.0,
+Enable,full,0.1.0,
+Disable,full,0.1.0,
+Export,full,0.1.0,
+Replay,full,0.1.0,
+Approve,approve,0.1.0,Given by the role's approval flag; no level gives it (ADR-0054 rule 9).
+Reject,approve,0.1.0,Given by the role's approval flag; no level gives it (ADR-0054 rule 9).

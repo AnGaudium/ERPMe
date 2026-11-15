@@ -1,0 +1,22 @@
+code,name,direction,value_source,costing_role,offset_transaction_key,needs_reference,sap_analog,added_in,meaning
+purchase_receipt,Purchase receipt,in,document,receipt,gr_ir_clearing,true,101,0.1.0,"Goods received against a purchase order, valued from the order; offset to GR/IR clearing."
+purchase_return,Purchase return,out,regime,regime,gr_ir_clearing,true,122,0.1.0,"Goods returned to a supplier. Set by regime; interim seed (unverified): document value, negative receipt. For goods received against a purchase order line the document value is the GR/IR debit of the positions the return debits, the latest (ADR-0020 rule 5 note)."
+sales_issue,Sales issue,out,preliminary_price,revalued_issue,cost_of_goods_sold,true,601,0.1.0,"Goods issued for a sale, valued at the preliminary price and revalued at period end."
+sales_return_receipt,Sales return receipt,in,regime,regime,cost_of_goods_sold,true,651,0.1.0,"Goods a customer returned. Set by regime; interim seed (unverified): document value (the original issue cost), receipt."
+transfer_out,Transfer out,out,preliminary_price,transfer,,true,301,0.1.0,Issuing side of a transfer between warehouses; the receiving side is transfer_in on the same document.
+transfer_in,Transfer in,in,issuing_value,transfer,,true,301,0.1.0,Receiving side of a transfer; takes exactly the value that left.
+stock_count_shortage,Stock count shortage,out,regime,regime,inventory_count_shortage,true,702,0.1.0,"Quantity missing at a stock count. Set by regime; interim seed (unverified): preliminary price, revalued issue."
+stock_count_surplus,Stock count surplus,in,regime,regime,inventory_count_surplus,true,701,0.1.0,"Quantity found in excess at a stock count. Set by regime; interim seed (unverified): preliminary price, receipt."
+internal_consumption,Internal consumption,out,preliminary_price,revalued_issue,consumption,false,201,0.1.0,Goods issued for internal use.
+other_receipt,Other receipt,in,document,receipt,other_receipt_offset,false,501,0.1.0,"Goods received without a purchase order, valued from the document."
+other_issue,Other issue,out,preliminary_price,revalued_issue,other_issue_offset,false,201,0.1.0,Goods issued for a purpose no other movement type covers.
+scrap,Scrap,out,preliminary_price,revalued_issue,scrap,false,551,0.1.0,Goods destroyed or written off.
+opening_balance,Opening balance,in,document,receipt,opening_balance,false,561,0.1.0,"Stock taken over at migration, valued from the import (DS-21)."
+production_issue,Production issue,out,preliminary_price,production_input,production_consumption,true,261,0.1.0,"Components issued to a production order's cost object, valued at the preliminary price and revalued at period end (ADR-0035)."
+production_return,Production return,in,preliminary_price,production_input,production_consumption,true,262,0.1.0,"Components returned from a production order: a negative issue at the period's preliminary price, revalued with issues (ADR-0035)."
+production_receipt,Production receipt,in,preliminary_price,production_output,production_output,true,101,0.1.0,"Main output received from a production order, at the preliminary price and revalued at period end (ADR-0035)."
+co_product_receipt,Co-product receipt,in,preliminary_price,production_output,production_output,true,101,0.1.0,"Co-product received from a production order, revalued at period end by coefficient (ADR-0035)."
+by_product_receipt,By-product receipt,in,regime,production_output,production_output,true,531,0.1.0,"By-product received from a production order. Set by regime; interim seed (unverified): the by_product_price list, final at once (ADR-0035)."
+disassembly_issue,Disassembly issue,out,preliminary_price,production_input,production_consumption,true,261,0.1.0,"Item issued to a disassembly order (ADR-0034, ADR-0035)."
+disassembly_receipt,Disassembly receipt,in,preliminary_price,production_output,production_output,true,101,0.1.0,"Component received from a disassembly order, revalued at period end (ADR-0035)."
+free_goods_issue,Free goods issue,out,preliminary_price,revalued_issue,free_goods_cost,true,601,0.1.0,"Free goods delivered with a sale under a promotion; offset as the regime chooses (ADR-0047 rule 17)."

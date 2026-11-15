@@ -1,6 +1,6 @@
 # ADR-0003: Build operating rules
 
-Status: accepted (2026-11-14). Answers drafted by an agent on the author's instruction to choose the simplest workable option; the author accepted them by that instruction. Amended before its first merge (2026-11-14): R3 and R10 changed by the author's decision. Design items: DS-17, DS-18, DS-30, DS-34, DS-37, DS-40. Related decisions: D3, D11, D15, D16.
+Status: accepted (2026-11-14). Answers drafted by an agent on the author's instruction to choose the simplest workable option; the author accepted them by that instruction. Amended before its first merge (2026-11-14): R3 and R10 changed by the author's decision. R5: who accepts design items in stage 1 of the six-stage policy is set by [ADR-0005](0005-technical-decisions-delegated.md). Design items: DS-17, DS-18, DS-30, DS-34, DS-37, DS-40. Related decisions: D3, D11, D15, D16.
 
 ## Decision
 
@@ -35,6 +35,8 @@ The fourteen operating questions raised while writing the [runbook](../runbook/R
 | Step 8 | FX revaluation: reverse and repost, or post the delta |
 | Step 10 | TT133 status; B03 for TT133 businesses |
 | Step 11 | Implementing decree of the Personal Data Protection Law; processor obligations (R12) |
+
+Note ([ADR-0057](0057-document-intake-and-extraction.md), proposed 2026-11-15): the step 7 item "Decree 70/2025" is stale: Vietnam's e-invoice rules are now Decree 254/2026/NĐ-CP and Circular 91/2026/TT-BTC, effective 1 July 2026. They are the basis of `l10n_vn`'s e-invoice reader, a package concern; the format annex is an open question (DS-40). The VAT deduction item is unchanged.
 
 ## Context
 
