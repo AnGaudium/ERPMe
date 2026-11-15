@@ -76,6 +76,8 @@ The web UI is one more client of the command and query layer. It writes data onl
      The audit link shows only to holders of `GetAuditRecord` (ADR-0038 rule 7).
    - **Command form** for any command: header fields, line tables (a plain keyboard table in v1; AG Grid on the hand-built screens), and the plan panel.
    - **Query result view** for computed queries (availability, pegging trees, production order status), rendered as tables or trees by result shape.
+
+   The export is `CreateListExport`, with at most `list_export_max_rows` rows ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 54).
 7. Navigation:
    - **The menu** is generated from the registry. Modules are grouped by area: accounting, inventory, sales, purchasing, production, warehouse, planning, work, settings. The user sees only nouns they may list, from `GetSessionContext`.
    - **The command palette** (`Ctrl/Cmd+K`) finds any permitted command, query, list or record by English or translated name.
@@ -93,6 +95,8 @@ The web UI is one more client of the command and query layer. It writes data onl
    - **Advisory.** The answer returns the subject's version and writes no denial records. Policy outcomes that need a simulation come back from the command itself.
    - **Who may call it.** Its permission is in every role template. In Phase 1 it is on no agent tool list (open question), because a denial-free probe of permissions with reasons would weaken the denial signal of ADR-0038 rule 5.
    - **Testing.** A DS-16 property test checks that `is_allowed: true` implies that simulation never fails with `invalid_state_transition`, `permission_denied`, `human_only`, `segregation_of_duties` or `change_pending`.
+
+   [ADR-0050](0050-agent-runtime-and-query-layer.md) rule 34 proposes keeping it people-only: agents plan from their tool list and simulate mode.
 
 **Simulate, plan, execute**
 
@@ -161,6 +165,8 @@ The web UI is one more client of the command and query layer. It writes data onl
     - **Revocation.** Revoking a session closes its stream.
     - **The client** coalesces headers for 300 ms per query key, invalidates the subject's TanStack Query keys and refetches through queries, so permissions and field classes apply on the read.
     - **Delivery.** Best effort. After a reconnect, the client refetches what is open.
+
+    The query builder emits one `SELECT` per statement, and `EXECUTE` on `pg_notify` is revoked from `PUBLIC` and granted to `erpme_app` and `erpme_worker` ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 44).
 14. Notifications to people beyond live screens (e-mail, push) are after Phase 1 (spec 07).
 
 **Language, keyboard, display**

@@ -111,6 +111,8 @@ Accounting and business choices stay with the author, as flagged interims: close
     - **Message-ID.** A sender controls the `Message-ID`. Intake skips a second message only when its content hash also matches. Otherwise both are kept and the later is flagged `duplicate_suspected`.
     - **Missing header.** Without a `Message-ID`, only the UID applies.
 11. Documents an agent drafts store `origin_work_item_id`, `workflow_step` and `draft_ordinal` (a number the step defines) on the shared `document` row (ADR-0009 rule 1). Together with `document_type` they are unique among documents in any state except `canceled`. A second attempt by any run is rejected with `duplicate_draft`, naming the existing draft, so a re-run of a crashed agent does not draft twice.
+
+    `workflow_step` values are `<agent_type>.<step_code>` ([ADR-0051](0051-agent-workflows.md) rule 8).
 12. Pick task creation (ADR-0023 rule 14) takes the `stock_value` lock of each item and warehouse (ADR-0027 rule 10, class 6) before reading available bin stock. Two releases therefore never allocate the same units. PAR-11 tests it.
 
 ## Context

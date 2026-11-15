@@ -50,6 +50,8 @@ On 2026-11-14 the author decided that every capability a customer cannot operate
    | DS-55 | Subcontracting (in Vietnamese, gia công): materials sent to a processor, the processing fee, receipt of finished goods, and the customs reporting of processing types where they apply |
 
    The production agent workflow is added to DS-34. When the production design is done, agents run design assessment 2 of the production flow (demand → MRP → production order → material issue → output → costing → cost of goods sold) as the first assessment was run. Its reports go in `docs/reviews/<date>-production-assessment/`.
+
+   The production agent is design item DS-57, designed before the production core step ([ADR-0051](0051-agent-workflows.md) rule 29).
 6. **Synthetic data.** DS-17 adds a fictional Vietnamese manufacturing company with multi-level bills of materials, production, subcontracting and production cost closing. It is due at the gate of the production core step. The production design items add their edge cases.
 7. **Author-owned documents.** The roadmap, build order, MVP scope, vision, specs and runbook are the author's documents. This ADR proposes their changes as an open question, with draft wording:
    - **Spec 09 (MVP scope):** production rows move to Phase 1, including MRP, routings, operations, shop floor and quality. "MVP is Phases 1 and 2" becomes "MVP is Phase 1".

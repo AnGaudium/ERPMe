@@ -177,6 +177,8 @@ Agents read the structures through deterministic queries. They draft revisions f
 
     Agents draft bills of materials and routings from spreadsheets or drawings, then propose the release (ADR-0029 rule 5). DS-34 designs the master-data workflow.
 
+    The master-data workflow is a later agent ([ADR-0051](0051-agent-workflows.md) rule 29).
+
 **Reserved checks and later features**
 
 16. Catalog codes:

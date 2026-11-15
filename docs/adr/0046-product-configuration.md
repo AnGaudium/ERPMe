@@ -101,6 +101,8 @@ Numbers join lists: a characteristic may take a number in a range with a step, s
    - **Necessary, not sufficient.** Allowed values are necessary: a combination of allowed values can still meet a `forbid` or a table several steps later. The lookahead flags the direct cases. A configuration is accepted only when it is complete.
    - **The query.** `EvaluateConfiguration` (product, date or model revision, values) exposes it to people and agents. It is computed, an exception to ADR-0004 rule 21 like `GetPrice`. A screen and an agent see the same remaining choices.
 
+   The quotation agent's configuring loop: [ADR-0051](0051-agent-workflows.md) rule 15.
+
 **Configurations**
 
 9. `product_configuration`:

@@ -88,12 +88,16 @@ Every exception, pending approval and other piece of business work is one `work_
     - **Claiming.** It needs `ClaimWorkItem` on a visible item.
     - **Agents.** An agent run claims only items whose kind its agent type declares (DS-32), within the permission intersection (ADR-0017 rule 11). Ownership is checked on the human the run acts for.
     - **Lease.** Agent claims expire after `work_claim_minutes` (company setting, default 30) unless renewed; a run renews on each command.
+
+    Agent claims are taken by `StartAgentRun` and renewed by the runner ([ADR-0050](0050-agent-runtime-and-query-layer.md) rules 15–16).
 11. Precedence and exclusion (Principle 8):
     - **A person over an agent.** A person's `ClaimWorkItem` on an item an agent run holds takes the claim. The dispatcher then rejects every later command of that run with `work_item_claim_lost` (rule 11, agent commands), so the agent stops and never works at the same time as a person.
     - **A person over a person.** Taking a claim from another person needs `AssignWorkItem`.
     - **An agent over anyone.** An agent run cannot take a held claim.
     - **Agent commands.** The run's work item is bound on `agent_run` when the run starts (DS-32). The dispatcher derives it from the credential, never from the request (ADR-0008 rule 8), and rejects any command of the run with `work_item_claim_lost` once the claim is gone. A held claim makes a second claimant fail with `work_item_claimed`.
     - **Runs without an exception.** A run a person or a schedule starts creates and claims an `agent_task` item for itself at its start, owned by the person the run acts for. No agent type may declare `agent_task`, so wake-ups cannot loop.
+
+    Shadow runs bind their work item without a claim, and the dispatcher skips the claim check for them because they only simulate ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 14).
 12. Other commands:
     - `AssignWorkItem` sets the owner and may clear a claim.
     - `ResolveWorkItem` (resolution code and note) is for kinds a person resolves.
@@ -107,6 +111,8 @@ Every exception, pending approval and other piece of business work is one `work_
 14. Events: `WorkItemRaised`, `WorkItemClaimed`, `WorkItemUnclaimed`, `WorkItemAssigned`, `WorkItemResolved`, `WorkItemCanceled`.
     - **Agent wake-ups.** Consumers that start agent runs (DS-32) react to `WorkItemRaised` for kinds an agent type declares.
     - **Live screens** update through ADR-0040 rule 13.
+
+    The wake-up consumer is `agent_wake_up`; a kind that a command on an agent tool list can raise is declared by no agent type ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 16).
 
 **Taint and agents**
 
@@ -138,6 +144,8 @@ Every exception, pending approval and other piece of business work is one `work_
     Unmatched bank lines and low stock (Principle 8) come with DS-25 and planning.
 
     `bank_line_unmatched` is added ([ADR-0048](0048-cash-bank-receivables-payables.md) rule 9).
+
+    `agent_run_stopped`, `agent_budget_exhausted` and `agent_denials_repeated` are added ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 55); `inbound_message`, `supplier_invoice_received`, `agent_quality_below_threshold` and `import_duplicate_suspected` are added ([ADR-0051](0051-agent-workflows.md) rule 30).
 19. Defects never enter the queue (ADR-0003 R7), and technical jobs are not work items (spec 07).
 
 **Build order**

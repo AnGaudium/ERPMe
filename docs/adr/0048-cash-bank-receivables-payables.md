@@ -114,6 +114,8 @@ Allocation is always explicit. A deterministic query proposes it, and a person o
    - **Reconciliation.** `GetBankReconciliation` (money account, date) compares the statement's closing balance with the book balance, and lists unmatched lines and unmatched book postings. The close checklist task "bank statements reconciled" (ADR-0012 rule 13) reads it.
    - **Ignoring a line** (`IgnoreBankLine`, with a reason; the new verb Ignore) is `human_only`.
    - **One line, one document** in Phase 1. Several lines to one document, or one line to several, come later (open question).
+
+   `BankLineSuggestionRecorded` carries IDs only; the suggested tokens stay on the line as untrusted fields ([ADR-0051](0051-agent-workflows.md) rule 17).
 9. Matching:
    - **The cascade:** `match_bank_line`, a pure function, checked by the lab on shuffled inputs. It first puts open items and documents in a canonical order (due date, then ID). An inflow considers only items on the debit side, an outflow only items on the credit side, and only items in the money account's currency. Then it applies, in order:
      1. **Already posted:** an unmatched posted document of this money account in the same direction and amount, dated within 5 days, whose reference is a token of the description or whose partner owns the counterparty's account. The closest date wins, then the earliest, then the lowest ID (score 95). Nothing new is drafted.
@@ -128,6 +130,8 @@ Allocation is always explicit. A deterministic query proposes it, and a person o
    - **Outcome.** Steps 2–4 draft a `bank_receipt` or `bank_payment` with the lines found, as `system` on behalf of the importer, and record the match. `MatchBankLine` links a line to an existing document. `UnmatchBankLine` unlinks it. It is rejected with `bank_statement_line_posted` when the document was created from that line and is posted; its fix names `Reverse<Type>`, which is `human_only` and unmatches the line itself (rule 16).
    - **Auto-post.** A rule allowing `system` to post a deterministic match below an amount is disabled by default. It needs shadow-mode evidence, an owner and confirmation (ADR-0029 rule 13; ADR-0043 rule 14). Drafts from a statement imported by an agent run are never auto-posted (ADR-0043 rule 9, floor 5; ADR-0029 rule 12).
    - **LLMs.** An agent reading descriptions works on tainted input. Its suggestions are drafts or proposed rules, never part of a score, and never auto-posted (spec 03 rule 1).
+
+   The agent records its reading with `RecordBankLineSuggestion`; a consumer re-runs the cascade with it and drafts without a score ([ADR-0051](0051-agent-workflows.md) rules 17–18).
 
 **Netting and write-offs**
 

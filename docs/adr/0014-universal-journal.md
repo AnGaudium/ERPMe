@@ -52,6 +52,8 @@ Currency columns are foreign keys to `currency.code`, named by currency type as 
 
 16. Indexes on `journal_line`: `(company_id, account_id, posting_period_id)`, `(company_id, system_account_id, posting_period_id)`, `(company_id, partner_id)` where not null, `(open_item_id)` where not null, `(material_document_line_id)` where not null. On `journal_entry`: `(company_id, posting_date)` for balances as of a date (ADR-0007 rule 23) and `(posting_period_id, close_task_id)` for close task staleness (ADR-0012 rule 12).
 17. AR/AP subledgers and inventory value are views over `journal_line` (and open items, [ADR-0026](0026-open-item-core.md)), not separate ledgers ([05](../spec/05-accounting-inventory-core.md)). Agents and reports read through the read-only query layer (DS-33). The open item cache equals its lines (INV-33; [ADR-0026](0026-open-item-core.md)).
+
+    Agents read through the semantic views of schema `query` and the computed module queries; management reporting reads `system_account_turnover` ([ADR-0050](0050-agent-runtime-and-query-layer.md) rules 51–53).
 18. `account_period_balance` caches, per (`company_id`, `account_id`, `posting_period_id`, `transaction_currency`, `is_closing_entry`), debit and credit turnover in all three currencies, and the cumulative closing balance of the lines with that `is_closing_entry` value up to the period's end; an account's balance is the sum of its two rows. It is written when a period's `general` area is locked; unlocking deletes that period's rows. A period with no movement has no rows; its balance is the closing balance of the latest earlier row. Balances of unlocked periods are computed from lines. It is never written on the posting path (ADR-0002).
 19. No partitioning in Phase 1 (ADR-0006 rule 23).
 

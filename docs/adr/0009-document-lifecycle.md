@@ -94,6 +94,8 @@ Every document has one row in a shared `document` table (type, company, state, v
 
    A credit note or sales return may correct an invoice that exists only in the old system, with `external_original` instead of `correction_of_id`, for originals dated before the migration cut-over; limits then apply against the entered amounts. Returns keep this rule's definition: `sales_return` and `purchase_return` credit returned goods and refer to the stock return lines. Cumulative limits are [ADR-0047](0047-commercial-documents-and-pricing.md) rule 20.
 
+    Agents may create correction drafts but not submit them: no `Submit`, `Post` or `Issue` is on an agent tool list, so people submit ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 30).
+
 ## Context
 
 DS-05 is needed by DS-06 (journal), DS-09 (inventory), DS-12 (periods), DS-22 (commercial documents) and DS-28 (approval). Constraints:

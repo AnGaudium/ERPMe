@@ -72,6 +72,8 @@ Policy is a deterministic threshold table per company, as runbook B7 asks.
 5. Which actor is evaluated:
    - **Consequence postings.** Commands registered `is_consequence_posting`, when their chain was started by a person's command and carries no origin agent run, are deterministic postings run on behalf of that person: close jobs (ADR-0012), FX revaluation (ADR-0011 rule 17), import chunks (ADR-0030 rule 9), tax adjustments (ADR-0041 rule 13) and automatic production receipts (ADR-0034). They are evaluated with actor kind `human` and that person as actor (ADR-0013 rule 9), and they need no confirmation. Their document types are named (`closing_entry`, `fx_revaluation`, `tax_adjustment`, and the production receipt), so rules can exclude them. If a rule requires approval or denies one, the job fails with a `consequence_posting_blocked` work item for the company's owner.
    - **Unattended postings.** Scheduled jobs and workflow auto-posts (DS-34) are evaluated as `system`.
+
+   The only unattended workflow posting is the deterministic bank cascade's auto-post ([ADR-0051](0051-agent-workflows.md) rule 18).
 6. Rules in force. They are the enabled versions in force on `clock.today` when the command runs, not on the document's date, so backdating cannot select old rules.
 7. Combining:
    - **Denials.** Any matching `deny` gives `denied`.
@@ -133,11 +135,15 @@ Policy is a deterministic threshold table per company, as runbook B7 asks.
     - **The row.** Each writes an immutable `approval` row (version, decision, reason, actor, on whose behalf, `decided_at`, `policy_decision_id`).
     - **Work items.** A pending approval is the work item `approval_pending` (ADR-0042 rule 17).
     - **Small companies.** Until the author decides, a person may approve their own document, and segregation of duties (which covers documents an agent wrote on the approver's behalf) applies to every company, and a company without a second eligible person cannot satisfy a rule that requires approval. The command that saves such a rule returns the check result `policy_no_eligible_approver` (open question).
+
+    Exception to the interim: a proposal promoting an agent type to assisted mode must be approved by a person other than its submitter (`approver_is_submitter`), so a one-person company cannot promote an agent until the author decides ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 14).
 14. Auto-posts and confirmation:
     - **Scope.** `is_confirmation_required` applies only to `post` and `issue` by `system` or `integration` actors.
     - **Work items.** Each such posting adds evidence to one `auto_post_unconfirmed` work item per rule and period (ADR-0042).
     - **Confirming.** `ConfirmAutoPost` (a list) may be run only by the owner on the rule's latest version, so a reassignment moves the duty. INV-87 covers every `system` and `integration` posting with confirmation required.
     - **Shadow mode.** A rule that lets `system` or `integration` post is enabled only by `EnablePolicyRule` with the shadow-mode evidence recorded (ADR-0003 R8; DS-34). A rule with empty `actor_kind` that allows is treated the same.
+
+    The shadow evidence comes through an evidence hook that `policy` declares and `cash` registers (`GetAutoPostShadowEvaluation`), wired by `app`, and is stored on the rule version; `EnablePolicyRule` returns `shadow_evidence_insufficient` below the figures of [ADR-0051](0051-agent-workflows.md) rule 18.
 15. Templates. The core seeds each company with:
     - two procedures, `standard` (rank 10, `accountant`) and `senior` (rank 20, `chief_accountant`);
     - the bank-account rule of rule 12;

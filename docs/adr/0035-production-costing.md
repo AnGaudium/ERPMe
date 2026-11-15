@@ -145,6 +145,8 @@ The accounting choices are the author's (ADR-0005 item 1). Each one below is a r
     - **Postings.** None: output already carries actual cost.
     - **Agent.** The variance agent (DS-34) ranks orders by variance and links them to documents.
 
+    The variance agent is a later agent ([ADR-0051](0051-agent-workflows.md) rule 29).
+
 **Vietnamese costing methods**
 
 16. The methods are views over the one model, so a choice per product group changes reports and settings, not the core:

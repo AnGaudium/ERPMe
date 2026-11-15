@@ -32,6 +32,8 @@ Before step 1 code freezes the platform modules, every entity that several modul
    | `attachments` | `attachment` and `attachment_link` (rule 2) | E-invoice XML, bank files, e-mails, customs scans, product images and print PDFs are stored once and linked from any module |
 
    Within layer 2, `documents` and `permissions` may import the `agent_runs` contract, and `agent_runs` imports neither of them, so there is no cycle. `documents` may also import the `attachments` contract to check scan state at `Post`; `attachments` imports neither ([ADR-0038](0038-audit-and-observability.md) rule 14). `registry` also imports `policy` and `work`; `documents`, `outbox`, `permissions`, `attachments`, `agent_runs` and `policy` import `work`; layers 3–4 raise and resolve work items through `work.contract` ([ADR-0042](0042-work-queue.md) rules 5–6; [ADR-0043](0043-policy-and-approval.md) rule 1).
+
+   The columns of `agent_type`, `agent_type_version`, `agent_type_setting`, `agent_run`, `agent_run_step`, `agent_budget_usage` and `agent_promotion_evidence` are in [ADR-0050](0050-agent-runtime-and-query-layer.md) rules 12, 14, 18, 19 and 23.
 2. Attachments:
    - **Identity and storage.** An `attachment` is unique per (`company_id`, SHA-256). It records media type, size, storage key, data label and source kind. The bytes live in an object store, never in the database (DS-37).
    - **Data labels.** A second upload of the same bytes in the same company reuses the row and keeps the stricter data label.

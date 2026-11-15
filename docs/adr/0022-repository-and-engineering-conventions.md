@@ -55,6 +55,10 @@ Checks:
    | 2 · Platform | `registry` (command registry, dispatcher, envelope, idempotency; its public entry point `erpme.registry.dispatch`), `documents` (lifecycle, versions, numbering), `periods`, `permissions`, `outbox`, `audit`, `localization` (loader), `db` (engine, session settings, RLS context, the generic lock helper and the lock-order registry, the `MetaData` naming convention), `agent_runs`, `work`, `attachments`, `work`, `policy` ([ADR-0027](0027-cross-cutting-ownership.md) rule 1; `documents` and `permissions` may import the `agent_runs` contract; `documents` may import the `attachments` contract, [ADR-0038](0038-audit-and-observability.md) rule 14) |
    | 1 · Foundation | `numeric` (ADR-0006), `clock` (ADR-0007), `ids`, `i18n`, `errors` |
 
+   `agent_runs` (layer 2), `agents` and `query` (layer 5) and their imports: [ADR-0050](0050-agent-runtime-and-query-layer.md) rule 1.
+
+   Hooks: a module may declare a hook that another module of the same or a higher layer registers and `app` (layer 6) wires, so no import goes sideways or up; used for the auto-post evidence and the outbound content check ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 36; [ADR-0051](0051-agent-workflows.md) rule 18).
+
 3. Shape of each module:
    - A module that owns tables or commands has:
      - `contract.py`, the only part other modules import (rule 4);
@@ -103,12 +107,16 @@ Checks:
      | `erpme_testkit` | `erpme_events`, `erpme_adapters`, `erpme_client`, `erpme.numeric` |
      | `erpme_reference` | standard library only |
 
+   A `forbidden` contract lets only `erpme.agents.gateway.adapters` import a provider library ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 4).
+
 **Database**
 
 7. Schemas, ownership and roles:
    - **Schemas.** One database. All tables are in schema `erpme`, domains are in `types` (ADR-0006), and Procrastinate's tables are in schema `procrastinate`. There is no schema per module: foreign keys cross modules and are declared by table name; one schema keeps RLS generation simple.
    - **Ownership.** Every `erpme` table is declared in exactly one module's `tables.py`. A CI check fails on a table owned twice or not at all; it exempts `alembic_version`, partitions and schema `procrastinate`.
    - **Roles.** Roles are cluster-level, so `backend/provision/roles.sql`, run as a superuser before any migration, creates the roles of ADR-0017 rule 18 and `erpme_check` (DS-16 rule 2: SELECT only, subject to RLS, never `BYPASSRLS`). The test fixture and the test server use the same file. Migrations only grant.
+
+   Views are in schema `query`, owned by the role `erpme_query_owner`, which `provision/roles.sql` creates ([ADR-0050](0050-agent-runtime-and-query-layer.md) rules 42–43).
 8. Migrations:
    - Alembic keeps one linear history in `backend/migrations/`. CI fails on more than one head and on any migration that does not upgrade an empty database to head.
    - The first migration creates the extensions `btree_gist` (ADR-0007) and `pg_trgm` (ADR-0002), the schemas, and the domains in `types`.
@@ -143,6 +151,8 @@ Checks:
 
      `system` actors are exempt. Exceeding the limit returns `rate_limited`.
    - **`environment`.** The installation setting `environment` (`production`, `test`, `simulation`; ADR-0007 rule 15) is required at startup from `ERPME_ENVIRONMENT`. It is stored on first start and can never change away from `production`. In `test` and `simulation`, every external lookup and gateway (tax ID lookup, e-invoice, bank, exchange-rate fetchers, e-mail) is replaced by a recording stub (DS-17 rule 19; DS-24, DS-25).
+
+   `statement_timeout` is 10 s for queries of agent runs on `erpme_readonly`; 30 s stays for other callers ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 43).
 10. Locks. The lock-order registry in `db` holds the one global order, asserted per command (each batch item and each consumer command separately) (superseded by the complete order of [ADR-0027](0027-cross-cutting-ownership.md) rule 10):
     1. period area state rows, share lock (ADR-0012 rule 9);
     2. `stock_value` rows ascending by item and warehouse ID, then lot and serial quantity rows (ADR-0020 rule 9);

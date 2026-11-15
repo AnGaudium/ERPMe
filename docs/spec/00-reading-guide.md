@@ -311,6 +311,29 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Change tracking | is\_change\_tracked | Table declaration that makes the write helpers record field changes: master data, settings, role assignments, period state, production structures |
 | Audit denial | audit\_denial | Coalesced record of commands or queries refused for permission, human-only, proposal, policy, outbound scope or segregation reasons |
 | Agent run, agent type | agent\_run, agent\_type | One agent execution (actor context, taint, spend, outcome); an agent kind's declared permissions and budgets; module `agent_runs`, layer 2 |
+| LLM gateway | `agents.gateway.complete` | The one function through which every LLM call goes: templates, data labels and the routing switch, cost, the processing log and replay ([ADR-0050](../adr/0050-agent-runtime-and-query-layer.md)) |
+| Agent type version | agent\_type\_version | Immutable, generated record of one version of an agent type: steps, tool list, permissions, declared work item kinds, scope kind, seats, prompt templates, output schemas, budgets and evaluation threshold |
+| Agent mode | agent\_type\_setting.mode: off, shadow, assisted | Per company and agent type: no runs; runs without effect whose outputs are compared with what people did; runs that draft. Agents never post |
+| Agent run step | agent\_run\_step | One row of an LLM call or tool call of a run, in request and response pairs (`llm_request` and `llm_response`, `tool_request` and `tool_result`): the request row is written before the call with its reserved amount, the response row after it, with versions, tokens, cost and row references; append-only platform records, not commands |
+| Run token | run token | Short-lived credential of one agent run, bound to its agent type version, tool list, human acted for and work item |
+| Run taint | agent\_run.tainted\_at | The instant a run first received untrusted data; set once, never cleared, committed before the data is returned |
+| Tainted read scope | scope\_kind: partner, import\_batch, subject | What a tainted run may read: its scope rows, its work item, the drafts of its work item, and reference data; after the taint, also what it may put into a prompt or a command input, whenever the row was read |
+| Prompt template | prompt template | Versioned Markdown file from which the gateway renders an LLM request; declares its inputs, seat and output schema |
+| Context item | context item | A value passed to the gateway with its field path, row, data label, field class and untrusted flag; never a free string |
+| Agent budget | agent\_budget\_usage | Reserved and spent LLM cost per company, agent type and date, per company and per installation; reserved before each call, so no limit is exceeded |
+| Run mode, replay | agent\_run.mode: live, shadow, replay, evaluation | Replay re-executes a run with its recorded LLM outputs and must give the same commands and plan hashes |
+| Golden evaluation set | golden set | Synthetic cases per workflow with the simulator's known answer, used by replay and evaluation runs |
+| Semantic view | schema `query`, `<noun>_overview` | Read-only view for agents and reports, declared with meanings, labels, field-class masking, record scope, taint scope and untrusted columns |
+| Secret field | is\_secret | Schema attribute of a field holding a secret; never in a view, in a query result for an agent, or in a prompt |
+| List export | list\_export (command `CreateListExport`) | A list query written by a job to an `.xlsx` attachment, with the requester's field classes and scope |
+| Shadow evaluation | query `GetAgentShadowEvaluation` | Comparison of shadow-run outputs with what people did; the evidence for promoting an agent type to assisted mode ([ADR-0051](../adr/0051-agent-workflows.md)) |
+| Draft-only command | is\_draft\_only | Registry attribute of commands that only create or update drafts, change proposals, notes or suggestion fields; the only commands a tainted agent run may run ([ADR-0050](../adr/0050-agent-runtime-and-query-layer.md)) |
+| Agent run bodies capability | read\_agent\_run\_bodies | Capability (in the `owner` template only) to read the request and response bodies of agent run steps; access to bodies is by this capability alone |
+| Effective agent mode | promoted\_version, promoted\_seat\_models | The mode a run uses: an assisted agent type whose version behavior or seat models differ from the promoted ones runs as shadow; the stored mode stays the person's choice |
+| Shape mask | shape mask (`maskable` template input) | A personal value replaced by its shape before it reaches a model with the routing switch on: upper-case letters become `A`, other letters `a`, Unicode digits `9`, other characters kept |
+| Promotion evidence | agent\_promotion\_evidence | Immutable snapshot of the shadow or rehearsal evidence for promoting an agent type: date range, behavior hash, seat models, figures and thresholds; the promotion proposal names it |
+| Outbound content check | query `GetOutboundContentCheck` (check result `outbound_content_flagged`) | The check that a customer-facing draft names no other partner's records and carries no cost or margin fields; evaluated in the plan of the command that creates or updates the draft |
+| Outside subject | (registry mark on subject tables) | A run subject that is outside content (an inbound interaction, an incoming e-invoice record, a bank statement line, an import batch or row, or any row whose `is_untrusted` is true); a run on it starts tainted, whoever starts it |
 | Work item | work\_item | Business work for a person or agent, with claim and due date; module `work`, layer 2 (DS-29); kinds registered in [work-item-kinds.csv](../catalogs/work-item-kinds.csv) ([ADR-0042](../adr/0042-work-queue.md)) |
 | Policy rule | policy\_rule | Row of the company's threshold table: action, type, actor kind, ordered conditions, effect, owner ([ADR-0043](../adr/0043-policy-and-approval.md)). Agents, systems and integrations start from a baseline (a person posts; approval for types with no posting step) that only an allow rule lifts |
 | Approval procedure | approval\_procedure | One-level approval by a role in the document's scope, with a rank unique per company; an approval satisfies decisions requiring its rank or lower |
@@ -378,7 +401,7 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Issue | Request legal issuance of a document; it posts when the issue is accepted (e.g. `IssueSalesInvoice`) | IssueRequested |
 | Record | Store an outcome reported by an outside system, e.g. an e-invoice outcome | Recorded |
 | Recall | Take back a request sent to an outside system before it took effect | Recalled |
-| Complete | Finish a held step by a human, e.g. a posting after acceptance; or end the logistics of a production order (technical completion); or finish a migration | Completed |
+| Complete | Finish a held step by a human, e.g. a posting after acceptance; or end the logistics of a production order (technical completion); or finish a migration; or finish an agent run with its outcome (`CompleteAgentRun`) | Completed |
 | Reopen | Return a document to draft after an outside step failed; or return a technically complete production order to in progress | Reopened |
 | Erase | Remove a data subject's personal data irreversibly | Erased |
 | Request | Hand work to another module for execution, e.g. replenishment or an e-invoice | Requested |
@@ -403,7 +426,7 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Import | Read an external file into the system | Imported |
 | Run | Start a deterministic system job, e.g. period-end actual costing | Completed (`<job noun>Completed`) |
 | Assign | Set the owner of a work item or a warehouse task; or attach output serials to a production order | Assigned |
-| Start | A person begins work on an assigned warehouse task; or start a migration's loading or reconciliation | Started |
+| Start | A person begins work on an assigned warehouse task; or start a migration's loading or reconciliation; or start an agent run (`StartAgentRun`) | Started |
 | Close | End further activity on an approved record that has had some, e.g. an order, or a change proposal once executed | Closed |
 | Restrict | Narrow who may post in a posting period (open to soft-locked) | Restricted |
 | Open | Let a restricted posting period accept postings from everyone with permission again (soft-locked to open) | Opened |

@@ -46,11 +46,15 @@ The hard floor on what a tainted run may read stays the literal spec 03 rule 1 u
    - **Failure.** A retryable error (`concurrent_update`, `timeout`) rolls back the delivery and is retried (ADR-0013 rule 8). On any non-retryable error, such as `plan_hash_mismatch` or `target_changed`, the consumer rolls back to the savepoint and runs `UpdateChangeProposal` as `system`, which commits with the delivery. That writes the next version with the error and the new plan, voids the approval (ADR-0009 rule 9), returns the proposal to `draft`, and creates a work item.
    - **Expiry.** A system job cancels proposals that are not approved within `change_proposal_ttl_days`, with reason `expired` (company setting, interim default 14).
    - **Query.** `ListChangeProposal`.
+
+   Agents and the consumers acting on their chains create proposals as drafts only; a person submits them, and a person other than the human the run acted for approves them ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 30; [ADR-0051](0051-agent-workflows.md) rules 13, 19, 22, 25).
 4. Agent calls: Policy may make people propose too, through a deny-only `direct_master_data_change` rule ([ADR-0043](0043-policy-and-approval.md) rule 12).
    - **Scope.** The dispatcher rejects an allowed-target command with `proposal_required` when it comes from an agent actor, or from any actor carrying an `origin_agent_run_id`. The executing consumer carries none, because the human `Approve` reset the origin (ADR-0013 rule 2). This applies in both simulate and execute mode. The error's fix names `CreateChangeProposal`.
    - **Humans.** A human with the permission may run such a command directly, unless policy (DS-28) requires a proposal for humans too.
    - **Bank accounts.** Interim, flagged: a change of a partner's bank account always goes through a proposal, also when a human starts it, approved by a human who wrote no version of it.
    - **Imports.** Human-run DS-21 import batches are outside the carrier.
+
+   A person's direct `UpdateAgentTypeSetting` that sets `assisted` returns `proposal_required`: promotion of an agent type always goes through a proposal ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 14).
 5. These rules use the carrier:
    - `partner_item` mappings (ADR-0019 rule 6);
    - tax ID differences (ADR-0019 rule 18);
@@ -60,6 +64,8 @@ The hard floor on what a tainted run may read stays the literal spec 03 rule 1 u
    - agent changes to planned orders: `UpdatePlannedOrder`, `FirmPlannedOrder`, `ConvertPlannedOrder` ([ADR-0036](0036-multi-level-mrp.md) rule 12);
    - technical completion and reopening of production orders ([ADR-0034](0034-production-orders-and-shop-floor.md) rule 17);
    - releases of bills of materials and routings, production versions, work centers and production settings ([ADR-0033](0033-production-master-data.md) rule 2).
+
+   Also the promotion of an agent type to assisted mode (`UpdateAgentTypeSetting`, with a frozen evidence snapshot); its approver must differ from its submitter (`approver_is_submitter`) ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 14).
 
 **Policy hook**
 
@@ -86,12 +92,16 @@ The hard floor on what a tainted run may read stays the literal spec 03 rule 1 u
      - the version it derives from had effective taint (rule 9) when it was written. That is the previous version, the version in force for a change (ADR-0028 rule 4), or, for version 1, the source document version it was created from. `document_version.derived_from_version_id` (nullable) stores the last two, so the derivation is checkable.
    - **Clearing.** `ClearTaint` (`human_only`, reason required) writes an immutable `taint_clearance` row: `document_version_id`, human actor, reason, `cleared_at`. The human for whom the tainted run acted cannot clear it (`segregation_of_duties`). Clearing never changes field attributes or read-taint.
    - **Status of this rule.** Interim, flagged: it changes the untrusted-content mechanism (ADR-0005 item 7; open question).
+
+   A version whose content copies a value from an `is_untrusted` field is written tainted, for example a matching-rule proposal built from a token an agent read in a bank description ([ADR-0051](0051-agent-workflows.md) rule 19).
 9. Effective taint means `is_tainted` with no clearance on that version. A version written later by a tainted run is tainted again.
 10. Run taint: Work items carry `is_tainted` as an OR over their raises ([ADR-0042](0042-work-queue.md) rule 5).
     - **`is_untrusted`.** A schema attribute separate from data labels (spec 17). It is set on fields filled from outside content: e-mail bodies, supplier e-invoice free text, bank statement texts and `interaction_summary` (ADR-0019 rule 20).
     - **When a run becomes tainted.** When the query layer (DS-33) returns to it any of: an `is_untrusted` field; a row of an effectively tainted version; a work item created from a tainted event; or an attachment from outside content.
     - **Views.** DS-33 views omit `is_untrusted` fields unless they are asked for, so listing documents does not taint a run.
     - **Master data.** Master data changed by an approved proposal is not tainted, because the human approval is the trust boundary.
+
+    The dispatcher applies run taint to every query result returned to a run, and commits `agent_run.tainted_at` before it returns the data ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 25).
 11. No policy decision for a non-human actor is `allowed` on an effectively tainted version or proposal. A tainted version is posted, sent or executed only by a human, or after a human approval. Whether a human may post a tainted draft without approval when policy requires none stays ADR-0017 rule 17's open question.
 
 **Consumers**
@@ -115,6 +125,10 @@ The hard floor on what a tainted run may read stays the literal spec 03 rule 1 u
 14. The only behavior is the literal spec 03 rule 1: a tainted run reads only records scoped to its related partner. No setting widens it, because spec 03 lets no policy, threshold or setting relax a hard floor.
     - **Recommendation to the author** (open question; ADR-0005 item 7): for quotations, also let such a run read the shared catalog, that partner's price list and available to promise, never other partners' records or `cost` and `margin` fields. Widening needs an ADR after the author decides.
     - **Outbound check.** The outgoing-message gate (ADR-0019 rule 17, module `crm`) rejects a customer draft that refers to another partner's records, or carries `cost` or `margin` fields, with `outbound_content_out_of_scope`. It only tightens, so it applies now.
+
+    [ADR-0050](0050-agent-runtime-and-query-layer.md) rule 27 reads the literal rule as: scope rows, the run's work item, the drafts it or an earlier run of the same item wrote, and reference data (flagged, open question). [ADR-0051](0051-agent-workflows.md) rule 10 gives the effects on the quotation and purchase invoice workflows; the same question is asked for purchase invoices.
+
+    The outbound check also runs in draft plans through `GetOutboundContentCheck` ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 36). Runs on subjects that are outside content start tainted, and after taint no out-of-scope row may enter a prompt or a command input ([ADR-0050](0050-agent-runtime-and-query-layer.md) rules 15, 25).
 
 **Audit and checks**
 

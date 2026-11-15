@@ -124,6 +124,8 @@ That last check failed until make-to-order supply carried its demand line, a req
     - **Agents.** The planning agent drafts the application as a change proposal. `UpdatePlannedOrder`, `FirmPlannedOrder` and `ConvertPlannedOrder` are `is_proposal_bound` for all planned order types (ADR-0029 rules 2 and 5). A planned order's `expected_version` is the SHA-256 of its canonical key, quantity, dates, version and state. The agent never applies directly.
     - **Later.** Finite scheduling inside the run, and rough-cut planning, come after Phase 1 (open question).
 
+    The planning agent's proposals: [ADR-0051](0051-agent-workflows.md) rule 24.
+
 **Performance, inputs and checks**
 
 13. Performance and inputs:

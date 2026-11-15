@@ -96,6 +96,8 @@ It adds only what production needs:
      - cancels open warehouse tasks and reservations;
      - closes the order's demand and supply lines as `canceled`;
      - leaves staged stock in the supply bin, with move tasks back proposed by the putaway rules.
+
+   In Phase 1 no agent tool list holds `Submit`, so people release production orders ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 30).
 6. Execution state, `production_order.execution_state`:
    - **`not_started`:** approved, nothing posted.
    - **`in_progress`:** from the first posting. It stays so when every posting has been reversed.
@@ -221,6 +223,8 @@ It adds only what production needs:
     - **Proposal-bound** (ADR-0029 rule 2): `CompleteProductionOrder` and `ReopenProductionOrder` are `other` and `is_proposal_bound`, with the order's version as `expected_version`. Agents reach them only through change proposals. ADR-0029 rule 5 gets a note.
     - **The close job** runs as `system`.
     - **Rescheduling by an agent** is a drafted update or change order.
+
+    The production and capture agents are later agents ([ADR-0051](0051-agent-workflows.md) rule 29).
 18. Events, permissions and queries:
     - **Events.** Beyond ADR-0009 rule 22's document events: `ProductionOrderCompleted` and `ProductionOrderReopened`. Reservations emit ADR-0023's events.
     - **Permissions.** Record scope for production documents uses `production_warehouse_id` as the warehouse dimension (ADR-0017 rule 9 gets a note). DS-15 adds a shop-floor role template.

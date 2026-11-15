@@ -45,6 +45,8 @@ Every code identifier is an English word or phrase from the glossary in [00-read
 15. Constraint and index names come from one SQLAlchemy `MetaData` naming convention: `pk_<table>`, `fk_<table>_<column>`, `uq_<table>_<columns>`, `ix_<table>_<columns>`, `ck_<table>_<name>`, where every `CHECK` constraint is given an explicit `<name>`. Triggers, which the convention does not cover, are named by hand `trg_<table>_<purpose>`.
 16. Other database objects: views are named like tables, as nouns, with no prefix, and share the database-wide uniqueness of rule 9 (placement is DS-33); sequences keep PostgreSQL's default `<table>_<column>_seq`; partitions are `<table>_<yyyy>` or `<table>_<yyyy>_<mm>`; database roles are `erpme_<purpose>` (the roles themselves are DS-15).
 
+    Placement: views are in schema `query`, named as nouns that never equal a table name ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 42).
+
 **Commands, queries and events**
 
 17. A command type is `PascalCase` verb + noun: a verb from the command verb list in the glossary, then a glossary noun (`CreatePurchaseOrder`, `PostGoodsReceipt`, `MatchBankLine`). The pydantic class has the same name. The verb list gives each verb's intent only; which states and preconditions allow a command is decided by DS-05 and the DS item that owns the noun.

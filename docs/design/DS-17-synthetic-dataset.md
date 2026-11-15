@@ -58,7 +58,7 @@ The simulator runs fictional companies day by day. It writes what happened in bu
    | Landed cost | `purchase_cost_invoice_received`: as a cost-source journal (rule 10) from step 3; as the purchase cost invoice from step 5 | 3 |
    | Opening | `opening_balances_recorded` (DS-21) | 4 |
    | Purchasing | `purchase_requested`, `purchase_ordered`, `purchase_invoice_received`, `customs_declared` | 5 |
-   | Sales | `quotation_requested` (e-mail), `sales_ordered`, `sales_order_changed`, `sales_invoice_issued` (with installments from the payment term), `credit_note_issued` | 5 |
+   | Sales | `quotation_requested` (e-mail), `customer_inquiry_received` (an e-mail from an unknown sender, ADR-0051 rule 30), `sales_ordered`, `sales_order_changed`, `sales_invoice_issued` (with installments from the payment term), `credit_note_issued` | 5 |
    | Cash | `payment_received`, `payment_made`, `bank_statement_received`, `netting_agreed`, `advance_paid`, `auto_post_confirmed` (the rule owner confirms auto-posts), `cash_counted`, `currency_exchanged`, `advance_settled` (ADR-0048) | 6 |
    | Safety | `bank_account_change_requested` (an e-mail asks to change a partner's bank account) | 5 |
    | Tax | `tax_rate_changed`, `invoice_corrected` (a correction in the package's form; [ADR-0053](../adr/0053-core-neutrality.md) rule 10) | 7 |

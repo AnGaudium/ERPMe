@@ -119,6 +119,8 @@ Planning answers, per item and warehouse: what to buy or move, how much, and by 
 12. Forecast adjustments record item, warehouse, `start_date`, `end_date`, quantity or factor, author and reason. They never overwrite the statistical forecast, so accuracy stays measurable (DS-33). Agent-proposed adjustments are change proposals, and taint is read from document versions ([ADR-0029](0029-proposals-and-agent-safety.md) rules 5, 11).
     - Approval is human, and an adjustment proposed by a tainted agent run is never approved by policy (spec 03 rule 1; ADR-0013 rule 11). An e-mail therefore cannot move purchase quantities.
     - Whether policy may approve untainted adjustments is an open question.
+
+    Forecast accuracy is the view `forecast_accuracy` ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 51).
 13. Forecast consumption:
     - Open sales order demand consumes forecast of the same item and warehouse within `forecast_consumption_days`: backward first, then forward. Lines are processed in date, document number and `line_number` order.
     - Shipped quantities are history, not demand.
@@ -210,6 +212,8 @@ Planning answers, per item and warehouse: what to buy or move, how much, and by 
     - resolves exceptions by drafting.
 
     It never changes approved data directly. "Approval-bound commands" are change proposals ([ADR-0029](0029-proposals-and-agent-safety.md) rule 5). Its planned order changes are change proposals ([ADR-0036](0036-multi-level-mrp.md) rule 12).
+
+    Designed in [ADR-0051](0051-agent-workflows.md) rules 23–25.
 24. Events: `ForecastCompleted`, `PlanningCompleted`, `PlannedOrderFirmed`, `PlannedOrderConverted` (from `planning`, for live screens and the audit trail, DS-30); `ReplenishmentRequested` (from `inventory`). Queries: `GetProjectedAvailability`, `ListPlannedOrder`, `ListPegging`, `ListForecast`. Queries also: `ListCapacityLoad`, `GetCapacityLevelingProposal`; `ListPegging` gains `depth` ([ADR-0036](0036-multi-level-mrp.md) rules 5, 11, 12).
 25. Performance target: a regenerative run over 2,000 items × 4 warehouses × a 180-day horizon finishes in 2 minutes or less, using under 2 GB of memory, on the test server. The nightly report records the run time and node count (DS-16, DS-17). With bills of materials: [ADR-0036](0036-multi-level-mrp.md) rule 13.
 

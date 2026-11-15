@@ -134,11 +134,15 @@ The migration period is then locked.
     - **What it may not do:** run, resume, abandon, reverse or complete.
     - **Taint.** Import files are outside content (ADR-0029 rule 10), so its runs are tainted, which its draft-only rights already allow.
     - **Proposals.** Human-run import batches are outside the change proposal carrier (ADR-0029 rule 4).
+
+    The workflow is [ADR-0051](0051-agent-workflows.md) rules 26–28; draft batches are edited with `UpdateImportBatch`.
 16. Data:
     - **Location.** Pilot data never enters the repository or CI.
     - **Personal data.** Contacts in import files are personal and go to a local model when an agent reads them (spec 17).
     - **Audit.** Imports and exports write audit records, and exports also write a processing-log entry (ADR-0038 rule 9).
     - **Retention.** Import files linked to posted opening documents become accounting evidence kept with the vouchers (ADR-0038 rule 15), with their personal data (flagged).
+
+    Spec 17 has no local models in Phase 1; until the author decides, personal samples are removed whenever the routing switch is on ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 5; [ADR-0051](0051-agent-workflows.md) rule 28).
 
 **Full export**
 

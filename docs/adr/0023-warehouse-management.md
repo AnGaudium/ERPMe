@@ -245,6 +245,8 @@ A small shop and a managed distribution warehouse run on the same model.
     - **Other commands:** `PackHandlingUnit`, `UnpackHandlingUnit`, `RunPickRelease`, `CreateDelivery`, `PostDelivery` (`ConvertWarehouse` removed, [ADR-0031](0031-design-simplifications.md)). The verbs Pack, Unpack, Start and Convert are added to the glossary, and Cancel is widened to tasks.
     - **Events:** `WarehouseTaskCreated`, `WarehouseTaskConfirmed` (with a shortage flag), `WarehouseTaskCanceled`, `StockReservationCreated`, `StockReservationCanceled`.
 21. Exceptions become work items (DS-29) from step 5: a short pick, a putaway without a target, or a reservation canceled by a physical fact. Before step 5 they are tasks without assignee and are listed by `ListWarehouseTask`. Agents read through the query layer (DS-33) and act only through draft commands: putaway rules, minimums and maximums, count plans, exception resolution. Slotting proposals come after Phase 1. Agent changes to putaway rules, pick-face levels and count plans go through change proposals ([ADR-0029](0029-proposals-and-agent-safety.md) rule 5). From step 5, one work item per exception ([ADR-0031](0031-design-simplifications.md) rule 16). Kinds `short_pick`, `putaway_without_target`, `reservation_canceled` ([ADR-0042](0042-work-queue.md) rule 18).
+
+    The warehouse agent is a later agent ([ADR-0051](0051-agent-workflows.md) rule 29).
 22. Printing (DS-27) covers bin labels, handling-unit labels, putaway and pick lists on paper, and confirmation from a desktop screen, so warehouses without phones work from step 5. The PWA (DS-31) comes at step 9; offline scanning after Phase 1.
 23. Queries and reports (DS-33):
     - `GetStockBalance`, extended by bin, status and handling unit;
@@ -253,6 +255,8 @@ A small shop and a managed distribution warehouse run on the same model.
     - `GetHandlingUnit`;
     - `GetPutawayPreview`;
     - stock by bin and status, near-expiry stock, open tasks, count accuracy.
+
+    Stock by bin and status and near-expiry stock read the view `stock_overview`; `warehouse_task_overview` and `count_accuracy` are added with the warehouse step ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 51).
 
 **Build order**
 

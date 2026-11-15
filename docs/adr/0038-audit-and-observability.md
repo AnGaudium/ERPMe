@@ -55,6 +55,8 @@ The retention periods and the strictness of scanning are flagged for the author.
    - **Coalescing.** One row per (company, actor, agent run, type, code, subject, `window_start`), with 10-minute windows. The writer upserts on a unique index over that key with `NULLS NOT DISTINCT`, adding to `count` and moving `last_at`.
    - **Failure.** A failed denial insert never fails the caller. It logs a structured error and raises a metric.
    - **Simulation.** A denial record is the one effect of a simulation that persists (ADR-0008 rule 9 gets a note).
+
+   Also `tool_not_allowed`, `tainted_read_out_of_scope`, `untrusted_read_not_allowed` and `tainted_run_not_allowed`; three denials stop a run ([ADR-0050](0050-agent-runtime-and-query-layer.md) rules 33, 55).
 6. Storage:
    - **Protection.** Audit and change records are protected by append-only triggers (rule 4's exception aside) and the generated company policy. The trigger on `audit_denial` allows only `count` and `last_at` to change, and only upward.
    - **Partitions.** `audit_record` and `audit_change` are partitioned by month on `id`; ADR-0006 rules 22 and 23 get a note. The daily job of ADR-0022 creates partitions three months ahead, with a default partition. `audit_denial` is not partitioned, because its unique coalescing index cannot include `id`, and coalescing keeps it small.
@@ -67,6 +69,8 @@ The retention periods and the strictness of scanning are flagged for the author.
    - `ListAuditDenial`.
 
    **Agents.** These queries are on no agent tool list in Phase 1 (ADR-0008 rule 6; DS-32), and tainted runs never read audit data. Reading denials would let an injected agent probe.
+
+   `ListAgentRun`, `GetAgentRun` and every view over audit tables are on no agent tool list either ([ADR-0050](0050-agent-runtime-and-query-layer.md) rules 30, 50).
 8. INV-89: every idempotency record of an executed command (ADR-0008 rule 19), within its retention, has an audit record with the same key, actor and command type, or the same `batch_id` for batches. The company is compared null-safely, and ADR-0008 rule 16 gets `company_id` on idempotency records. Area `platform`, first step 1. Group 80–89 is now full: further safety and platform invariants use INV-200 to INV-299 (DS-16).
 
 **Other audit duties**
@@ -93,12 +97,16 @@ The retention periods and the strictness of scanning are flagged for the author.
       - dead tuples and autovacuum lag (ADR-0002);
       - LLM tokens and cost per agent type (an amount exempt from rule 11, as an operational figure).
     - **Logs.** structlog JSON with `trace_id` and `request_id`.
+
+    Gateway and tool-call spans and the agent metrics: [ADR-0050](0050-agent-runtime-and-query-layer.md) rule 21.
 11. No values in telemetry, enforced:
     - **Allow-lists.** Span attributes and log fields come from an allow-list of keys (codes, types, counts, hashes). A structlog processor and a span processor drop everything else.
     - **Exceptions** are recorded as type and error code only.
     - **SQL.** Statement and parameter capture is off.
     - **Metric labels.** No IDs as labels; only low-cardinality codes.
     - **The check.** A CI test seeds canary values in the scenario run and fails if any reaches emitted telemetry.
+
+    The allow-listed attributes of gateway spans are in [ADR-0050](0050-agent-runtime-and-query-layer.md) rule 21; prompts and outputs stay in `agent_run_step` only.
 12. Telemetry goes through OTLP to a collector:
     - **Tool choices.** The backend and the attachment scanner are new tool categories, chosen by ADR in DS-37, not from ADR-0002's list of tools not used. The byte-level media detection library is chosen by ADR at the first step that builds upload.
     - **Dashboard.** In Phase 1 the operations dashboard is the backend's, with panels generated from the metric names. Held deliveries and their `last_error` (ADR-0013 rule 8) are read through the delivery query, not the dashboard, because they carry values. An ERPMe screen comes later.
