@@ -50,6 +50,8 @@ One developer, most code written by AI. Popular libraries help AI write correct 
 **Performance and resources:**
 
 1. **PDF generation always runs in its own queue**, never in the web process, because WeasyPrint is heavy on RAM and CPU. The PDF worker is a separate process with limited concurrency, restarted periodically to release memory. PDFs of posted documents are stored by hash of document version and template version: posted documents are immutable, so each is generated once. The UI receives PDFs asynchronously.
+
+   Note: the key also covers the document's state and e-invoice state, the print data contract version, the language and the marker, and a file is reused only for documents in a final state ([ADR-0049](0049-statutory-reporting-and-printing.md) rule 28).
 2. **Dead tuples are handled per table type**, not with one strategy for all:
    - The journal and material documents are append-only and produce almost no dead tuples. Not partitioned in Phase 1, but the primary key is chosen so the tables can later be partitioned by fiscal year without restructuring.
    - Fast-cycling tables (outbox, technical queue, agent run logs) are partitioned by month; when retention expires, drop the whole partition instead of deleting rows. Accounting and audit data are never deleted this way.

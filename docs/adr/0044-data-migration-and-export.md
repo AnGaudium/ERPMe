@@ -101,6 +101,8 @@ The migration period is then locked.
    - **Checks.** INV-20 to INV-24 hold.
 10. Year-to-date at a mid-year cut-over. Income and expense of the fiscal year before the cut-over are loaded as `opening_turnover` rows (account, debit and credit turnover in company currency). These are non-posting figures that statutory reports of that year read (DS-26); the year's profit to date is already in the post-closing balance of retained earnings. Flagged.
 
+    Note: `opening_turnover` is owned by `ledger` and written by `CreateOpeningTurnover`. Its rows hold turnover before closing entries, and carry `start_date` and `end_date` instead of a fiscal year, because the first fiscal year after a mid-year cut-over is short. DDL in DS-06 ([ADR-0049](0049-statutory-reporting-and-printing.md) rule 14).
+
 **Currencies and the clearing account**
 
 11. Reconciliation. `old_balance` rows bring the old books' figures:
@@ -155,6 +157,8 @@ The migration period is then locked.
       - erased values, which stay masked (ADR-0019 rule 10).
     - **Download.** The zip is an attachment that is not accounting evidence. Its bytes are deleted after 7 days, and a download needs the same permission and is audited.
 18. Historical transactions before the cut-over are not migrated in Phase 1 (open question); the rehearsal month of go-live is replayed as ordinary documents on staging.
+
+    Note: comparatives of statements for ranges before the cut-over come from `report_comparative_value`, entered at migration ([ADR-0049](0049-statutory-reporting-and-printing.md) rule 14).
 
 ## Context
 

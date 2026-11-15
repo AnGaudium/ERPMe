@@ -30,7 +30,11 @@ The core has one fixed, versioned system chart of accounts, kept as a catalog fi
 **Who uses which tier**
 
 14. The core, the policy engine, agents, management reports and consolidation refer only to system accounts. Statutory reports and books are defined by the localization package on operational accounts (rule 6 of 06; DS-26). Consolidation of companies in one instance sums balances by system account (rule 7 of 06); intercompany eliminations use the partner on intercompany open items.
+
+    Note: agents may read statutory reports, books and their drill-downs, which are operational-account views, to answer questions and explain figures. They never use an operational code to choose an account, a policy input or a posting ([ADR-0049](0049-statutory-reporting-and-printing.md) rule 18).
 15. A balance on a bilateral account is presented as a receivable or an advance (or a payable or an advance) per open item: each open item carries a kind (e.g. invoice, advance, credit) defined in [ADR-0026](0026-open-item-core.md) rule 2, and statutory reports split the balance by that kind and by partner (DS-26).
+
+    Note: the split is set by the options of an account term: `by` (`account`, `partner` or `partner_kind`), required on the split measures with no core default, `kind`, and `term` with `undated` ([ADR-0049](0049-statutory-reporting-and-printing.md) rule 7).
 
 **Validation**
 

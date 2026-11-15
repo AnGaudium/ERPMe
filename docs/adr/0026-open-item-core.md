@@ -34,6 +34,8 @@ DS-25 keeps payments, bank statements, matching UX, netting, payment allocation 
    The side table is `open_item_collection`; `original_posting_date` and the due-date check are corrected in the DDL ([ADR-0048](0048-cash-bank-receivables-payables.md) rules 17, 18).
 2. `open_item_kind` is a core catalog: `invoice`, `credit` (credit notes and debit notes that reduce an invoice), `advance` (non-monetary per spec 07, excluded from revaluation by kind, ADR-0011 rule 18), `payment_on_account` (money received or paid without an item to settle), `loan` (one per drawdown, ADR-0025), `other`. DS-25 may add kinds; statutory presentation per kind and side is DS-26's (ADR-0010 rule 15), and the meaning of each kind for presentation is the regime's (open question).
 
+   Note: the format of that split is [ADR-0049](0049-statutory-reporting-and-printing.md) rule 7.
+
 **One posting path**
 
 3. Every journal line on an account whose effective control kind is `receivable`, `payable` or `loan` declares its item effect to `ledger.contract.write_journal_entry` (ADR-0022 rule 4):

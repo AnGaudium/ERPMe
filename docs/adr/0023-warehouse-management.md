@@ -248,6 +248,8 @@ A small shop and a managed distribution warehouse run on the same model.
 
     The warehouse agent is a later agent ([ADR-0051](0051-agent-workflows.md) rule 29).
 22. Printing (DS-27) covers bin labels, handling-unit labels, putaway and pick lists on paper, and confirmation from a desktop screen, so warehouses without phones work from step 5. The PWA (DS-31) comes at step 9; offline scanning after Phase 1.
+
+    Note: labels and lists are print subjects over registered queries. The print contract, the worker and their templates come at step 5, interim until the author decides the build order ([ADR-0049](0049-statutory-reporting-and-printing.md) rules 25, 30).
 23. Queries and reports (DS-33):
     - `GetStockBalance`, extended by bin, status and handling unit;
     - `GetAvailableToPromise`;

@@ -42,6 +42,8 @@ The commercial documents are a thin layer over the core (B3). They hold what was
    - **Kits** (bill of materials usage `kit`, ADR-0033 rule 3) come after Phase 1 (open question).
 
    Note: "Approval hold allowed" for `sales_invoice`, `sales_return`, `credit_note` and `debit_note` is derived from the regime setting `documents.issuance_without_delay`: "no" while it is true, as `l10n_vn` seeds it; the core default is false ([ADR-0053](0053-core-neutrality.md) rule 8). Corrections stay correction documents by the author's core decision of 2026-11-14; the adjustment and replacement invoice forms are `l10n_vn`'s and the e-invoice add-on's ([ADR-0053](0053-core-neutrality.md) rule 14).
+
+   Note: every type in this table, and the stock documents, are `is_printable` and carry the optional header field `print_language` ([ADR-0049](0049-statutory-reporting-and-printing.md) rules 25, 27).
 2. Lines, references and copying:
    - **Quantities.** Lines store the entered quantity and unit and the inventory quantity (ADR-0018 rule 11). GR/IR positions, correction limits and progress use inventory quantities.
    - **Line references** use the typed keys of ADR-0028 rule 2: `quotation_line_id`, `sales_order_line_id`, `delivery_line_id`, `return_from_customer_line_id`, `purchase_request_line_id`, `purchase_order_line_id`, `goods_receipt_line_id`, `return_to_supplier_line_id`, and `correction_of_line_id` on correction lines.

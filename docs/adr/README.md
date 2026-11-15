@@ -52,6 +52,7 @@ One file per decision, named `NNNN-short-title.md`, using [template.md](template
 | [ADR-0046](0046-product-configuration.md) | Product configuration (DS-56) | Accepted (2026-11-15) |
 | [ADR-0047](0047-commercial-documents-and-pricing.md) | Commercial documents and the pricing procedure (DS-22) | Accepted (2026-11-15) |
 | [ADR-0048](0048-cash-bank-receivables-payables.md) | Cash, bank, receivables and payables processes (DS-25) | Accepted (2026-11-15) |
+| [ADR-0049](0049-statutory-reporting-and-printing.md) | Statutory reporting and printing (DS-26, DS-27) | Accepted (2026-11-15) |
 | [ADR-0050](0050-agent-runtime-and-query-layer.md) | Agent runtime and read-only query layer (DS-32, DS-33) | Accepted (2026-11-15) |
 | [ADR-0051](0051-agent-workflows.md) | Agent workflows (DS-34) | Accepted (2026-11-15) |
 | [ADR-0052](0052-minimal-crm.md) | Minimal CRM: partners, contacts, interaction timeline, email intake (DS-35) | Accepted (2026-11-15) |

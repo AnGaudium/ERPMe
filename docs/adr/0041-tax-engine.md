@@ -166,6 +166,8 @@ Tax codes, dated rates and a dated tax matrix are package rules, read live. The 
     - **After filing.** For a filed period, `GetTaxReturn` returns the snapshot and the difference from a fresh computation, which is what a supplementary return declares.
     - **Prior-period adjustments.** Adjustments declared in a period for rows of an earlier filed period feed that period's prior-period boxes (in Vietnam [37] and [38]), not the current deduction.
     - **Exporting** a return file is step 7 work on these queries (DS-26).
+
+    Note: the export is `RenderTaxReturn` ([ADR-0049](0049-statutory-reporting-and-printing.md) rule 21).
 19. A return form is package data, `tax/returns/<form>.csv`: `box`, labels, `source`, basis. Sources are separated by `;` and summed: With no earlier filed return, `carry:` reads the migration's `opening_vat_carry_forward` ([ADR-0044](0044-data-migration-and-export.md) rule 13).
     - `base:<code>` and `tax:<code>`;
     - `deductible:<code>`, the deductible tax of rows of the period after their adjustments;
@@ -174,6 +176,8 @@ Tax codes, dated rates and a dated tax matrix are package rules, read live. The 
     - `carry:<box>`, the box of the previous filed return.
 
     Form codes are lowercased with non-alphanumerics as `_`: `01/GTGT` is `01_gtgt` (ADR-0004 rule 5).
+
+    Note: the minus sign in formulas is the ASCII `-`, as DS-14 and `01_gtgt.csv` write it; the `−` above means `-`. A form file gains an optional header (`effective_from`, `exports`) at its next version; until then the undated file is effective from the package's first date ([ADR-0049](0049-statutory-reporting-and-printing.md) rules 5, 21).
 
 **Files and checks**
 

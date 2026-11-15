@@ -66,6 +66,8 @@ Under ADR-0016 rule 12, production refuses unverified content until the author v
    - **Production costs.** 623x (construction machinery) → `production_cost_overhead`. 621 → material, 622 → labor, 627x → overhead, 154 → work in process (ADR-0035 rule 18).
    - **Closing.** 911 → `income_summary`; 4211 and 4212 → `retained_earnings`. Carrying 4212 into 4211 at the new year is a closing task for step 8 (DS-26).
    - **Unreached accounts.** `unreached_system_accounts.csv` states the system accounts no operational account reaches and why: `inventory_other`, `income_other`, `expense_other` and `revenue_deduction_other`, for which TT99 has no account (ADR-0010 rule 17).
+
+   Note: carrying 4212 into 4211 is the close task `balance_carry_forward`, which runs `ledger`'s idempotent job `RunBalanceCarryForward` with the two accounts as parameters ([ADR-0049](0049-statutory-reporting-and-printing.md) rules 22, 23).
 5. Legal form. TT99 opens 41111 and 41112 only for joint-stock companies, so 4111 is a node for them and a postable account for every other company.
    - **The `condition` column.** It is empty, `legal_form=<code>` or `legal_form!=<code>`.
    - **Legal forms.** The manifest declares them with their legal source: `joint_stock`, `limited_liability`, `private_enterprise` and `partnership`, under the Law on Enterprises. `CreateCompany` records `company.legal_form`, which is null for packages that declare none (DS-20; ADR-0027 rule 5).
@@ -104,6 +106,8 @@ Under ADR-0016 rule 12, production refuses unverified content until the author v
      - Employees: 141 for advances. As suppliers, employees fall to 331, because no payable-control account fits them (open question).
    - **Production.** Production consumption 621. Output and WIP transfer 154. Abnormal, unabsorbed and residual cost 6325. External processing 62771. Processor stock stays on its inventory account (ADR-0037 rule 1).
 
+   Note: the presentation of 33881 and 33882 uses DS-26's format ([ADR-0049](0049-statutory-reporting-and-printing.md) rule 22); the lines are DS-19's report definitions.
+
 **Settings**
 
 9. Each choice is its own key, so each carries its own basis. The core registers every key with its schema (DS-18). There are 39 entries in all.
@@ -134,6 +138,8 @@ Under ADR-0016 rule 12, production refuses unverified content until the author v
     - the working calendar (ADR-0024).
 
     Note: `l10n_vn` owns the Vietnamese tax data (codes, rates, matrix, groups, return forms, package kinds and deductibility rules) under this ADR; DS-23 owns only their format. `l10n_vn`'s golden scenarios are to be listed with DS-19 (open question) ([ADR-0053](0053-core-neutrality.md) rules 10, 13).
+
+    Note: statutory reports, books, print templates and close task content follow the formats of [ADR-0049](0049-statutory-reporting-and-printing.md). The TT99 definitions are DS-19 data from step 6 (interim until the author decides the build order, [ADR-0049](0049-statutory-reporting-and-printing.md) rule 30), the close task content from step 8.
 
 **Validation**
 

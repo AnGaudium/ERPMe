@@ -131,6 +131,8 @@ The hard floor on what a tainted run may read stays the literal spec 03 rule 1 u
 
     The outbound check also runs in draft plans through `GetOutboundContentCheck` ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 36). Runs on subjects that are outside content start tainted, and after taint no out-of-scope row may enter a prompt or a command input ([ADR-0050](0050-agent-runtime-and-query-layer.md) rules 15, 25). The CRM's outbound checks, and `tainted_read_out_of_scope` for its timeline and duplicate queries outside the scope partner: [ADR-0052](0052-minimal-crm.md) rules 16, 18, 28.
 
+    Note: for a generated file the outbound check reads the attachment's `generated_kind`, `generated_audience` and `generated_subject_document_id`: only an external print of a document of the message's partner passes ([ADR-0049](0049-statutory-reporting-and-printing.md) rule 29).
+
 **Audit and checks**
 
 15. Audit rows (ADR-0027 rule 8) also record `origin_agent_run_id`, `on_behalf_of_id` and `policy_decision_id`. Full columns: [ADR-0038](0038-audit-and-observability.md) rule 2.

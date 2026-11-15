@@ -16,9 +16,12 @@ l10n/l10n_vn/
       partner_groups.csv           # package template (ADR-0039)
       unreached_system_accounts.csv  # package template: ADR-0010 rule 17 statement (ADR-0039)
       close_checklist.yaml         # package template (ADR-0012)
+      reports/<code>/              # package rules: <effective_from>.yaml and .csv per statement or book (ADR-0049)
+      print_templates/<code>/      # package template: the regime's print forms (ADR-0049)
       settings.yaml                # package rules: regime settings (ADR-0016 rules 9-12)
   settings.yaml                    # package rules for every regime (accounting_regime null)
   numbering.yaml                   # package template: numbering formats (ADR-0009)
+  print_templates/<code>/          # package template: print templates for every regime (ADR-0049)
   i18n/
     vi/terminology.json            # overrides of core terms
     vi/l10n_vn.json                # package strings
@@ -53,6 +56,8 @@ components:
   partner_groups: regimes/{regime}/partner_groups.csv
   unreached_system_accounts: regimes/{regime}/unreached_system_accounts.csv
   close_checklist: regimes/{regime}/close_checklist.yaml
+  reports: regimes/{regime}/reports
+  print_templates: [print_templates, regimes/{regime}/print_templates]
   regime_settings: [settings.yaml, regimes/{regime}/settings.yaml]
   numbering: numbering.yaml
   translations: i18n
@@ -97,7 +102,7 @@ In CSV templates the basis is six columns: `basis` (`legal_source`, `author_deci
 | basis columns | As above |
 | `note` | Why an interim choice was made and its alternatives |
 
-Seed lists (`valuation_classes.csv`, `item_groups.csv`, `partner_groups.csv`) have `code`, `name_en`, `name_<language>` and the basis columns. The TT99 content is in [DS-19-vietnam-tt99](DS-19-vietnam-tt99/README.md) ([ADR-0039](../adr/0039-vietnam-package-tt99.md)). `unreached_system_accounts.csv` has `system_account` and `reason`. `close_checklist.yaml` carries `period_pattern` and `special_period_count` with one basis, and the tasks of ADR-0012.
+Seed lists (`valuation_classes.csv`, `item_groups.csv`, `partner_groups.csv`) have `code`, `name_en`, `name_<language>` and the basis columns. The TT99 content is in [DS-19-vietnam-tt99](DS-19-vietnam-tt99/README.md) ([ADR-0039](../adr/0039-vietnam-package-tt99.md)). `unreached_system_accounts.csv` has `system_account` and `reason`. `close_checklist.yaml` carries `period_pattern` and `special_period_count` with one basis, and the tasks of ADR-0012. Task fields: below and [ADR-0049](../adr/0049-statutory-reporting-and-printing.md) rule 23.
 
 ## Tax files (CSV)
 
@@ -139,3 +144,94 @@ Each entry is one dated rule. The values below show the format only; the Vietnam
   verified_by: "<author's name>"
   verified_on: "<date>"
 ```
+
+## Report definitions (YAML and CSV)
+
+Per regime under `regimes/<regime>/reports/<code>/`, one pair of files per definition version ([ADR-0049](../adr/0049-statutory-reporting-and-printing.md) rules 2–12). The version used is the latest whose `effective_from` is on or before the report's end date. A version a company has filed never changes.
+
+`<effective_from>.yaml` of a statement:
+
+```yaml
+# example: TT99's balance sheet, format only (the content is DS-19 data)
+code: b01_dn                     # lowercase, non-alphanumerics as _ (ADR-0004 rule 5)
+kind: statement
+form: B01-DN                     # the official label, data
+name_en: Balance sheet
+name_vi: "<name>"
+effective_from: 2026-01-01
+is_fileable: true
+comparative: day_before_from     # day_before_from | prior_year_range | none
+term_months: 12                  # horizon of term=short and term=long; required when a term uses term=, no core default
+display_rounding: half_away_from_zero   # optional; the default
+coverage: [asset, liability, equity]
+exports: {xml: {template: b01_dn.xml.j2, schema: b01_dn.xsd}}   # optional
+field_classes: []
+status: unverified
+open_question: "(DS-26, DS-27) Statutory reporting and printing choices"
+```
+
+A cash flow statement adds `cash_flow: {method: direct, cash_accounts: "<selector>"}`.
+
+`<effective_from>.csv` of a statement:
+
+| Column | Meaning |
+| --- | --- |
+| `line` | Line code, unique in the version |
+| `kind` | `heading`, `line` or `check` (a formula that must be zero) |
+| `level` | Indentation, 0 for top level |
+| `label_en`, `label_<language>` | Labels |
+| `note` | Reference to the notes to the statements, optional |
+| `source` | Terms separated by `;` and summed, a `-` prefix subtracting: `account:<selector>:<measure>[:<key>=<value>]...`, `cash_in:<selector>`, `cash_out:<selector>`, `report:<code>:<line>`, `carry:<line>` (over the header's comparative range; not with `comparative: none`), `formula:<expression>` |
+| basis columns | As above |
+
+- **Selectors:** operational codes joined by `|`, each with its descendants in the company's tree; `!<code>` removes one with its descendants.
+- **Measures:** `opening`, `opening_debit`, `opening_credit`, `debit_turnover`, `credit_turnover`, `change`, `closing`, `closing_debit`, `closing_credit`.
+- **Options:** `by=account|partner|partner_kind` (required on `opening_debit`, `opening_credit`, `closing_debit` and `closing_credit`; no core default), `kind=<kinds joined by |>`, `term=short|long` with `undated=short|long` (required with `term`), `closing_entries=exclude`, `counterpart=<selector>`.
+- **Formulas:** `[line]`, `+`, `-` (the ASCII hyphen-minus, the only minus sign), parentheses, `pos()`, `neg()`.
+
+Example rows (format only; the TT99 lines are DS-19 data):
+
+```csv
+line,kind,level,label_en,label_vi,note,source,basis,basis_document,basis_article,basis_date,verified_by,verified_on
+131,line,2,Short-term trade receivables,<label>,,account:131:closing_debit:by=partner_kind:term=short:undated=short,unverified,"(DS-26, DS-27) Statutory reporting and printing choices",,,,
+312,line,2,Advances from customers,<label>,,account:131:closing_credit:by=partner_kind:kind=advance|payment_on_account,unverified,"(DS-26, DS-27) Statutory reporting and printing choices",,,,
+c01,check,0,Total assets equal total sources,,,formula:[270]-[440],unverified,"(DS-26, DS-27) Statutory reporting and printing choices",,,,
+```
+
+A book's header has the statement's names, dates and basis, plus `row_source` (`journal_line`, `material_document_line`, `stock`, `open_item`, `production_order_period_cost`), `scope` (a selector), `filters`, `group_by`, `rows` (`line` or `counterpart`) and `period` (`range` or `as_of`). Its CSV has `column`, `label_en`, `label_<language>`, `field` (a field of the row source's result schema, or `debit`, `credit`, `counterpart_accounts`, `running_balance`, `quantity_in`, `quantity_out`, `running_quantity`), `total` (`sum` or empty) and the basis columns. Rows are ordered, and paged by a cursor over the same keys, as [ADR-0049](../adr/0049-statutory-reporting-and-printing.md) rule 10 says: for `journal_line` and `material_document_line` rows by posting date, document number, document type, `journal_entry.id` (or `material_document.id`) and line number, a counterpart pair's rows by the counterpart line's number; `open_item` rows by the group fields, then the open item's ID; `stock` rows by the group fields, then `item_id`, `warehouse_id`, `owner_partner_id` and `lot_id` or `serial_number_id` where exposed; `production_order_period_cost` rows by the group fields, then `production_order_id`, `posting_period_id` and the cost component. In every key null sorts before any value, and the cursor compares it that way (null equals null, null is less than any value).
+
+A return form (`tax/returns/<form>.csv`) may gain a header `<form>.yaml` with `effective_from` and `exports` at its next version ([ADR-0049](../adr/0049-statutory-reporting-and-printing.md) rule 21).
+
+## Print templates
+
+`print_templates/<code>/` at package level, or `regimes/<regime>/print_templates/<code>/` for a regime's form, which wins over a package-level template of the same code ([ADR-0049](../adr/0049-statutory-reporting-and-printing.md) rules 24–29):
+
+| File | Content |
+| --- | --- |
+| `template.yaml` | `code`; `subject` (a printable document type, a registered query, `report:<code>` or `partial`); `audience` (`external` or `internal`); `contract_version` (`major.minor`); `languages`; `field_classes` (internal templates only); `is_default`; basis |
+| `template.html` | Jinja2 HTML, sandboxed and autoescaped; formatting filters; `t()` for catalog strings; only `asset:` references |
+| `style.css` | Optional CSS for WeasyPrint |
+
+## Close checklist tasks
+
+Each entry of `tasks` in `close_checklist.yaml` ([ADR-0049](../adr/0049-statutory-reporting-and-printing.md) rule 23) has `code`, `area`, `kind`, `runs`, `is_required`, `is_sequential`, `depends_on`, `applies_to` (`every_period`, `fiscal_year_end`, `special_period`, `fiscal_year_first_period`), `parameters`, `label_en`, `label_<language>` and the basis fields:
+
+```yaml
+tasks:
+  - code: balance_carry_forward
+    area: general
+    kind: job
+    runs: RunBalanceCarryForward
+    is_required: true
+    is_sequential: false
+    depends_on: []
+    applies_to: fiscal_year_first_period
+    parameters: {from_account: "<code>", to_account: "<code>"}
+    label_en: Carry last year's result to earlier years
+    status: unverified
+    open_question: "(DS-26, DS-27) Statutory reporting and printing choices"
+```
+
+## Package code for prints
+
+`AmountInWords`: `amount_in_words(amount, currency, language) -> str`, the amount in words in the package's languages; the core ships English. Where no installed implementation covers the print language, prints show the amount in numerals only ([ADR-0049](../adr/0049-statutory-reporting-and-printing.md) rule 25).

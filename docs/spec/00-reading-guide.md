@@ -22,7 +22,7 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Migration | migration | A company's move from its old system: phased import batches, opening documents in a one-day migration fiscal year, reconciliation, completion ([ADR-0044](../adr/0044-data-migration-and-export.md)) |
 | Opening balance entry | opening\_balance\_entry, opening\_open\_item\_entry | Opening documents per currency for account balances and for open items per old invoice, offset to the opening balance clearing account |
 | Import key map | import\_key\_map | Map from a migrated record's external code to its ID, so corrected re-runs update instead of duplicating |
-| Opening turnover | opening\_turnover | Non-posting year-to-date debit and credit turnover per account before a mid-year cut-over, read by statutory reports |
+| Opening turnover | opening\_turnover | Non-posting year-to-date debit and credit turnover per account before a mid-year cut-over, read by statutory reports; owned by `ledger`, dated by start and end date ([ADR-0049](../adr/0049-statutory-reporting-and-printing.md) rule 14) |
 | Simulation | simulate, plan\_hash | Principle 2 |
 | Actor, principal acted for | actor, on\_behalf\_of | Actor kinds: human, agent, integration, system. A system actor is a deterministic job (costing, FX revaluation, closing entries, scheduled matching); its on\_behalf\_of is always the accountable human: the policy owner or the human who triggered the job Actor rows: `user_account`, `agent_type` with `agent_run`, `integration_client`, registered system job ([ADR-0017](../adr/0017-permission-envelope.md)). |
 | Company, branch | company (company\_id), branch | The legal entity with its currency, time zone, package, regime, costing scope and fiscal calendar owner; a branch or dependent unit of it, also an analytical dimension ([ADR-0027](../adr/0027-cross-cutting-ownership.md) rule 5) |
@@ -254,6 +254,17 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Package kind | package\_kind | A package's own name for a tax kind, declared in `tax/package_kinds.csv` under one core kind ([ADR-0053](../adr/0053-core-neutrality.md) rule 2) |
 | Tax return | tax\_return | Immutable snapshot of a filed return; later changes appear as prior-period adjustments |
 | Declaration date | declaration\_date | The date that places a tax row or adjustment in a return period |
+| Report definition | report\_definition; kind: statement, book | A statutory statement or book defined as package data (a dated header and a CSV of lines or columns) and read live, or a company's own definition beside the package's ([ADR-0049](../adr/0049-statutory-reporting-and-printing.md)) |
+| Report line | report\_line | One line of a statement definition: label, sources or a formula, or a check that must be zero; also a golden scenario kind |
+| Measure | opening, opening\_debit, opening\_credit, debit\_turnover, credit\_turnover, change, closing, closing\_debit, closing\_credit | What an account term reads over a date range, in company currency; debit and credit parts come from the bilateral split by account, partner, or partner and open-item kind |
+| Counterpart attribution | counterpart | The split of each journal entry into pairs of a positive and a negative line, in proportion and rounded so every line's pairs sum exactly; used for counterpart filters, the counterpart column of books and the direct cash flow |
+| Statutory report filing | statutory\_report\_filing | Immutable snapshot of a filed statement; a later recomputation shows the difference, filed as a supplement |
+| Report comparative value | report\_comparative\_value | Company data per report line and range, for comparatives before the cut-over, entered at migration |
+| Print template | print\_template, print\_template\_version; audience: external, internal | Jinja2 HTML and CSS rendered to PDF; a package template copied into the company; every change is a new immutable version |
+| Print data contract | print\_data\_contract | Versioned (semver) JSON Schema of what a print template receives for one subject: a document's version content plus derived print fields, or a query result |
+| Print profile | print\_profile | Company or branch header data for prints: address, phone, representatives, bank details, logo, seal and signature images |
+| Render job | render\_job | A request to produce a PDF, XLSX or XML file from a print template or report definition, run on queue `pdf`; its file becomes an attachment |
+| Generated file | attachment source kind generated; contains\_untrusted | An attachment the render worker produced: not scanned for malware, and records its kind, audience, subject document and whether the rendered data held untrusted fields; accounting evidence when it prints a posted document or is a filed statement |
 | Tracking | tracking: none, lot, serial | Whether a product's stock movements carry lots or serial numbers |
 | Partner kind | partner\_kind: organization, sole\_proprietorship, individual | Decides row-conditional data labels: name, tax ID, addresses, phones, emails and bank accounts of sole proprietorships (unincorporated businesses not registered as enterprises, whose identifiers are the owner's; in Vietnam, household businesses, named by `l10n_vn`) and individuals are personal; unknown kind is treated as personal ([ADR-0019](../adr/0019-partners-and-crm-foundation.md)) |
 | Partner role, profile | partner\_role; customer\_profile, supplier\_profile, employee\_profile | Roles added to one partner over time, deactivated not deleted; each role's own data in its profile, selected by the document's role. Employees are partners with the employee role |
@@ -410,7 +421,7 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Resume | Continue a stopped job from where it stopped, e.g. an import batch (`ResumeImport`) | Resumed |
 | Abandon | Stop a job for good; what it already posted stays until reversed, e.g. an import batch | Abandoned |
 | Issue | Request legal issuance of a document; it posts when the issue is accepted (e.g. `IssueSalesInvoice`) | IssueRequested |
-| Record | Store an outcome reported by an outside system, e.g. an e-invoice outcome | Recorded |
+| Record | Store an outcome reported by an outside system or by a worker that ran outside the transaction, e.g. an e-invoice outcome or a rendered file ([ADR-0049](../adr/0049-statutory-reporting-and-printing.md) rule 20) | Recorded |
 | Recall | Take back a request sent to an outside system before it took effect | Recalled |
 | Complete | Finish a held step by a human, e.g. a posting after acceptance; or end the logistics of a production order (technical completion); or finish a migration; or finish an agent run with its outcome (`CompleteAgentRun`) | Completed |
 | Reopen | Return a document to draft after an outside step failed; or return a technically complete production order to in progress; or return a closed complaint to open | Reopened |
@@ -447,6 +458,8 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Skip | Leave out an optional step with a reason, e.g. an optional close task | Skipped |
 | Retry | Try a held step again, e.g. a held event delivery | Retried |
 | Replay | Deliver retained events again to a consumer that has not handled them | Replayed |
+| Render | Produce a file from a print template or a report definition, as a job; the file does not exist when the command commits ([ADR-0049](../adr/0049-statutory-reporting-and-printing.md) rule 20) | RenderRequested |
+| File | Record that a statutory report or tax return was submitted to an authority, storing an immutable snapshot (`FileStatutoryReport`, `FileTaxReturn`) | Filed |
 | Send | Hand a message to its outside channel for delivery, e.g. an outbound message; the outcome is recorded later | SendRequested |
 
 Work items get the verbs Claim and Unclaim ([ADR-0042](../adr/0042-work-queue.md)), because Lock belongs to posting periods and Release to master data revisions; a command batch needs no verb ([ADR-0008](../adr/0008-command-envelope-and-registry.md) rule 20). A posted document is never canceled: it is corrected by a correction document or, if its type is internal, reversed (Principle 5, [ADR-0009](../adr/0009-document-lifecycle.md) rules 19, 23), so Cancel never applies to posted documents.

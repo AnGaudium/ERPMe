@@ -61,6 +61,8 @@ Employees are partners so that advances to them are open items per person (141 i
 
     The content check is also the registered query `GetOutboundContentCheck`, evaluated in the plan of every command that creates or updates a customer-facing draft (check result `outbound_content_flagged`); the send still refuses with `outbound_content_out_of_scope` ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 36).
 
+    Note: a generated file passes the gate in a partner draft only when its attachment has `generated_kind` `print`, `generated_audience` `external`, and a `generated_subject_document_id` whose partner is the message's partner. `crm` reads these columns from the attachment, never from `reporting` ([ADR-0049](0049-statutory-reporting-and-printing.md) rules 28, 29).
+
 **Enrichment, duplicates and insights**
 
 18. Tax ID lookup goes through an interface the localization package implements with an authorized provider, never by bypassing a public portal's captcha ([08](../spec/08-l10n-vn.md#e-invoicing-and-tax)). A result is stored as a dated snapshot with its source; differences from the partner's fields are proposed as an update for a human to accept (master data changes by agents need approval, [14](../spec/14-agent-workflows.md)). A lookup on an individual or household business is logged (rule 11). Differences are proposed as change proposals ([ADR-0029](0029-proposals-and-agent-safety.md) rule 5).

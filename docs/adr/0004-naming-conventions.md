@@ -15,6 +15,8 @@ Every code identifier is an English word or phrase from the glossary in [00-read
 3. One identifier end to end: a database column, the pydantic field, the JSON key, the MCP argument and the generated TypeScript property have the same name. No `alias`, no camelCase conversion in the API.
 4. An identifier is never a word marked reserved for PostgreSQL in Appendix C of the PostgreSQL documentation, a Python keyword, or a name reserved by pydantic `BaseModel` (the `model_` prefix, `schema`, `json`, `dict`, `copy`). Use a more specific glossary word instead (`sales_order`, not `order`).
 5. Official codes from law or standards (accounting regimes, statutory forms) appear only as data or inside the localization package that owns them, lowercased (`tt99`, `b01`). The owning DS item (DS-19, DS-23, DS-26) fixes the form of codes that contain other characters, such as `01/GTGT`. Account numbers such as 131 are data, never identifiers.
+
+   Note: statutory report and book codes follow the form of return forms: lowercase, every non-alphanumeric character as `_` (the TT99 form `B01-DN` is `b01_dn`), the official label kept as data ([ADR-0049](0049-statutory-reporting-and-printing.md) rule 2).
 6. Identifiers are at most 63 bytes, PostgreSQL's limit. CI checks every database identifier, including the names a naming convention generates (checked before SQLAlchemy shortens them), sequence, partition and trigger names, and rejects a longer name instead of letting it be truncated.
 
 **Modules and packages**

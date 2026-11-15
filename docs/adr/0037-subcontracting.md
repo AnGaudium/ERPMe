@@ -85,6 +85,8 @@ Outsourced work runs on the production core:
 
    Note: "held in 154" reads "held in work in process (e.g. 154 in TT99)" ([ADR-0053](0053-core-neutrality.md) rule 14).
 
+   Note: the disclosure is a book over the row source `stock`, filtered to non-owned stock ([ADR-0049](0049-statutory-reporting-and-printing.md) rule 22).
+
 **Checks and catalogs**
 
 9. Catalog changes, version 0.x. The transaction keys become 46 (ADR-0015):

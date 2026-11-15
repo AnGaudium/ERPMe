@@ -50,7 +50,7 @@ Checks:
    | --- | --- |
    | 6 · Composition | `app`: registers every module's handlers, consumers and queries; startup checks; entry points (rule 5) |
    | 5 · Interfaces | `api` (REST and MCP generated from the registry), `query` (read-only layer, DS-33), `agents` (after step 4), `sdk` (rule 4), `imports` (staged data imports, [ADR-0030](0030-commercial-seams-and-imports.md) rule 9) |
-   | 4 · Commercial | `sales`, `purchasing`, `cash` (from steps 5–6), `crm`, `planning` ([ADR-0024](0024-planning.md); it reads `production.contract`'s planning function and structures ([ADR-0036](0036-multi-level-mrp.md) rule 3) and `inventory.contract`'s `demand_supply_line` and hands over through `inventory.contract.request_replenishment`) |
+   | 4 · Commercial | `sales`, `purchasing`, `cash` (from steps 5–6), `reporting` (from step 5, interim until the author decides the build order, [ADR-0049](0049-statutory-reporting-and-printing.md) rule 30), `crm`, `planning` ([ADR-0024](0024-planning.md); it reads `production.contract`'s planning function and structures ([ADR-0036](0036-multi-level-mrp.md) rule 3) and `inventory.contract`'s `demand_supply_line` and hands over through `inventory.contract.request_replenishment`) |
    | 3 · Core business | `ledger` (journal, accounts, account determination, multi-currency), `inventory` (material documents, stock, costing, landed cost, and the warehouse management tables of [ADR-0023](0023-warehouse-management.md)), `master_data` (partners, products, warehouses, units, currencies, working calendars per [ADR-0033](0033-production-master-data.md) rule 11), `tax`; `production` (Phase 1 per [ADR-0032](0032-phase-1-scope-with-production.md); master data per [ADR-0033](0033-production-master-data.md)) and `assets` (Phase 3) per [ADR-0025](0025-later-phase-seams.md) |
    | 2 · Platform | `registry` (command registry, dispatcher, envelope, idempotency; its public entry point `erpme.registry.dispatch`), `documents` (lifecycle, versions, numbering), `periods`, `permissions`, `outbox`, `audit`, `localization` (loader), `db` (engine, session settings, RLS context, the generic lock helper and the lock-order registry, the `MetaData` naming convention), `agent_runs`, `work`, `attachments`, `work`, `policy` ([ADR-0027](0027-cross-cutting-ownership.md) rule 1; `documents` and `permissions` may import the `agent_runs` contract; `documents` may import the `attachments` contract, [ADR-0038](0038-audit-and-observability.md) rule 14) |
    | 1 · Foundation | `numeric` (ADR-0006), `clock` (ADR-0007), `ids`, `i18n`, `errors` |
@@ -58,6 +58,8 @@ Checks:
    `agent_runs` (layer 2), `agents` and `query` (layer 5) and their imports: [ADR-0050](0050-agent-runtime-and-query-layer.md) rule 1.
 
    Hooks: a module may declare a hook that another module of the same or a higher layer registers and `app` (layer 6) wires, so no import goes sideways or up; used for the auto-post evidence and the outbound content check ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 36; [ADR-0051](0051-agent-workflows.md) rule 18). Also `master_data`'s partner e-mail domain hook, which `crm` registers ([ADR-0052](0052-minimal-crm.md) rule 5).
+
+   Note: `reporting` imports only contracts of layers 1 to 3 and no other layer-4 module; names of records that other layer-4 modules own reach its prints through the hook `print_relation_resolver`. Agents reach its queries through `query` ([ADR-0049](0049-statutory-reporting-and-printing.md) rules 1, 25).
 
 3. Shape of each module:
    - A module that owns tables or commands has:

@@ -125,10 +125,14 @@ The retention periods and the strictness of scanning are flagged for the author.
     - **Posting.** `Post` of a document with a linked attachment that is not `clean` is rejected with `attachment_not_available`. `documents` reads the state through `attachments.contract`, a new import inside layer 2 (ADR-0022 and ADR-0027 rule 1 get a note).
     - **Scan mode.** `attachment_scan_mode` is an installation setting: `required`, or `optional`, under which attachments pass with the check result `scan_unavailable` when no scanner is deployed. `production` requires `required` (flagged; open question).
     - **Untrusted content.** Attachments from outside content are untrusted (ADR-0029 rule 10).
+
+    Note: generated files (source kind `generated`) are created `clean` without a malware scan: the render worker produces their bytes from company templates in a sandbox without network access. `clean` covers only the scan. A generated file whose rendered instance held an `is_untrusted` field carries `contains_untrusted`, and reading it taints a run ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 25; [ADR-0049](0049-statutory-reporting-and-printing.md) rule 28).
 15. Retention:
     - **Accounting attachments.** `Post` sets `attachment.is_accounting_evidence` on every linked attachment; it is never unset. Bytes of such an attachment are kept `attachment_retention_years` after its last link ends. This is a regime setting, seeded `unverified` at 10 years for accounting vouchers. Under ADR-0016 rule 12 an unverified setting fails closed, so such bytes are not purged until the author verifies it. TT99 seed: package `settings.yaml` ([ADR-0039](0039-vietnam-package-tt99.md) rule 9).
     - **Erasure.** Erasure removes a subject's links except links to posted accounting documents, which stay as voucher evidence; ADR-0027 rule 2 gets a note.
     - **Other attachments.** Their bytes are deleted when the last link goes, including at erasure (ADR-0019 rule 10).
+
+    Note: linking a generated file to a posted document, or to a statutory report filing as the submitted file, sets `is_accounting_evidence` ([ADR-0049](0049-statutory-reporting-and-printing.md) rules 19, 28).
 
 ## Context
 

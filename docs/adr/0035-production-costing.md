@@ -161,6 +161,8 @@ The accounting choices are the author's (ADR-0005 item 1). Each one below is a r
 
     Note: the Vietnamese method names and the product cost sheet are `l10n_vn`'s content, owned by ADR-0039; the core keeps the views ([ADR-0053](0053-core-neutrality.md) rule 13).
 
+    Note: the core provides the row source `production_order_period_cost` for books; `l10n_vn`'s cost sheet is a book definition over it, with field class `cost` ([ADR-0049](0049-statutory-reporting-and-printing.md) rules 10, 22).
+
 **Data, catalogs and checks**
 
 17. Tables and commands. All maintenance commands are `master_data_change`, because they change valuation:

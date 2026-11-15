@@ -45,6 +45,8 @@ Allocation is always explicit. A deterministic query proposes it, and a person o
 
    Note: the Vietnamese voucher names are examples from spec 08; the types are neutral ([ADR-0053](0053-core-neutrality.md) rule 14).
 
+   Note: the cash book is a book definition over journal lines grouped by account. The payment types are `is_printable` and carry `print_language` ([ADR-0049](0049-statutory-reporting-and-printing.md) rules 10, 27).
+
 **Money accounts**
 
 2. `money_account` (company data, `master_data_change`, change-tracked; agents propose changes, ADR-0029 rule 5):

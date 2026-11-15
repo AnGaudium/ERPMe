@@ -41,6 +41,8 @@ Before step 1 code freezes the platform modules, every entity that several modul
    - **Deletion.** Erasure of a data subject (ADR-0019) removes that subject's links. Bytes are deleted only when no link remains and retention allows. Links to posted accounting documents stay as voucher evidence ([ADR-0038](0038-audit-and-observability.md) rule 15).
    - **Details.** DS-36 owns retention, scanning and limits: [ADR-0038](0038-audit-and-observability.md) rules 13–15.
 
+   Note: source kind `generated` marks files the render worker produced. They are created in scan state `clean` because they are not scanned for malware; that says nothing about their content. Their row also records `generated_kind`, `generated_audience`, `generated_subject_document_id` and `contains_untrusted`, set at creation and never changed. A second creation of the same bytes keeps the stricter `contains_untrusted`, as it does the stricter data label ([ADR-0049](0049-statutory-reporting-and-printing.md) rule 28).
+
 **Derivation trace**
 
 3. `derivation_trace` is owned by `ledger` and written through `ledger.contract.write_derivation_trace` in the caller's transaction. It holds:

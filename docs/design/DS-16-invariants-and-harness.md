@@ -47,14 +47,14 @@ The product is `erpme` (ADR-0004 rule 7). Test tooling lives in separate top-lev
    | --- | --- |
    | `code` | `INV-nn`, or `INV-nnn` from INV-100 ([ADR-0033](../adr/0033-production-master-data.md) rule 16), never reused |
    | `name` | snake_case |
-   | `area` | `ledger`, `platform`, `inventory`, `receivables_payables`, `documents`, `warehouse`, `planning`, `subledger` or `safety` |
+   | `area` | `ledger`, `platform`, `inventory`, `receivables_payables`, `documents`, `warehouse`, `planning`, `subledger`, `safety`, `production`, `tax`, `cash` or `reporting` |
    | `check_point` | rule 10 |
    | `first_step` | The first build step at which the data it checks can exist; from then on it must have code and pass |
    | `flagged` | The open question it depends on, if its statement restates an interim rule |
    | `keys` | The business key fields a violation reports |
    | `source`, `added_in`, `statement` | |
 
-   Codes are grouped: 01–19 ledger and platform, 20–29 inventory, 30–39 receivables and payables, 40–49 documents, 50–59 warehouse (ADR-0023), 60–69 planning (ADR-0024), 70–79 subledgers (ADR-0025), 80–89 agent safety and platform integrity (ADR-0027, ADR-0029). INV-37 (GR/IR) has area `ledger` but sits in 30–39 beside the open-item checks, and INV-48 has area `inventory` but sits in 40–49 because 20–29 is full. INV-100 to INV-199 are production, area `production`; [ADR-0033](../adr/0033-production-master-data.md) rule 16 reserves INV-100 to INV-102 and PAR-12 until the production core step is numbered; ADR-0034 and [ADR-0035](../adr/0035-production-costing.md) reserve INV-103 to INV-108 and PAR-13. The naive recomputation (rule 29) gains cost-object nodes ([ADR-0035](../adr/0035-production-costing.md) rule 20). INV-56 was restated by [ADR-0031](../adr/0031-design-simplifications.md) rule 11, which strengthens it. Group 80–89 is full with INV-89 ([ADR-0038](../adr/0038-audit-and-observability.md) rule 8); further safety and platform invariants use INV-200 to INV-299; tax invariants use INV-300 to INV-399, area `tax` ([ADR-0041](../adr/0041-tax-engine.md) rule 12). Version 0.1.0 has 76 invariants. A hash test ([ADR-0031](../adr/0031-design-simplifications.md) rule 4) checks that a batch creating a record with a server-generated ID and referring to it in a later item hashes equally in simulate and execute. Later items add rows with the next free code in their group. CRM invariants use INV-500 to INV-599, area `crm` ([ADR-0052](../adr/0052-minimal-crm.md) rule 34); INV-49, area `documents`, takes the last free code of the documents group 40–49.
+   Codes are grouped: 01–19 ledger and platform, 20–29 inventory, 30–39 receivables and payables, 40–49 documents, 50–59 warehouse (ADR-0023), 60–69 planning (ADR-0024), 70–79 subledgers (ADR-0025), 80–89 agent safety and platform integrity (ADR-0027, ADR-0029). INV-37 (GR/IR) has area `ledger` but sits in 30–39 beside the open-item checks, and INV-48 has area `inventory` but sits in 40–49 because 20–29 is full. INV-100 to INV-199 are production, area `production`; [ADR-0033](../adr/0033-production-master-data.md) rule 16 reserves INV-100 to INV-102 and PAR-12 until the production core step is numbered; ADR-0034 and [ADR-0035](../adr/0035-production-costing.md) reserve INV-103 to INV-108 and PAR-13. The naive recomputation (rule 29) gains cost-object nodes ([ADR-0035](../adr/0035-production-costing.md) rule 20). INV-56 was restated by [ADR-0031](../adr/0031-design-simplifications.md) rule 11, which strengthens it. Group 80–89 is full with INV-89 ([ADR-0038](../adr/0038-audit-and-observability.md) rule 8); further safety and platform invariants use INV-200 to INV-299; tax invariants use INV-300 to INV-399, area `tax` ([ADR-0041](../adr/0041-tax-engine.md) rule 12). Reporting and printing invariants use INV-400 to INV-499, area `reporting` ([ADR-0049](../adr/0049-statutory-reporting-and-printing.md) rule 31). Version 0.1.0 has 76 invariants. A hash test ([ADR-0031](../adr/0031-design-simplifications.md) rule 4) checks that a batch creating a record with a server-generated ID and referring to it in a later item hashes equally in simulate and execute. Later items add rows with the next free code in their group. CRM invariants use INV-500 to INV-599, area `crm` ([ADR-0052](../adr/0052-minimal-crm.md) rule 34); INV-49, area `documents`, takes the last free code of the documents group 40–49.
 5. Each catalog row has exactly one check, registered with `@invariant("INV-21")` in `erpme_testkit.invariants`. A CI test compares catalog and registry:
    - a row whose `first_step` is at or below `[tool.erpme] build_step` (DS-18) and has no check fails;
    - a check without a row fails;
@@ -195,6 +195,7 @@ The product is `erpme` (ADR-0004 rule 7). Test tooling lives in separate top-lev
     | `open_item` | `partner`, `document_ref`, `currency` |
     | `journal_line` | `document_ref`, `account`, `item`, `warehouse`, `currency` |
     | `document_count` | `document_type`, `state` |
+    | `report_line` | `report` (code), `line`, `from`, `to`; company amounts ([ADR-0049](../adr/0049-statutory-reporting-and-printing.md) rule 32) |
 
     - Balances are closing balances, signed debit positive (ADR-0014 rule 6).
     - Quantities are in the inventory unit.
@@ -210,7 +211,7 @@ The product is `erpme` (ADR-0004 rule 7). Test tooling lives in separate top-lev
 27. Golden expected values are the author's (ADR-0005 item 3; runbook step 0). An agent may draft `scenario.yaml` without `status`, and may commit a regenerated `expected.csv` that CI verifies against the workbook. CI fails when a commit with an agent's `Co-Authored-By` trailer changes an author-only path. That check is a tripwire; the control is the author's line-by-line review of every `reserved-review` pull request (rule 6).
 28. The scenario runner replays events through the adapter of `build_step` or a later step, with the command protocol of rule 15, so scenarios written at step 1 keep running later:
     - After each event it runs the `day` checks.
-    - At the end it compares expected values with core query results by exact equality: `GetTrialBalance` (per account, period, currency and amount kind), `ListJournalLine`, `GetStockBalance` (ADR-0020), and the open-item and average-cost queries their items add.
+    - At the end it compares expected values with core query results by exact equality: `GetTrialBalance` (per account, period, currency and amount kind), `ListJournalLine`, `GetStockBalance` (ADR-0020), and the open-item and average-cost queries their items add. `report_line` rows compare with `GetStatutoryReport` ([ADR-0049](../adr/0049-statutory-reporting-and-printing.md) rule 15).
     - `GetTrialBalance` is a requirement this item places on the ledger module at step 1.
 
 ## 7. Naive recomputation and comparison
@@ -224,7 +225,7 @@ The product is `erpme` (ADR-0004 rule 7). Test tooling lives in separate top-lev
     | 4 | Open items and their open amounts, from opening balances on (ADR-0026) |
     | 6 | Carrying amounts on settlement; realized FX |
     | 7 | VAT per tax code and return line |
-    | 8 | Unrealized FX revaluation; closing entries |
+    | 8 | Unrealized FX revaluation; closing entries; statutory report lines from the definitions in the regime snapshot ([ADR-0049](../adr/0049-statutory-reporting-and-printing.md) rule 32) |
 
     Rules the specification leaves to the regime are read from the snapshot, never hard-coded, so a flagged rule changes both references together.
 30. The reference comparison report compares, for each run, company, period and key, the core result, the naive result and, where present, the golden value:

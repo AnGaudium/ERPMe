@@ -79,6 +79,24 @@ CREATE TABLE branch (
     UNIQUE (company_id, id),
     CONSTRAINT ck_branch_declaring_unit_tax_id CHECK (NOT is_declaring_unit OR tax_id IS NOT NULL)
 );
+CREATE TABLE print_profile (                              -- print header of the company (branch_id null) or a branch (ADR-0049 rule 26)
+    id                          uuid PRIMARY KEY,
+    company_id                  uuid NOT NULL REFERENCES company (id),
+    branch_id                   uuid,                                -- a branch row's non-empty fields win over the company row's
+    address                     jsonb,                               -- the columns of partner_address as keys (ADR-0045 rule 8)
+    phone                       text,
+    email                       text,
+    website                     text,
+    legal_representative_name   text,                                -- personal (spec 17)
+    legal_representative_title  text,
+    chief_accountant_name       text,                                -- personal (spec 17)
+    bank_details                jsonb,                               -- list of {bank_name, account_number, branch}, printed as text
+    logo_attachment_id          uuid,                                -- attachment (DS-36), PNG or JPEG
+    seal_attachment_id          uuid,                                -- label internal; never printed on a document with a marker
+    signature_attachment_id     uuid,                                -- label internal; never printed on a document with a marker
+    UNIQUE NULLS NOT DISTINCT (company_id, branch_id),
+    FOREIGN KEY (company_id, branch_id) REFERENCES branch (company_id, id)
+);
 CREATE TABLE cost_center (
     id          uuid PRIMARY KEY,
     company_id  uuid NOT NULL REFERENCES company (id),

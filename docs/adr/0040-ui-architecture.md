@@ -198,6 +198,8 @@ The web UI is one more client of the command and query layer. It writes data onl
       - size: at most 250 KB gzipped of JavaScript for the shell and 150 KB for the PWA route. AG Grid loads only on the hand-built desktop screens (ADR-0002, performance rule 3).
     - **Storage.** Business and personal data never go into browser storage. An unsaved form lives in memory; a draft is a server-side document. Browser storage holds only per-viewer conveniences such as column choices.
 
+    Note: the untrusted-field rule holds in printed files too: untrusted fields are escaped and never rendered as HTML ([ADR-0049](0049-statutory-reporting-and-printing.md) rule 29).
+
 **Structure, tests and scope**
 
 18. `frontend/src/` holds:

@@ -429,6 +429,23 @@ CREATE TABLE account_period_balance (
         UNIQUE (company_id, account_id, posting_period_id, transaction_currency, is_closing_entry)
 );
 
+-- ADR-0044 rule 10; ADR-0049 rule 14: year-to-date turnover before a mid-year cut-over, non-posting, read by statutory
+-- reports. Owned by ledger, written by CreateOpeningTurnover in the migration's batches, unchanged after
+-- CompleteMigration. Dates instead of a fiscal year: the first fiscal year after a mid-year cut-over is short.
+-- FORCE ROW LEVEL SECURITY and the generated company policy.
+CREATE TABLE opening_turnover (
+    id                       uuid          PRIMARY KEY,
+    company_id               uuid          NOT NULL REFERENCES company (id),
+    account_id               uuid          NOT NULL REFERENCES account (id),
+    start_date               date          NOT NULL,
+    end_date                 date          NOT NULL,      -- the migration's opening_date
+    company_debit_turnover   types.amount  NOT NULL,
+    company_credit_turnover  types.amount  NOT NULL,
+    recorded_at              timestamptz   NOT NULL DEFAULT now(),
+    CONSTRAINT uq_opening_turnover_company_id_account_id_start_date UNIQUE (company_id, account_id, start_date),
+    CONSTRAINT ck_opening_turnover_dates CHECK (start_date <= end_date)
+);
+
 -- ADR-0026 rule 3: the cycle open_item <-> journal_line is closed by a deferred foreign key.
 ALTER TABLE open_item ADD CONSTRAINT fk_open_item_origin_journal_line_id_journal_line
     FOREIGN KEY (origin_journal_line_id) REFERENCES journal_line (id) DEFERRABLE INITIALLY DEFERRED;
