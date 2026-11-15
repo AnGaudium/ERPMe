@@ -57,6 +57,8 @@ The migration period is then locked.
 
    **Batch state.** ADR-0030 rule 9.3 gets a note: a batch is `posted` when all its rows are; the clearing check belongs to `CompleteMigration` (rule 12). A migration that is not completed blocks locking any operating period (a close check, as ADR-0030 rule 9.5).
 
+   Note: phase 2 (master data) also loads money accounts, partner bank accounts, payment terms and cost centers, which later phases name: opening cash and bank balances post to money accounts' operational accounts, and open items carry payment terms (holistic review, 2026-11-15).
+
 **Formats and identities**
 
 4. The template is one workbook, generated from the registry:

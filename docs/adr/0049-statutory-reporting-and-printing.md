@@ -237,6 +237,8 @@ Statutory reports, books and printed documents are produced by one new layer-4 m
 
     - **TT99 content** (which tasks, their areas, order and whether required) stays package data for step 8, `unverified` (DS-19).
 
+    Note: a period-end tax offset task (in TT99, input VAT offset against output VAT) runs the job `RunTaxReturnOffset` of module `tax`, shaped like `RunBalanceCarryForward`: it posts a `balance_transfer` through `ledger.contract.write_journal_entry`, dated the period's last day, with the task's `close_task_id`. Its task parameters name the two accounts and the return form and box whose filed value is the amount (`{form, box, debit_account, credit_account}`). It reads the period's latest filed `tax_return` (ADR-0041 rule 18), fails with `tax_return_not_filed` when there is none, and moves the box value less what earlier runs for the period moved, so a supplementary return moves only the difference. It lives in `tax` because `ledger` never imports `tax` (ADR-0022 rule 2). The TT99 content (accounts, box, whether required) is the author's (open question) (holistic review, 2026-11-15).
+
 **Print templates (DS-27)**
 
 24. Print templates:

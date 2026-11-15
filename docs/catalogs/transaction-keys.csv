@@ -6,8 +6,8 @@ gr_ir_clearing,GR/IR clearing,valuation_class;warehouse,gr_ir_clearing,gr_ir,fal
 price_difference,Price difference,valuation_class;warehouse,price_difference;inventory_raw_material;inventory_tools_supplies;inventory_finished_goods;inventory_merchandise;inventory_other,,true,0.1.0,Difference between invoice and receipt value (SAP PRD); the regime sends it to inventory or to price differences; to inventory it goes through purchase_cost_clearing and a landed cost (ADR-0021 rule 12).
 cost_of_goods_sold,Cost of goods sold,valuation_class;warehouse;item_group,cost_of_goods_sold,,false,0.1.0,Value of goods issued for a sale (SAP GBB-VAX).
 consumption,Consumption,valuation_class;warehouse;item_group,expense;prepaid_expense;construction_in_progress;inventory_work_in_process;production_cost_overhead,,false,0.1.0,"Value of goods issued for internal use: to an expense, a prepaid cost, construction or production (SAP GBB-VBR)."
-inventory_count_shortage,Stock count shortage,valuation_class;warehouse,asset_shortage_pending;inventory_difference,,false,0.1.0,Value of a stock count shortage; the regime chooses pending or expense (SAP GBB-INV).
-inventory_count_surplus,Stock count surplus,valuation_class;warehouse,asset_surplus_pending;inventory_difference;non_operating_income,,false,0.1.0,"Value of a stock count surplus; the regime chooses pending, a reduction of inventory differences, or income."
+inventory_count_shortage,Stock count shortage,valuation_class;warehouse,asset_shortage_pending;inventory_difference,,true,0.1.0,Value of a stock count shortage; the regime chooses pending or expense (SAP GBB-INV).
+inventory_count_surplus,Stock count surplus,valuation_class;warehouse,asset_surplus_pending;inventory_difference;non_operating_income,,true,0.1.0,"Value of a stock count surplus; the regime chooses pending, a reduction of inventory differences, or income."
 inventory_revaluation_offset,Inventory revaluation offset,valuation_class;warehouse,expense,,false,0.1.0,Offset of a period-end costing revaluation of stock (DS-09).
 inventory_write_down,Inventory write-down,valuation_class;warehouse,inventory_write_down_expense,,false,0.1.0,Expense of writing inventory down to net realizable value.
 inventory_write_down_allowance,Inventory write-down allowance,valuation_class;warehouse,inventory_write_down_allowance,,false,0.1.0,Allowance that reduces inventory to net realizable value.
@@ -34,7 +34,7 @@ payment_discount_given,Payment discount given,,payment_discount_given,,false,0.1
 payment_discount_received,Payment discount received,,payment_discount_received,,false,0.1.0,Discount granted by a supplier for early payment.
 income_summary_transfer,Income summary transfer,,income_summary,,false,0.1.0,Closing transfer of income and expenses to the income summary (ADR-0012 rule 18).
 retained_earnings_transfer,Retained earnings transfer,,retained_earnings,,false,0.1.0,Closing transfer of the period result to retained earnings.
-other_receipt_offset,Other receipt offset,valuation_class;warehouse,non_operating_income;income_other;liability_other;expense_other,,false,0.1.0,Offset of goods received without a purchase order; the regime or company chooses the account (ADR-0020).
+other_receipt_offset,Other receipt offset,valuation_class;warehouse,non_operating_income;income_other;liability_other;expense_other,,true,0.1.0,Offset of goods received without a purchase order; the regime or company chooses the account (ADR-0020).
 other_issue_offset,Other issue offset,valuation_class;warehouse;item_group,expense,,false,0.1.0,Offset of goods issued for a purpose no other movement type covers.
 scrap,Scrap,valuation_class;warehouse,expense,,false,0.1.0,Value of goods destroyed or written off.
 production_consumption,Production consumption,,production_cost_material,cost_object,false,0.1.0,Materials issued to a production order (ADR-0035).
@@ -61,3 +61,4 @@ bad_debt_recovery,Bad debt recovery,,non_operating_income,,false,0.1.0,"A receip
 payable_release_income,Payable release,,non_operating_income,,false,0.1.0,"A payable no longer owed, written off. (ADR-0048)."
 currency_exchange_clearing,Currency exchange clearing,,currency_exchange_clearing,,false,0.1.0,"Clearing between the two sides of a currency exchange, never revalued (ADR-0011 rule 4; ADR-0048 rule 12)."
 purchase_expense,Purchase expense,item_group,expense;prepaid_expense;construction_in_progress,,false,0.1.0,"Purchase invoice expense lines, and service lines without a service receipt, by the item group; an entered account is checked against the key (ADR-0047 rule 12)."
+cash_in_transit,Cash in transit,currency,cash_in_transit,,false,0.1.0,"Money between two money accounts of one currency, posted by both sides of a money transfer (ADR-0048 rule 12, note)."

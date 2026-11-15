@@ -112,7 +112,7 @@ At package level under `tax/` ([ADR-0041](../adr/0041-tax-engine.md) rules 1–3
 | --- | --- |
 | `tax_codes.csv` | `code`, names, `tax_kind` (`vat`, `sales_tax`, `excise`, `customs_duty`, `other`), `package_kind` (optional), `direction`, `calculation`, `sequence`, `base_includes` (core or package kinds separated by `;`), `transaction_key`, `deductibility`, `import_treatment`, `fixed_asset_code`, and, until DS-24 defines its own file, the e-invoice add-on's `e_invoice_label` ([ADR-0053](../adr/0053-core-neutrality.md) rules 2, 12) |
 | `package_kinds.csv` | `code` (never a core kind's code), `tax_kind` (the core kind it belongs to), names, basis columns ([ADR-0053](../adr/0053-core-neutrality.md) rule 2) |
-| `deductibility_rules.yaml` | A YAML list: `code`, `condition_type`, `applies_to` (`tax_kind`, `directions`), `parameters` (the condition type's schema), `effective_from`, and the basis fields of regime settings; at most one rule per tax kind and direction on a date ([ADR-0053](../adr/0053-core-neutrality.md) rule 3) |
+| `deductibility_rules.yaml` | A YAML list: `code`, `condition_type`, `applies_to` (`tax_kind`, `directions`), `parameters` (the condition type's schema), `effective_from`, and the basis fields of regime settings. Per tax kind and direction, the entry with the latest `effective_from` on or before the tax date is in force, across codes; an entry with `condition_type: none` and no parameters ends the rule before it; two entries may not share tax kind, direction and `effective_from` ([ADR-0053](../adr/0053-core-neutrality.md) rule 3 and its notes) |
 | `tax_rates.csv` | `tax_code`, `effective_from`, `rate_percent` |
 | `tax_matrix.csv` | `direction`, `partner_tax_group`, `item_tax_group`, `effective_from`, `tax_codes` (separated by `;`) |
 | `item_tax_groups.csv`, `partner_tax_groups.csv` | `code`, names, and for partner groups the `directions` they apply to |
@@ -136,6 +136,12 @@ Each entry is one dated rule. The values below show the format only; the Vietnam
   effective_from: 2026-01-01
   status: unverified
   open_question: "(DS-10, DS-19) Which published quote ... and may a document carry an approximate rate?"
+
+- key: fx.revaluation.scope           # per system account; excluded_open_item_kinds has no core default (ADR-0011 rule 18)
+  value: {per_open_item: [receivable_trade], per_balance: [cash_in_bank], default: none, excluded_open_item_kinds: [advance]}
+  effective_from: 2026-01-01
+  status: unverified
+  open_question: "(DS-10, DS-12, DS-19) Under TT99, are foreign-currency items revalued ..."
 
 - key: example.verified_setting
   value: {...}

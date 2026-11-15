@@ -126,3 +126,4 @@ report_sales,reports,report,query,Sales reports,0.1.0,Sales analysis (DS-26).
 report_purchasing,reports,report,query,Purchasing reports,0.1.0,Purchasing analysis (DS-26).
 report_production,reports,report,query,Production reports,0.1.0,Production and variance reports (DS-26; ADR-0035).
 production_cost_settlement,finance,document_type,production,Production cost settlement,0.1.0,"ADR-0035 rules 1, 5; written only by the period-end costing job."
+money_transfer,banking,document_type,cash,Money transfer,0.1.0,"ADR-0048 rules 1, 12 (notes)."

@@ -67,9 +67,11 @@
     # financial_investment_other also holds equity securities (121, 2281), which are not monetary: they are excluded per item (open question).
     per_balance: [cash_on_hand, cash_in_bank, cash_in_transit, financial_investment_other, deposit_paid, receivable_other, payable_deposit, payable_other, payable_employee, accrued_expense, borrowing, liability_other]
     default: none
+    # Open item kind advance is never revalued, employee advances on 141 included (ADR-0011 rule 18 note; open question).
+    excluded_open_item_kinds: [advance]
   effective_from: 2026-01-01
   status: unverified
-  open_question: "(DS-10, DS-12, DS-19) Under TT99, are foreign-currency items revalued at every period end or only at fiscal year end"
+  open_question: "(DS-10, DS-12, DS-19) Under TT99, are foreign-currency items revalued at every period end or only at fiscal year end; (DS-10, DS-19, DS-25) Is an employee advance a monetary item"
 
 - key: fx.import_receipt.rate
   value: transaction

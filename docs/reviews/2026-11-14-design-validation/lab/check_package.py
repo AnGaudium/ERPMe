@@ -323,11 +323,12 @@ def run(docs, pkg, regime, quiet=False):
         # Deductibility conditions (ADR-0053 rule 3): package rules of core condition types, with one basis each.
         dr_path = os.path.join(tdir, 'deductibility_rules.yaml')
         if os.path.exists(dr_path):
-            cond_types = {'payment_evidence_threshold': {'threshold', 'aggregation', 'failing_methods', 'lapse', 'exempt_document_kinds'}}
+            cond_types = {'payment_evidence_threshold': {'threshold', 'aggregation', 'failing_methods', 'lapse', 'exempt_document_kinds'},
+                          'none': set()}   # none ends the rule before it (ADR-0053 rule 3 note)
             methods = {'cash', 'bank_transfer', 'card', 'offset', 'third_party'}   # evidence_method values; none never fails
             aggs = {'per_seller_per_day', 'per_document'}
             seen_dr = set()
-            dr_codes = {}   # (tax_kind, direction) -> rule codes; rules have no end date, so two codes overlap
+            dr_dates = {}   # (tax_kind, direction, effective_from) -> codes; the latest entry on or before a date is in force
             for e in yaml.safe_load(open(dr_path, encoding='utf-8')) or []:
                 where = f'deductibility rule {e.get("code")}'
                 ident = (e.get('code'), str(e.get('effective_from')))
@@ -336,13 +337,14 @@ def run(docs, pkg, regime, quiet=False):
                 if not datere.match(ident[1]): fail(f'{where}: date {ident[1]!r}')
                 basis_yaml(e, where)
                 at = e.get('applies_to') or {}
-                for dn_ in at.get('directions') or []: dr_codes.setdefault((at.get('tax_kind'), dn_), set()).add(e.get('code'))
+                for dn_ in at.get('directions') or []: dr_dates.setdefault((at.get('tax_kind'), dn_, ident[1]), []).append(e.get('code'))
                 if at.get('tax_kind') not in kinds: fail(f'{where}: applies to unknown tax kind {at.get("tax_kind")!r}')
                 if not at.get('directions') or set(at['directions']) - {'purchase', 'import'}: fail(f'{where}: directions must be purchase or import')
                 ct = e.get('condition_type')
                 if ct not in cond_types: fail(f'{where}: unknown condition type {ct!r}'); continue
                 p = e.get('parameters') or {}
                 if set(p) != cond_types[ct]: fail(f'{where}: parameters {sorted(p)} != {sorted(cond_types[ct])}'); continue
+                if ct == 'none': continue
                 th = p['threshold'] or {}
                 if not (th.get('amount') and th.get('currency') and isinstance(th.get('includes_tax'), bool)): fail(f'{where}: threshold needs amount, currency, includes_tax')
                 ag = p['aggregation'] or {}
@@ -350,8 +352,8 @@ def run(docs, pkg, regime, quiet=False):
                 if not p['failing_methods'] or set(p['failing_methods']) - methods: fail(f'{where}: bad failing_methods')
                 if p['lapse'] not in ('due_date', 'none'): fail(f'{where}: bad lapse')
                 if not isinstance(p['exempt_document_kinds'], list): fail(f'{where}: exempt_document_kinds must be a list')
-            for (tk_, dn_), codes_ in sorted(dr_codes.items()):
-                if len(codes_) > 1: fail(f'deductibility rules overlap for {tk_}/{dn_}: {sorted(codes_)} (one rule per tax kind and direction on a date)')
+            for (tk_, dn_, ef_), codes_ in sorted(dr_dates.items()):
+                if len(codes_) > 1: fail(f'deductibility rules overlap for {tk_}/{dn_} from {ef_}: {sorted(codes_)} (one entry per tax kind, direction and date)')
             notes.append(f'deductibility: {len(seen_dr)} rules')
         # tax.non_cash_payment_threshold is no longer a core key (ADR-0053 rule 3).
         tax_settings = {'tax.rate_date_basis', 'tax.declaration_date_basis', 'tax.rounding_level',
@@ -417,7 +419,8 @@ def self_test(docs, pkg, regime):
         ('undeclared kind in a VAT base', lambda d: edit_pkg(d, 'tax/tax_codes.csv', ',special_consumption;environmental_protection,', ',special_consumption;environmental,')),
         ('unknown deductibility condition type', lambda d: edit_pkg(d, 'tax/deductibility_rules.yaml', 'condition_type: payment_evidence_threshold', 'condition_type: no_such_condition')),
         ('deductibility rule without basis', lambda d: edit_pkg(d, 'tax/deductibility_rules.yaml', '  status: unverified\n', '')),
-        ('two deductibility rules for one kind and direction', lambda d: edit_pkg(d, 'tax/deductibility_rules.yaml', '- code: non_cash_payment_threshold\n', '- code: second_rule\n  condition_type: payment_evidence_threshold\n  applies_to: {tax_kind: vat, directions: [purchase]}\n  parameters:\n    threshold: {amount: "1", currency: VND, includes_tax: true}\n    aggregation: {default: per_document}\n    failing_methods: [cash]\n    lapse: none\n    exempt_document_kinds: []\n  effective_from: 2026-01-01\n  status: unverified\n  open_question: "(DS-23) Input VAT and non-cash payment"\n- code: non_cash_payment_threshold\n')),
+        ('two deductibility rules for one kind, direction and date', lambda d: edit_pkg(d, 'tax/deductibility_rules.yaml', '- code: non_cash_payment_threshold\n', '- code: second_rule\n  condition_type: payment_evidence_threshold\n  applies_to: {tax_kind: vat, directions: [purchase]}\n  parameters:\n    threshold: {amount: "1", currency: VND, includes_tax: true}\n    aggregation: {default: per_document}\n    failing_methods: [cash]\n    lapse: none\n    exempt_document_kinds: []\n  effective_from: 2026-01-01\n  status: unverified\n  open_question: "(DS-23) Input VAT and non-cash payment"\n- code: non_cash_payment_threshold\n')),
+        ('a none deductibility rule with parameters', lambda d: edit_pkg(d, 'tax/deductibility_rules.yaml', 'condition_type: payment_evidence_threshold', 'condition_type: none')),
         ('test_fixture basis outside a test package', edit('account_determination.csv', ',unverified,(DS-19) TT99 default account determination,', ',test_fixture,,')),
     ]
     wrong = 0

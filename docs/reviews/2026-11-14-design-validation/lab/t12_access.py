@@ -256,7 +256,7 @@ for n, spec in CRM.items():
 for n, leaf in CRM_QUERIES.items():
     REG.append((n, leaf, "query", verb_of(n), None))
 # Reporting and printing (ADR-0049; ADR-0054 rule 24). RenderReport, FileStatutoryReport and FileTaxReturn are above.
-REPORTING = {"RenderPrint": ("general_access", "other"), "RenderTaxReturn": ("report_tax", "other"),
+REPORTING = {"RenderPrint": ("general_access", "other"), "RenderTaxReturn": ("report_tax", "other"), "RunTaxReturnOffset": ("report_tax", "posting"),
              "CreateReportDefinition": ("report_finance", "master_data_change"), "UpdateReportDefinition": ("report_finance", "master_data_change"),
              "CreateReportComparativeValue": ("report_finance", "other"), "UpdateReportComparativeValue": ("report_finance", "other"),
              "DeleteReportComparativeValue": ("report_finance", "other"),

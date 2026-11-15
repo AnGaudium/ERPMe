@@ -109,12 +109,16 @@ Tax codes, dated rates and a dated tax matrix are package rules, read live. The 
       - **INV-301:** a posted document's tax rows equal its posted version's `document_line_tax`.
 
       They open a new group, INV-300 to INV-399, area `tax` (DS-16).
+
+    Note: the journal gets one tax line per tax code, entry and tax line role. Recoverable import VAT therefore has two: the payable line through `import_tax` and the recoverable line through `input_tax` ([ADR-0021](0021-landed-cost.md) rule 11). INV-300 reads the `import_tax` line, as it says (holistic review, 2026-11-15).
 13. Later changes are `tax_line_adjustment` rows, append-only:
     - **Columns:** `adjusts_tax_line_id`, `kind`, `deductible_delta` (in document and company currency; positive raises deductible VAT), `declaration_date`, `reason`, and the journal entry when one posts.
     - **Kinds:** `payment_evidence`, `cash_payment`, `due_date_lapse`, `apportionment`, `period_move`, `reversal_of_adjustment`.
     - **Postings.** An adjustment that moves VAT between input tax and expense posts a `tax_adjustment` document (`PostTaxAdjustment`, actor `system`) through `input_tax_non_deductible`. The posting carries the source line's dimensions (cost center, project, item) and posts on the adjustment's declaration date.
 
     Note: the kinds are `condition_met`, `condition_failed` (with the condition type's reason in `reason`, e.g. `failing_method` or `lapsed`), `apportionment`, `period_move` and `reversal_of_adjustment`. `payment_evidence`, `cash_payment` and `due_date_lapse` are gone ([ADR-0053](0053-core-neutrality.md) rule 3).
+
+    Note: an adjustment whose declaration date falls in a period that does not admit it ([ADR-0012](0012-posting-periods-and-closing.md) rule 5's note: locked, or soft-locked without the capability) takes the first day of the earliest later period that admits it as its declaration date, so it is declared in that period's return, and raises a `tax_adjustment_redated` work item for the accountant (holistic review, 2026-11-15).
 
 **Input VAT deductibility (Vietnam, flagged)**
 

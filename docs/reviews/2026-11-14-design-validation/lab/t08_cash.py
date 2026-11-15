@@ -4,7 +4,10 @@ B: the matching cascade `match_bank_line` (rule 9): already-posted documents fir
    within one partner, side and currency (a partial or excess amount settles the referenced items, never another
    item); then the counterparty's bank account (bank code and number) with an exact amount; then a bounded subset;
    shared accounts and ambiguous references go unmatched. Inputs are put in canonical order first, so shuffled
-   inputs give the same proposal.
+   inputs give the same proposal. Reference scores depend on who owns the paying account: the item's partner
+   100 / 80, nobody (counterparty_unverified) at most 85 / 65, another partner (third party) at most 60; neither of
+   the last two is auto-posted. Installments: a due-ordered prefix summing exactly scores 100, a single item 90,
+   and <reference>-<installment> names one installment (holistic review notes on rule 9).
 A: allocation proposals (rule 6).
 D: early-payment discounts by the gross-up of rule 7.
 P: bad-debt provision by aging bucket (rule 14).
@@ -63,20 +66,27 @@ def match_bank_line(line, items, posted, accounts, currency="VND", rules=()):
     if cand:
         best = min(cand, key=lambda p: (abs((p[3] - line["date"]).days), p[3], p[0]))
         return ("posted", best[0], [], 95)
-    # 2. whole-token references within one partner
+    # 2. whole-token references within one partner; <reference>-<installment_number> names one installment
     tokens = ref_tokens(line["description"])
-    ref = [i for i in mine if i[3] in tokens]
+    ref = [i for i in mine if i[3] in tokens or f"{i[3]}-{i[7] if len(i) > 7 else 1}" in tokens]
     if ref:
         if len({i[1] for i in ref}) > 1: return ("unmatched", "ambiguous_reference", [], 0)
-        total = sum(i[5] for i in ref)
-        third = len(partners) == 1 and partners[0] != ref[0][1]       # paid from another partner's account
-        if total == line["amount"]: return ("reference_third_party" if third else "reference", ref[0][1], [(i[0], i[5]) for i in ref], 70 if third else 100)
+        owner = ref[0][1]                                        # untrusted reference: who owns the paying account?
+        trust = "" if owner in partners else ("_third_party" if partners else "_unverified")
+        cap_exact, cap_partial = {"": (100, 80), "_unverified": (85, 65), "_third_party": (60, 60)}[trust]
+        run, prefix = 0, []
+        for i in ref:                                            # due-date order: a prefix summing exactly
+            run += i[5]; prefix.append(i)
+            if run >= line["amount"]: break
+        if run == line["amount"]: return ("reference" + trust, owner, [(i[0], i[5]) for i in prefix], min(100, cap_exact))
+        single = [i for i in ref if i[5] == line["amount"]]
+        if single: return ("reference_single" + trust, owner, [(single[0][0], single[0][5])], min(90, cap_exact))
         out, left = [], line["amount"]
         for i in ref:                                            # oldest due first
             take = min(left, i[5]); out.append((i[0], take)); left -= take
             if left == 0: break
         if left: out.append(("on_account", left))
-        return ("reference_partial", ref[0][1], out, 80)
+        return ("reference_partial" + trust, owner, out, cap_partial)
     # company rules, only after steps 1 and 2
     up = line["description"].upper()
     for pattern, target in rules:
@@ -103,10 +113,10 @@ def match_bank_line(line, items, posted, accounts, currency="VND", rules=()):
 L = lambda desc, amt, cp=None, direction="in", date="2026-05-16": {"description": desc, "amount": amt, "counterparty": cp, "direction": direction, "date": d(date)}
 check("B01 an already-posted receipt of the same amount and partner is found first, before any open item",
       match_bank_line(L("ck", 4000000, ("TCB", "9988776655")), ITEMS, POSTED, ACCOUNTS)[:2], ("posted", "pay1"))
-check("B02 a whole-token reference with the exact amount", match_bank_line(L("TT INV-0102 thanh toan", 2500000), ITEMS, [], ACCOUNTS), ("reference", "P1", [("oi2", 2500000)], 100))
-check("B03 INV-01 does not match inside INV-0102: whole tokens only", match_bank_line(L("pay INV-0102", 1000000), ITEMS, [], ACCOUNTS)[0], "reference_partial")
+check("B02 a whole-token reference with the exact amount, paid from the partner's own account", match_bank_line(L("TT INV-0102 thanh toan", 2500000, ("VCB", "0123456789")), ITEMS, [], ACCOUNTS), ("reference", "P1", [("oi2", 2500000)], 100))
+check("B03 INV-01 does not match inside INV-0102: whole tokens only", match_bank_line(L("pay INV-0102", 1000000, ("VCB", "0123456789")), ITEMS, [], ACCOUNTS)[0], "reference_partial")
 check("B04 a reference whose amount differs settles that item partly, never another item",
-      match_bank_line(L("INV-0101", 1000000), ITEMS, [], ACCOUNTS), ("reference_partial", "P1", [("oi1", 1000000)], 80))
+      match_bank_line(L("INV-0101", 1000000, ("VCB", "0123456789")), ITEMS, [], ACCOUNTS), ("reference_partial", "P1", [("oi1", 1000000)], 80))
 check("B05 more than the referenced item: the rest goes on account", match_bank_line(L("INV-0103", 1200000), ITEMS, [], ACCOUNTS)[2], [("oi3", 1000000), ("on_account", 200000)])
 check("B06 references of two partners are ambiguous: unmatched", match_bank_line(L("INV-01 INV-0103", 2000000), ITEMS, [], ACCOUNTS)[:2], ("unmatched", "ambiguous_reference"))
 check("B07 an inflow never matches a payable (side), nor an item in another currency",
@@ -119,9 +129,36 @@ lines = [L("ck", 4000000, ("VCB", "0123456789")), L("INV-0101 INV-0103", 2500000
 same = all(len({str(match_bank_line(ln, rng.sample(ITEMS, len(ITEMS)), rng.sample(POSTED, len(POSTED)), ACCOUNTS)) for _ in range(40)}) == 1 for ln in lines)
 check("B11 shuffled items and posted documents always give the same proposal", same, True)
 check("B12 a short token (thang 5) is not a reference: the exact account match stands", match_bank_line(L("thanh toan thang 5", 1000000, ("VCB", "0123456789")), ITEMS + [("oi9", "P1", "debit", "5", "VND", 700000, d("2026-04-01"))], [], ACCOUNTS)[:3], ("account_amount", "P1", [("oi3", 1000000)]))
-check("B13 a P1 invoice paid from P2's account: matched with a third-party flag and a lower score", match_bank_line(L("INV-0102", 2500000, ("TCB", "9988776655")), ITEMS, [], ACCOUNTS), ("reference_third_party", "P1", [("oi2", 2500000)], 70))
+check("B13 a P1 invoice paid from P2's account: matched with a third-party flag, at most 60", match_bank_line(L("INV-0102", 2500000, ("TCB", "9988776655")), ITEMS, [], ACCOUNTS), ("reference_third_party", "P1", [("oi2", 2500000)], 60))
 check("B14 a company rule maps a bank fee to an account", match_bank_line(L("Phi dich vu thang 5", 22000), ITEMS, [], ACCOUNTS, rules=RULES)[:2], ("rule_account", "bank_charge"))
 check("B15 a company rule names the partner when the account is unknown", match_bank_line(L("CONG TY P2 chuyen tien", 4000000, ("XXX", "1")), ITEMS, [], ACCOUNTS, rules=RULES)[:3], ("account_amount", "P2", [("oi4", 4000000)]))
+# untrusted references (holistic review note on rule 9)
+check("B16 a reference from an account no partner owns: flagged counterparty_unverified, at most 85",
+      match_bank_line(L("TT INV-0102", 2500000), ITEMS, [], ACCOUNTS), ("reference_unverified", "P1", [("oi2", 2500000)], 85))
+check("B17 the same for a partial amount: at most 65",
+      match_bank_line(L("INV-0101", 1000000), ITEMS, [], ACCOUNTS), ("reference_partial_unverified", "P1", [("oi1", 1000000)], 65))
+check("B18 an account registered to no partner counts as unknown",
+      match_bank_line(L("INV-0102", 2500000, ("BANK-Z", "000")), ITEMS, [], ACCOUNTS)[0::3], ("reference_unverified", 85))
+check("B19 another partner's account in the partial branch: third party, at most 60",
+      match_bank_line(L("INV-0101", 1000000, ("TCB", "9988776655")), ITEMS, [], ACCOUNTS), ("reference_partial_third_party", "P1", [("oi1", 1000000)], 60))
+def auto_post_eligible(res):
+    """An enabled auto-post rule may consider only matches whose paying account belongs to the item's partner."""
+    return res[0] != "unmatched" and not res[0].endswith(("_unverified", "_third_party"))
+check("B20 unverified and third-party drafts are never auto-posted; a verified one may be",
+      [auto_post_eligible(match_bank_line(ln, ITEMS, [], ACCOUNTS)) for ln in (L("TT INV-0102", 2500000), L("INV-0102", 2500000, ("TCB", "9988776655")), L("INV-0102", 2500000, ("VCB", "0123456789")))],
+      [False, False, True])
+# installments share their invoice's reference (holistic review note on rule 9)
+INST = [("oi21", "P4", "debit", "INV-0301", "VND", 3000000, d("2026-05-10"), 1), ("oi22", "P4", "debit", "INV-0301", "VND", 3000000, d("2026-06-10"), 2),
+        ("oi23", "P4", "debit", "INV-0301", "VND", 4000000, d("2026-07-10"), 3)]
+P4ACC = ("BANK-D", "4444"); ACC4 = dict(ACCOUNTS); ACC4[P4ACC] = ["P4"]
+check("B21 the first installment's amount settles it at 100", match_bank_line(L("INV-0301", 3000000, P4ACC), ITEMS + INST, [], ACC4), ("reference", "P4", [("oi21", 3000000)], 100))
+check("B22 a due-ordered prefix summing exactly settles both installments at 100", match_bank_line(L("INV-0301", 6000000, P4ACC), ITEMS + INST, [], ACC4), ("reference", "P4", [("oi21", 3000000), ("oi22", 3000000)], 100))
+check("B23 a later installment alone equals the amount: settled at 90", match_bank_line(L("INV-0301", 4000000, P4ACC), ITEMS + INST, [], ACC4), ("reference_single", "P4", [("oi23", 4000000)], 90))
+check("B24 INV-0301-2 names the second installment only", match_bank_line(L("TT INV-0301-2", 3000000, P4ACC), ITEMS + INST, [], ACC4), ("reference", "P4", [("oi22", 3000000)], 100))
+check("B25 an installment token with a short amount settles that installment partly", match_bank_line(L("INV-0301-3", 1000000, P4ACC), ITEMS + INST, [], ACC4), ("reference_partial", "P4", [("oi23", 1000000)], 80))
+same4 = all(len({str(match_bank_line(ln, rng.sample(ITEMS + INST, len(ITEMS) + len(INST)), [], ACC4)) for _ in range(40)}) == 1
+            for ln in (L("INV-0301", 4000000, P4ACC), L("INV-0301", 6000000, P4ACC), L("INV-0301-2", 3000000, P4ACC)))
+check("B26 shuffled installments always give the same proposal", same4, True)
 
 # ---------------- A: allocation proposals ----------------
 def propose_allocation(amount, items):

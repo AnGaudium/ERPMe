@@ -139,7 +139,10 @@ CREATE TABLE open_item (
     predecessor_open_item_id    uuid REFERENCES open_item (id),
     CONSTRAINT ck_open_item_due_date CHECK ((open_item_kind IN ('invoice', 'credit') AND due_date IS NOT NULL)
                                            OR (open_item_kind IN ('advance', 'payment_on_account', 'loan') AND due_date IS NULL)
-                                           OR open_item_kind = 'other')
+                                           OR open_item_kind = 'other'),
+    -- Amounts are signed like journal amounts (debit positive); comparisons use magnitudes (ADR-0026 rule 1 note).
+    CONSTRAINT ck_open_item_original_transaction_amount CHECK (sign(original_transaction_amount) = CASE natural_side WHEN 'debit' THEN 1 ELSE -1 END),
+    CONSTRAINT ck_open_item_is_settled CHECK (NOT is_settled OR (open_transaction_amount = 0 AND open_company_amount = 0 AND coalesce(open_group_amount, 0) = 0))
 );
 CREATE INDEX ix_open_item_company_id_partner_id ON open_item (company_id, partner_id) WHERE NOT is_settled AND NOT is_reversed;
 CREATE INDEX ix_open_item_company_id_account_id ON open_item (company_id, account_id) WHERE NOT is_settled AND NOT is_reversed;

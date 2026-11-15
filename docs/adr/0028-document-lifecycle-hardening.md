@@ -82,6 +82,8 @@ This ADR amends the document lifecycle (ADR-0009) in five places, before step 3 
    4. **On `EInvoiceRejected`**, a consumer runs `Reopen<Type>`, which returns the document to `draft` with the rejection reason and creates a work item for the issuer.
 
    Note: that completion `Post<Type>` is registered `is_consequence_posting` and carries the issuer's decision: floors 3 to 6 and the actor-kind policy point are applied at `Issue` and not repeated, so an e-invoiced correction or an agent-drafted e-invoiced invoice posts without a held delivery ([ADR-0043](0043-policy-and-approval.md) rules 5 and 9 notes; [ADR-0027](0027-cross-cutting-ownership.md) rule 12 note).
+
+   Note: `Issue<Type>` from `approved` (an approval hold, [ADR-0053](0053-core-neutrality.md) rule 8) asks the policy nothing new while the `policy_input_hash` and the actor kind equal those of the approved version's decision; it stores that decision, bound to the approved version, on the `posting_intent`. When either differs, it evaluates again, as from `draft`, where `Issue` always evaluates. Floors 3–6 of ADR-0043 rule 9 still apply at `Issue`, and the plan and its hash are computed at `Issue` as before (holistic review, 2026-11-15).
 8. Package validation:
    - **The interface.** Before the request, `EInvoiceValidator` checks schema, buyer tax ID format, registered symbol and dates. It is published by the core and implemented by the localization package (ADR-0016 rule 17). It is network-free and deterministic, and runs in simulation and at `Issue`.
    - **Errors.** Failures return `e_invoice_invalid`, with the package's code in `details`.

@@ -47,6 +47,8 @@ Allocation is always explicit. A deterministic query proposes it, and a person o
 
    Note: the cash book is a book definition over journal lines grouped by account. The payment types are `is_printable` and carry `print_language` ([ADR-0049](0049-statutory-reporting-and-printing.md) rules 10, 27).
 
+   Note: a further posting type, `money_transfer` (reversible while unreferenced, rule 16; approval hold allowed; not e-invoice capable; authorization leaf `money_transfer` under `banking`), moves money between two money accounts of the company in one currency. It has no partner, open item or tax. Its accounting is in rule 12's notes; the registry row follows the table above (holistic review, 2026-11-15).
+
 **Money accounts**
 
 2. `money_account` (company data, `master_data_change`, change-tracked; agents propose changes, ADR-0029 rule 5):
@@ -80,6 +82,8 @@ Allocation is always explicit. A deterministic query proposes it, and a person o
      - `is_rate_unusual`: rule 12's rate check.
 
      The conditions join ADR-0043 rule 3 (a note there).
+
+   Note: the settlement rate is optional. Without one, the document converts at the transaction lookup rate (applied rate origin `lookup`, ADR-0011 rule 11), and rule 12's rate check is skipped: there is nothing to compare, so neither `settlement_rate_unusual` nor `settlement_rate_unchecked` is returned, and `is_rate_unusual` is false (holistic review, 2026-11-15).
 4. Cash counts:
    - **`cash_count`** (non-posting) records a cash money account, the counted amount (optionally by denomination) and the book balance at the time. It is kept as evidence even when nothing differs.
    - **`cash_count_adjustment`.** When a count is approved with a difference, it creates and posts this document:
@@ -118,6 +122,8 @@ Allocation is always explicit. A deterministic query proposes it, and a person o
    - **One line, one document** in Phase 1. Several lines to one document, or one line to several, come later (open question).
 
    `BankLineSuggestionRecorded` carries IDs only; the suggested tokens stay on the line as untrusted fields ([ADR-0051](0051-agent-workflows.md) rule 17).
+
+   Note: `match_state` gains `proposed`. A proposed line names its document in `proposed_document_id`, with the cascade's `score` and `match_basis` (`already_posted`, `reference`, `company_rule`, `account_amount`, `account_subset`, `llm_suggestion` or `manual`); a matched line names its document as before. `GetBankReconciliation` counts proposed lines as unmatched, so neither the reconciliation nor its close task treats a draft as booked. INV-95 is unchanged (holistic review, 2026-11-15).
 9. Matching:
    - **The cascade:** `match_bank_line`, a pure function, checked by the lab on shuffled inputs. It first puts open items and documents in a canonical order (due date, then ID). An inflow considers only items on the debit side, an outflow only items on the credit side, and only items in the money account's currency. Then it applies, in order:
      1. **Already posted:** an unmatched posted document of this money account in the same direction and amount, dated within 5 days, whose reference is a token of the description or whose partner owns the counterparty's account. The closest date wins, then the earliest, then the lowest ID (score 95). Nothing new is drafted.
@@ -134,6 +140,17 @@ Allocation is always explicit. A deterministic query proposes it, and a person o
    - **LLMs.** An agent reading descriptions works on tainted input. Its suggestions are drafts or proposed rules, never part of a score, and never auto-posted (spec 03 rule 1).
 
    The agent records its reading with `RecordBankLineSuggestion`; a consumer re-runs the cascade with it and drafts without a score ([ADR-0051](0051-agent-workflows.md) rules 17–18).
+
+   Note: the cascade proposes; it never matches a line to a draft. Step 1 and the drafts of steps 2–4 leave the line `proposed`. The line becomes `matched` only in the transaction that posts its proposed document, or by `MatchBankLine` naming a posted document; `MatchBankLine` naming a draft makes that draft the proposal. Discarding or canceling a proposed draft, or `UnmatchBankLine` on a proposed line, returns the line to `unmatched` in the same transaction. A document is the proposal of at most one line (rule 8: one line, one document), and an auto-post matches the line in its posting transaction (holistic review, 2026-11-15).
+
+   Note: a reference in a description is untrusted (ADR-0029 rule 10), so step 2's score depends on whose account paid:
+   - **the item's partner owns the counterparty's account** (also when it shares it): 100 for the exact amount, 80 otherwise;
+   - **no partner owns it, or the line names none:** the draft is flagged `counterparty_unverified`, scores at most 85 for the exact amount and 65 otherwise, and is never auto-posted;
+   - **only other partners own it:** the draft is marked `paid_by_third_party` in the partial branch too, scores at most 60 in both branches, and is never auto-posted.
+
+   `t08_cash.py` covers each case (holistic review, 2026-11-15).
+
+   Note: an invoice's installments share its reference. Among the referenced items in due-date order, a prefix that sums exactly to the amount scores 100 and settles those items; otherwise a single referenced item equal to the amount scores 90 and settles that item; otherwise the partial branch applies. A token `<reference>-<installment_number>` (e.g. `INV-0101-2`) names that installment alone. The caps of the previous note apply to these scores, and `t08_cash.py` covers them (holistic review, 2026-11-15).
 
 **Netting and write-offs**
 
@@ -160,6 +177,12 @@ Allocation is always explicit. A deterministic query proposes it, and a person o
     - **Settling items** in a foreign currency follows ADR-0026 rule 6.
     - **Currency exchange.** `currency_exchange` moves an amount out of one money account and another amount into a second one in another currency. A settle line in another currency does the same inside a payment (rule 3). Each side posts against key `currency_exchange_clearing`. Its new system account `currency_exchange_clearing` (control kind `none`) is excluded from every revaluation scope by the core, like `opening_balance_clearing` (ADR-0011 rule 18). Per document, it nets to zero in company and group currency after the realized difference of the outgoing side, which takes its book value. Per transaction currency it may keep balances, which revaluation never touches. TT99 maps it to a technical account 998, `unverified` (ADR-0011 rule 4 gets a note).
     - **Ownership of the realized FX logic.** It is ADR-0026 rule 6. The author-owned runbook still names DS-10 (open question).
+
+    Note: transfers between money accounts. A `money_transfer` is one document per side, so each statement line matches its own document (rule 8). The outgoing side names the source and the target money account and posts the source's credit against key `cash_in_transit`; the incoming side refers to the outgoing one and posts the target's debit against the same key for the same transaction amount. Posting the outgoing side drafts the incoming side. Both money accounts must share a currency (`money_transfer_currency_mismatch`; across currencies, `currency_exchange`). In a foreign currency both sides carry the source's book value in company and group currency, so a transfer has no realized difference, and `cash_in_transit` nets to zero per transfer in every currency. A payment's `account` line that names a money account's operational account is rejected with `money_account_line_not_allowed`: money moves between money accounts only by `money_transfer` or `currency_exchange`. TT99 maps key `cash_in_transit` to 113, `unverified` (holistic review, 2026-11-15).
+
+    Note: each money account has one `money_account_balance` row, owned by `cash` and serialized (ADR-0008 rule 10): the cumulative foreign, company and group balance that the book rate and the floor read. Every posting on a money account's operational account locks it, after partner rows and before open items ([ADR-0027](0027-cross-cutting-ownership.md) rule 10's note). Postings that `ledger` makes on these accounts, such as revaluation and general journal lines, take it through a lock hook that `cash` registers (ADR-0022 rule 2) (holistic review, 2026-11-15).
+
+    Note: group currency. In a `currency_exchange` and in a settle line's exchange, both clearing lines take the group amount of the incoming leg, on an applied rate of origin `settlement`, so the clearing account nets to zero in group currency too, and the outgoing side's group difference is realized. The group moving average applies to every money account, company-currency ones included, because their group amount is a translation. Overdraft beyond the balance is valued as ADR-0011 rule 15's note says, at the settlement rate; for the group amount of a company-currency account that is the group translation rate of the posting (holistic review, 2026-11-15).
 
 **Advances**
 

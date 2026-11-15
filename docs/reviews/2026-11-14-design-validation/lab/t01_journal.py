@@ -46,12 +46,12 @@ def line(cx, e, n, acct, side, amt, period="p1", **kw):
                 side=side, transaction_currency="VND", transaction_amount=amt, company_currency="VND", company_amount=amt)
     cols.update(kw)
     cx.execute("insert into journal_line (%s) values (%s)" % (",".join(cols), ",".join(["%s"]*len(cols))), list(cols.values())); return lid
-def open_item(cx, d, line_id, partner="partner", amt=1000):
+def open_item(cx, d, line_id, partner="partner", amt=1000, side="debit"):
     oi = new()
     cx.execute("""insert into open_item (id,company_id,partner_id,account_id,open_item_kind,natural_side,transaction_currency,origin_document_id,origin_journal_line_id,
       document_date,posting_date,original_posting_date,due_date,original_transaction_amount,original_company_amount,open_transaction_amount,open_company_amount)
-      values (%s,%s,%s,%s,'invoice','debit','VND',%s,%s,'2027-01-15','2027-01-15','2027-01-15','2027-02-15',%s,%s,%s,%s)""",
-      (oi, ids["co"], ids[partner], ids["a_rec"], d, line_id, amt, amt, amt, amt)); return oi
+      values (%s,%s,%s,%s,'invoice',%s,'VND',%s,%s,'2027-01-15','2027-01-15','2027-01-15','2027-02-15',%s,%s,%s,%s)""",
+      (oi, ids["co"], ids[partner], ids["a_rec"], side, d, line_id, amt, amt, amt, amt)); return oi
 
 def invoice_ok(cx):
     d = doc(cx); e = entry(cx, d, 2); l1 = new(); oi = open_item(cx, d, l1)
@@ -96,6 +96,17 @@ def oi_update_identity(cx):
     cx.execute("update open_item set partner_id=%s", (ids["partner2"],))
 expect("T12 open item identity immutable", oi_update_identity, True, "immutable")
 def oi_update_amount(cx):
-    cx.execute("update open_item set open_transaction_amount=0, is_settled=true")
+    cx.execute("update open_item set open_transaction_amount=0, open_company_amount=0, is_settled=true")
 expect("T13 open item cache columns may change", oi_update_amount, False)
+def credit_item_ok(cx):
+    d = doc(cx, "credit_note"); e = entry(cx, d, 2); l1 = new(); oi = open_item(cx, d, l1, amt=-1000, side="credit")
+    line(cx, e, 1, "a_rec", "credit", -1000, id=l1, partner_id=ids["partner"], open_item_id=oi)
+    line(cx, e, 2, "a_rev", "debit", 1000)
+expect("T14 a credit-side open item carries negative amounts, like its line (ADR-0026 rule 1 note)", credit_item_ok, False)
+expect("T15 an open item whose amount has the other side's sign is rejected",
+       lambda cx: open_item(cx, doc(cx), new(), side="credit"), True, "ck_open_item_original_transaction_amount")
+def settled_with_rest(cx):
+    oi = open_item(cx, doc(cx), new())
+    cx.execute("update open_item set open_transaction_amount=0, is_settled=true where id=%s", (oi,))
+expect("T16 a settled item must have all open amounts zero", settled_with_rest, True, "ck_open_item_is_settled")
 print(sum(1 for r in RESULTS if r[0]), "/", len(RESULTS), "passed")

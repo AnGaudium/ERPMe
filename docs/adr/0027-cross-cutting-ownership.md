@@ -125,9 +125,13 @@ Before step 1 code freezes the platform modules, every entity that several modul
 
     Exception: credit hold updates on other orders' demand rows, made inside a `sales` command that holds the partner lock, take no class 1 lock of those orders; a hold is a single flag that does not conflict with their other changes ([ADR-0047](0047-commercial-documents-and-pricing.md) rule 18).
 
+    Note: `money_account_balance` rows ([ADR-0048](0048-cash-bank-receivables-payables.md) rule 12's note) are a class of their own between partner rows (9) and open item rows (10), in ascending ID (holistic review, 2026-11-15).
+
 **Catalog and glossary consistency**
 
 11. ADR-0015 rule 2 gets one exception, kept as data: a column `has_regime_alternatives` in `transaction-keys.csv` marks keys that share a system account's code while listing alternatives that are a regime choice under rule 4 (`price_difference`, `fx_gain_unrealized`, `fx_loss_unrealized`). CI reads that column. ADR-0015's key count becomes 38. Note: the column also marks keys that do not share a system account's code, whenever the listed accounts are alternatives a regime or company chooses between (`cash_surplus`, `cash_shortage`, `bank_charge`, `production_abnormal_cost`, `production_unabsorbed_overhead`) ([ADR-0053](0053-core-neutrality.md) rule 6).
+
+    Note: the key count in this rule is historical; the catalog is authoritative, and ADR-0015 rule 1's latest note gives the count (holistic review, 2026-11-15).
 12. Glossary fixes:
     - one definition of preliminary price, and one row for company and branch;
     - the stock quantity row with bin, status and handling unit;
