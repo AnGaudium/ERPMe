@@ -172,6 +172,8 @@ Policy is a deterministic threshold table per company, as runbook B7 asks.
     Note ([ADR-0063](0063-configurable-policy-settings.md), proposed 2026-11-15): the evidence floor is the setting `auto_post.max_error_rate` (default 1%, at most 2%): at least ceil(3 / rate) proposals with at least (1 - rate) posted unchanged, which the default makes ADR-0051 rule 18's 300 at 99%. `bank_charge` rules have their own capped evidence. A reversal of a `system` posting, or a confirmation recording it wrong, marks the rule version's evidence outdated and raises `auto_post_suspended` (rules 9, 10).
 
     Note ([ADR-0064](0064-production-agent.md), proposed 2026-11-15): a second evidence hook: `production` registers `GetProductionImportShadowEvaluation` for `integration` postings of `operation_confirmation` by the production import, which also needs `production.mes_import.auto_post` (rule 25).
+
+    Note (Final simulation review, 2026-11-15): the evidence hook returns, with its figures, the registered setting keys and values the evidence was judged under. `EnablePolicyRule` stores the keys in `policy_rule_version.evidence_setting_keys` and the values in `shadow_evidence.settings`; a rule version with evidence lists at least one key, and the keys are set once with the evidence ([ADR-0063](0063-configurable-policy-settings.md) rule 3 note). Lab check `t15_platform_ddl.py` L06 to L08.
 15. Templates. The core seeds each company with:
     - two procedures, `standard` (rank 10, `accountant`) and `senior` (rank 20, `chief_accountant`);
     - the bank-account rule of rule 12;

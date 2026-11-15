@@ -1182,6 +1182,26 @@ if "--load" in sys.argv:
     X("insert into automation_scope_skip (company_id, automation_rule_id, business_date, skipped_count, recorded_at) values (%s,%s,'2026-11-20',3,now())", (I["co"], I["rule"]))
     D_good("D30e the scope skip count rises", lambda cx: cx.execute("update automation_scope_skip set skipped_count=4 where automation_rule_id=%s", (I["rule"],)))
     D_bad("D30f ... and never falls, and is never deleted", "counts only rise", lambda cx: cx.execute("update automation_scope_skip set skipped_count=1 where automation_rule_id=%s", (I["rule"],)))
+    # Final simulation review, 2026-11-15: a rule version and the table version it pins, activated together (ADR-0058 rules 20, 24 notes).
+    TV3, TV4, PV2 = new(), new(), new()
+    for tv, n_ in ((TV3, 3), (TV4, 4)):
+        X("""insert into decision_table_version (id, company_id, decision_table_id, version, hit_policy, inputs, outputs, content_hash, registry_version, drafted_by_kind,
+             drafted_by_id, on_behalf_of_id, drafting_window_to, recorded_at) values (%s,%s,%s,%s,'unique','[{"code":"x","type":"amount"}]','[{"code":"o"}]',%s,'1','human',%s,%s,'2026-11-15',now())""",
+          (tv, I["co"], I["tab"], n_, H, I["u"], I["u"]))
+        X("update decision_table_version set state='backtested' where id=%s", (tv,))
+    X("update decision_table_version set state='retired' where id=%s", (TV4,))
+    D_good("D30g a rule version leaves draft pinning a backtested table version, so its replay can be stored before the table is in force",
+           lambda cx: pinned(cx, PV2, [TV3], 23))
+    D_bad("D30h ... but not a retired one", "not an assisted or active version", lambda cx: pinned(cx, new(), [TV4], 24))
+    D_bad("D30i the rule version does not go active while its pinned table version is only backtested (a rule in force pins only assisted or active versions)",
+          "not an assisted or active version", lambda cx: cx.execute("update automation_rule_version set state='active', effective_from='2026-11-22' where id=%s", (PV2,)))
+    D_good("D30j it may run in shadow pinning the backtested table version", lambda cx: cx.execute("update automation_rule_version set state='shadow' where id=%s", (PV2,)))
+    D_bad("D30l one proposal raising the rule version before its table version is refused, so a half activation never commits", "not an assisted or active version",
+          lambda cx: (cx.execute("update automation_rule_version set state='active', effective_from='2026-11-22' where id=%s", (PV2,)),
+                      cx.execute("update decision_table_version set state='active', effective_from='2026-11-22' where id=%s", (TV3,))))
+    D_good("D30k ... and table first, in one transaction, both come into force (rule 24 note)", lambda cx: (
+        cx.execute("update decision_table_version set state='active', effective_from='2026-11-22' where id=%s", (TV3,)),
+        cx.execute("update automation_rule_version set state='active', effective_from='2026-11-22' where id=%s", (PV2,))))
     # executions: keys, outcomes, the chain-target index and the depth checks
     EV1, CH = new(), new()
     def uuid_of(s): return _uuid.uuid5(_uuid.NAMESPACE_URL, s)

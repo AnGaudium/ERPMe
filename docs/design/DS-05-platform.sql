@@ -353,6 +353,13 @@ CREATE TABLE policy_rule_version (
     -- ADR-0063 rules 3 and 10: also the setting_value row of a loosening that outdates auto-post evidence, or the audit record
     -- of a reversal or wrong confirmation of a system posting.
     shadow_evidence_outdated_by uuid CONSTRAINT ck_policy_rule_version_outdated CHECK (shadow_evidence_outdated_by IS NULL OR shadow_evidence IS NOT NULL),
+    -- ADR-0063 rule 3 and ADR-0043 rule 14, notes of the final simulation review: the registered keys (outdates auto_post)
+    -- the evidence was judged under, set once with shadow_evidence by EnablePolicyRule, which keeps their values in
+    -- shadow_evidence.settings. The executing transaction of a loosening of key k marks exactly the dependent evidence:
+    --   UPDATE policy_rule_version SET shadow_evidence_outdated_by = <the setting_value row> WHERE company_id = <company>
+    --      AND is_enabled AND shadow_evidence_outdated_by IS NULL AND k = ANY (evidence_setting_keys)
+    evidence_setting_keys   text[] CONSTRAINT ck_policy_rule_version_evidence_settings CHECK ((evidence_setting_keys IS NULL) = (shadow_evidence IS NULL)
+        AND (evidence_setting_keys IS NULL OR cardinality(evidence_setting_keys) >= 1)),
     recorded_at             timestamptz NOT NULL,
     UNIQUE (policy_rule_id, version),
     UNIQUE (company_id, id),
@@ -370,6 +377,7 @@ CREATE TABLE policy_rule_version (
         OR (owner_user_id IS NOT NULL AND amount_company_max IS NOT NULL
             AND (action NOT IN ('post', 'issue') OR is_confirmation_required)))
 );
+CREATE INDEX ix_policy_rule_version_evidence_setting_keys ON policy_rule_version USING gin (evidence_setting_keys) WHERE shadow_evidence_outdated_by IS NULL;
 
 -- ===== Documents [documents] (ADR-0009; ADR-0028; ADR-0030 rule 11; ADR-0052 rule 18; ADR-0054 rule 14) =====
 CREATE TABLE numbering_configuration (                     -- per document type: prefix, per-branch series, format (ADR-0009 rule 15)
@@ -1142,6 +1150,38 @@ CREATE TABLE payment_line (
         OR line_kind = 'account')
 );
 CREATE INDEX ix_payment_line_open_item_id ON payment_line (open_item_id) WHERE open_item_id IS NOT NULL;
+-- ADR-0048 rule 17 (and its note of the final simulation review): the collection side table of an open item (ADR-0026
+-- rule 1), owned by cash. One row per open item that has collection data, written with the first of them; no row reads as
+-- level 0, no reminder, not blocked, not disputed. ADR-0063 rule 27 sets the payment block of a suspected near-duplicate
+-- purchase invoice in the transaction that posts it, and clears it when a person records not a duplicate. The key to
+-- open_item is closed below (open_item gains a key with its company).
+CREATE TABLE open_item_collection (                        -- change-tracked (ADR-0038), so INV-98 reads the block at a posting
+    open_item_id          uuid PRIMARY KEY,
+    company_id            uuid NOT NULL,
+    dunning_level         integer NOT NULL DEFAULT 0 CONSTRAINT ck_open_item_collection_dunning_level CHECK (dunning_level >= 0),   -- the level of cash.dunning.levels last reminded
+    last_reminder_date    date,
+    is_payment_blocked    boolean NOT NULL DEFAULT false,
+    payment_block_reason  text CONSTRAINT ck_open_item_collection_payment_block_reason CHECK (payment_block_reason IN ('duplicate_review', 'manual')),   -- interim: not stated in ADR-0048 (why the item is held)
+    is_disputed           boolean NOT NULL DEFAULT false,
+    dispute_reason        text,
+    recorded_at           timestamptz NOT NULL,
+    CONSTRAINT ck_open_item_collection_payment_block CHECK (is_payment_blocked = (payment_block_reason IS NOT NULL)),
+    CONSTRAINT ck_open_item_collection_dispute CHECK (is_disputed = (dispute_reason IS NOT NULL)),
+    CONSTRAINT ck_open_item_collection_reminder CHECK ((dunning_level = 0) = (last_reminder_date IS NULL))
+);
+CREATE INDEX ix_open_item_collection_held ON open_item_collection (company_id) WHERE is_payment_blocked OR is_disputed;
+-- ADR-0063 rule 27 note: a settle line of an outgoing payment (cash_payment, bank_payment) never names an open item blocked
+-- for payment. Post of these types repeats the check, so a block set after the draft also holds. Receipts are not held.
+CREATE FUNCTION payment_line_check_payment_block() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF NEW.line_kind = 'settle' AND EXISTS (
+        SELECT 1 FROM open_item_collection oc JOIN payment p ON p.id = NEW.payment_id
+         WHERE oc.open_item_id = NEW.open_item_id AND oc.is_payment_blocked AND p.document_type IN ('cash_payment', 'bank_payment')) THEN
+        RAISE EXCEPTION 'open item % is blocked for payment (open_item_payment_blocked)', NEW.open_item_id USING ERRCODE = 'check_violation';
+    END IF;
+    RETURN NEW;
+END
+$$;
 
 -- ===== Keys closed after their tables (cycles and tables of other design items) =====
 -- work_item -> agent_run -> work_item and document -> work_item would be cycles in a top-down load.
@@ -1158,6 +1198,9 @@ ALTER TABLE segregation_exception ADD CONSTRAINT fk_segregation_exception_audit_
 -- DS-20: a payment's beneficiary account belongs to its partner (ADR-0028 rule 15; ADR-0048 rule 3).
 ALTER TABLE partner_bank_account ADD CONSTRAINT uq_partner_bank_account_company_id_partner_id_id UNIQUE (company_id, partner_id, id);
 ALTER TABLE payment ADD CONSTRAINT fk_payment_partner_bank_account_id FOREIGN KEY (company_id, partner_id, partner_bank_account_id) REFERENCES partner_bank_account (company_id, partner_id, id);
+-- DS-06: an open item's collection row belongs to the item's company (ADR-0048 rule 17 note). open_item gains a key with its company.
+ALTER TABLE open_item ADD CONSTRAINT uq_open_item_company_id_id UNIQUE (company_id, id);
+ALTER TABLE open_item_collection ADD CONSTRAINT fk_open_item_collection_open_item_id FOREIGN KEY (company_id, open_item_id) REFERENCES open_item (company_id, id);
 -- DS-35 refers to attachment and agent_run by ID until their DDL exists; this file is that DDL.
 ALTER TABLE inbound_message ADD CONSTRAINT fk_inbound_message_raw_attachment_id FOREIGN KEY (company_id, raw_attachment_id) REFERENCES attachment (company_id, id);
 ALTER TABLE interaction_summary ADD CONSTRAINT fk_interaction_summary_agent_run_id FOREIGN KEY (company_id, agent_run_id) REFERENCES agent_run (company_id, id);
@@ -1404,13 +1447,14 @@ CREATE TRIGGER trg_posting_intent_check_change BEFORE UPDATE OR DELETE ON postin
 CREATE TRIGGER trg_change_proposal_execution_immutable BEFORE UPDATE OR DELETE ON change_proposal_execution FOR EACH ROW EXECUTE FUNCTION platform_reject_change();
 CREATE TRIGGER trg_change_proposal_execution_item_immutable BEFORE UPDATE OR DELETE ON change_proposal_execution_item FOR EACH ROW EXECUTE FUNCTION platform_reject_change();
 CREATE TRIGGER trg_policy_rule_version_append_only BEFORE UPDATE OR DELETE ON policy_rule_version FOR EACH ROW
-    EXECUTE FUNCTION platform_check_append_only('{is_enabled}', '{shadow_evidence,shadow_evidence_outdated_by}', '{}');
+    EXECUTE FUNCTION platform_check_append_only('{is_enabled}', '{shadow_evidence,shadow_evidence_outdated_by,evidence_setting_keys}', '{}');
 CREATE TRIGGER trg_change_proposal_frozen BEFORE INSERT OR UPDATE OR DELETE ON change_proposal FOR EACH ROW EXECUTE FUNCTION document_check_frozen('id');
 CREATE TRIGGER trg_change_proposal_item_frozen BEFORE INSERT OR UPDATE OR DELETE ON change_proposal_item FOR EACH ROW EXECUTE FUNCTION document_check_frozen('change_proposal_id');
 CREATE TRIGGER trg_period_unlock_request_frozen BEFORE INSERT OR UPDATE OR DELETE ON period_unlock_request FOR EACH ROW EXECUTE FUNCTION document_check_frozen('id');
 CREATE TRIGGER trg_document_line_tax_frozen BEFORE INSERT OR UPDATE OR DELETE ON document_line_tax FOR EACH ROW EXECUTE FUNCTION document_check_frozen('document_id');
 CREATE TRIGGER trg_payment_frozen BEFORE INSERT OR UPDATE OR DELETE ON payment FOR EACH ROW EXECUTE FUNCTION document_check_frozen('id');
 CREATE TRIGGER trg_payment_line_frozen BEFORE INSERT OR UPDATE OR DELETE ON payment_line FOR EACH ROW EXECUTE FUNCTION document_check_frozen('payment_id');
+CREATE TRIGGER trg_payment_line_payment_block BEFORE INSERT OR UPDATE OF open_item_id, line_kind, payment_id ON payment_line FOR EACH ROW EXECUTE FUNCTION payment_line_check_payment_block();
 CREATE TRIGGER trg_tax_line_immutable BEFORE UPDATE OR DELETE ON tax_line FOR EACH ROW EXECUTE FUNCTION platform_reject_change();
 CREATE TRIGGER trg_tax_line_adjustment_immutable BEFORE UPDATE OR DELETE ON tax_line_adjustment FOR EACH ROW EXECUTE FUNCTION platform_reject_change();
 CREATE TRIGGER trg_audit_record_append_only BEFORE UPDATE OR DELETE ON audit_record FOR EACH ROW
@@ -1474,7 +1518,7 @@ BEGIN
         'posting_intent', 'change_proposal', 'change_proposal_item', 'change_proposal_execution', 'change_proposal_execution_item',
         'outbox_event', 'event_delivery', 'audit_record', 'audit_change', 'audit_denial', 'attachment', 'attachment_link',
         'document_line_tax', 'tax_line', 'tax_line_adjustment', 'agent_promotion_evidence', 'money_account', 'bank_statement',
-        'bank_statement_line', 'payment', 'payment_line'] LOOP
+        'bank_statement_line', 'payment', 'payment_line', 'open_item_collection'] LOOP
         EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', v_table);
         EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', v_table);
         IF v_table = ANY (v_nullable) THEN

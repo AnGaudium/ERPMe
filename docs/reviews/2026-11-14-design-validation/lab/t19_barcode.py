@@ -486,9 +486,11 @@ def classify(identifier, body, camera_format=None):
     return "plain", True                                          # a numeric lot code goes on to the registry and context steps
 
 
-def resolve(scan, reg, data, context=None, today=TODAY):
+def resolve(scan, reg, data, context=None, today=TODAY, best_before_fills_expiry=False):
     """Rules 12-14: typed candidates or typed issues, never a guess. `data` holds the typed rows of the lab company:
-    item_barcode {barcode: (item, unit)}, lots {(item, code): id}, serials {(item, code): id}."""
+    item_barcode {barcode: (item, unit)}, lots {(item, code): id}, serials {(item, code): id}. best_before_fills_expiry is the
+    setting barcode.gs1.best_before_fills_expiry, default false: (15) is the best before date and fills the expiry only when true
+    (ADR-0063 rule 26; final simulation review 2026-11-15)."""
     context = context or {}
     out = dict(encoding=None, elements={}, candidates=[], issues=[], checks=[])
     try:
@@ -557,16 +559,19 @@ def resolve(scan, reg, data, context=None, today=TODAY):
                 if measure:
                     v, u = el[measure[0]]["value"]
                     qty, qunit = F(str(v)), u
-                expiry = el.get("17", el.get("15", {})).get("value")
+                expiry = el.get("17", {}).get("value")
+                if expiry is None and best_before_fills_expiry:
+                    expiry = el.get("15", {}).get("value")
+                bb = {"best_before_date": el["15"]["value"]} if "15" in el else {}
                 lot = el.get("10", {}).get("raw")
                 if "21" in el:                                    # (01)(21), with (10) one serial that carries the lot (rule 13)
                     code = el["21"]["raw"]
                     cands.append(dict(type="serial", id=data["serials"].get((item, code)), item_id=item, uom_id=unit, serial_code=code,
                                       lot_code=lot, lot_id=data["lots"].get((item, lot)) if lot else None, expiry_date=expiry,
-                                      quantity=F(1), quantity_uom_id=unit))
+                                      quantity=F(1), quantity_uom_id=unit, **bb))
                 elif lot is not None:
                     cands.append(dict(type="lot", id=data["lots"].get((item, lot)), item_id=item, uom_id=unit, lot_code=lot,
-                                      quantity=qty, quantity_uom_id=qunit, expiry_date=expiry))
+                                      quantity=qty, quantity_uom_id=qunit, expiry_date=expiry, **bb))
                 else:
                     cands.append(dict(type="item_unit", id=gtin, item_id=item, uom_id=unit, quantity=qty, quantity_uom_id=qunit))
     elif enc in ("gtin", "plain"):
@@ -936,7 +941,13 @@ check("P86 a scanned expiry differing from the existing lot's is gs1_capture_con
 check("P87 a typed lot code differing from the scanned one is gs1_capture_conflict", raises(capture_lot, cand, None, dict(lot_code="LOT-B2")) == "gs1_capture_conflict")
 check("P88 a new lot takes the scanned code and expiry", capture_lot(cand) == dict(code="LOT-A1", expiry_date=dt.date(2026, 12, 31)))
 e15 = R_("]C1" + "01" + G14 + "15270300" + "10LOT-C3")["candidates"][0]
-check("P89 (15) best before fills the expiry when (17) is absent, day 00 as the month's last day", e15["expiry_date"] == dt.date(2027, 3, 31), e15)
+check("P89 (15) best before is kept as the best before date and no longer fills the expiry by default (barcode.gs1.best_before_fills_expiry "
+      "false; ADR-0063 rule 26), day 00 as the month's last day", e15["expiry_date"] is None and e15["best_before_date"] == dt.date(2027, 3, 31), e15)
+e15t = resolve(dict(raw="]C1" + "01" + G14 + "15270300" + "10LOT-C3"), REG, DATA, best_before_fills_expiry=True)["candidates"][0]
+e17t = resolve(dict(raw="]C1" + "01" + G14 + "17271010" + "15270300" + "10LOT-C3"), REG, DATA, best_before_fills_expiry=True)["candidates"][0]
+check("P89b ... with the setting true, (15) fills the expiry when (17) is absent, and (17) wins when both are present (final simulation review "
+      "2026-11-15)", e15t["expiry_date"] == dt.date(2027, 3, 31) and e17t["expiry_date"] == dt.date(2027, 10, 10)
+      and e17t["best_before_date"] == dt.date(2027, 3, 31), (e15t, e17t))
 
 # --- variable-measure conversion (rule 18 with ADR-0056)
 c1 = convert_capture("i_kg", F("11.56"), "KGM")

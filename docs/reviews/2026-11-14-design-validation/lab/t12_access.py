@@ -1652,6 +1652,60 @@ check("G53 the accountant submits the purchase invoice agent's CreateUomAlias pr
       chk53 == [] and cand53 == {"chief_accountant", "purchasing_manager", "owner"} and r53a == "approver_not_eligible"
       and r53b is None and d53["state"] == "approved", (sorted(cand53), r53a, r53b))
 
+# Final simulation review 2026-11-15: an automation activation (ADR-0058 rule 24) and a loosening of a policy setting (ADR-0063 rule 3)
+# each have a submitter and a different approver in the role templates (ADR-0054 rule 11 note). The registry gains the commands involved.
+REG += [("SetArtifactVersionState", "configuration", "command", "Set", "master_data_change", "full"),
+        ("SetArtifactCurrentVersion", "configuration", "command", "Set", "other", "full"),
+        ("CreateAutomationRuleVersion", "configuration", "command", "Create", "other"),
+        ("CreateDecisionTableVersion", "configuration", "command", "Create", "other"),
+        ("CreateArtifactEvidence", "automation", "command", "Create", "other", "full")]
+NEW_ROWS = {("chief_accountant", "change_proposal"), ("chief_accountant", "company_setting"), ("chief_accountant", "configuration"),
+            ("chief_accountant", "automation")} | {(m, n) for m in ("sales_manager", "purchasing_manager", "production_planner") for n in ("configuration", "automation")}
+EXP2 = {t: set(expand(TPL[t])) for t in TEMPLATES}
+OLD_TPL = {t: {n: v for n, v in rows.items() if (t, n) not in NEW_ROWS} for t, rows in TPL.items()}
+EXP_OLD = {t: set(expand(OLD_TPL[t])) for t in TEMPLATES}
+AUTHOR = {"CreateAutomationRuleVersion", "CreateDecisionTableVersion", "CreateArtifactEvidence", "SubmitChangeProposal"}
+ACT_APPROVE = {"ApproveChangeProposal", "SetArtifactVersionState"}
+def holders(exp, need_):
+    return {t for t in TEMPLATES if need_ <= exp[t]}
+check("G54 automation activation in the templates: the owner, the chief accountant and the sales, purchasing and production managers draft, create "
+      "evidence and submit; the owner and the chief accountant approve (ApproveChangeProposal and SetArtifactVersionState at full); the IT "
+      "administrator drafts and rolls back but neither submits nor approves; before the review only the owner did both, so nobody could approve the "
+      "owner's draft",
+      holders(EXP2, AUTHOR) == {"owner", "chief_accountant", "sales_manager", "purchasing_manager", "production_planner"}
+      and holders(EXP2, ACT_APPROVE) == {"owner", "chief_accountant"} and holders(EXP_OLD, AUTHOR) == holders(EXP_OLD, ACT_APPROVE) == {"owner"}
+      and {"CreateAutomationRuleVersion", "SetArtifactCurrentVersion"} <= EXP2["it_administrator"] and "SubmitChangeProposal" not in EXP2["it_administrator"],
+      (sorted(holders(EXP2, AUTHOR)), sorted(holders(EXP2, ACT_APPROVE))))
+def cp2(t, targets):
+    ok_ = "ApproveChangeProposal" in EXP2[t] and set(targets) <= EXP2[t]
+    return {"roles": {t: None}, "approve": {"change_proposal"} if ok_ else set(), "read": None, "human": True}
+act = Engine(GEN, {}, [10, 20], {t: cp2(t, ("SetArtifactVersionState",)) for t in TEMPLATES})
+d54o, d54p = new_doc(author="owner", dtype="change_proposal"), new_doc(author="purchasing_manager", dtype="change_proposal")
+act.submit(d54o, 10, T0); act.submit(d54p, 10, T0)
+c54o, c54p = act.candidates(d54o, d54o["decision"]["plan"][0], T0), act.candidates(d54p, d54p["decision"]["plan"][0], T0)
+r54a, r54b = ok_call(act.approve, "owner", d54o, T0), ok_call(act.approve, "chief_accountant", d54o, T0)
+check("G55 an activation the owner drafted and submitted goes to the chief accountant, who approves it, and the owner is refused "
+      "(segregation_of_duties); one the purchasing manager submitted may go to the owner or the chief accountant (ADR-0058 rule 24 note)",
+      c54o == {"chief_accountant"} and c54p == {"owner", "chief_accountant"} and r54a == "segregation_of_duties" and r54b is None
+      and d54o["state"] == "approved", (sorted(c54o), sorted(c54p), r54a, r54b))
+LVL = lambda tpl, t, leaf: ORDER[effective(tpl[t], leaf)[0]]
+SUBMIT_P = lambda exp, tpl: {t for t in TEMPLATES if {"SubmitChangeProposal", "UpdateCompanySetting"} <= exp[t] and LVL(tpl, t, "policy") >= ORDER["edit"]}
+APPROVE_P = lambda exp, tpl: {t for t in TEMPLATES if {"ApproveChangeProposal", "UpdateCompanySetting"} <= exp[t] and LVL(tpl, t, "policy") == ORDER["full"]}
+def lp(t):
+    ok_ = t in APPROVE_P(EXP2, TPL)
+    return {"roles": {t: None}, "approve": {"change_proposal"} if ok_ else set(), "read": None, "human": True}
+loose = Engine(GEN, {}, [10, 20], {t: lp(t) for t in TEMPLATES})
+d56 = new_doc(author="chief_accountant", dtype="change_proposal")
+loose.submit(d56, 10, T0)
+c56 = loose.candidates(d56, d56["decision"]["plan"][0], T0)
+r56a, r56b = ok_call(loose.approve, "chief_accountant", d56, T0), ok_call(loose.approve, "owner", d56, T0)
+check("G56 a loosening of auto_post.max_error_rate (leaf policy): the chief accountant now submits it (change_proposal edit, company_setting "
+      "edit, policy full) as the owner does; the approvers hold policy at full; she is refused on her own proposal and the owner approves it; "
+      "before the review only the owner could submit (ADR-0063 rule 3; ADR-0054 rule 11 note)",
+      SUBMIT_P(EXP2, TPL) == APPROVE_P(EXP2, TPL) == {"owner", "chief_accountant"} and SUBMIT_P(EXP_OLD, OLD_TPL) == {"owner"}
+      and c56 == {"owner"} and r56a == "segregation_of_duties" and r56b is None and d56["state"] == "approved",
+      (sorted(SUBMIT_P(EXP2, TPL)), sorted(APPROVE_P(EXP2, TPL)), sorted(c56), r56a, r56b))
+
 c.close()
 passed = sum(1 for ok_, *_ in RESULTS if ok_)
 print(f"{passed} / {len(RESULTS)} passed")

@@ -45,6 +45,10 @@ chief_accountant,report_tax,post,false
 chief_accountant,agent_run_bodies,none,false
 chief_accountant,print_profile,none,false
 chief_accountant,product_unit,edit,false
+chief_accountant,change_proposal,edit,true
+chief_accountant,company_setting,edit,false
+chief_accountant,configuration,full,false
+chief_accountant,automation,full,false
 accountant,sales,read,true
 accountant,sales_invoice,post,false
 accountant,sales_return,edit,true
@@ -232,8 +236,14 @@ chief_accountant,bank_payment,edit,true
 cashier,bank_payment,post,false
 purchasing_manager,purchase_invoice,edit,true
 sales_manager,change_proposal,edit,true
+sales_manager,configuration,edit,false
+sales_manager,automation,full,false
 purchasing_manager,change_proposal,edit,true
+purchasing_manager,configuration,edit,false
+purchasing_manager,automation,full,false
 production_planner,change_proposal,edit,true
+production_planner,configuration,edit,false
+production_planner,automation,full,false
 accountant,change_proposal,edit,false
 sales_clerk,change_proposal,edit,false
 buyer,change_proposal,edit,false

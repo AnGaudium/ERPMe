@@ -761,6 +761,59 @@ trial("K06 a period unlock request names an area of the period (ADR-0043 rule 16
     cx.execute("insert into period_unlock_request (id, company_id, posting_period_id, area, reason, recorded_at) values (%s,%s,%s,'tax','late invoice',now())", (d, I["co"], I["per"]))),
       True, "ck_period_unlock_request_area")
 
+# ======================================================================= L: final simulation review, 2026-11-15
+# The payment block on open_item_collection (ADR-0048 rule 17 note; ADR-0063 rule 27 note) and the settings auto-post evidence
+# depends on (ADR-0063 rule 3 note; ADR-0043 rule 14 note).
+JL2 = X("select id from journal_line where journal_entry_id=%s and line_number=2", (JE,)).fetchone()[0]
+OI = new()
+X("""insert into open_item (id, company_id, partner_id, account_id, open_item_kind, natural_side, transaction_currency, origin_document_id,
+     origin_journal_line_id, document_date, posting_date, original_posting_date, due_date, original_transaction_amount, original_company_amount,
+     open_transaction_amount, open_company_amount) values (%s,%s,%s,%s,'invoice','credit','VND',%s,%s,%s,%s,%s,%s,-200000,-200000,-200000,-200000)""",
+  (OI, I["co"], I["p1"], I["acBank2"], INV, JL2, TODAY, TODAY, TODAY, TODAY))
+def collection(cx, co="co", blocked=False, reason=None, disputed=False, why=None):
+    cx.execute("""insert into open_item_collection (open_item_id, company_id, is_payment_blocked, payment_block_reason, is_disputed, dispute_reason, recorded_at)
+                  values (%s,%s,%s,%s,%s,%s,now())""", (OI, I[co], blocked, reason, disputed, why))
+trial("L01 a payment block names its reason (ADR-0048 rule 17 note)", lambda cx: collection(cx, blocked=True), True, "ck_open_item_collection_payment_block")
+trial("L02 ... and a dispute its reason", lambda cx: collection(cx, disputed=True), True, "ck_open_item_collection_dispute")
+trial("L03 the collection row belongs to its open item's company", lambda cx: collection(cx, co="co2"), True, "fk_open_item_collection_open_item_id")
+collection(X0, blocked=True, reason="duplicate_review")
+def settle(cx):
+    pid = payment(cx, new())
+    cx.execute("""insert into payment_line (id, company_id, payment_id, line_number, line_kind, transaction_amount, open_item_id, open_item_transaction_amount,
+                  evidence_method, recorded_at) values (%s,%s,%s,2,'settle',200000,%s,200000,'bank_transfer',now())""", (new(), I["co"], pid, OI))
+trial("L04 a bank payment cannot settle an open item blocked for payment under a near-duplicate review (open_item_payment_blocked; ADR-0063 rule 27 note)",
+      settle, True, "open_item_payment_blocked")
+trial("L05 ... once not a duplicate is recorded, which clears the block and its reason, it can", lambda cx: (
+    cx.execute("update open_item_collection set is_payment_blocked=false, payment_block_reason=null where open_item_id=%s", (OI,)), settle(cx)), False)
+PR2 = new()
+X("insert into policy_rule (id, company_id, code, recorded_at) values (%s,%s,'bank_charge_auto_post',now())", (PR2, I["co"]))
+def evidenced(cx, vid, n, keys, enabled=True, evidence=True):
+    cx.execute("""insert into policy_rule_version (id, company_id, policy_rule_id, version, effective_from, action, actor_kind, amount_company_max, effect,
+                  is_confirmation_required, owner_user_id, is_enabled, shadow_evidence, evidence_setting_keys, recorded_at)
+                  values (%s,%s,%s,%s,'2026-12-01','post','system',500000,'allow',true,%s,%s,%s,%s,now())""",
+               (vid, I["co"], PR2, n, I["uChief"], enabled, json.dumps({"function_code": "cash.match_bank_line"}) if evidence else None, keys))
+trial("L06 auto-post evidence is stored with the setting keys it was judged under (ADR-0063 rule 3 note)", lambda cx: evidenced(cx, new(), 9, None), True,
+      "ck_policy_rule_version_evidence_settings")
+EVK = {"bank_charge": ["auto_post.max_error_rate", "cash.bank_charge.auto_post_ceiling", "cash.bank_charge.min_evidence_lines"],
+       "cascade": ["auto_post.max_error_rate", "cash.auto_post.accept_llm_originated_rules"], "disabled": ["cash.bank_charge.auto_post_ceiling"]}
+PRV = {k: new() for k in EVK}
+for n_, (k, keys) in enumerate(EVK.items(), 1):
+    evidenced(X0, PRV[k], n_, keys, enabled=(k != "disabled"))
+MARK = ("update policy_rule_version set shadow_evidence_outdated_by=%s where company_id=%s and is_enabled and shadow_evidence_outdated_by is null"
+        " and %s = any (evidence_setting_keys)")                   # the statement DS-05 states on the column
+def marked(by):
+    return {k for k, v in PRV.items() if X("select shadow_evidence_outdated_by from policy_rule_version where id=%s", (v,)).fetchone()[0] == by}
+SV1, SV2 = new(), new()
+X(MARK, (SV1, I["co"], "cash.bank_charge.auto_post_ceiling"))
+m1 = marked(SV1)
+X(MARK, (SV2, I["co"], "auto_post.max_error_rate"))
+m2 = marked(SV2)
+check("L07 a loosening of cash.bank_charge.auto_post_ceiling marks exactly the enabled rule versions whose evidence lists it (the bank charge rule, "
+      "not the cascade rule, not a disabled one); a later loosening of auto_post.max_error_rate marks the cascade rule, the bank charge rule's "
+      "marker staying the first (ADR-0063 rule 3 note)", m1 == {"bank_charge"} and m2 == {"cascade"}, (m1, m2))
+trial("L08 the evidence's setting keys are set once with it", lambda cx: cx.execute(
+    "update policy_rule_version set evidence_setting_keys='{auto_post.max_error_rate}' where id=%s", (PRV["cascade"],)), True, "append-only")
+
 # ---------------------------------------------------------------- the end
 X0.close()
 c = conn(); c.autocommit = True

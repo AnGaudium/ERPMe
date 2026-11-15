@@ -521,13 +521,27 @@ BEGIN
     RETURN NEW;
 END
 $$;
--- ADR-0058 rule 20: a rule version leaves draft only when every pinned decision table version exists in the company and is
--- assisted or active; a pinned version is neither retired nor demoted to shadow while a current or shadow rule version pins it.
+-- ADR-0058 rule 20 and its note of the final simulation review: a rule version leaves draft only when every pinned decision
+-- table version exists in the company and is frozen (backtested, shadow, assisted or active), so its replay can be stored
+-- against a table not yet in force; it becomes active only when every pinned version is assisted or active, so a rule in
+-- force never pins anything else. One change proposal may raise the table version and then the rule version in one
+-- transaction (rule 24 note). A pinned version is neither retired nor demoted to shadow while a current or shadow rule
+-- version pins it.
 CREATE FUNCTION automation_rule_version_check_pins() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE
     v_bad uuid;
 BEGIN
     IF OLD.state = 'draft' AND NEW.state <> 'draft' THEN
+        SELECT p INTO v_bad FROM unnest(NEW.decision_table_version_ids) AS p
+         WHERE NOT EXISTS (SELECT 1 FROM decision_table_version d WHERE d.id = p AND d.company_id = NEW.company_id
+                             AND d.state IN ('backtested', 'shadow', 'assisted', 'active'))
+         LIMIT 1;
+        IF v_bad IS NOT NULL THEN
+            RAISE EXCEPTION 'automation_rule_version % pins decision table version %, which is not an assisted or active version of the company, nor a backtested or shadow one a proposal may raise first (artifact_invalid)', NEW.id, v_bad
+                USING ERRCODE = 'check_violation';
+        END IF;
+    END IF;
+    IF NEW.state = 'active' AND OLD.state IS DISTINCT FROM 'active' THEN
         SELECT p INTO v_bad FROM unnest(NEW.decision_table_version_ids) AS p
          WHERE NOT EXISTS (SELECT 1 FROM decision_table_version d WHERE d.id = p AND d.company_id = NEW.company_id AND d.state IN ('assisted', 'active'))
          LIMIT 1;
