@@ -5,7 +5,7 @@ Draft package data decided by [ADR-0039](../../adr/0039-vietnam-package-tt99.md)
 | File | Content |
 | --- | --- |
 | [manifest.yaml](manifest.yaml) | Package manifest, with the legal forms that select chart rows |
-| [settings.yaml](settings.yaml) | Package rules for every regime: reversal, default posting dates, attachment retention, invoice issuance and the e-invoice requirement, tax settings |
+| [settings.yaml](settings.yaml) | Package rules for every regime: reversal, default posting dates, attachment retention, invoice issuance and the e-invoice requirement, tax settings, the data-processing policy and the incoming e-invoice formats ([ADR-0057](../../adr/0057-document-intake-and-extraction.md) rule 30) |
 | [regimes/tt99/chart_template.csv](regimes/tt99/chart_template.csv) | All 184 TT99 codes, the package's detail accounts and 999, mapped to system accounts; `condition`; `cost_behavior`; the key is (`code`, `condition`): code 4111 has one row for `legal_form=joint_stock` and one for the other legal forms |
 | [regimes/tt99/account_determination.csv](regimes/tt99/account_determination.csv) | Default determination for every transaction key, with a note on each interim choice |
 | [regimes/tt99/unreached_system_accounts.csv](regimes/tt99/unreached_system_accounts.csv) | System accounts the template does not reach, and why (ADR-0010 rule 17) |

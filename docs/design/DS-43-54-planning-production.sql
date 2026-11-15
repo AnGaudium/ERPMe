@@ -385,17 +385,19 @@ CREATE TABLE bill_of_materials (                           -- ADR-0033 rule 3; p
     company_id   uuid NOT NULL,
     item_id      uuid,                                         -- the main output
     product_id   uuid,
+    proposed_change_proposal_item_id  uuid,                    -- a new main output: the proposal item that will create it, while every revision is a draft (ADR-0062 rule 14)
     usage        text NOT NULL DEFAULT 'production' CONSTRAINT ck_bill_of_materials_usage CHECK (usage IN ('production', 'kit')),   -- kit: rules in DS-22
     alternative  text NOT NULL,
     name         text NOT NULL,
     is_active    boolean NOT NULL DEFAULT true,
     recorded_at  timestamptz NOT NULL,
-    UNIQUE NULLS NOT DISTINCT (company_id, item_id, product_id, usage, alternative),
+    UNIQUE NULLS NOT DISTINCT (company_id, item_id, product_id, proposed_change_proposal_item_id, usage, alternative),
     UNIQUE (company_id, id),
     UNIQUE (company_id, id, usage),
     FOREIGN KEY (company_id, item_id) REFERENCES item (company_id, id),
     FOREIGN KEY (company_id, product_id) REFERENCES product (company_id, id),
-    CONSTRAINT ck_bill_of_materials_output CHECK ((item_id IS NULL) <> (product_id IS NULL))
+    -- the main output is an item, a configurable product, or a proposal item while the drafts refer to it (ADR-0062 rule 14)
+    CONSTRAINT ck_bill_of_materials_output CHECK (num_nonnulls(item_id, product_id, proposed_change_proposal_item_id) = 1)
 );
 CREATE TABLE bill_of_materials_revision (                  -- immutable once released (ADR-0033 rules 3-4)
     id                             uuid PRIMARY KEY,
@@ -424,7 +426,8 @@ CREATE TABLE bill_of_materials_component (                 -- ADR-0033 rule 6; s
     company_id                      uuid NOT NULL,
     bill_of_materials_revision_id   uuid NOT NULL,
     position                        integer NOT NULL CONSTRAINT ck_bill_of_materials_component_position CHECK (position > 0),
-    component_item_id               uuid NOT NULL,              -- an active item of a stock product (checked at release)
+    component_item_id               uuid,                       -- an active item of a stock product (checked at release); null while a proposal item stands in (ADR-0062 rule 14)
+    proposed_change_proposal_item_id uuid,                      -- the stable ID of the CreateProduct or CreateItem proposal item that will create it; key in DS-36-document-intake.sql
     quantity                        types.quantity NOT NULL,    -- per base quantity, in uom_id
     uom_id                          uuid NOT NULL REFERENCES uom (id),
     -- the conversion snapshot, no default factor: the exact quantity in the component's inventory unit is
@@ -453,7 +456,10 @@ CREATE TABLE bill_of_materials_component (                 -- ADR-0033 rule 6; s
     CONSTRAINT ck_bill_of_materials_component_quantity CHECK (quantity > 0 OR sizing = 'linear'),
     CONSTRAINT ck_bill_of_materials_component_linear CHECK ((sizing = 'linear') = (quantity_per_value IS NOT NULL AND sizing_attribute_id IS NOT NULL)),
     CONSTRAINT ck_bill_of_materials_component_uom_factor CHECK (uom_numerator > 0 AND uom_denominator > 0 AND uom_factor_source IN ('identity', 'item', 'product', 'global')
-        AND (uom_factor_source <> 'identity' OR (uom_numerator = 1 AND uom_denominator = 1)))
+        AND (uom_factor_source <> 'identity' OR (uom_numerator = 1 AND uom_denominator = 1))),
+    UNIQUE (company_id, id),
+    -- an item or a proposal item, never both (ADR-0062 rule 14); release refuses the second (production_release_readiness_guard)
+    CONSTRAINT ck_bill_of_materials_component_item CHECK (num_nonnulls(component_item_id, proposed_change_proposal_item_id) = 1)
 );
 CREATE TABLE bill_of_materials_output (                    -- co-products and by-products besides the main output (ADR-0033 rule 7)
     id                              uuid PRIMARY KEY,
@@ -516,6 +522,8 @@ CREATE TABLE routing_operation (                           -- one linear sequenc
     service_item_id           uuid,                            -- external: an item of a service product
     default_supplier_id       uuid,                            -- external: the purchase may choose another supplier
     is_milestone              boolean NOT NULL DEFAULT false,
+    is_setup_duration_stated  boolean NOT NULL DEFAULT true,   -- false: no source stated the setup time; it is 0 and release refuses it (ADR-0062 rule 10)
+    is_run_duration_stated    boolean NOT NULL DEFAULT true,   -- the same for the run time
     setup_duration            numeric(12,4) NOT NULL DEFAULT 0 CONSTRAINT ck_routing_operation_setup CHECK (setup_duration >= 0),   -- hours per order
     run_duration              numeric(12,4) NOT NULL DEFAULT 0 CONSTRAINT ck_routing_operation_run CHECK (run_duration >= 0),       -- hours per base quantity
     operation_scrap_percent   types.percent NOT NULL DEFAULT 0 CONSTRAINT ck_routing_operation_scrap CHECK (operation_scrap_percent >= 0 AND operation_scrap_percent < 100),
@@ -539,7 +547,9 @@ CREATE TABLE routing_operation (                           -- one linear sequenc
     CONSTRAINT ck_routing_operation_control_fields CHECK (CASE control
         WHEN 'internal' THEN work_center_id IS NOT NULL AND service_item_id IS NULL AND default_supplier_id IS NULL
         ELSE service_item_id IS NOT NULL AND default_supplier_id IS NOT NULL END),
-    CONSTRAINT ck_routing_operation_sizing CHECK ((sizing_attribute_id IS NULL) = (setup_duration_per_value IS NULL AND run_duration_per_value IS NULL))
+    CONSTRAINT ck_routing_operation_sizing CHECK ((sizing_attribute_id IS NULL) = (setup_duration_per_value IS NULL AND run_duration_per_value IS NULL)),
+    -- an unstated time is written as 0, never as a guess (ADR-0062 rule 10)
+    CONSTRAINT ck_routing_operation_stated CHECK ((is_setup_duration_stated OR setup_duration = 0) AND (is_run_duration_stated OR run_duration = 0))
 );
 CREATE TABLE routing_operation_activity (                  -- standard activity quantities, inside the revision and its hash (rule 10)
     company_id            uuid NOT NULL,
@@ -1189,7 +1199,7 @@ CREATE INDEX ix_operation_progress_component_component ON operation_progress_com
 CREATE TABLE cost_estimate (                               -- benchmark for target cost and variances; never values stock (rule 14)
     id                             uuid PRIMARY KEY,
     company_id                     uuid NOT NULL,
-    production_version_id          uuid NOT NULL,
+    production_version_id          uuid,                       -- null only for a draft estimate on draft revisions (ADR-0062 rule 12)
     item_id                        uuid,                       -- a configured item with the product-level version (ADR-0046 rule 14)
     costing_date                   date NOT NULL,              -- acts as the explosion_date (ADR-0033 rule 5)
     costing_lot_quantity           types.quantity NOT NULL CONSTRAINT ck_cost_estimate_lot CHECK (costing_lot_quantity > 0),   -- holistic decision 18 (ADR-0035 rule 14 note); the command defaults it to the version's minimum lot, else one unit
@@ -1197,6 +1207,7 @@ CREATE TABLE cost_estimate (                               -- benchmark for targ
     price_basis                    text NOT NULL DEFAULT 'actual_average' CONSTRAINT ck_cost_estimate_price_basis CHECK (price_basis IN ('actual_average', 'preliminary_price', 'purchase_price')),   -- flagged default
     bill_of_materials_revision_id  uuid NOT NULL,              -- the revisions it pins (revision_in_use, ADR-0033 rule 4)
     routing_revision_id            uuid,
+    previous_cost_estimate_id      uuid,                       -- the estimate the response's delta compares with (ADR-0062 rule 12)
     company_amount                 types.amount,               -- interim: not stated in ADR-0035 (total for the lot, company currency)
     unit_cost                      types.unit_price,           -- interim: not stated in ADR-0035 (company_amount / costing_lot_quantity; the preliminary price fallback, rule 4)
     released_at                    timestamptz,
@@ -1206,7 +1217,9 @@ CREATE TABLE cost_estimate (                               -- benchmark for targ
     FOREIGN KEY (company_id, item_id) REFERENCES item (company_id, id),
     FOREIGN KEY (company_id, bill_of_materials_revision_id) REFERENCES bill_of_materials_revision (company_id, id),
     FOREIGN KEY (company_id, routing_revision_id) REFERENCES routing_revision (company_id, id),
-    CONSTRAINT ck_cost_estimate_released CHECK ((state = 'released') = (released_at IS NOT NULL AND company_amount IS NOT NULL AND unit_cost IS NOT NULL))
+    CONSTRAINT ck_cost_estimate_released CHECK ((state = 'released') = (released_at IS NOT NULL AND company_amount IS NOT NULL AND unit_cost IS NOT NULL)),
+    FOREIGN KEY (company_id, previous_cost_estimate_id) REFERENCES cost_estimate (company_id, id),
+    CONSTRAINT ck_cost_estimate_version CHECK (production_version_id IS NOT NULL OR state = 'draft')
 );
 -- One released estimate per version and costing date (holistic review); the lookup of the estimate in force uses it too.
 CREATE UNIQUE INDEX ux_cost_estimate_released ON cost_estimate (company_id, production_version_id, costing_date) WHERE state = 'released';
@@ -1231,6 +1244,34 @@ CREATE TABLE cost_estimate_line (                          -- rolled up level by
     CONSTRAINT ck_cost_estimate_line_source CHECK (num_nonnulls(component_item_id, activity_type_id, cost_center_id) <= 1
         AND (cost_component <> 'material' OR component_item_id IS NOT NULL)
         AND (activity_type_id IS NULL OR cost_component IN ('labor', 'overhead')))
+);
+CREATE TABLE cost_estimate_gap (                           -- what a draft estimate could not price: listed, never zero, never released (ADR-0062 rule 12)
+    company_id                      uuid NOT NULL,
+    cost_estimate_id                uuid NOT NULL,
+    gap_number                      integer NOT NULL CONSTRAINT ck_cost_estimate_gap_number CHECK (gap_number > 0),
+    gap_kind                        text NOT NULL CONSTRAINT ck_cost_estimate_gap_kind CHECK (gap_kind IN ('material_price_missing', 'activity_rate_missing',
+                                        'activity_quantity_missing', 'component_item_pending', 'setup_duration_unstated', 'run_duration_unstated', 'routing_missing')),
+    component_item_id               uuid,
+    bill_of_materials_component_id  uuid,
+    routing_operation_id            uuid,
+    work_center_id                  uuid,
+    activity_type_id                uuid,
+    detail                          jsonb NOT NULL DEFAULT '{}',
+    recorded_at                     timestamptz NOT NULL,
+    PRIMARY KEY (cost_estimate_id, gap_number),
+    FOREIGN KEY (company_id, cost_estimate_id) REFERENCES cost_estimate (company_id, id),
+    FOREIGN KEY (company_id, component_item_id) REFERENCES item (company_id, id),
+    FOREIGN KEY (company_id, bill_of_materials_component_id) REFERENCES bill_of_materials_component (company_id, id),
+    FOREIGN KEY (company_id, routing_operation_id) REFERENCES routing_operation (company_id, id),
+    FOREIGN KEY (company_id, work_center_id) REFERENCES work_center (company_id, id),
+    FOREIGN KEY (company_id, activity_type_id) REFERENCES activity_type (company_id, id),
+    CONSTRAINT ck_cost_estimate_gap_subject CHECK (CASE gap_kind
+        WHEN 'material_price_missing' THEN component_item_id IS NOT NULL
+        WHEN 'activity_rate_missing' THEN work_center_id IS NOT NULL AND activity_type_id IS NOT NULL
+        WHEN 'activity_quantity_missing' THEN routing_operation_id IS NOT NULL
+        WHEN 'setup_duration_unstated' THEN routing_operation_id IS NOT NULL
+        WHEN 'run_duration_unstated' THEN routing_operation_id IS NOT NULL
+        ELSE true END)
 );
 CREATE TABLE activity_rate (                               -- planned rates (rule 14)
     company_id         uuid NOT NULL,
@@ -1356,6 +1397,49 @@ CREATE TRIGGER trg_routing_operation_activity_guard BEFORE INSERT OR UPDATE OR D
     FOR EACH ROW EXECUTE FUNCTION production_revision_content_guard('routing_revision', 'routing_revision_id');
 CREATE TRIGGER trg_cost_estimate_line_guard BEFORE INSERT OR UPDATE OR DELETE ON cost_estimate_line
     FOR EACH ROW EXECUTE FUNCTION production_revision_content_guard('cost_estimate', 'cost_estimate_id');
+CREATE TRIGGER trg_cost_estimate_gap_guard BEFORE INSERT OR UPDATE OR DELETE ON cost_estimate_gap
+    FOR EACH ROW EXECUTE FUNCTION production_revision_content_guard('cost_estimate', 'cost_estimate_id');
+-- Release readiness (ADR-0062 rules 10, 12, 14): a bill of materials revision whose header or a component refers to a
+-- proposal item, a routing revision with an unstated setup or run time, and an estimate with a gap or without a
+-- production version are never released, whether updated from draft or inserted as released. The commands refuse
+-- first with the same codes.
+CREATE FUNCTION production_release_readiness_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF NEW.state = 'released' AND (TG_OP = 'INSERT' OR OLD.state = 'draft') THEN
+        IF TG_TABLE_NAME = 'bill_of_materials_revision' THEN
+            IF EXISTS (SELECT 1 FROM bill_of_materials_component c WHERE c.bill_of_materials_revision_id = NEW.id AND c.component_item_id IS NULL)
+               OR EXISTS (SELECT 1 FROM bill_of_materials b WHERE b.id = NEW.bill_of_materials_id AND b.proposed_change_proposal_item_id IS NOT NULL) THEN
+                RAISE EXCEPTION 'bill_of_materials_item_pending' USING ERRCODE = 'check_violation';
+            END IF;
+        ELSIF TG_TABLE_NAME = 'routing_revision' THEN
+            IF EXISTS (SELECT 1 FROM routing_operation o WHERE o.routing_revision_id = NEW.id AND NOT (o.is_setup_duration_stated AND o.is_run_duration_stated)) THEN
+                RAISE EXCEPTION 'routing_duration_unstated' USING ERRCODE = 'check_violation';
+            END IF;
+        ELSIF TG_TABLE_NAME = 'cost_estimate' THEN
+            IF NEW.production_version_id IS NULL OR EXISTS (SELECT 1 FROM cost_estimate_gap g WHERE g.cost_estimate_id = NEW.id) THEN
+                RAISE EXCEPTION 'cost_estimate_incomplete' USING ERRCODE = 'check_violation';
+            END IF;
+        END IF;
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER trg_bill_of_materials_revision_readiness BEFORE INSERT OR UPDATE ON bill_of_materials_revision
+    FOR EACH ROW EXECUTE FUNCTION production_release_readiness_guard();
+CREATE TRIGGER trg_routing_revision_readiness BEFORE INSERT OR UPDATE ON routing_revision
+    FOR EACH ROW EXECUTE FUNCTION production_release_readiness_guard();
+CREATE TRIGGER trg_cost_estimate_readiness BEFORE INSERT OR UPDATE ON cost_estimate
+    FOR EACH ROW EXECUTE FUNCTION production_release_readiness_guard();
+-- A header names a proposal item only while every revision of it is a draft (ADR-0062 rule 14).
+CREATE FUNCTION bill_of_materials_proposal_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF NEW.proposed_change_proposal_item_id IS NOT NULL
+       AND EXISTS (SELECT 1 FROM bill_of_materials_revision r WHERE r.bill_of_materials_id = NEW.id AND r.state <> 'draft') THEN
+        RAISE EXCEPTION 'bill_of_materials_item_pending' USING ERRCODE = 'check_violation';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER trg_bill_of_materials_proposal_guard BEFORE INSERT OR UPDATE ON bill_of_materials
+    FOR EACH ROW EXECUTE FUNCTION bill_of_materials_proposal_guard();
 
 -- ===== Changes to tables of other design items =====
 -- cost_object (DS-06, owned by production, ADR-0034 rule 15): the production order key DS-06 left for this module. DS-06

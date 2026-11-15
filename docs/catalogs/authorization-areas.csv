@@ -117,6 +117,8 @@ agent_bank_matching,agent,function,agents,Bank matching agent,0.1.0,Capability s
 agent_purchase_invoice,agent,function,agents,Purchase invoice agent,0.1.0,Capability start_agent:purchase_invoice at edit (ADR-0051; ADR-0054 rule 24).
 agent_planning,agent,function,agents,Planning agent,0.1.0,Capability start_agent:planning at edit (ADR-0051; ADR-0054 rule 24).
 agent_data_migration,agent,function,agents,Data migration agent,0.1.0,Capability start_agent:data_migration at edit (ADR-0051; ADR-0054 rule 24).
+agent_document_reader,agent,function,agents,Document reader agent,0.1.0,Capability start_agent:document_reader at edit (ADR-0057 rule 31; ADR-0054 rule 24).
+agent_product_engineering,agent,function,agents,Product engineering agent,0.1.0,Capability start_agent:product_engineering at edit (ADR-0062 rule 1; ADR-0054 rule 24).
 agent_run_bodies,administration,function,agent_runs,Agent run bodies,0.1.0,"Capability read_agent_run_bodies at full; none in every template except owner (ADR-0050 rule 20; ADR-0054 rule 8)."
 audit,administration,function,audit,Audit log,0.1.0,"GetAuditRecord, ListAuditRecord, denials (ADR-0038)."
 event_delivery,administration,function,outbox,Event deliveries,0.1.0,"RetryEventDelivery and SkipEventDelivery at post, ReplayEvents at full, all human_only, for deliveries with a company; installation deliveries stay with the operator (ADR-0013 rules 8, 16; ADR-0054 rule 24)."

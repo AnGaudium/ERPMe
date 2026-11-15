@@ -357,7 +357,8 @@ CREATE TABLE product_category (
     default_inventory_uom_id   uuid REFERENCES uom (id),
     basis                      jsonb NOT NULL,
     is_active                  boolean NOT NULL DEFAULT true,
-    UNIQUE (company_id, code)
+    UNIQUE (company_id, code),
+    UNIQUE (company_id, id)
 );
 CREATE TABLE storage_condition (                           -- ADR-0023 rule 3
     id uuid PRIMARY KEY, company_id uuid NOT NULL REFERENCES company (id), code text NOT NULL, name text NOT NULL,
@@ -578,6 +579,48 @@ CREATE TABLE partner_item (                                -- a partner's own co
     FOREIGN KEY (company_id, item_id) REFERENCES item (company_id, id)
 );
 CREATE INDEX ix_partner_item_item_id ON partner_item (item_id);
+CREATE TABLE item_manufacturer_part (                      -- a manufacturer's part number for an item, step 4 of component resolution (ADR-0062 rules 7, 19) [master_data]
+    id                            uuid PRIMARY KEY,
+    company_id                    uuid NOT NULL,
+    item_id                       uuid NOT NULL,
+    manufacturer_name             text NOT NULL,                -- as the manufacturer writes it
+    normalized_manufacturer_name  text NOT NULL,                -- case folded, whitespace collapsed
+    part_number                   text NOT NULL,
+    normalized_part_number        text NOT NULL,                -- upper-cased, separators removed; letters and digits of any script
+    is_active                     boolean NOT NULL DEFAULT true,
+    UNIQUE (company_id, id),
+    CONSTRAINT uq_item_manufacturer_part UNIQUE (company_id, normalized_manufacturer_name, normalized_part_number),
+    FOREIGN KEY (company_id, item_id) REFERENCES item (company_id, id),
+    CONSTRAINT ck_item_manufacturer_part_normalized CHECK (normalized_part_number ~ '^[[:alnum:]]+$' AND normalized_part_number = upper(normalized_part_number)
+        AND normalized_manufacturer_name = lower(normalized_manufacturer_name))
+);
+CREATE TABLE code_series (                                 -- master-data code sequences, without fiscal year or branch (ADR-0062 rules 9, 19) [master_data]
+    id                   uuid PRIMARY KEY,
+    company_id           uuid NOT NULL,
+    record_kind          text NOT NULL CONSTRAINT ck_code_series_record_kind CHECK (record_kind IN ('product')),
+    product_category_id  uuid,                                 -- a series of its own for one category, with its short code as prefix
+    prefix               text NOT NULL DEFAULT '',
+    next_value           bigint NOT NULL CONSTRAINT ck_code_series_next_value CHECK (next_value >= 1),   -- moved only by the numbering lock helper at execution
+    format               text NOT NULL CONSTRAINT ck_code_series_format CHECK (format LIKE '%{counter:%}%'),
+    UNIQUE NULLS NOT DISTINCT (company_id, record_kind, product_category_id),
+    FOREIGN KEY (company_id, product_category_id) REFERENCES product_category (company_id, id)
+);
+CREATE TABLE product_category_requirement (                -- readiness rules per category, rules as data (ADR-0062 rules 9, 11, 19) [master_data]
+    id                        uuid PRIMARY KEY,
+    company_id                uuid NOT NULL,
+    product_category_id       uuid NOT NULL,
+    requirement               text NOT NULL CONSTRAINT ck_product_category_requirement_requirement CHECK (requirement IN ('variant_attribute', 'dimensions', 'weights',
+                                  'barcode', 'supplier_item', 'bill_of_materials', 'routing', 'production_version', 'cost_estimate', 'classification')),
+    variant_attribute_id      uuid,
+    classification_scheme_id  uuid,
+    is_active                 boolean NOT NULL DEFAULT true,
+    UNIQUE NULLS NOT DISTINCT (company_id, product_category_id, requirement, variant_attribute_id, classification_scheme_id),
+    FOREIGN KEY (company_id, product_category_id) REFERENCES product_category (company_id, id),
+    FOREIGN KEY (company_id, variant_attribute_id) REFERENCES variant_attribute (company_id, id),
+    FOREIGN KEY (company_id, classification_scheme_id) REFERENCES classification_scheme (company_id, id),
+    CONSTRAINT ck_product_category_requirement_target CHECK ((requirement = 'variant_attribute') = (variant_attribute_id IS NOT NULL)
+        AND (requirement = 'classification') = (classification_scheme_id IS NOT NULL))
+);
 CREATE TABLE classification_scheme (
     id uuid PRIMARY KEY, company_id uuid NOT NULL REFERENCES company (id), code text NOT NULL, name text NOT NULL,
     is_hierarchical boolean NOT NULL DEFAULT false, is_protected boolean NOT NULL DEFAULT false, UNIQUE (company_id, code),

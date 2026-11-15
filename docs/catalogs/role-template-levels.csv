@@ -79,6 +79,7 @@ accountant,agent_run_bodies,none,false
 accountant,print_profile,none,false
 accountant,agent_bank_matching,edit,false
 accountant,agent_purchase_invoice,edit,false
+accountant,agent_document_reader,edit,false
 accountant,uom_alias,edit,false
 cashier,banking,read,false
 cashier,cash_receipt,post,false
@@ -107,6 +108,7 @@ sales_clerk,agent_run_bodies,none,false
 sales_clerk,print_profile,none,false
 sales_clerk,agent_quotation,edit,false
 sales_clerk,agent_customer_onboarding,edit,false
+sales_clerk,agent_document_reader,edit,false
 sales_manager,sales,post,true
 sales_manager,sales_invoice,edit,false
 sales_manager,inventory,read,false
@@ -182,6 +184,7 @@ production_planner,report_production,read,false
 production_planner,agent_run_bodies,none,false
 production_planner,print_profile,none,false
 production_planner,agent_planning,edit,false
+production_planner,agent_product_engineering,edit,false
 shop_floor_lead,production_order,read,false
 shop_floor_lead,production_issue,post,false
 shop_floor_lead,operation_confirmation,post,false

@@ -96,3 +96,16 @@
   effective_from: 2026-01-01
   status: unverified
   open_question: "(DS-40, DS-24) Vietnamese unit names on prints and e-invoices"
+
+# --- Intake and data processing (ADR-0057 rules 20, 30): Vietnamese values of core-registered keys ---
+- key: data_processing.policy
+  value: {internal: {allowed: true, assessment_for_cross_border: false}, personal: {allowed: true, assessment_for_cross_border: true}, sensitive_personal: {allowed: false, assessment_for_cross_border: true}}
+  effective_from: 2026-01-01
+  status: unverified
+  open_question: "(DS-40, DS-32) The data-processing policy of l10n_vn: does cross-border processing of personal data by a model provider need a filed transfer impact assessment"
+
+- key: intake.e_invoice_formats
+  value: {formats: [{code: tct_1450_1510, root_element: HDon, selection: schema_version, signer_subject: seller_tax_id}], unknown_version: review}
+  effective_from: 2026-07-01
+  status: unverified
+  open_question: "(DS-40, DS-24) The e-invoice format annex in l10n_vn: does the format annex of Circular 91/2026/TT-BTC replace the XML structure of Decision 1450/QĐ-TCT as amended by Decision 1510/QĐ-TCT"

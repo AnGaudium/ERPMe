@@ -27,7 +27,11 @@ Ignore,edit,0.1.0,
 Validate,edit,0.1.0,
 Import,edit,0.1.0,
 Set,edit,0.1.0,As in SetPriceListEntries (ADR-0045 rule 7).
-Verify,edit,0.1.0,"Checks a configuration against an outside system and records the result, as in VerifyMailboxAuthentication (ADR-0052 rule 14)."
+Verify,edit,0.1.0,"Checks or confirms data and records the result: a configuration against an outside system, as in VerifyMailboxAuthentication (ADR-0052 rule 14), or extracted values and a whole extraction by a person, as in VerifyExtractionFields and VerifyDocumentExtraction (ADR-0057 rule 23)."
+Correct,edit,0.1.0,"Appends a person's correction that supersedes an earlier value, as in CorrectExtractionField (ADR-0057 rule 23)."
+Propose,edit,0.1.0,"Drafts a change proposal from verified data, as in ProposeContactFromExtraction (ADR-0057 rule 27)."
+Bind,edit,0.1.0,"Replaces a draft's reference to a proposal item by the item its execution created, as in BindProposedItems (ADR-0062 rule 14)."
+End,edit,0.1.0,"Ends or narrows a dated permission or setting; a command may declare a higher minimum, as EndDataProcessingPermission does (ADR-0057 rule 20)."
 Raise,edit,0.1.0,"The system opens a work item for an exception it found (work.contract.raise_work_item, event WorkItemRaised; ADR-0042 rule 5); no command type uses it yet."
 Post,post,0.1.0,
 Issue,post,0.1.0,

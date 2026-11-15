@@ -1,0 +1,10 @@
+# Draft settings of the fictional test package l10n_xx (ADR-0053 rule 9; DS-16 amendment), entries that later ADRs oblige
+# the test package to declare. The test kit builds l10n_xx at step 1 and takes these entries over; every entry carries the
+# basis test_fixture, which CI refuses in any other package (DS-14).
+# data_processing.policy has no core default (ADR-0057 rule 20), so the test package states one: personal data may be
+# processed by a model provider, and processing in another country needs a recorded assessment, so core tests exercise
+# both the permitted and the refused path.
+- key: data_processing.policy
+  value: {internal: {allowed: true, assessment_for_cross_border: false}, personal: {allowed: true, assessment_for_cross_border: true}, sensitive_personal: {allowed: false, assessment_for_cross_border: true}}
+  effective_from: 2026-01-01
+  status: test_fixture

@@ -410,6 +410,26 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Shadow evaluation | query `GetAgentShadowEvaluation` | Comparison of shadow-run outputs with what people did; the evidence for promoting an agent type to assisted mode ([ADR-0051](../adr/0051-agent-workflows.md)) |
 | Draft-only command | is\_draft\_only | Registry attribute of commands that only create or update drafts, change proposals, notes or suggestion fields; the only commands a tainted agent run may run ([ADR-0050](../adr/0050-agent-runtime-and-query-layer.md)) |
 | Agent run bodies capability | read\_agent\_run\_bodies | Capability (in the `owner` template only) to read the request and response bodies of agent run steps; access to bodies is by this capability alone |
+| Document extraction | document\_extraction | What was read from one clean attachment for one purpose, with its state, reader attempts and flags ([ADR-0057](../adr/0057-document-intake-and-extraction.md)) |
+| Extraction field | extraction\_field | One extracted value with its evidence, method and the engine's confidence; append-only, a correction supersedes the earlier row and keeps its type |
+| Rule run | extraction\_rule\_run | One evaluation of the purpose's rules over every current field, appended after each recording, correction or confirmation; the latest counts |
+| Extraction confirmation | extraction\_confirmation | A person's confirmation of a current field row |
+| Reader ladder | rung | The fixed order of readers: structured XML, embedded XML, QR and vCard, spreadsheet, PDF text layer, OCR words, vision; the first valid record wins |
+| Document reader | document\_reader | A registered pure reader (code, version, rung), and the tool-less agent type that adds vision values |
+| Alignment | vision\_aligned, vision\_unaligned | Code's check that a vision value stands at consecutive cited OCR words of one line, numbers exactly; an unaligned value is a greyed suggestion that fills nothing |
+| Closed shape | shape | The form a value type must have to be trusted: a canonical decimal, an ISO date, a catalog currency, a checked tax ID or IBAN, a code or unit resolved to a record |
+| Value trust | extraction\_field\_trust | Computed when read: a normalized value that fits its shape and passed the extraction's latest rules from a deterministic reader, or that a person confirmed, carries no instruction and does not taint a run; raw text and evidence never |
+| Quarantined e-invoice record | is\_quarantined | An incoming record whose signature did not pass: it holds no duplicate key and waits for a person's supplier confirmation |
+| Code series | code\_series | A master-data code sequence without fiscal year or branch, such as product codes issued at a proposal's execution |
+| Hidden text suspected | hidden\_text\_suspected | Text in a PDF's text layer without an OCR counterpart at its position on the rendered page; forces a full review |
+| Data-processing policy | data\_processing.policy, data\_processing\_permission | The regime's rule per data class for model providers and cross-border processing, without a core default, and the company's permitted providers |
+| Personal vision seat | extraction\_vision\_personal | The seat class that reads personal page images; disabled until a company configures a permitted provider |
+| Extraction mapping rule | extraction\_mapping\_rule | A per-partner rule learned from corrections (a label, column header or unit text that means a field), changed only through proposals |
+| Product engineering | product\_engineering | The agent type that drafts products, items, bills of materials and routings from a person's note or spreadsheet, with checks, estimate and an evidence pack ([ADR-0062](../adr/0062-product-engineering-workflow.md)) |
+| Proposal-item reference | proposed\_change\_proposal\_item\_id | A draft structure's pointer to the stable ID of the proposal item that will create its item; release is blocked until it is bound |
+| Cost estimate gap | cost\_estimate\_gap | What an estimate could not price (price, rate, activity quantity, pending item, unstated setup or run time); listed, never zero |
+| Readiness requirement | product\_category\_requirement | A category's rule of what a product needs before release |
+| Manufacturer part number | item\_manufacturer\_part | A manufacturer's code for an item, used in component resolution with its manufacturer |
 | Effective agent mode | promoted\_version, promoted\_seat\_models | The mode a run uses: an assisted agent type whose version behavior or seat models differ from the promoted ones runs as shadow; the stored mode stays the person's choice |
 | Shape mask | shape mask (`maskable` template input) | A personal value replaced by its shape before it reaches a model with the routing switch on: upper-case letters become `A`, other letters `a`, Unicode digits `9`, other characters kept |
 | Promotion evidence | agent\_promotion\_evidence | Immutable snapshot of the shadow or rehearsal evidence for promoting an agent type: date range, behavior hash, seat models, figures and thresholds; the promotion proposal names it |
@@ -542,7 +562,11 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Allocate | Distribute an amount or quantity over targets | Allocated |
 | Import | Read an external file into the system | Imported |
 | Set | Replace a record's whole list of values in one command, e.g. a price list's entries (`SetPriceListEntries`) | Set |
-| Verify | Check a configuration against an outside system and record the result, e.g. a mailbox's sender authentication (`VerifyMailboxAuthentication`) | Verified |
+| Verify | Check or confirm data and record the result: a configuration against an outside system (`VerifyMailboxAuthentication`), or extracted values by a person (`VerifyExtractionFields`, `VerifyDocumentExtraction`) | Verified |
+| Correct | Append a person's correction that supersedes an earlier value (`CorrectExtractionField`) | Corrected |
+| Propose | Draft a change proposal from verified data (`ProposeContactFromExtraction`) | Proposed |
+| Bind | Replace a draft's reference to a proposal item by the item its execution created (`BindProposedItems`) | Bound |
+| End | End or narrow a dated permission or setting (`EndDataProcessingPermission`) | Ended |
 | Run | Start a deterministic system job, e.g. period-end actual costing | Completed (`<job noun>Completed`) |
 | Assign | Set the owner of a work item or a warehouse task; or attach output serials to a production order | Assigned |
 | Start | A person begins work on an assigned warehouse task; or start a migration's loading or reconciliation; or start an agent run (`StartAgentRun`) | Started |

@@ -28,6 +28,8 @@ Every amended ADR gets a note at the end of the amended rule, citing a rule of t
    - **New design items** apply the test. ADR-0016's Decision paragraph already states the rule ("the core holds none of it"); this ADR makes it checkable item by item. [template.md](template.md) has no checklist, so it is not changed; reviewers apply the test as part of the spec check of ADR-0005.
    - **Not overlay:** the UI language (Vietnamese is shipped by the core, D8; rule 16), and decisions the author took for the core even when Vietnam motivated them (rule 14).
 
+   Note ([ADR-0057](0057-document-intake-and-extraction.md), proposed 2026-11-15): the data-processing policy is core and regime-neutral: the core registers the key `data_processing.policy` and the gate, without a default; a regime's values (such as a recorded assessment for cross-border processing of personal data) are package data, and the test package `l10n_xx` declares its own ([ADR-0057](0057-document-intake-and-extraction.md) rules 20, 30).
+
 **Tax**
 
 2. Tax kinds. The core `tax_kind` of a tax code is one of `vat`, `sales_tax`, `excise`, `customs_duty` or `other` (ADR-0041 rule 1 gets a note).

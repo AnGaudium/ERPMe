@@ -128,6 +128,8 @@ The retention periods and the strictness of scanning are flagged for the author.
     - **Flow.** The endpoint streams the bytes to the object store under a temporary key, then dispatches the registered command `CreateAttachment` (SHA-256, size, detected type, data label, source kind), which is audited and emits `AttachmentCreated`. A daily job sweeps temporary bytes that no attachment row references after 24 hours.
     - **Errors.** `attachment_too_large` (category `too_large`, HTTP 413) and `attachment_type_not_allowed`.
     - **Allowed types.** The list is installation data: PDF; PNG, JPEG and WebP (not SVG); XML; CSV; XLSX, recognised by its ZIP content types; and e-mail messages. The type is detected from the bytes.
+
+    Note ([ADR-0057](0057-document-intake-and-extraction.md), proposed 2026-11-15): the allowed types are unchanged; a vCard file is not one in Phase 1. Photos, business cards, delivery notes, voice and inquiry attachments, and every attachment from inbound e-mail, are labelled `personal` as a whole at creation, and the label is never lowered; extractions take it or a higher one ([ADR-0057](0057-document-intake-and-extraction.md) rules 3, 19).
 14. Scan state machine, `attachment.state` (`pending_scan`, `clean`, `rejected`):
     - **Running the scan.** A new attachment emits `AttachmentCreated`. A consumer on `integrations` runs the scanner and records the outcome. A scanner outage retries and is eventually held (ADR-0013 rule 8).
     - **Rejected attachments.** Their bytes are deleted at once, and their links are removed with a work item. A new upload of the same SHA-256 as a rejected row is refused with `attachment_rejected`. An upload matching a pending row reuses it.

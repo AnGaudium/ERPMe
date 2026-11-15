@@ -65,6 +65,8 @@ Checks:
 
    Note: layer 2 lists `work` twice; it is one module.
 
+   Note ([ADR-0057](0057-document-intake-and-extraction.md), proposed 2026-11-15): `attachments` declares the hook `document_reader`; modules and packages register pure readers on it and `app` wires them, so `attachments` imports no module and no package. No new module: the extraction tables belong to `attachments`, mapping rules to `master_data`, the data-processing permission's table to `agent_runs` and its commands to `agents` ([ADR-0057](0057-document-intake-and-extraction.md) rule 1).
+
 3. Shape of each module:
    - A module that owns tables or commands has:
      - `contract.py`, the only part other modules import (rule 4);

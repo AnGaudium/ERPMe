@@ -36,6 +36,8 @@ The fourteen operating questions raised while writing the [runbook](../runbook/R
 | Step 10 | TT133 status; B03 for TT133 businesses |
 | Step 11 | Implementing decree of the Personal Data Protection Law; processor obligations (R12) |
 
+Note ([ADR-0057](0057-document-intake-and-extraction.md), proposed 2026-11-15): the step 7 item "Decree 70/2025" is stale: Vietnam's e-invoice rules are now Decree 254/2026/NĐ-CP and Circular 91/2026/TT-BTC, effective 1 July 2026. They are the basis of `l10n_vn`'s e-invoice reader, a package concern; the format annex is an open question (DS-40). The VAT deduction item is unchanged.
+
 ## Context
 
 The runbook needs these answers to be executable; the specification left them open ([open-questions.md](../open-questions.md)). The project has one author, so each rule is judged by the work it adds per week, not only by what it protects.

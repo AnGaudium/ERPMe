@@ -78,6 +78,8 @@ The web UI is one more client of the command and query layer. It writes data onl
    - **Query result view** for computed queries (availability, pegging trees, production order status), rendered as tables or trees by result shape.
 
    The export is `CreateListExport`, with at most `list_export_max_rows` rows ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 54).
+
+   Note ([ADR-0057](0057-document-intake-and-extraction.md), proposed 2026-11-15): the extraction verification screen is a hand-built screen: the page beside the fields with evidence boxes, risky fields first, keyboard first, machine-checked fields apart from human-confirmed ones, unaligned values greyed and duplicates and flags at the top ([ADR-0057](0057-document-intake-and-extraction.md) rule 22).
 7. Navigation:
    - **The menu** is generated from the registry. Modules are grouped by area: accounting, inventory, sales, purchasing, production, warehouse, planning, work, settings. The user sees only nouns they may list, from `GetSessionContext`.
    - **The command palette** (`Ctrl/Cmd+K`) finds any permitted command, query, list or record by English or translated name.

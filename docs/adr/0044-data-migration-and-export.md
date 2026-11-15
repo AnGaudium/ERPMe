@@ -65,6 +65,8 @@ The migration period is then locked.
 
    Note ([ADR-0061](0061-barcodes.md), proposed 2026-11-15): phase 2 loads the old system's barcodes. A code that is a valid GTIN loads as one; any other old code of 1 to 48 characters of `A-Z 0-9 - . / _`, starting with a letter or a digit, numeric ones included, loads with `is_legacy_barcode` on item barcodes, bins and handling units, so existing labels stay readable. Codes with other characters (a space, `+`, `$`, `%`) are listed for relabelling. Legacy codes are unique in the barcode registry, numeric ones also on their digits padded to 14, never parsed as GS1, and a numeric one that passes a GTIN check digit is listed with `legacy_code_gtin_like`. Lot and serial codes load as they are (rule 8).
 
+   Note ([ADR-0062](0062-product-engineering-workflow.md), proposed 2026-11-15): phase 2 also loads work centers and activity types, bills of materials (multi-level by a level or indent column), routings with setup and run times and activities, and production versions, after products and items; rows resolve components by exact code, barcode, supplier code with its supplier and manufacturer part number with its manufacturer, each to exactly one item, else `item_unresolved` ([ADR-0062](0062-product-engineering-workflow.md) rule 18).
+
 **Formats and identities**
 
 4. The template is one workbook, generated from the registry:
