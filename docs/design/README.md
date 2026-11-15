@@ -2,6 +2,8 @@
 
 [backlog.md](backlog.md) lists the design items DS-01 to DS-57, their dependencies and the build step that needs each one.
 
+The architecture overview summarizes the design and links to it: [architecture-core.md](architecture-core.md) (Part A, the coder core every coding agent reads), [architecture-overview.md](architecture-overview.md) (Part B, for the author and reviewers) and [generated/](generated/data-map.md) (Part C: module cards, data map, event matrix, ADR index, written by the lab's `gen_overview.py`; `erpme-dev generate` takes this over at build step 0).
+
 Each design item that is not a single decision gets a file here named `DS-xx-short-title.md`. A design item is done when:
 
 1. Its file exists (ADR in `../adr/`, specification here, or catalog in `../catalogs/`).

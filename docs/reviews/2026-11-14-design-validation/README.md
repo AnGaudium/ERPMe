@@ -57,6 +57,7 @@ The scripts are in [lab/](lab/):
 | `check_package.py` | A package regime against the core catalogs and open questions: ADR-0010 rules 11, 17 and template analogues of 16; ADR-0015 rules 4, 9, 10, 13; ADR-0016 rule 6 bases; required settings; per legal form. tax files (ADR-0041 rule 20). `--self-test` applies twenty-eight broken copies (L-09, L-10 and later reviews) |
 | `tax_lab.py` | The tax computation of [ADR-0041](../../adr/0041-tax-engine.md) on 20,000 random documents (line and document rounding, prices including tax, symmetry under every mode, compound bases, zero and assessed codes), the company-currency tie-out, and the seed data with a credit note across the rate change (L-10) |
 | `policy_lab.py` | Policy evaluation of [ADR-0043](../../adr/0043-policy-and-approval.md) on 5,000 random rule tables: order independence, floors, defaults, the two-dimensional decision, consequence postings, and the save-time monotonicity check over amount, discount, margin and booleans (L-11) |
+| `gen_overview.py` | Generates the architecture overview's Part C into `design/generated/` (module cards, data map with cross-module foreign keys and polymorphic references, event matrix, ADR index) from the DDL drafts, the owners their SQL comments state, the lab stubs, ADR headers, the glossary verb list and the catalogs; fails on a table with no stated owner or a stub unless it is listed as a finding; `--check` fails when the outputs are stale. Interim: `erpme-dev generate` (ADR-0022 rules 14, 17) takes this over at build step 0 |
 
 ## Findings
 
