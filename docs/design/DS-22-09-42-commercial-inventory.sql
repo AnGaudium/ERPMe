@@ -25,7 +25,8 @@
 -- demand_supply_line (ADR-0024 rule 8), planned_order and production_order_operation. This file relies on
 -- demand_supply_line's hold_reasons (a set of not_approved and credit_hold; a row is released when the set is empty) and
 -- UNIQUE (company_id, id), and adds the step 5 keys of its sales order, purchase order and purchase request line
--- columns (ADR-0028 rule 2). work_item (DS-29) and attachment (DS-36) are referenced by ID only.
+-- columns (ADR-0028 rule 2). work_item (DS-29) is keyed by (company_id, id) to DS-05-platform.sql; attachment (DS-36)
+-- is referenced by ID only.
 -- The final-state immutability of headers and lines (ADR-0009 rule 14, issuing of ADR-0028 rule 6) is the documents
 -- module's generic trigger; material document, warehouse movement and GR/IR posting rows are append-only here.
 -- Partner snapshot columns partner_name, partner_tax_id and partner_address (ADR-0028 rule 16) are content of every
@@ -162,7 +163,7 @@ CREATE TABLE quotation_line (
     FOREIGN KEY (company_id, warehouse_id) REFERENCES warehouse (company_id, id),
     FOREIGN KEY (company_id, promotion_id) REFERENCES promotion (company_id, id),
     CONSTRAINT ck_quotation_line_manual_price CHECK (is_price_manual = (manual_unit_price IS NOT NULL)),
-    CONSTRAINT ck_quotation_line_free_of_charge CHECK (NOT is_free_of_charge OR (net_unit_price = 0 AND line_amount = 0 AND document_discount_amount = 0)),
+    CONSTRAINT ck_quotation_line_free_of_charge CHECK (NOT is_free_of_charge OR coalesce(net_unit_price = 0 AND line_amount = 0 AND document_discount_amount = 0, false)),
     CONSTRAINT ck_quotation_line_free_goods_source CHECK (free_goods_source_line_number IS NULL OR (is_free_of_charge AND promotion_id IS NOT NULL AND free_goods_source_line_number <> line_number))
 );
 
@@ -236,7 +237,7 @@ CREATE TABLE sales_order_line (
     FOREIGN KEY (company_id, warehouse_id) REFERENCES warehouse (company_id, id),
     FOREIGN KEY (company_id, promotion_id) REFERENCES promotion (company_id, id),
     CONSTRAINT ck_sales_order_line_manual_price CHECK (is_price_manual = (manual_unit_price IS NOT NULL)),
-    CONSTRAINT ck_sales_order_line_free_of_charge CHECK (NOT is_free_of_charge OR (net_unit_price = 0 AND line_amount = 0 AND document_discount_amount = 0)),
+    CONSTRAINT ck_sales_order_line_free_of_charge CHECK (NOT is_free_of_charge OR coalesce(net_unit_price = 0 AND line_amount = 0 AND document_discount_amount = 0, false)),
     CONSTRAINT ck_sales_order_line_free_goods_source CHECK (free_goods_source_line_number IS NULL OR (is_free_of_charge AND promotion_id IS NOT NULL AND free_goods_source_line_number <> line_number))
 );
 CREATE INDEX ix_sales_order_line_quotation_line_id ON sales_order_line (quotation_line_id) WHERE quotation_line_id IS NOT NULL;
@@ -264,11 +265,12 @@ CREATE TABLE credit_hold (
     release_reason           text,
     released_order_amount    types.amount,                   -- interim: not stated in ADR-0047 (the order value the release covers)
     cleared_at               timestamptz,
-    work_item_id             uuid,                           -- the credit_hold work item (DS-29), no key until its DDL exists
+    work_item_id             uuid,                           -- the credit_hold work item (DS-29, DS-05-platform.sql)
     recorded_at              timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, sales_order_id) REFERENCES sales_order (company_id, id),
     FOREIGN KEY (company_id, partner_id) REFERENCES partner (company_id, id),
+    FOREIGN KEY (company_id, work_item_id) REFERENCES work_item (company_id, id),
     CONSTRAINT ck_credit_hold_held CHECK (state <> 'held' OR (held_at IS NOT NULL AND release_kind IS NULL AND cleared_at IS NULL)),
     CONSTRAINT ck_credit_hold_released CHECK ((release_kind IS NOT NULL) = (released_at IS NOT NULL)
         AND (state NOT IN ('released', 'lapsed') OR release_kind IS NOT NULL)),
@@ -529,7 +531,7 @@ CREATE TABLE delivery_line (
     FOREIGN KEY (company_id, delivery_id) REFERENCES delivery (company_id, id),
     FOREIGN KEY (company_id, sales_order_line_id) REFERENCES sales_order_line (company_id, id),
     FOREIGN KEY (company_id, item_id) REFERENCES item (company_id, id),
-    FOREIGN KEY (product_configuration_id) REFERENCES product_configuration (id),   -- DS-56 has no (company_id, id) key; the item carries the company
+    FOREIGN KEY (company_id, product_configuration_id) REFERENCES product_configuration (company_id, id),
     FOREIGN KEY (company_id, warehouse_id) REFERENCES warehouse (company_id, id)
 );
 CREATE INDEX ix_delivery_line_sales_order_line_id ON delivery_line (sales_order_line_id) WHERE sales_order_line_id IS NOT NULL;
@@ -569,7 +571,7 @@ CREATE TABLE return_from_customer_line (
     FOREIGN KEY (company_id, return_from_customer_id) REFERENCES return_from_customer (company_id, id),
     FOREIGN KEY (company_id, delivery_line_id) REFERENCES delivery_line (company_id, id),
     FOREIGN KEY (company_id, item_id) REFERENCES item (company_id, id),
-    FOREIGN KEY (product_configuration_id) REFERENCES product_configuration (id),   -- DS-56 has no (company_id, id) key; the item carries the company
+    FOREIGN KEY (company_id, product_configuration_id) REFERENCES product_configuration (company_id, id),
     FOREIGN KEY (company_id, warehouse_id) REFERENCES warehouse (company_id, id),
     CONSTRAINT fk_return_from_customer_line_bin FOREIGN KEY (bin_id, warehouse_id) REFERENCES bin (id, warehouse_id)
 );

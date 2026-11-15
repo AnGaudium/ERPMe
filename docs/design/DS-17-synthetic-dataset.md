@@ -41,7 +41,7 @@ The simulator runs fictional companies day by day. It writes what happened in bu
    | `concurrency_group` | Optional. A hint used only by parallel test PAR-01; sequential replays ignore it |
 
    A log file starts with a header line (rule 13); `scenario.yaml` `events` have no header.
-5. Business event types in log schema 0.3.0 (0.2.0 added the ADR-0028 events; 0.3.0 adds the ADR-0029 events), with the first step at which each is executable:
+5. Business event types in log schema 0.4.0 (0.2.0 added the ADR-0028 events and 0.3.0 the ADR-0029 events; 0.4.0 adds `price_list_published` (ADR-0045), `cash_counted`, `currency_exchanged` and `advance_settled` (ADR-0048), `customer_inquiry_received` (ADR-0051), the CRM types (ADR-0052), `invoice_corrected` (ADR-0053), the setup types `user_registered`, `role_assigned`, `approval_pool_updated` and `policy_rule_created` (ADR-0054, ADR-0055) and the production types (ADR-0032 to ADR-0037)), with the first step at which each is executable:
 
    | Area | Types | First step |
    | --- | --- | --- |
@@ -209,7 +209,7 @@ The simulator runs fictional companies day by day. It writes what happened in bu
     | --- | --- |
     | `code` | `EC-nn`, never reused |
     | `name` | |
-    | `area` | |
+    | `area` | `ledger`, `platform`, `inventory`, `documents`, `receivables_payables`, `close`, `tax`, `warehouse`, `planning`, `purchasing`, `imports`, `safety`, `cash`, `crm` or `reporting`; DS-16's area names where they match |
     | `first_executable_step` | ADR-0003 R1 |
     | `business_event_types` | A `;` list validated against the schema; `*` for any |
     | `frequency_value`, `frequency_basis` | `per_month`, `per_quarter`, `per_year`, `per_dataset`, `per_period_close`, `percent_of_events`, `percent_of_postings`, `percent_of_lines`, `percent_of_orders`, `percent_of_tracked_item_movements` |
@@ -219,9 +219,11 @@ The simulator runs fictional companies day by day. It writes what happened in bu
     | `added_in` | |
     | `description` | |
 
-    Version 0.1.0 has 71 edge cases (EC-46 to EC-52 for open items, ADR-0026; EC-65 and EC-66 for tax, ADR-0041; EC-67 and EC-68 for imports, ADR-0030 and ADR-0044; EC-69 to EC-71 for commercial documents, ADR-0047; EC-53 to EC-55, EC-59, EC-60 for the document lifecycle, ADR-0028; EC-56 to EC-58 for agent safety, ADR-0029; EC-61 to EC-64 for commercial seams, ADR-0030), EC-32 to EC-40 for warehouse management (ADR-0023) and EC-41 to EC-45 for planning (ADR-0024):
+    Version 0.1.0 has 109 edge cases. EC-01 to EC-31 are the first set:
     - 23 from [12-testing.md](../spec/12-testing.md#synthetic-dataset), counting landed cost after partial sale and after period lock separately;
     - eight that ADRs require: foreign-currency journal, reversal of an internal document, transfer through transit, preliminary price missing, degenerate costing, one cost source over several receipts, cost before receipt, import VAT on customs.
+
+    Later groups: EC-32 to EC-40 warehouse management (ADR-0023); EC-41 to EC-45 planning (ADR-0024); EC-46 to EC-52 open items (ADR-0026); EC-53 to EC-55, EC-59 and EC-60 the document lifecycle (ADR-0028); EC-56 to EC-58 agent safety (ADR-0029); EC-61 to EC-64 commercial seams (ADR-0030); EC-65 and EC-66 tax (ADR-0041); EC-67 and EC-68 imports (ADR-0030, ADR-0044); EC-69 to EC-71 commercial documents (ADR-0047); EC-72 to EC-78 cash and bank (ADR-0048); EC-79 to EC-83 agent workflows (ADR-0050, ADR-0051); EC-84 to EC-91, EC-99 and EC-100 CRM (ADR-0052); EC-92 to EC-98 reporting (ADR-0049); EC-110 to EC-118 users, roles and approval stages (ADR-0054, ADR-0055). EC-101 to EC-109 are unused, and EC-119 to EC-129 are free in the block of ADR-0054. Rows written before the ADRs listed their own codes (most of EC-01 to EC-31) name a source ADR that does not cite the code; the catalog is authoritative.
 
     Outcomes of EC-20, EC-21, EC-22 and EC-63 are business behavior the spec does not state (ADR-0005 item 11). ADR-0047 gives them interim, flagged outcomes (rules 18, 20, 22); the author confirms them before their first executable step.
 23. Each edge case has one injector in `erpme_simulator/edge_cases/`, registered by code. A CI test compares catalog and registry (as DS-16 rule 5 does for invariants) and validates `business_event_types` against the schema. Injectors add or modify events only through the generators, and never write anything a real business could not produce.

@@ -40,6 +40,8 @@ The migration period is then locked.
      - the import batches it owns, in phase order.
    - **Commands.** All state changes are `human_only`.
    - **Rehearsals.** They run on staging from an empty database, and real data stays there at most 7 days (ADR-0003 R12).
+
+   Note (catalog review, 2026-11-15): "ADR-0044 rule N" citations refer to this Rules section, not to the numbered summary under Decision.
 2. The migration period. `CreateMigration` creates a migration fiscal year (code `M` and the opening year, e.g. `M2026`) of one regular period from `opening_date` to `opening_date`, with no special period. It also creates the company's first operating fiscal year from `cut_over_date` if it does not exist; at a mid-year cut-over that year is short (flagged). This is a declared exception to ADR-0012 rule 1 and ADR-0007 rule 18, noted there.
    - **Where opening documents post.** Only into this period, and only once `clock.today` is on or after `opening_date`, so the period-ahead check of ADR-0012 rule 6 has its reference period.
    - **Locking.** `CompleteMigration` locks it in every area, subledger areas first, without the soft-lock step or close tasks. This is a declared exception to ADR-0012 rule 7.

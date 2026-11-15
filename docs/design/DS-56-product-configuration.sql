@@ -4,7 +4,7 @@
 -- keys within a company, UUIDv7 IDs without defaults. Every model row carries product_id, so its characteristics are
 -- keyed to the product's product_variant_attribute rows. The production columns of ADR-0046 rules 12-13
 -- (product-level bills of materials and versions, selection conditions and sizing) belong to the production DDL,
--- not yet drafted.
+-- DS-43-54-planning-production.sql.
 -- Conditions, effects, cells and defaults are canonical JSON in the grammar of ADR-0046 rules 5-7, validated at release.
 -- They name characteristics and list values by code; codes never change once used (ADR-0046 rule 3).
 
@@ -110,6 +110,7 @@ CREATE TABLE product_configuration (                        -- immutable, conten
     created_at    timestamptz NOT NULL,
     created_xact_id  xid8 NOT NULL DEFAULT pg_current_xact_id(),   -- the top-level transaction, also inside savepoints
     UNIQUE (company_id, product_id, content_hash),
+    UNIQUE (company_id, id),
     UNIQUE (company_id, id, product_id),
     FOREIGN KEY (company_id, product_id) REFERENCES product (company_id, id)
 );

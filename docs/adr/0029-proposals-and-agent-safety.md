@@ -33,6 +33,8 @@ The hard floor on what a tainted run may read stays the literal spec 03 rule 1 u
    - **Permissions.** The proposer needs the permission `CreateChangeProposal`. The human the proposer acts for, or the proposer when human, must hold each target command's permission (ADR-0017 rule 13).
 
    Note: a change proposal may not target `employee_profile.department_id`, `manager_partner_id` or `user_account_id`; it is refused with `employee_organization_command_required` ([ADR-0054](0054-users-roles-and-authorizations.md) rule 6).
+
+   Note (catalog review, 2026-11-15): "ADR-0029 rule N" citations refer to this Rules section, not to the numbered summary under Decision.
 2. Allowed targets:
    - commands whose `effect_class` (ADR-0027 rule 17) is `master_data_change`;
    - commands registered `is_proposal_bound` (a new registry attribute, ADR-0008 rule 1).

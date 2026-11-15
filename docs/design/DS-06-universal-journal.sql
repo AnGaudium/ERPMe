@@ -32,10 +32,11 @@ CREATE TABLE cost_object (
     code                 text NOT NULL,
     name                 text NOT NULL,
     kind                 text NOT NULL CONSTRAINT ck_cost_object_kind CHECK (kind IN ('production_order', 'cost_pool')),
-    production_order_id  uuid,   -- FK to production_order (ADR-0034), added with the production module
+    production_order_id  uuid,   -- FK to production_order (ADR-0034), added by DS-43-54-planning-production.sql
     cost_center_id       uuid REFERENCES cost_center (id),
     state                text NOT NULL DEFAULT 'open' CONSTRAINT ck_cost_object_state CHECK (state IN ('open', 'closed')),
     UNIQUE (company_id, code),
+    CONSTRAINT uq_cost_object_company_id_id_production_order_id UNIQUE (company_id, id, production_order_id),   -- an order's cost_object_id names the cost object that names it (DS-43-54)
     CONSTRAINT ck_cost_object_kind_reference CHECK ((kind = 'production_order') = (production_order_id IS NOT NULL)
         AND (kind = 'cost_pool') = (cost_center_id IS NOT NULL))
 );

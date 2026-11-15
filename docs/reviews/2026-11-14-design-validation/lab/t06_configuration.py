@@ -511,7 +511,7 @@ def move_rule(x):
     x.execute("insert into configuration_model_revision (id, company_id, configuration_model_id, product_id, revision, start_date) values (%s,%s,%s,%s,3,'2027-01-01')", (d, I["co"], I["model"], I["prod"]))
     x.execute("update configuration_rule set configuration_model_revision_id=%s where configuration_model_revision_id=%s and position=10", (d, I["rev"]))
 trial("C21 a rule cannot be moved out of a released revision", move_rule, "revision_released")
-ddl = open(os.environ.get("ERPME_DS56", os.path.expanduser("~/Projects/ERPMe/docs/design/DS-56-product-configuration.sql"))).read()
+ddl = open(os.environ.get("ERPME_DS56", os.path.join(os.path.expanduser(os.environ.get("ERPME_DOCS", "~/Projects/ERPMe/docs")), "design", "DS-56-product-configuration.sql"))).read()
 tables = re.findall(r"^CREATE TABLE (\w+)", ddl, re.M)
 missing = [tb for tb in tables if not cx.execute("select 1 from information_schema.columns where table_schema='erpme' and table_name=%s and column_name='company_id'", (tb,)).fetchone()]
 check(f"C19 all {len(tables)} DS-56 tables carry company_id (missing: {missing or 'none'})", missing, [])

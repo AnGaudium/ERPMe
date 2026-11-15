@@ -93,6 +93,8 @@ Planning answers, per item and warehouse: what to buy or move, how much, and by 
    - **Overdue lines.** Demand or supply dated before the planning date counts at the planning date (interim, flagged).
 
    Supply rows of draft purchase lines without `origin_planned_order_id` or pegging are deleted with the line; all others are closed, never deleted ([ADR-0047](0047-commercial-documents-and-pricing.md) rule 10).
+
+   Note (catalog review, 2026-11-15): the rows of a production order's components and outputs carry the hold reason `not_approved` until the order is approved (released), like sales and purchase rows ([ADR-0047](0047-commercial-documents-and-pricing.md) rule 18 note). Make-to-order netting and planning count only released rows as demand; supply rows count once planned, held or not.
 9. Stock on hand:
    - **Counted:** stock in status `available` in the warehouse, in any bin. `quality_inspection` and `blocked` stock do not count (interim, flagged).
    - **Never counted:** stock in `goods_sent` warehouses.
@@ -126,6 +128,8 @@ Planning answers, per item and warehouse: what to buy or move, how much, and by 
     - **n ≥ 52:** the 8-week moving average times the seasonal or event index, as above (tier `indexed`, no check result).
 
     An event week of an event with no past occurrence in the history uses the week's seasonal index, or 1 where no index exists. The tier is stored on each `forecast_line` (rule 21's note), and the check results stay unhashed (rule 17).
+
+    Note (catalog review, 2026-11-15): with n = 0 the run writes no `forecast_line` rows, and the check result carries `details.tier` `none`; `forecast_line.forecast_tier` holds only `short_mean`, `unindexed` or `indexed` (DS-43-54-planning-production.sql), so the tier is stored on each line that exists.
 12. Forecast adjustments record item, warehouse, `start_date`, `end_date`, quantity or factor, author and reason. They never overwrite the statistical forecast, so accuracy stays measurable (DS-33). Agent-proposed adjustments are change proposals, and taint is read from document versions ([ADR-0029](0029-proposals-and-agent-safety.md) rules 5, 11).
     - Approval is human, and an adjustment proposed by a tainted agent run is never approved by policy (spec 03 rule 1; ADR-0013 rule 11). An e-mail therefore cannot move purchase quantities.
     - Whether policy may approve untainted adjustments is an open question.

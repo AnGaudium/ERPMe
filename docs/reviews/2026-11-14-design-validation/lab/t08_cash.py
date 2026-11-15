@@ -44,7 +44,7 @@ ITEMS = [
     ("oi7", "P1", "credit", "BILL-77", "VND", 2500000, d("2026-05-12")),          # a payable to P1
     ("oi8", "P1", "debit", "INV-0104", "USD", 100, d("2026-05-12")),
 ]
-ACCOUNTS = {("VCB", "0123456789"): ["P1"], ("TCB", "9988776655"): ["P2"], ("ACB", "5555"): ["P1", "P3"]}
+ACCOUNTS = {("BANK-A", "0123456789"): ["P1"], ("BANK-B", "9988776655"): ["P2"], ("BANK-C", "5555"): ["P1", "P3"]}
 POSTED = [  # unmatched posted payment documents of this money account: id, direction, amount, date, reference, partner
     ("pay1", "in", 4000000, d("2026-05-16"), "", "P2"),
 ]
@@ -112,24 +112,24 @@ def match_bank_line(line, items, posted, accounts, currency="VND", rules=()):
     return ("unmatched", "no_rule", [], 0)
 L = lambda desc, amt, cp=None, direction="in", date="2026-05-16": {"description": desc, "amount": amt, "counterparty": cp, "direction": direction, "date": d(date)}
 check("B01 an already-posted receipt of the same amount and partner is found first, before any open item",
-      match_bank_line(L("ck", 4000000, ("TCB", "9988776655")), ITEMS, POSTED, ACCOUNTS)[:2], ("posted", "pay1"))
-check("B02 a whole-token reference with the exact amount, paid from the partner's own account", match_bank_line(L("TT INV-0102 thanh toan", 2500000, ("VCB", "0123456789")), ITEMS, [], ACCOUNTS), ("reference", "P1", [("oi2", 2500000)], 100))
-check("B03 INV-01 does not match inside INV-0102: whole tokens only", match_bank_line(L("pay INV-0102", 1000000, ("VCB", "0123456789")), ITEMS, [], ACCOUNTS)[0], "reference_partial")
+      match_bank_line(L("ck", 4000000, ("BANK-B", "9988776655")), ITEMS, POSTED, ACCOUNTS)[:2], ("posted", "pay1"))
+check("B02 a whole-token reference with the exact amount, paid from the partner's own account", match_bank_line(L("TT INV-0102 thanh toan", 2500000, ("BANK-A", "0123456789")), ITEMS, [], ACCOUNTS), ("reference", "P1", [("oi2", 2500000)], 100))
+check("B03 INV-01 does not match inside INV-0102: whole tokens only", match_bank_line(L("pay INV-0102", 1000000, ("BANK-A", "0123456789")), ITEMS, [], ACCOUNTS)[0], "reference_partial")
 check("B04 a reference whose amount differs settles that item partly, never another item",
-      match_bank_line(L("INV-0101", 1000000, ("VCB", "0123456789")), ITEMS, [], ACCOUNTS), ("reference_partial", "P1", [("oi1", 1000000)], 80))
+      match_bank_line(L("INV-0101", 1000000, ("BANK-A", "0123456789")), ITEMS, [], ACCOUNTS), ("reference_partial", "P1", [("oi1", 1000000)], 80))
 check("B05 more than the referenced item: the rest goes on account", match_bank_line(L("INV-0103", 1200000), ITEMS, [], ACCOUNTS)[2], [("oi3", 1000000), ("on_account", 200000)])
 check("B06 references of two partners are ambiguous: unmatched", match_bank_line(L("INV-01 INV-0103", 2000000), ITEMS, [], ACCOUNTS)[:2], ("unmatched", "ambiguous_reference"))
 check("B07 an inflow never matches a payable (side), nor an item in another currency",
       (match_bank_line(L("BILL-77", 2500000), ITEMS, [], ACCOUNTS)[0], match_bank_line(L("INV-0104", 100), ITEMS, [], ACCOUNTS)[0]), ("unmatched", "unmatched"))
-check("B08 no reference: the counterparty's account and an exact amount", match_bank_line(L("ck", 1000000, ("VCB", "0123456789")), ITEMS, [], ACCOUNTS), ("account_amount", "P1", [("oi3", 1000000)], 90))
-check("B09 an account shared by two partners: unmatched", match_bank_line(L("ck", 1000000, ("ACB", "5555")), ITEMS, [], ACCOUNTS)[:2], ("unmatched", "shared_account"))
-check("B10 a sum of items: the fewest, then the oldest", match_bank_line(L("ck", 4000000, ("VCB", "0123456789")), ITEMS, [], ACCOUNTS), ("account_subset", "P1", [("oi1", 1500000), ("oi2", 2500000)], 70))
+check("B08 no reference: the counterparty's account and an exact amount", match_bank_line(L("ck", 1000000, ("BANK-A", "0123456789")), ITEMS, [], ACCOUNTS), ("account_amount", "P1", [("oi3", 1000000)], 90))
+check("B09 an account shared by two partners: unmatched", match_bank_line(L("ck", 1000000, ("BANK-C", "5555")), ITEMS, [], ACCOUNTS)[:2], ("unmatched", "shared_account"))
+check("B10 a sum of items: the fewest, then the oldest", match_bank_line(L("ck", 4000000, ("BANK-A", "0123456789")), ITEMS, [], ACCOUNTS), ("account_subset", "P1", [("oi1", 1500000), ("oi2", 2500000)], 70))
 rng = random.Random(25)
-lines = [L("ck", 4000000, ("VCB", "0123456789")), L("INV-0101 INV-0103", 2500000), L("ck", 4000000, ("TCB", "9988776655"), date="2026-06-30"), L("INV-0102", 1000000)]
+lines = [L("ck", 4000000, ("BANK-A", "0123456789")), L("INV-0101 INV-0103", 2500000), L("ck", 4000000, ("BANK-B", "9988776655"), date="2026-06-30"), L("INV-0102", 1000000)]
 same = all(len({str(match_bank_line(ln, rng.sample(ITEMS, len(ITEMS)), rng.sample(POSTED, len(POSTED)), ACCOUNTS)) for _ in range(40)}) == 1 for ln in lines)
 check("B11 shuffled items and posted documents always give the same proposal", same, True)
-check("B12 a short token (thang 5) is not a reference: the exact account match stands", match_bank_line(L("thanh toan thang 5", 1000000, ("VCB", "0123456789")), ITEMS + [("oi9", "P1", "debit", "5", "VND", 700000, d("2026-04-01"))], [], ACCOUNTS)[:3], ("account_amount", "P1", [("oi3", 1000000)]))
-check("B13 a P1 invoice paid from P2's account: matched with a third-party flag, at most 60", match_bank_line(L("INV-0102", 2500000, ("TCB", "9988776655")), ITEMS, [], ACCOUNTS), ("reference_third_party", "P1", [("oi2", 2500000)], 60))
+check("B12 a short token (thang 5) is not a reference: the exact account match stands", match_bank_line(L("thanh toan thang 5", 1000000, ("BANK-A", "0123456789")), ITEMS + [("oi9", "P1", "debit", "5", "VND", 700000, d("2026-04-01"))], [], ACCOUNTS)[:3], ("account_amount", "P1", [("oi3", 1000000)]))
+check("B13 a P1 invoice paid from P2's account: matched with a third-party flag, at most 60", match_bank_line(L("INV-0102", 2500000, ("BANK-B", "9988776655")), ITEMS, [], ACCOUNTS), ("reference_third_party", "P1", [("oi2", 2500000)], 60))
 check("B14 a company rule maps a bank fee to an account", match_bank_line(L("Phi dich vu thang 5", 22000), ITEMS, [], ACCOUNTS, rules=RULES)[:2], ("rule_account", "bank_charge"))
 check("B15 a company rule names the partner when the account is unknown", match_bank_line(L("CONG TY P2 chuyen tien", 4000000, ("XXX", "1")), ITEMS, [], ACCOUNTS, rules=RULES)[:3], ("account_amount", "P2", [("oi4", 4000000)]))
 # untrusted references (holistic review note on rule 9)
@@ -140,12 +140,12 @@ check("B17 the same for a partial amount: at most 65",
 check("B18 an account registered to no partner counts as unknown",
       match_bank_line(L("INV-0102", 2500000, ("BANK-Z", "000")), ITEMS, [], ACCOUNTS)[0::3], ("reference_unverified", 85))
 check("B19 another partner's account in the partial branch: third party, at most 60",
-      match_bank_line(L("INV-0101", 1000000, ("TCB", "9988776655")), ITEMS, [], ACCOUNTS), ("reference_partial_third_party", "P1", [("oi1", 1000000)], 60))
+      match_bank_line(L("INV-0101", 1000000, ("BANK-B", "9988776655")), ITEMS, [], ACCOUNTS), ("reference_partial_third_party", "P1", [("oi1", 1000000)], 60))
 def auto_post_eligible(res):
     """An enabled auto-post rule may consider only matches whose paying account belongs to the item's partner."""
     return res[0] != "unmatched" and not res[0].endswith(("_unverified", "_third_party"))
 check("B20 unverified and third-party drafts are never auto-posted; a verified one may be",
-      [auto_post_eligible(match_bank_line(ln, ITEMS, [], ACCOUNTS)) for ln in (L("TT INV-0102", 2500000), L("INV-0102", 2500000, ("TCB", "9988776655")), L("INV-0102", 2500000, ("VCB", "0123456789")))],
+      [auto_post_eligible(match_bank_line(ln, ITEMS, [], ACCOUNTS)) for ln in (L("TT INV-0102", 2500000), L("INV-0102", 2500000, ("BANK-B", "9988776655")), L("INV-0102", 2500000, ("BANK-A", "0123456789")))],
       [False, False, True])
 # installments share their invoice's reference (holistic review note on rule 9)
 INST = [("oi21", "P4", "debit", "INV-0301", "VND", 3000000, d("2026-05-10"), 1), ("oi22", "P4", "debit", "INV-0301", "VND", 3000000, d("2026-06-10"), 2),

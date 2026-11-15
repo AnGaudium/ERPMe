@@ -152,6 +152,8 @@ Allocation is always explicit. A deterministic query proposes it, and a person o
 
    Note: an invoice's installments share its reference. Among the referenced items in due-date order, a prefix that sums exactly to the amount scores 100 and settles those items; otherwise a single referenced item equal to the amount scores 90 and settles that item; otherwise the partial branch applies. A token `<reference>-<installment_number>` (e.g. `INV-0101-2`) names that installment alone. The caps of the previous note apply to these scores, and `t08_cash.py` covers them (holistic review, 2026-11-15).
 
+   Note (catalog review, 2026-11-15): the flag `paid_by_third_party` is the column `is_paid_by_third_party` of `payment_line` (DS-05-platform.sql; ADR-0004 rule 13).
+
 **Netting and write-offs**
 
 10. `partner_netting`:
@@ -284,6 +286,8 @@ Allocation is always explicit. A deterministic query proposes it, and a person o
       DS-17 adds events `cash_counted`, `currency_exchanged` and `advance_settled` to its cash group; EC-77 uses `period_closed`.
 
     Note: `cash_surplus` and `cash_shortage` also list `non_operating_income` and `non_operating_expense`, and `bank_charge` lists `financial_expense`, as regime alternatives; the TT99 rows are unchanged ([ADR-0053](0053-core-neutrality.md) rule 6).
+
+    Note (catalog review, 2026-11-15): the seven edge cases are EC-72 to EC-78, in the order listed; [edge-cases.csv](../catalogs/edge-cases.csv) is authoritative.
 21. Lab check `t08_cash.py` ([validation lab](../reviews/2026-11-14-design-validation/README.md)), pure functions:
     - the matching cascade: already-posted first, whole-token references within one partner, side and currency, partial references, shared accounts, subsets, and the same proposal for shuffled inputs;
     - allocation proposals; discounts by rule 7's gross-up; provision buckets;

@@ -67,6 +67,8 @@ Tax codes, dated rates and a dated tax matrix are package rules, read live. The 
    **When they are computed.** `Create` and `Update` compute them, and they freeze with the content, in `issuing` and `approved` (ADR-0028 rule 7). `GetDocumentTaxes` reads them, so DS-24 issues exactly these amounts.
 
    **Purchase lines** also carry `input_use`: `taxable` (the default), `non_taxable` or `shared` (rules 14, 16).
+
+   Note (catalog review, 2026-11-15): column names in DS-05-platform.sql follow ADR-0004 rule 13: `base_transaction_amount`, `tax_transaction_amount` and `computed_tax_transaction_amount` on `document_line_tax`, and `base_transaction_amount` and `tax_transaction_amount` on `tax_line`, for base, `tax` and `computed_tax` in document currency.
 7. Determination:
    - **Lookup.** The codes come from the matrix by direction, the document's partner tax group, the product's item tax group and the tax date.
    - **The tax date** is read from `tax.rate_date_basis`: the invoice date for sales, the supplier's invoice date for purchases, the declaration date for imports (flagged).

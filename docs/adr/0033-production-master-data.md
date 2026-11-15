@@ -142,6 +142,8 @@ Agents read the structures through deterministic queries. They draft revisions f
     Available hours per working day = `capacity_units` × `hours_per_day` × `efficiency_percent` / 100. That is enough for an infinite load view and simple forward scheduling (DS-52, DS-54). Shift patterns are later.
 
     **Calendar ownership.** `working_calendar` moves from planning to `master_data` (layer 3), so that production can read it. ADR-0024 rule 4 gets a note.
+
+    Note (catalog review, 2026-11-15): a work center's `code` is unique per company; its `name` is not (DS-43-54-planning-production.sql). "Unique per company" above applies to the code.
 12. `activity_type` is company data, for example `setup`, `machine` and `labor`, with a time unit (ADR-0018 rule 8, kind `time`). `work_center_activity` rows list which activity types a work center records, with a default `quantity` and `basis` copied into new routing operations. Planned and actual activity rates are DS-53's.
 
 **Production versions and settings**

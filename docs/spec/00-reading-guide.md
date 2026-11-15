@@ -57,7 +57,7 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Completing approver | (approval row) | The approver whose approval completed a document's approval plan; an approved change proposal executes on their behalf, and they are the converter of the drafts it creates ([ADR-0055](../adr/0055-approval-pools-and-stages.md) rule 16) |
 | Policy input hash | policy\_input\_hash | Hash of the inputs a policy decision evaluated; posting asks again when it changes, and an approval stands while the required procedure does not rise |
 | Change proposal | change\_proposal, change\_proposal\_execution | Non-posting document holding exact commands for changes that are not documents, with their diff, the targets' expected versions and the simulated plan; executed by a consumer after a human approval ([ADR-0029](../adr/0029-proposals-and-agent-safety.md)) |
-| Policy point | policy\_decision | A command at which the dispatcher evaluates policy once and the handler stores the decision: `Submit`, `Post` from draft, `Issue`, and `Post` of an approved document whose policy input hash changed |
+| Policy point | policy\_decision | A command at which the dispatcher evaluates policy once and the handler stores the decision: `Submit`, `Post` from draft, `Issue`, and `Post` of an approved document whose policy input hash changed; the stored record is the row Policy decision |
 | Tainted version | is\_tainted, derived\_from\_version\_id | A document version written by a tainted run or derived from a tainted version; immutable, inherited by later and derived versions |
 | Taint clearance | taint\_clearance | Immutable record by which a human clears a version's taint, with a reason; not a data label |
 | Untrusted field | is\_untrusted | Schema attribute of a field filled from outside content; separate from data labels; a run given such a field becomes tainted |
@@ -219,7 +219,7 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Package rule | package\_rule | Package content read live and dated: regime settings, tax rates, statutory reports, data labels |
 | Basis | basis: legal\_source, author\_decision, unverified, company\_decision, test\_fixture (test packages only) | What every package template entry and package rule rests on; only the author sets verification and decisions (ADR-0003 R10) |
 | Regime setting | regime\_setting | One dated rule of an accounting regime, read through `regime_setting(company, key, date)`; keys, schemas, date basis and company options registered by the core; a used row's value never changes |
-| Work queue item | work\_item | Business work; distinct from technical jobs (job) |
+| Work queue item | work\_item | Business work; distinct from technical jobs (job) (see also Work item) |
 | Permission, capability | permission | The name of a command type or query, or a registered capability such as `post_in_soft_locked_period` or `start_agent:<agent_type>`; generated, never hand-maintained ([ADR-0017](../adr/0017-permission-envelope.md)) |
 | Role, role assignment | role, role\_assignment | A company's named set of permissions, and its grant to a user with optional record and field scope; roles store levels per authorization area; templates owner, chief\_accountant, accountant, cashier, sales\_clerk, sales\_manager, buyer, purchasing\_manager, warehouse\_keeper, production\_planner, shop\_floor\_lead, auditor, it\_administrator, found by `template_code` ([ADR-0054](../adr/0054-users-roles-and-authorizations.md)); installation role operator |
 | Record scope | record scope | Branches or warehouses an assignment is limited to (document headers and master data); rows outside are reported as not found; filtered results say `is_scope_filtered` |
@@ -238,14 +238,14 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Policy, approval | policy, approval | An approval row binds to a document version and its `version_hash`; a new version voids it ([ADR-0009](../adr/0009-document-lifecycle.md) rule 11) |
 | Document version, version hash | document\_version, version\_hash | Every change to an unposted document writes a new version; its canonical content is hashed with SHA-256 |
 | Numbering series | numbering\_series | Gapless counter per company, document type, fiscal year and optional branch; posting documents are numbered at posting, by the fiscal year of the posting date ([ADR-0009](../adr/0009-document-lifecycle.md) rules 8, 15) |
-| Policy decision | policy\_decision | The policy engine's outcome (allow, deny, approval required, human only) stored against a document version ([ADR-0009](../adr/0009-document-lifecycle.md) rule 11) |
+| Policy decision | policy\_decision | The policy engine's outcome (allow, deny, approval required, human only) stored against a document version ([ADR-0009](../adr/0009-document-lifecycle.md) rule 11) (see also Policy point) |
 | Partner, item, warehouse | partner, item, warehouse | One partner, many roles. An item is one sellable, stockable variant of a product; documents, stock and journal lines refer to items ([ADR-0018](../adr/0018-product-and-item-model.md)) |
 | Product | product | What all variants share: product category, buyer, item group, valuation class, units, tracking, item tax group, price control; a product without variants has one item |
 | Product type | product\_type: stock, non\_stock, service | Whether a product is kept and valued in stock |
-| Variant attribute | variant\_attribute, variant\_attribute\_value, item\_variant\_value | Company-defined dimension such as color or size; any number per product; `variant_mode` is `variant` (each item has one value per such attribute, unique combination `variant_key`) or `line_option` ([ADR-0045](../adr/0045-master-data-and-price-lists.md) rule 15) |
+| Variant attribute | variant\_attribute, variant\_attribute\_value, item\_variant\_value | Company-defined dimension such as color or size; any number per product; `variant_mode` is `variant` (each item has one value per such attribute, unique combination `variant_key`) or `line_option` ([ADR-0045](../adr/0045-master-data-and-price-lists.md) rule 15) (see also Characteristic) |
 | Line option | variant\_mode: line\_option; document\_line\_option | An attribute chosen on a document line that creates no item, may add a price extra, and travels to delivery and production ([ADR-0045](../adr/0045-master-data-and-price-lists.md)) |
 | Configurable product | product.is\_configurable | A product sold through a configuration model; its items are configured items ([ADR-0046](../adr/0046-product-configuration.md) rule 2) |
-| Characteristic | variant\_attribute | An attribute of a configurable product, item-defining (variant mode) or a line option; a list or a number in a range with a step ([ADR-0046](../adr/0046-product-configuration.md) rule 3) |
+| Characteristic | variant\_attribute | An attribute of a configurable product, item-defining (variant mode) or a line option; a list or a number in a range with a step ([ADR-0046](../adr/0046-product-configuration.md) rule 3) (see also Variant attribute) |
 | Configuration model | configuration\_model, configuration\_model\_revision | A product's rules, tables and defaults, in released revisions ([ADR-0046](../adr/0046-product-configuration.md) rule 4) |
 | Configuration | product\_configuration | An immutable, content-addressed record of the chosen values of a product's characteristics, numbers stored as numbers; it holds no model revision ([ADR-0046](../adr/0046-product-configuration.md) rule 9) |
 | Configured item | item of a configurable product | The item for one combination of item-defining values, created when a sales or production order leaves draft ([ADR-0046](../adr/0046-product-configuration.md) rule 11) |
@@ -339,7 +339,7 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Developer CLI | erpme-dev | Runs every check; CI jobs call only its subcommands (ADR-0022 rule 14) |
 | Check role | erpme\_check | Database role for invariant checks: SELECT only, subject to RLS |
 | Command type | command\_type | Name of a command: `PascalCase` verb from the command verb list + glossary noun, e.g. `PostGoodsReceipt`; `snake_case` form for MCP tools and handlers |
-| Query | query | Read-only operation: `Get<Noun>` (one record), `List<Noun>` (filtered list). Not a command; no idempotency key |
+| Query | query | Read-only operation: `Get<Noun>` (one record), `List<Noun>` (filtered list). Not a command; no idempotency key; `Evaluate<Noun>` computes a result from given inputs ([ADR-0004](../adr/0004-naming-conventions.md) rule 21 note) |
 | Event, event type | event, event\_type | A fact written to the outbox: `PascalCase` noun + the verb's event form, e.g. `GoodsReceiptPosted`; schema in DS-13 |
 | Outbox | outbox\_event | Transactional outbox: one row per event, written in the same transaction as the state change (D4, [ADR-0013](../adr/0013-outbox-and-events.md)) |
 | Event subject, subject sequence | event\_subject, subject\_sequence | The record an event is about, and its event counter 1, 2, 3, …: the only ordering of events ([ADR-0013](../adr/0013-outbox-and-events.md)) |
@@ -380,7 +380,7 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Promotion evidence | agent\_promotion\_evidence | Immutable snapshot of the shadow or rehearsal evidence for promoting an agent type: date range, behavior hash, seat models, figures and thresholds; the promotion proposal names it |
 | Outbound content check | query `GetOutboundContentCheck` (check result `outbound_content_flagged`) | The check that a customer-facing draft names no other partner's records and carries no cost or margin fields; evaluated in the plan of the command that creates or updates the draft |
 | Outside subject | (registry mark on subject tables) | A run subject that is outside content (an inbound interaction, an incoming e-invoice record, a bank statement line, an import batch or row, or any row whose `is_untrusted` is true); a run on it starts tainted, whoever starts it |
-| Work item | work\_item | Business work for a person or agent, with claim and due date; module `work`, layer 2 (DS-29); kinds registered in [work-item-kinds.csv](../catalogs/work-item-kinds.csv) ([ADR-0042](../adr/0042-work-queue.md)) |
+| Work item | work\_item | Business work for a person or agent, with claim and due date; module `work`, layer 2 (DS-29); kinds registered in [work-item-kinds.csv](../catalogs/work-item-kinds.csv) ([ADR-0042](../adr/0042-work-queue.md)) (see also Work queue item) |
 | Policy rule | policy\_rule | Row of the company's threshold table: action, type, actor kind, ordered conditions, effect, owner ([ADR-0043](../adr/0043-policy-and-approval.md)). Agents, systems and integrations start from a baseline (a person posts; approval for types with no posting step) that only an allow rule lifts |
 | Approval procedure | approval\_procedure | A named rank, unique per company; a policy decision's rank selects the required stages of the document's approval pool ([ADR-0055](../adr/0055-approval-pools-and-stages.md)) |
 | Approval pool | approval\_pool, approval\_pool\_document\_type | A company's group of document types that share approval stages; a selector may route by a boolean policy input |
@@ -432,6 +432,35 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Idempotency record | idempotency\_record | Stored response of a successful execution under (actor, command type or `command_batch`, idempotency key), kept at least 90 days |
 | Human only | human\_only | Registry flag on commands an agent never executes (closing periods, reversing posted documents), and an integration neither while ADR-0008 rule 2's open question stands; agents may simulate them; a system job may run one on behalf of a human only where an ADR says so ([ADR-0027](../adr/0027-cross-cutting-ownership.md) rule 12) |
 | Command scope | scope: company, installation | Whether a command or query acts in one company (`company_id` required) or on the whole installation |
+| User session | user\_session | A server-side sign-in session of a user account, stored as a token hash ([ADR-0017](../adr/0017-permission-envelope.md) rule 2; DS-15) |
+| Credential reset | credential\_reset | A one-time password reset token, stored as a hash ([ADR-0054](../adr/0054-users-roles-and-authorizations.md) rule 4) |
+| Integration token | integration\_token | An integration client's credential, stored only as a hash and valid at most one year ([ADR-0017](../adr/0017-permission-envelope.md) rule 3) |
+| Installation role assignment | installation\_role\_assignment | Grant of the installation role `operator` to a user account ([ADR-0017](../adr/0017-permission-envelope.md) rule 7) |
+| Role level | role\_level | A role's level and approval flag on one node of the authorization area tree, inherited downward ([ADR-0054](../adr/0054-users-roles-and-authorizations.md) rule 8) |
+| Role permission | role\_permission | The stored expansion of a role's levels minus its holds in force, which the dispatcher reads ([ADR-0054](../adr/0054-users-roles-and-authorizations.md) rule 9) |
+| Role assignment scope | role\_assignment\_scope | The record scope of a role assignment, one branch or warehouse per row; none means the whole company ([ADR-0017](../adr/0017-permission-envelope.md) rule 9) |
+| Delegation role assignment | delegation\_role\_assignment | A role assignment of the delegator lent by a delegation of kind `role_assignments` ([ADR-0054](../adr/0054-users-roles-and-authorizations.md) rule 21) |
+| Segregation review | segregation\_review | The owner's confirmed review of one posting period's segregation exceptions in the small-company mode (`ConfirmSegregationReview`, [ADR-0054](../adr/0054-users-roles-and-authorizations.md) rule 20) |
+| Company currency activation | company\_currency\_activation | A currency a company has activated for use ([ADR-0011](../adr/0011-multi-currency.md) rule 7) |
+| Working calendar holiday | working\_calendar\_holiday | A non-working date of a working calendar, copied from a package template entry or added by the company ([ADR-0045](../adr/0045-master-data-and-price-lists.md) rule 10) |
+| Partner address | partner\_address | An address of a partner (DS-20) |
+| Partner bank account | partner\_bank\_account | A partner's bank account, changed only through change proposals ([ADR-0029](../adr/0029-proposals-and-agent-safety.md) rule 4) |
+| Product variant attribute | product\_variant\_attribute | A variant attribute assigned to a product, in variant mode or as a line option (DS-20; [ADR-0046](../adr/0046-product-configuration.md) rule 3) |
+| Interaction participant | interaction\_participant | An address taking part in an interaction (`from`, `to`, `cc`, `bcc`, `reply_to`, `attendee`), resolved to a contact or user where possible ([ADR-0052](../adr/0052-minimal-crm.md)) |
+| Data subject request content | data\_subject\_request\_content | The personal text of a data subject request, kept outside its header and version so that erasure can blank it ([ADR-0052](../adr/0052-minimal-crm.md) rule 24) |
+| Outbound message content | outbound\_message\_content | The subject and body of an outbound message, kept outside its header and version ([ADR-0052](../adr/0052-minimal-crm.md) rule 27) |
+| Outbound message recipient | outbound\_message\_recipient | A recipient of an outbound message, only a contact of the message's partner ([ADR-0052](../adr/0052-minimal-crm.md) rule 27) |
+| Outbound message delivery recipient | outbound\_message\_delivery\_recipient | An address one delivery attempt used, copied at send ([ADR-0052](../adr/0052-minimal-crm.md) rule 28) |
+| Partner tax lookup | partner\_tax\_lookup | A dated snapshot of a tax ID lookup, written by `RecordPartnerTaxLookup`; its result is untrusted ([ADR-0019](../adr/0019-partners-and-crm-foundation.md) rule 18; [ADR-0052](../adr/0052-minimal-crm.md)) |
+| Configuration rule | configuration\_rule | A rule of a configuration model revision: a condition with an effect, or a `forbid` ([ADR-0046](../adr/0046-product-configuration.md) rule 6) |
+| Configuration table | configuration\_table, configuration\_table\_column, configuration\_table\_row | A table of allowed value combinations in a configuration model revision, with its columns and rows ([ADR-0046](../adr/0046-product-configuration.md) rule 7) |
+| Configuration default | configuration\_default | A default value of a characteristic in a configuration model revision ([ADR-0046](../adr/0046-product-configuration.md) rule 8) |
+| Product configuration value | product\_configuration\_value | One value of a stored product configuration ([ADR-0046](../adr/0046-product-configuration.md) rule 9) |
+| Role template | role.template\_code | A seeded set of levels from which a company role is created; owner rules `role:<template>` resolve through it, never through role codes; the list is [role-templates.csv](../catalogs/role-templates.csv) ([ADR-0054](../adr/0054-users-roles-and-authorizations.md) rule 11) |
+| Bank matching rule | bank\_matching\_rule | A company rule, proposal-bound, that maps a bank description token or a counterparty account to a partner or an account, applied before step 3 of the matching cascade ([ADR-0048](../adr/0048-cash-bank-receivables-payables.md) rule 9) |
+| System account turnover | system\_account\_turnover | Aggregate query view of turnover per system account, read by management reporting ([ADR-0050](../adr/0050-agent-runtime-and-query-layer.md) rules 51–53) |
+| Partner item overview | partner\_item\_overview | Row view of a partner's `partner_item` rows, the only item source of a tainted quotation run ([ADR-0051](../adr/0051-agent-workflows.md) rule 10) |
+| Work item owner rules | run\_on\_behalf\_of, subject\_owner, subject\_assignee | Owner rules of work item kinds: the human the agent run acts for; the user the subject names as its owner; the user the subject names as its assignee ([ADR-0042](../adr/0042-work-queue.md) rule 7 notes) |
 
 **Command verbs** ([ADR-0004](../adr/0004-naming-conventions.md) rules 17–22). A command type starts with one of these verbs; its event, if any, ends with the event form. The intent column says what the verb is for, nothing more: which states and preconditions allow a command is decided by DS-05 and the DS item that owns the noun. A new verb is added here, with its intent and event form, in the same change as the first command that needs it; a verb never takes a second meaning.
 
@@ -456,7 +485,8 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Reopen | Return a document to draft after an outside step failed; or return a technically complete production order to in progress; or return a closed complaint to open | Reopened |
 | Erase | Remove a data subject's personal data irreversibly | Erased |
 | Request | Hand work to another module for execution, e.g. replenishment or an e-invoice | Requested |
-| Pack, Unpack | Put stock into or take it out of a handling unit | Packed, Unpacked |
+| Pack | Put stock into a handling unit | Packed |
+| Unpack | Take stock out of a handling unit | Unpacked |
 | Firm | Fix a proposal so later runs keep it, e.g. a planned order | Firmed |
 | Activate | Start enforcing something once, irreversibly, e.g. a subledger | Activated |
 | Claim | A person or agent run takes a work item as its only worker | Claimed |
@@ -470,7 +500,8 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Reserve | Hold stock for a demand line, e.g. components of a production order | Reserved |
 | Release | Make a draft revision of master data effective from its start date, e.g. a bill of materials revision | Released |
 | Convert | Turn a record into another form once, e.g. a planned order into draft documents | Converted |
-| Match, Unmatch | Link or unlink bank lines or documents, or an interaction and its partner; open items are settled against each other by an `open_item_matching` document | Matched, Unmatched |
+| Match | Link bank lines or documents, or an interaction and its partner; open items are settled against each other by an `open_item_matching` document | Matched |
+| Unmatch | Undo a match: unlink bank lines or documents, or an interaction and its partner | Unmatched |
 | Ignore | Set an imported line aside with a reason, so that no rule or person matches it ([ADR-0048](../adr/0048-cash-bank-receivables-payables.md) rule 8); or keep withheld a permission an upgrade held back (`IgnoreRolePermissionHold`) | Ignored |
 | Transfer | Move records to another account or owner, e.g. a partner's open items | Transferred |
 | Allocate | Distribute an amount or quantity over targets | Allocated |
@@ -492,6 +523,10 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Render | Produce a file from a print template or a report definition, as a job; the file does not exist when the command commits ([ADR-0049](../adr/0049-statutory-reporting-and-printing.md) rule 20) | RenderRequested |
 | File | Record that a statutory report or tax return was submitted to an authority, storing an immutable snapshot (`FileStatutoryReport`, `FileTaxReturn`) | Filed |
 | Send | Hand a message to its outside channel for delivery, e.g. an outbound message; the outcome is recorded later | SendRequested |
+| Get | Query one record by `id`; a query, not a command ([ADR-0004](../adr/0004-naming-conventions.md) rule 21) | none (queries emit no event) |
+| List | Query a filtered list of records; a query, not a command | none |
+| Evaluate | Query that computes a result from given inputs and stores nothing, e.g. a configuration (`EvaluateConfiguration`) ([ADR-0004](../adr/0004-naming-conventions.md) rule 21 note) | none |
+| Raise | The system opens a work item for an exception it found (`work.contract.raise_work_item`, [ADR-0042](../adr/0042-work-queue.md) rule 5); no command type uses it | Raised (`WorkItemRaised`) |
 
 Work items get the verbs Claim and Unclaim ([ADR-0042](../adr/0042-work-queue.md)), because Lock belongs to posting periods and Release to master data revisions; a command batch needs no verb ([ADR-0008](../adr/0008-command-envelope-and-registry.md) rule 20). A posted document is never canceled: it is corrected by a correction document or, if its type is internal, reversed (Principle 5, [ADR-0009](../adr/0009-document-lifecycle.md) rules 19, 23), so Cancel never applies to posted documents.
 

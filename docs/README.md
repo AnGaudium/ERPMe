@@ -8,7 +8,7 @@ This folder is the source of truth for the ERPMe specification (D17). Everything
 2. [decisions.md](decisions.md): decided items D1–D17.
 3. [spec/01-vision.md](spec/01-vision.md) and [spec/02-principles.md](spec/02-principles.md).
 4. [spec/10-roadmap.md](spec/10-roadmap.md) and [spec/11-build-order.md](spec/11-build-order.md): phases, lean scope, build steps and gates.
-5. [design/backlog.md](design/backlog.md): the design work, DS-01 to DS-55.
+5. [design/backlog.md](design/backlog.md): the design work, DS-01 to DS-57.
 6. [runbook/README.md](runbook/README.md): how the build is run, step by step, to the Phase 1 gate.
 7. The spec files for the area you work on.
 
@@ -20,12 +20,13 @@ This folder is the source of truth for the ERPMe specification (D17). Everything
 | `decisions.md` | Decided items D1–Dn, ranked just below ADRs | A new ADR, then add or amend the row |
 | `adr/` | Architecture decision records, numbered `NNNN-title.md` | New file per decision; never rewrite an accepted ADR, supersede it |
 | `design/` | Design backlog and one specification per design item (`DS-xx-title.md`) | Written when the design item is worked on |
-| `catalogs/` | Data the core relies on: system accounts, transaction keys, movement types, edge cases | Versioned with the design item that owns it |
+| `catalogs/` | Data the core relies on: system accounts, transaction keys, movement types, work item kinds, invariants, edge cases, authorization areas, authorization verb levels, role templates and their levels, segregation rules ([catalogs/README.md](catalogs/README.md)) | Versioned with the design item that owns it |
 | `open-questions.md` | Questions that need the author or legal verification | Add freely; close with a link to the answer |
 | `risks.md` | Risks and mitigations | Review at each phase gate |
 | `runbook/` | Implementation runbook: operating rhythm, steps 0–11, testing operations, go-live, escalation rules, step log | Edit in place; never overrides decided items, gates, scope or build order |
 | `prompts/` | Briefs used to start AI sessions for larger tasks | Add one per task |
 | `research/` | Dated research notes used as design input; not decisions | Add a dated folder; cite from the ADR or design item that uses it |
+| `reviews/` | Dated design reviews (`<date>-<topic>/`), with the validation lab's scripts and findings | Add a dated folder; a finding is fixed in the documents it concerns |
 | `archive/` | Frozen historical documents | Never edited |
 
 ## Spec files

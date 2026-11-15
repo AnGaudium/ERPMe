@@ -19,6 +19,8 @@ This ADR amends the document lifecycle (ADR-0009) in five places, before step 3 
 1. `Update` submits the full list of lines.
    - **Matching.** Lines are matched to existing rows by `line_number`. A line number is never renumbered and never reused in its document. A new line takes the next unused number; a missing number deletes its row.
    - **IDs.** Row `id`s are stable, and version content still excludes them (ADR-0009 rule 9).
+
+   Note (catalog review, 2026-11-15): "ADR-0028 rule N" citations refer to this Rules section, not to the numbered summary under Decision.
 2. Commercial document lines and `demand_supply_line` (ADR-0024 rule 8) refer to other document lines by typed foreign keys. Each key is named after the referenced line table, e.g. `sales_order_line_id`, `transfer_order_line_id`, `goods_receipt_line_id`. A line of the same table referred to as its correction uses `correction_of_line_id` (ADR-0004 rule 12). Production line columns on `demand_supply_line` are added before step 3, flagged for the author ([ADR-0034](0034-production-orders-and-shop-floor.md) rule 9). So is `for_demand_supply_line_id` on supply rows ([ADR-0036](0036-multi-level-mrp.md) rule 9). `production_order_operation_id` on purchase lines and `owner_partner_id` on `demand_supply_line` are flagged likewise ([ADR-0037](0037-subcontracting.md) rules 4, 7).
    - **Roles.** Each table declares its reference roles. Each role allows at most one non-null column, and a role is mandatory where the table declares it.
    - **Execution tables** refer to `demand_supply_line_id` only: `stock_reservation`, `warehouse_task` and pegging (ADR-0023 rules 13–14; ADR-0024 rule 20). This replaces "a demand line" in those rules and cuts the line-reference pairs from about four per line table to one.
@@ -28,6 +30,8 @@ This ADR amends the document lifecycle (ADR-0009) in five places, before step 3 
    A draft purchase request or order line whose supply row carries `origin_planned_order_id` or pegging cannot be removed (its quantity goes to zero, or the document is canceled, closing the row as `canceled`). Other draft lines removed in draft delete their rows. Rows are never deleted once their document has left draft ([ADR-0047](0047-commercial-documents-and-pricing.md) rule 10).
 
    Note: interim for the simulation and the DDL drafts, until the author decides under B3: the columns `production_order_component_id`, `production_order_output_id`, `for_demand_supply_line_id` and `owner_partner_id` on `demand_supply_line`, and `production_order_operation_id` on purchase lines, are assumed to exist. The flag and its open question stay, flagged for the author; dropping them later is a DDL change before step 3 (holistic review 2026-11-15, item P10).
+
+   Note (catalog review, 2026-11-15): `correction_of_line_id` may name a line of another line table where the correction is a document of another type (DS-22-09-42-commercial-inventory.sql); [ADR-0047](0047-commercial-documents-and-pricing.md) rule 2 wins over "a line of the same table".
 3. Once another document refers to a line:
    - the line cannot be deleted (`document_line_referenced`);
    - its item, unit and warehouse cannot change (`referenced_line_immutable`);

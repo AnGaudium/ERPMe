@@ -180,6 +180,8 @@ ADR-0017 fixed the envelope: permissions are the names of registered commands, q
 
     Payment reversals (`full`) stay with `owner`. `owner` keeps every permission (rule 12), so its conflicts remain and rule 19's per-document check is its control; for every other template this replaces the bullet **Seeded conflicts**. Lab check `t12_access.py` checks that no other template holds both sides of a seeded rule. Also ([ADR-0055](0055-approval-pools-and-stages.md) rule 5 note): `sales_manager`, `purchasing_manager` and `production_planner` have `edit` with `can_approve` on `change_proposal`, so they submit and approve change proposals, and `production_planner` has `edit` on `delegation` as an approving template. Interim, flagged with the template contents (open question).
 
+    Note (catalog review, 2026-11-15): the templates `accountant`, `sales_clerk` and `buyer` also get `change_proposal` at `edit` without the approval flag, so the people who handle agent proposals in their area (bank matching rules, customer onboarding, purchase mapping) can submit them; approval stays with the `general` pool ([ADR-0055](0055-approval-pools-and-stages.md) rule 5 note). `change_proposal` is on no side of a seeded segregation rule, so every template except `owner` stays free of conflicts.
+
 **Assignments, record scope and owner scope**
 
 12. `role_assignment` (company data, change-tracked):
@@ -263,6 +265,8 @@ ADR-0017 fixed the envelope: permissions are the names of registered commands, q
     - **Catalog names.** CI checks that every permission in the catalog is registered.
 
     Note: the seeded templates other than `owner` hold no both sides of these rules (rule 11 note).
+
+    Note (catalog review, 2026-11-15): assignments of the `owner` template are exempt from the checks that keep mode `block` free of conflicts (rule 18: the switch to `block`, `EnableSegregationRule` and every rights path; INV-229), because that template holds every permission (rule 12) and would otherwise make `block` impossible in any company. The owner still meets rule 19's per-document check: one person cannot act on both sides of a pair on one document. A user whose other assignments hold both sides is not exempt (lab t12, E5b and E5c).
 18. Check on every change of rights:
     - **When.** On every path that changes a person's effective rights: `CreateRoleAssignment`, `UpdateRoleAssignment`, `UpdateRole` (for every holder), `EnableUserAccount`, `CreateDelegation` of both kinds (the substitute's own rights plus what is lent), `ConfirmUserInvitation` (the pending assignments), `ConfirmRolePermissionHold` (every holder of the role), `EnableSegregationRule` (for every user), and the re-expansion on upgrade (rule 9).
     - **The test.** A rule conflicts when the union of a user's permissions from assignments and delegations in force on any common day holds at least one permission of each side.
@@ -388,6 +392,8 @@ ADR-0017 fixed the envelope: permissions are the names of registered commands, q
     - **Edge cases** (block EC-110 to EC-129; EC-97 to EC-109 follow the reporting block of ADR-0049, which starts at EC-92 and takes what it needs, and this ADR uses none of them): EC-110, an owner-scoped sales clerk and their manager; EC-111, a user who holds both the buyer and the warehouse keeper role writes a purchase order and then tries to post its goods receipt; EC-116, an IT administrator of one company tries to reset the password of a user shared with another company; EC-118, two people, one login: a company invites an existing login meaning someone else, and the account's owner never gains or loses anything.
 
     Note: INV-216 is now [ADR-0050](0050-agent-runtime-and-query-layer.md)'s (rule 55 note); INV-217 to INV-219 stay unused.
+
+    Note (catalog review, 2026-11-15): corrected: the reporting block of [ADR-0049](0049-statutory-reporting-and-printing.md) is EC-92 to EC-98; EC-99 and EC-100 are CRM rows of [ADR-0052](0052-minimal-crm.md); EC-101 to EC-109 are unused. This ADR's block is EC-110 to EC-129, of which EC-110 to EC-118 are taken (with ADR-0055's).
 26. Lab check `t12_access.py` ([validation lab](../reviews/2026-11-14-design-validation/README.md)), on DS-15-access.sql loaded with DS-20 and DS-06:
     - the field counts of every catalog file it reads, and every glossary verb against the verb catalog;
     - level expansion: inheritance and overrides, verbs against effect classes, declared minimum levels, the approval flag, capabilities, the templates' delegation and agent run body rights, and the same set for shuffled inputs;

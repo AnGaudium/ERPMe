@@ -238,6 +238,16 @@ tasks:
     open_question: "(DS-26, DS-27) Statutory reporting and printing choices"
 ```
 
+## Loader errors
+
+The package loader reports these at deploy time, when an operator loads a package version. They are not command errors and have no HTTP status; the load fails as a whole and nothing of the version is installed ([ADR-0016](../adr/0016-localization-package-structure.md) rule 13). The loader also refuses a test package in a `production` installation (Manifest, above).
+
+| Code | When | Rule |
+| --- | --- | --- |
+| `regime_setting_in_use` | A new version changes the value of a setting row, or drops a row, that a company on the regime has used for a posted document dated on or after the row's `effective_from`; the change must be a new row with a later `effective_from` | [ADR-0016](../adr/0016-localization-package-structure.md) rule 13 |
+| `deductibility_rule_overlap` | Two deductibility rules would apply to one (`tax_kind`, direction) on the same date | [ADR-0053](../adr/0053-core-neutrality.md) rule 3 |
+| `report_definition_in_use` | A new version changes a report definition version that a company has filed; a correction is a new version with a later date | [ADR-0049](../adr/0049-statutory-reporting-and-printing.md) rule 2 |
+
 ## Package code for prints
 
 `AmountInWords`: `amount_in_words(amount, currency, language) -> str`, the amount in words in the package's languages; the core ships English. Where no installed implementation covers the print language, prints show the amount in numerals only ([ADR-0049](../adr/0049-statutory-reporting-and-printing.md) rule 25).

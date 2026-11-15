@@ -380,7 +380,7 @@ D = {
     "domains": [("P1", "acme.example", True), ("G1", "group.example", True), ("G2", "group.example", True), ("P2", "beta.example", False),
                 ("P3", "freemail.example", True)],
     "outbound": {"h-q12": ("P1", {"buyer@acme.example"})},
-    "public": {"gmail.com", "freemail.example"},
+    "public": {"gmail.com", "freemail.example"},   # gmail.com is kept on purpose: the rule under test is about a real public mail domain
 }
 def m(sender, auth=True, refs=(), tax_ids=()):
     return {"auth": auth, "sender": sender, "domain": sender.split("@")[1], "refs": set(refs), "tax_ids": set(tax_ids)}
@@ -432,8 +432,8 @@ def normalize_name(name, stop_words=(), fold_pairs=None):
 
 
 STOP = ["cong ty", "tnhh", "co phan", "cp"]     # sample package stop words (l10n_vn's are package data, unverified)
-check("N01 a Vietnamese name normalizes without marks and with the package's stop words", normalize_name("Công ty TNHH Thương mại Đại Phát", STOP), "thuong mai dai phat")
-check("N02 case, punctuation and spacing do not matter, and stop words go", normalize_name("  ĐẠI-PHÁT,  Co. Phan  ", STOP), "dai phat")
+check("N01 a Vietnamese name normalizes without marks and with the package's stop words", normalize_name("Công ty TNHH Thương mại Đơn Mẫu Một", STOP), "thuong mai don mau mot")
+check("N02 case, punctuation and spacing do not matter, and stop words go", normalize_name("  ĐƠN-MẪU,  Co. Phan  ", STOP), "don mau")
 check("N03 the core fold table is language-neutral", normalize_name("Łódź Øresund STRASSE Straße Æther Œuvre Þór Ðorđe"), "lodz oresund strasse strasse aether oeuvre thor dorde")
 check("N04 a package fold pair adds to the core table", normalize_name("Ŧest", fold_pairs={"ŧ": "t"}), "test")
 
@@ -831,13 +831,13 @@ header_text = sorted(r[0] + "." + r[1] for r in X("select table_name, column_nam
 check("M05 the two document headers and their lines hold no personal text", header_text, [])
 
 # ---- S: normalized names and trigram search
-for k, raw in (("s_a", "Công ty TNHH An Phát"), ("s_b", "Công ty CP An Phát Trading"), ("s_c", "Bình Minh"), ("s_d", "An Phú")):
+for k, raw in (("s_a", "Công ty TNHH Mẫu Một"), ("s_b", "Công ty CP Mẫu Một Trading"), ("s_c", "Ví Dụ Ba"), ("s_d", "Mẫu Mười")):
     X("insert into partner_search_key (partner_id, company_id, normalized_name, recorded_at) values (%s,%s,%s,now())", (I[k], I["co"], normalize_name(raw, STOP)))
 def search(q, threshold=0.6):
     rows = X("select k.partner_id from partner_search_key k join partner p on p.id=k.partner_id where k.company_id=%s and similarity(k.normalized_name, %s) >= %s"
              " order by similarity(k.normalized_name, %s) desc, p.code limit 10", (I["co"], q, threshold, q)).fetchall()
     return [r[0] for r in rows]
-q = normalize_name("CÔNG TY TNHH AN PHÁT", STOP)
+q = normalize_name("CÔNG TY TNHH MẪU MỘT", STOP)
 check("S01 a differently written name finds the same partner first", search(q)[:1], [I["s_a"]])
 check("S02 an unrelated name is not a candidate", I["s_c"] in search(q), False)
 check("S03 the trigram index exists", X("select count(*) from pg_indexes where indexname='ix_partner_search_key_normalized_name'").fetchone()[0], 1)

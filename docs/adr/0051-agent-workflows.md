@@ -114,6 +114,8 @@ Six agent types are designed now, each as a code-orchestrated workflow on the ru
     - **Inputs:** `interaction_overview` (with `include_untrusted` for an e-mail), `partner_overview`, `contact_overview`, `partner_item_overview`, the partner's earlier lines from `document_line_overview`, `GetCreditExposure`; in untainted runs also `item_overview`, `configuration_model_overview`, `EvaluateConfiguration`, `GetConfigurationEstimate` and `GetAvailableToPromise`. Note: the kind is renamed `inbound_message_matched`; `crm` raises it for messages whose sender authentication passed, matched automatically or by `MatchInteraction` ([ADR-0052](0052-minimal-crm.md) rule 15).
 
     Note (flow review, 2026-11-15): the designed configuring path. A salesperson records the customer's request as a `note` interaction in their own words (`CreateInteraction`, `is_untrusted` false) and starts the quotation agent on it; that run is untainted, so it reads the catalog, configures (L4) and writes the text (L5). The note is the person's own text, for which they vouch. A run woken by `inbound_message_matched` on a customer's e-mail stays tainted: it resolves only the partner's related items, leaves configurable lines unresolved with their hints, writes no text and hands over to a person, who may then record such a note. Whether a tainted run may configure stays the author's (open questions (DS-47, DS-32) on the quotation hard floor and on the readings of spec 03 rule 1); simulations show this path and say so.
+
+    Note (catalog review, 2026-11-15): the work item kind `inbound_message` is now `inbound_message_matched` ([ADR-0052](0052-minimal-crm.md) rule 15); `inbound_message` remains the name of its table there (rule 13).
 15. Steps:
     - **L1 `classify_message`** (seat classification with personal data): output `QuotationClassifyOutput`: `intent` (`quotation_request`, `order`, `complaint`, `payment_question`, `delivery_question`, `other`), `language`. Anything but `quotation_request` ends the run `not_applicable` with a note.
     - **L2 `extract_request`** (seat classification with personal data): output `QuotationExtractOutput`: `lines` (description text, quantity as stated, unit text, requested date text, `characteristic_hints` as name and value texts, `source_span`), `customer_reference`, `requested_delivery_date`. Checks: spans; each quantity is a positive decimal that appears in its span; dates parse; at most 50 lines (more ends the run `not_applicable`, for a person).
@@ -263,6 +265,8 @@ Six agent types are designed now, each as a code-orchestrated workflow on the ru
     Note: the owner rule `role:sales` named here is now `role:sales_clerk` ([ADR-0054](0054-users-roles-and-authorizations.md) rule 11).
 
     Note: further rows for the intake seam (rule 20 note): errors `e_invoice_record_unreadable` and `e_invoice_supplier_mismatch` (validation); check result `e_invoice_signature_unverified`; the work item kind `supplier_invoice_received` now has module `tax`.
+
+    Note (catalog review, 2026-11-15): in this list, the work item kind `inbound_message` is now `inbound_message_matched` ([ADR-0052](0052-minimal-crm.md) rule 15); `inbound_message` remains the name of its table there (rule 13).
 
 ## Context
 

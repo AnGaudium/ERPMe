@@ -143,6 +143,12 @@ Execute: the same request with `"mode": "execute"` and `"expected_plan_hash": "9
 
 Module-specific codes are added by the DS item that owns the module, in the registry's catalog, with the same columns.
 
+Trigger-held immutability is one class, precondition with HTTP 422: `revision_released`, `configuration_immutable` and `referenced_line_immutable` mean that a stored row may no longer change, and the caller creates a new revision or document instead (catalog review, 2026-11-15).
+
+Envelope-level codes are defined here and nowhere else: `malformed_request`, `unknown_command_type`, `unknown_field`, `internal_error`, `invalid_timestamp`, `too_many_decimal_places`, `record_not_found` and `timeout`. Where their row cites an ADR rule, that rule states the condition and this catalog names the code.
+
+Outcome and violation enumerations are not error codes and are not catalogued here; the ADR that defines each owns it: the render job outcomes of [ADR-0049](../adr/0049-statutory-reporting-and-printing.md) rule 31 (`render_failed`, `render_too_large`, `render_output_invalid`), the agent run outcomes of [ADR-0050](../adr/0050-agent-runtime-and-query-layer.md) (`budget_exceeded`, `time_exceeded`, `output_invalid`, `provider_unavailable`, `resume_diverged`, `crashed`, and `replay_diverged` for replays), and the configuration violation codes of [ADR-0046](../adr/0046-product-configuration.md) rule 18 (`configuration_set_conflict`, `configuration_table_no_match` and the others listed there). Loader errors of the package loader are in [DS-14](DS-14-localization-package.md) (Loader errors).
+
 | Code | Category | HTTP | Retryable | When |
 | --- | --- | --- | --- | --- |
 | `malformed_request` | malformed | 400 | no | The body is not valid JSON or not an object |
@@ -229,7 +235,7 @@ Module-specific codes are added by the DS item that owns the module, in the regi
 | `routing_conditions_shared` | validation | 422 | no | A routing with selection conditions would serve more than one configurable product ([ADR-0046](../adr/0046-product-configuration.md) rule 12) |
 | `characteristic_in_use` | precondition | 422 | no | A used characteristic's mode, value type, unit, range, step or code, or a value's code, would change ([ADR-0046](../adr/0046-product-configuration.md) rule 3) |
 | `item_configurable_product` | validation | 422 | no | `CreateItem` names a configurable product; its items are created only from configurations ([ADR-0046](../adr/0046-product-configuration.md) rule 2) |
-| `configuration_immutable` | conflict | 409 | no | A configuration or its values would change (database trigger; [ADR-0046](../adr/0046-product-configuration.md) rule 9) |
+| `configuration_immutable` | precondition | 422 | no | A configuration or its values would change (database trigger; [ADR-0046](../adr/0046-product-configuration.md) rule 9) |
 | `configuration_characteristic_not_item_defining` | validation | 422 | no | A selection condition or sizing names a line option ([ADR-0046](../adr/0046-product-configuration.md) rule 12) |
 | `option_extra_not_allowed` | validation | 422 | no | An option extra names a variant-mode value of a product that is not configurable, or is on a by-product list ([ADR-0045](../adr/0045-master-data-and-price-lists.md) rule 13, [ADR-0046](../adr/0046-product-configuration.md) rule 15) |
 | `quotation_expired` | precondition | 422 | no | A quotation is copied to an order after `valid_until` without `reprice` ([ADR-0047](../adr/0047-commercial-documents-and-pricing.md) rule 3) |
@@ -357,6 +363,45 @@ Module-specific codes are added by the DS item that owns the module, in the regi
 | `partner_has_open_items` | precondition | 422 | no | The partner's reconciliation account cannot change while it has open items; use `TransferPartnerOpenItems` ([ADR-0026](../adr/0026-open-item-core.md) rule 12) |
 | `control_dimension_missing` | precondition | 422 | no | A line on an account whose control kind is active lacks a required dimension (partner and open item, item and warehouse, cost object, fixed asset; loan: partner and open item); trigger-level failures map to it (ADR-0014 rule 10; [ADR-0025](../adr/0025-later-phase-seams.md) rule 4) |
 | `subledger_activation_date_not_reached` | precondition | 422 | no | A line on an activated subledger account is dated before the company's activation date ([ADR-0025](../adr/0025-later-phase-seams.md) rule 4) |
+| `role_assignment_invalid` | validation | 422 | no | Owner scopes that do not fit: edit wider than read, `branch` without record scope, `company` with one, or an owner scope on a non-user assignment ([ADR-0054](../adr/0054-users-roles-and-authorizations.md) rule 13) |
+| `delegation_invalid` | validation | 422 | no | A delegation to oneself, to an inactive user or one without an assignment in the company, of assignments that are not the delegator's, of delegated authority, or of a TOTP role to a substitute without TOTP ([ADR-0054](../adr/0054-users-roles-and-authorizations.md) rule 21) |
+| `department_cycle` | validation | 422 | no | A department's parent chain would loop ([ADR-0054](../adr/0054-users-roles-and-authorizations.md) rule 6) |
+| `employee_manager_cycle` | validation | 422 | no | An employee's chain of managers would loop ([ADR-0054](../adr/0054-users-roles-and-authorizations.md) rule 6) |
+| `employee_organization_command_required` | validation | 422 | no | `CreatePartner`, `UpdatePartner` or a change proposal names an employee's `department_id`, `manager_partner_id` or `user_account_id`; only `UpdateEmployeeOrganization` changes them ([ADR-0054](../adr/0054-users-roles-and-authorizations.md) rule 6) |
+| `approval_pool_invalid` | validation | 422 | no | An active pool without an active stage, stage minimum ranks that decrease, a rank that requires no stage, a stage without a member, a selector row naming an inactive pool, `general` deactivated, or a selector that sends a riskier document to a pool with fewer approvals ([ADR-0055](../adr/0055-approval-pools-and-stages.md) rules 2–4) |
+| `last_owner_required` | precondition | 422 | no | The change would leave the company without a user holding every permission of the template `owner` ([ADR-0054](../adr/0054-users-roles-and-authorizations.md) rule 12) |
+| `user_shared_across_companies` | precondition | 422 | no | The user is linked to another company too (a current or future assignment that is not pending); only an operator disables the account, changes its name or e-mail, resets its password or clears its lockout ([ADR-0054](../adr/0054-users-roles-and-authorizations.md) rule 3) |
+| `small_company_mode_not_allowed` | precondition | 422 | no | More than two active users hold a posting or approval permission ([ADR-0054](../adr/0054-users-roles-and-authorizations.md) rule 20) |
+| `small_company_mode_active` | precondition | 422 | no | The change would give a third user a posting or approval permission while the small-company mode is on ([ADR-0054](../adr/0054-users-roles-and-authorizations.md) rule 20) |
+| `approval_already_given` | precondition | 422 | no | The person, or the delegator they act for, already counts in an approval of this round ([ADR-0055](../adr/0055-approval-pools-and-stages.md) rule 7) |
+| `approval_would_strand_stage` | precondition | 422 | no | This approver is needed to fill a later required stage and nobody else can; another person approves this stage, or the author updates or cancels, or the stage members change ([ADR-0055](../adr/0055-approval-pools-and-stages.md) rule 7) |
+| `approval_plan_empty` | precondition | 422 | no | A decision requires a rank but the selected pool requires no stage for it ([ADR-0055](../adr/0055-approval-pools-and-stages.md) rule 5) |
+| `consent_missing` | precondition | 422 | no | The message's purpose needs consent that the data subject has not given ([ADR-0019](../adr/0019-partners-and-crm-foundation.md) rule 9) |
+| `public_mail_domain` | validation | 422 | no | A public mail domain cannot identify a partner ([ADR-0052](../adr/0052-minimal-crm.md) rule 5) |
+| `interaction_in_future` | validation | 422 | no | A call, meeting or chat is dated in the future; appointments come after Phase 1 ([ADR-0052](../adr/0052-minimal-crm.md) rule 6) |
+| `interaction_already_matched` | precondition | 422 | no | The interaction already has a partner; `UnmatchInteraction` first ([ADR-0052](../adr/0052-minimal-crm.md) rule 10) |
+| `link_partner_mismatch` | precondition | 422 | no | The interaction is unmatched, or the linked document or complaint has no partner or another partner than the interaction or complaint; also a match or unmatch that would conflict with an existing link ([ADR-0052](../adr/0052-minimal-crm.md) rule 9) |
+| `recipient_not_partner_contact` | validation | 422 | no | A recipient is not a contact of the message's partner ([ADR-0052](../adr/0052-minimal-crm.md) rules 27, 28) |
+| `recipient_address_missing` | precondition | 422 | no | The message has no `to` recipient, or a recipient contact is inactive or has no e-mail address ([ADR-0052](../adr/0052-minimal-crm.md) rule 28) |
+| `mailbox_not_sending` | precondition | 422 | no | The sending mailbox has sending disabled ([ADR-0052](../adr/0052-minimal-crm.md) rule 28) |
+| `automatic_send_not_allowed` | permission | 403 | no | A non-human actor tried to send: agents never send; a system job sends only the company's automatic types, untainted and without an origin agent run ([ADR-0052](../adr/0052-minimal-crm.md) rule 28) |
+| `data_subject_kind_invalid` | validation | 422 | no | A processing basis, request or erasure names a partner that is an organization ([ADR-0052](../adr/0052-minimal-crm.md) rule 23) |
+| `consent_evidence_missing` | validation | 422 | no | A consent basis needs the interaction that records it; silence is never consent ([ADR-0052](../adr/0052-minimal-crm.md) rule 23) |
+| `approval_required` | precondition | 422 | no | The policy engine requires an approval first (DS-28) |
+| `approval_hold_not_allowed` | precondition | 422 | no | `Submit`, `Approve` or `Reject` on a document whose type allows an approval hold only by regime, while the regime setting `documents.issuance_without_delay` is true for its date; `details` name the setting; issue or post it directly ([ADR-0053](../adr/0053-core-neutrality.md) rule 8) |
+| `invalid_state_transition` | precondition | 422 | no | The command is not allowed in the document's (including `issuing` and change states, ADR-0028) or warehouse task's state; `details` lists the allowed commands ([ADR-0009](../adr/0009-document-lifecycle.md) rule 5) |
+| `posting_date_mismatch` | validation | 422 | no | `Post` carries a `posting_date` different from the document's ([ADR-0009](../adr/0009-document-lifecycle.md) rule 9) |
+| `document_referenced` | precondition | 422 | no | Delete, cancel or reverse of a document that other documents refer to ([ADR-0009](../adr/0009-document-lifecycle.md) rules 7, 19) |
+| `rate_limited` | rate_limited | 429 | yes | `details.retry_after_seconds` says when to retry |
+| `internal_error` | internal | 500 | no | Anything unexpected; the response carries only a reference for the logs |
+| `timeout` | unavailable | 503 | yes | `transaction_timeout` reached (ADR-0008 rule 11) |
+
+### Check results
+
+The check-result catalog of [ADR-0040](../adr/0040-ui-architecture.md) rule 10: findings that do not stop a command, returned in `checks`. One catalog holds errors and check results, and their codes never collide; this table lists the check results apart from the errors above.
+
+| Code | Category | HTTP | Retryable | When |
+| --- | --- | --- | --- | --- |
 | `partner_duplicate_suspected` | check result | — | — | Another partner of the company has the same tax ID; the command succeeds and a work item is created ([ADR-0019](../adr/0019-partners-and-crm-foundation.md) rule 4) |
 | `e_invoice_signature_unverified` | check result | — | — | An imported incoming e-invoice record's signature check did not pass; the purchase invoice agent starts only after the importer confirms its supplier with `ConfirmEInvoiceSupplier` ([ADR-0051](../adr/0051-agent-workflows.md) rule 20) |
 | `partner_snapshot_stale` | check result | — | — | The document's partner data differs from the partner master; warns (interim, flagged; for the tax ID on e-invoiced types `Issue` is rejected with `e_invoice_invalid`) ([ADR-0028](../adr/0028-document-lifecycle-hardening.md) rule 16) |
@@ -401,38 +446,6 @@ Module-specific codes are added by the DS item that owns the module, in the regi
 | `tax_code_differs_from_matrix` | check result | — | — | A line's tax code differs from the matrix's, where ADR-0018 rule 16 allows it ([ADR-0041](../adr/0041-tax-engine.md) rule 7) |
 | `tax_amount_differs_from_computed` | check result | — | — | A supplier's stated tax differs from the computed one beyond `tax.stated_amount_tolerance`; the stated amount is used ([ADR-0041](../adr/0041-tax-engine.md) rule 10) |
 | `outbound_content_flagged` | check result | — | — | A customer-facing draft refers to another partner's records or carries cost or margin fields; sending it would be refused with `outbound_content_out_of_scope` ([ADR-0050](../adr/0050-agent-runtime-and-query-layer.md) rule 36) |
-| `role_assignment_invalid` | validation | 422 | no | Owner scopes that do not fit: edit wider than read, `branch` without record scope, `company` with one, or an owner scope on a non-user assignment ([ADR-0054](../adr/0054-users-roles-and-authorizations.md) rule 13) |
-| `delegation_invalid` | validation | 422 | no | A delegation to oneself, to an inactive user or one without an assignment in the company, of assignments that are not the delegator's, of delegated authority, or of a TOTP role to a substitute without TOTP ([ADR-0054](../adr/0054-users-roles-and-authorizations.md) rule 21) |
-| `department_cycle` | validation | 422 | no | A department's parent chain would loop ([ADR-0054](../adr/0054-users-roles-and-authorizations.md) rule 6) |
-| `employee_manager_cycle` | validation | 422 | no | An employee's chain of managers would loop ([ADR-0054](../adr/0054-users-roles-and-authorizations.md) rule 6) |
-| `employee_organization_command_required` | validation | 422 | no | `CreatePartner`, `UpdatePartner` or a change proposal names an employee's `department_id`, `manager_partner_id` or `user_account_id`; only `UpdateEmployeeOrganization` changes them ([ADR-0054](../adr/0054-users-roles-and-authorizations.md) rule 6) |
-| `approval_pool_invalid` | validation | 422 | no | An active pool without an active stage, stage minimum ranks that decrease, a rank that requires no stage, a stage without a member, a selector row naming an inactive pool, `general` deactivated, or a selector that sends a riskier document to a pool with fewer approvals ([ADR-0055](../adr/0055-approval-pools-and-stages.md) rules 2–4) |
-| `last_owner_required` | precondition | 422 | no | The change would leave the company without a user holding every permission of the template `owner` ([ADR-0054](../adr/0054-users-roles-and-authorizations.md) rule 12) |
-| `user_shared_across_companies` | precondition | 422 | no | The user is linked to another company too (a current or future assignment that is not pending); only an operator disables the account, changes its name or e-mail, resets its password or clears its lockout ([ADR-0054](../adr/0054-users-roles-and-authorizations.md) rule 3) |
-| `small_company_mode_not_allowed` | precondition | 422 | no | More than two active users hold a posting or approval permission ([ADR-0054](../adr/0054-users-roles-and-authorizations.md) rule 20) |
-| `small_company_mode_active` | precondition | 422 | no | The change would give a third user a posting or approval permission while the small-company mode is on ([ADR-0054](../adr/0054-users-roles-and-authorizations.md) rule 20) |
-| `approval_already_given` | precondition | 422 | no | The person, or the delegator they act for, already counts in an approval of this round ([ADR-0055](../adr/0055-approval-pools-and-stages.md) rule 7) |
-| `approval_would_strand_stage` | precondition | 422 | no | This approver is needed to fill a later required stage and nobody else can; another person approves this stage, or the author updates or cancels, or the stage members change ([ADR-0055](../adr/0055-approval-pools-and-stages.md) rule 7) |
-| `approval_plan_empty` | precondition | 422 | no | A decision requires a rank but the selected pool requires no stage for it ([ADR-0055](../adr/0055-approval-pools-and-stages.md) rule 5) |
-| `consent_missing` | precondition | 422 | no | The message's purpose needs consent that the data subject has not given ([ADR-0019](../adr/0019-partners-and-crm-foundation.md) rule 9) |
-| `public_mail_domain` | validation | 422 | no | A public mail domain cannot identify a partner ([ADR-0052](../adr/0052-minimal-crm.md) rule 5) |
-| `interaction_in_future` | validation | 422 | no | A call, meeting or chat is dated in the future; appointments come after Phase 1 ([ADR-0052](../adr/0052-minimal-crm.md) rule 6) |
-| `interaction_already_matched` | precondition | 422 | no | The interaction already has a partner; `UnmatchInteraction` first ([ADR-0052](../adr/0052-minimal-crm.md) rule 10) |
-| `link_partner_mismatch` | precondition | 422 | no | The interaction is unmatched, or the linked document or complaint has no partner or another partner than the interaction or complaint; also a match or unmatch that would conflict with an existing link ([ADR-0052](../adr/0052-minimal-crm.md) rule 9) |
-| `recipient_not_partner_contact` | validation | 422 | no | A recipient is not a contact of the message's partner ([ADR-0052](../adr/0052-minimal-crm.md) rules 27, 28) |
-| `recipient_address_missing` | precondition | 422 | no | The message has no `to` recipient, or a recipient contact is inactive or has no e-mail address ([ADR-0052](../adr/0052-minimal-crm.md) rule 28) |
-| `mailbox_not_sending` | precondition | 422 | no | The sending mailbox has sending disabled ([ADR-0052](../adr/0052-minimal-crm.md) rule 28) |
-| `automatic_send_not_allowed` | permission | 403 | no | A non-human actor tried to send: agents never send; a system job sends only the company's automatic types, untainted and without an origin agent run ([ADR-0052](../adr/0052-minimal-crm.md) rule 28) |
-| `data_subject_kind_invalid` | validation | 422 | no | A processing basis, request or erasure names a partner that is an organization ([ADR-0052](../adr/0052-minimal-crm.md) rule 23) |
-| `consent_evidence_missing` | validation | 422 | no | A consent basis needs the interaction that records it; silence is never consent ([ADR-0052](../adr/0052-minimal-crm.md) rule 23) |
-| `approval_required` | precondition | 422 | no | The policy engine requires an approval first (DS-28) |
-| `approval_hold_not_allowed` | precondition | 422 | no | `Submit`, `Approve` or `Reject` on a document whose type allows an approval hold only by regime, while the regime setting `documents.issuance_without_delay` is true for its date; `details` name the setting; issue or post it directly ([ADR-0053](../adr/0053-core-neutrality.md) rule 8) |
-| `invalid_state_transition` | precondition | 422 | no | The command is not allowed in the document's (including `issuing` and change states, ADR-0028) or warehouse task's state; `details` lists the allowed commands ([ADR-0009](../adr/0009-document-lifecycle.md) rule 5) |
-| `posting_date_mismatch` | validation | 422 | no | `Post` carries a `posting_date` different from the document's ([ADR-0009](../adr/0009-document-lifecycle.md) rule 9) |
-| `document_referenced` | precondition | 422 | no | Delete, cancel or reverse of a document that other documents refer to ([ADR-0009](../adr/0009-document-lifecycle.md) rules 7, 19) |
-| `rate_limited` | rate_limited | 429 | yes | `details.retry_after_seconds` says when to retry |
-| `internal_error` | internal | 500 | no | Anything unexpected; the response carries only a reference for the logs |
-| `timeout` | unavailable | 503 | yes | `transaction_timeout` reached (ADR-0008 rule 11) |
 
 ## Canonical plan for hashing
 

@@ -115,8 +115,8 @@ CREATE TABLE item_warehouse_planning (                     -- an item without a 
     -- the route ends in this row's warehouse
     CONSTRAINT fk_item_warehouse_planning_route FOREIGN KEY (company_id, transfer_route_id, warehouse_id) REFERENCES transfer_route (company_id, id, destination_warehouse_id),
     CONSTRAINT ck_item_warehouse_planning_route CHECK ((replenishment_source = 'transfer') = (transfer_route_id IS NOT NULL)),
-    CONSTRAINT ck_item_warehouse_planning_reorder_point CHECK (planning_method <> 'reorder_point' OR reorder_point >= 0),
-    CONSTRAINT ck_item_warehouse_planning_min_max CHECK (planning_method <> 'min_max' OR (minimum_quantity >= 0 AND maximum_quantity >= minimum_quantity)),
+    CONSTRAINT ck_item_warehouse_planning_reorder_point CHECK (planning_method <> 'reorder_point' OR coalesce(reorder_point >= 0, false)),
+    CONSTRAINT ck_item_warehouse_planning_min_max CHECK (planning_method <> 'min_max' OR coalesce(minimum_quantity >= 0 AND maximum_quantity >= minimum_quantity, false)),
     CONSTRAINT ck_item_warehouse_planning_service_level CHECK ((safety_stock_method = 'service_level') = (service_level_percent IS NOT NULL)
                                                                 AND (service_level_percent IS NULL OR (service_level_percent > 0 AND service_level_percent < 100))),
     CONSTRAINT ck_item_warehouse_planning_fixed_lot CHECK ((lot_size_method = 'fixed') = (fixed_lot_quantity IS NOT NULL) AND coalesce(fixed_lot_quantity, 1) > 0),
@@ -230,9 +230,10 @@ CREATE TABLE forecast_line (                               -- statistical foreca
     warehouse_id     uuid NOT NULL,
     forecast_date    date NOT NULL,
     quantity         types.quantity NOT NULL CONSTRAINT ck_forecast_line_quantity CHECK (quantity >= 0),   -- inventory unit, remainder carried forward (rule 10)
-    -- the forecast tier of holistic decision F0 (ADR-0024 rule 11 note): none (no history, with forecast_history_insufficient),
-    -- short_mean (1-7 weeks), unindexed (8-51 weeks: 8-week average), indexed (52 weeks or more)
-    forecast_tier    text NOT NULL CONSTRAINT ck_forecast_line_tier CHECK (forecast_tier IN ('none', 'short_mean', 'unindexed', 'indexed')),
+    -- the forecast tier of holistic decision F0 (ADR-0024 rule 11 notes): short_mean (1-7 weeks), unindexed (8-51 weeks:
+    -- 8-week average), indexed (52 weeks or more); with no history the run writes no line, and the check result
+    -- forecast_history_insufficient carries details.tier none
+    forecast_tier    text NOT NULL CONSTRAINT ck_forecast_line_tier CHECK (forecast_tier IN ('short_mean', 'unindexed', 'indexed')),
     index_factor     numeric(12,6) NOT NULL DEFAULT 1 CONSTRAINT ck_forecast_line_index_factor CHECK (index_factor >= 0),   -- interim: not stated in ADR-0024 (seasonal or event index applied)
     demand_event_id  uuid,                                     -- interim: not stated in ADR-0024 (the event whose index replaced the seasonal one)
     recorded_at      timestamptz NOT NULL,
@@ -293,7 +294,8 @@ CREATE TABLE demand_supply_line (
     origin_planned_order_id         uuid,                       -- ADR-0024 rule 8; INV-62
     closed_reason                   text CONSTRAINT ck_demand_supply_line_closed_reason CHECK (closed_reason IN ('fulfilled', 'canceled')),
     -- commercial holistic fix (ADR-0047 note): released when empty. Unreleased demand rows are not demand; purchase supply
-    -- rows count for planning while held, but goods are received only once released.
+    -- rows count for planning while held, but goods are received only once released. Production component and output
+    -- rows carry not_approved until their order is approved (released), like sales and purchase rows (ADR-0024 rule 8 note).
     hold_reasons                    text[] NOT NULL DEFAULT '{}' CONSTRAINT ck_demand_supply_line_hold_reasons
                                         CHECK (hold_reasons <@ ARRAY['not_approved', 'credit_hold']::text[]),
     recorded_at                     timestamptz NOT NULL,
@@ -756,7 +758,7 @@ CREATE TABLE planning_exception (                          -- one work item per 
     FOREIGN KEY (company_id, demand_supply_line_id) REFERENCES demand_supply_line (company_id, id),
     CONSTRAINT ck_planning_exception_reason_kind CHECK ((kind = 'planning_parameter_missing') = (reason IS NOT NULL)),
     CONSTRAINT ck_planning_exception_subject CHECK (CASE
-        WHEN kind = 'capacity_overload' THEN work_center_id IS NOT NULL AND start_date IS NOT NULL AND end_date >= start_date
+        WHEN kind = 'capacity_overload' THEN work_center_id IS NOT NULL AND start_date IS NOT NULL AND coalesce(end_date >= start_date, false)
         WHEN kind IN ('below_supplier_minimum_amount', 'container_underfilled') THEN supplier_partner_id IS NOT NULL
         ELSE item_id IS NOT NULL AND warehouse_id IS NOT NULL END),
     CONSTRAINT ck_planning_exception_closed CHECK ((state = 'closed') = (closed_at IS NOT NULL))
@@ -809,13 +811,13 @@ CREATE TABLE production_order (                            -- typed header of a 
     production_version_id           uuid,                      -- standard and disassembly; a rework order has no explosion (rule 4)
     bill_of_materials_revision_id   uuid,                      -- snapshot at the explosion date
     routing_revision_id             uuid,
-    product_configuration_id        uuid REFERENCES product_configuration (id),   -- a configured item's configuration (ADR-0046 rule 13)
+    product_configuration_id        uuid,                      -- a configured item's configuration (ADR-0046 rule 13)
     good_quantity                   types.quantity NOT NULL CONSTRAINT ck_production_order_good_quantity CHECK (good_quantity > 0),   -- G
     planned_output_quantity         types.quantity NOT NULL,   -- Q = G / (1 - assembly scrap)
     planned_start_date              date NOT NULL,             -- the explosion_date
     planned_end_date                date NOT NULL,
     scheduling_direction            text NOT NULL DEFAULT 'forward' CONSTRAINT ck_production_order_scheduling CHECK (scheduling_direction IN ('forward', 'backward')),
-    cost_object_id                  uuid,                      -- set at release (rule 15); key added below, after cost_object's composite key
+    cost_object_id                  uuid,                      -- set at release (rule 15); key added below, to DS-06's composite key
     origin_planned_order_id         uuid,                      -- DS-54
     for_demand_supply_line_id       uuid,                      -- B3, interim: make to order (rule 14)
     overdelivery_tolerance_percent  types.percent NOT NULL DEFAULT 0 CONSTRAINT ck_production_order_tolerance CHECK (overdelivery_tolerance_percent >= 0),
@@ -832,6 +834,7 @@ CREATE TABLE production_order (                            -- typed header of a 
     FOREIGN KEY (company_id, routing_revision_id) REFERENCES routing_revision (company_id, id),
     FOREIGN KEY (company_id, origin_planned_order_id) REFERENCES planned_order (company_id, id),
     FOREIGN KEY (company_id, for_demand_supply_line_id) REFERENCES demand_supply_line (company_id, id),
+    FOREIGN KEY (company_id, product_configuration_id) REFERENCES product_configuration (company_id, id),
     CONSTRAINT ck_production_order_version CHECK (order_type = 'rework' OR (production_version_id IS NOT NULL AND bill_of_materials_revision_id IS NOT NULL)),
     CONSTRAINT ck_production_order_planned_output CHECK (planned_output_quantity >= good_quantity),
     CONSTRAINT ck_production_order_dates CHECK (planned_end_date >= planned_start_date)
@@ -1130,7 +1133,8 @@ CREATE TABLE cost_estimate (                               -- benchmark for targ
     FOREIGN KEY (company_id, routing_revision_id) REFERENCES routing_revision (company_id, id),
     CONSTRAINT ck_cost_estimate_released CHECK ((state = 'released') = (released_at IS NOT NULL AND company_amount IS NOT NULL AND unit_cost IS NOT NULL))
 );
-CREATE INDEX ix_cost_estimate_version_date ON cost_estimate (production_version_id, costing_date) WHERE state = 'released';
+-- One released estimate per version and costing date (holistic review); the lookup of the estimate in force uses it too.
+CREATE UNIQUE INDEX ux_cost_estimate_released ON cost_estimate (company_id, production_version_id, costing_date) WHERE state = 'released';
 CREATE TABLE cost_estimate_line (                          -- rolled up level by level from released estimates of made components (rule 14)
     company_id         uuid NOT NULL,
     cost_estimate_id   uuid NOT NULL,
@@ -1279,9 +1283,9 @@ CREATE TRIGGER trg_cost_estimate_line_guard BEFORE INSERT OR UPDATE OR DELETE ON
     FOR EACH ROW EXECUTE FUNCTION production_revision_content_guard('cost_estimate', 'cost_estimate_id');
 
 -- ===== Changes to tables of other design items =====
--- cost_object (DS-06, owned by production, ADR-0034 rule 15): the production order key DS-06 left for this module, and a
--- composite key so an order's cost_object_id can only name the cost object of kind production_order that names it.
-ALTER TABLE cost_object ADD CONSTRAINT uq_cost_object_company_id_id_production_order_id UNIQUE (company_id, id, production_order_id);
+-- cost_object (DS-06, owned by production, ADR-0034 rule 15): the production order key DS-06 left for this module. DS-06
+-- holds the composite key (company_id, id, production_order_id), so an order's cost_object_id can only name the cost
+-- object of kind production_order that names it.
 ALTER TABLE cost_object ADD CONSTRAINT fk_cost_object_production_order FOREIGN KEY (company_id, production_order_id) REFERENCES production_order (company_id, id);
 ALTER TABLE production_order ADD CONSTRAINT fk_production_order_cost_object FOREIGN KEY (company_id, cost_object_id, id) REFERENCES cost_object (company_id, id, production_order_id);
 -- Columns on tables without a DDL draft, listed for their owners:

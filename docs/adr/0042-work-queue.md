@@ -82,6 +82,8 @@ Every exception, pending approval and other piece of business work is one `work_
    Note: kind rule `planning_node_owner`: the company's `planning_owner_id` when the subject node's `replenishment_source` is `production`, otherwise `buyer`. Kind `planning_exception` uses it ([ADR-0024](0024-planning.md) rule 21's note) (holistic review 2026-11-15, item P7).
 
    Note: the kind rules, completed. `run_on_behalf_of` is `agent_run.on_behalf_of_id` of the subject run, or of the raising run when the subject is not a run (`agent_run_stopped`, whose subject is the agent type); a re-raise keeps it (rule 5). `document_owner` is the document's `created_by_user_id` ([ADR-0054](0054-users-roles-and-authorizations.md) rule 14), not its owner employee. `issuer` is the human of the `Issue`: its actor, or its `on_behalf_of`. `subject_owner:<column>` and `subject_assignee:<column>` join the kind rules (moved from the Fallback bullet): the user is read from the subject column the kind's registration names (rule 1 note), which may go through one reference as `<reference column>.<column>`. Catalog values: `mailbox_unreachable` `subject_owner:owner_user_id`; `follow_up_due` `subject_assignee:assignee_user_id`; `attachment_rejected` `subject_owner:created_by_user_id`, the uploader (the human of `CreateAttachment`, a column the attachment row gains); `import_duplicate_suspected` `subject_owner:import_batch_id.created_by_user_id`, the batch creator. `warehouse_role` is the template `warehouse_keeper` scoped to the subject's warehouse. "The `owner` role" in the Fallback is `company_owner`.
+
+   Note (catalog review, 2026-11-15): `work_item.owner_role` stores the bare template code (e.g. `accountant`) or `company_owner` (DS-05-platform.sql); `role:<template>` is the notation of the kind catalog, resolved to that column when the item is raised.
 8. Due rules give business dates through the company calendar (ADR-0024 rule 4; calendar days for layer-2 callers, rule 5):
    - `same_day`, or `days:<n>` business days after the raise;
    - `required_date` minus the lead time, for planning;
@@ -170,6 +172,8 @@ Every exception, pending approval and other piece of business work is one `work_
     `bank_line_unmatched` is added ([ADR-0048](0048-cash-bank-receivables-payables.md) rule 9).
 
     `agent_run_stopped`, `agent_budget_exhausted` and `agent_denials_repeated` are added ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 55); `inbound_message`, `supplier_invoice_received`, `agent_quality_below_threshold` and `import_duplicate_suspected` are added ([ADR-0051](0051-agent-workflows.md) rule 30).
+
+    Note (catalog review, 2026-11-15): the work item kind `inbound_message` is now `inbound_message_matched` ([ADR-0052](0052-minimal-crm.md) rule 15); `inbound_message` remains the name of its table there (rule 13).
 19. Defects never enter the queue (ADR-0003 R7), and technical jobs are not work items (spec 07).
 
 **Build order**

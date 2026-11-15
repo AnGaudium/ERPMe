@@ -156,7 +156,7 @@ trial("M39 a company unit code must start with x-", lambda cx: cx.execute("inser
 trial("M40 a conversion factor is positive", lambda cx: cx.execute("insert into product_uom values (%s,%s,%s,0,1)", (I["co"], I["prod"], I["kg"])), True, "ck_product_uom_numerator")
 trial("M41 a group row needs its basis", lambda cx: cx.execute("insert into item_group (id, company_id, code, name) values (%s,%s,'g2','G2')", (new(), I["co"])), True, "basis")
 # M42: every DS-20 table carries company_id except the global catalogs (ADR-0045 rule 1; ADR-0022 rule 8).
-ddl = open(os.environ.get("ERPME_DS20", os.path.expanduser("~/Projects/ERPMe/docs/design/DS-20-master-data.sql"))).read()
+ddl = open(os.environ.get("ERPME_DS20", os.path.join(os.path.expanduser(os.environ.get("ERPME_DOCS", "~/Projects/ERPMe/docs")), "design", "DS-20-master-data.sql"))).read()
 tables = re.findall(r"^CREATE TABLE (\w+)", ddl, re.M)
 cx = conn()
 missing = [tb for tb in tables if tb not in ("currency", "uom", "uom_conversion", "company") and not cx.execute(

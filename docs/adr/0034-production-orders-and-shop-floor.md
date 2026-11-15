@@ -90,6 +90,8 @@ It adds only what production needs:
      - **Outputs.** The components of the version's bill of materials revision, one level with phantoms exploded, scaled to G, received with `disassembly_receipt`. The bill of materials outputs are left out, and so is the routing unless the client adds operations.
      - **Limits.** Cumulative net issues of the input may not exceed G × (1 + tolerance). The outputs are `co_product` lines; how cost splits over them is DS-53's. Technical completion is manual, and INV-104 does not apply.
 
+   Note (catalog review, 2026-11-15): a production order has at most one output of type `main` (a unique index in DS-43-54-planning-production.sql); a disassembly order has none, its outputs being `co_product` lines. A `rework` order may have no production version, since it has no explosion.
+
 **Lifecycle and execution state**
 
 5. Document states follow ADR-0009 rule 6: Release is `submit` of type `production_order` for policy ([ADR-0043](0043-policy-and-approval.md) rule 17).

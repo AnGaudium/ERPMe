@@ -95,6 +95,8 @@ Policy is a deterministic threshold table per company, as runbook B7 asks.
      - at `post` and `issue`, `human_post`.
 
      A matching `allow` rule lifts the baseline. Restrictive rules add to it and never lift it. For `human` the baseline is empty. So a rule that requires approval above an amount never frees a system posting below it.
+
+   Note (catalog review, 2026-11-15): DS-05-platform.sql stores a rule as `policy_rule` (its identity, whose ID breaks ties) and `policy_rule_version` (match, conditions, effect and procedure, dated by `effective_from`); a decision records `policy_rule_id` and `policy_rule_version`.
 8. Mapping to ADR-0029's stored outcome:
    - `denied` → `denied`;
    - a rank → `approval_required`, with the procedure;
@@ -102,6 +104,8 @@ Policy is a deterministic threshold table per company, as runbook B7 asks.
    - otherwise → `allowed`.
 
    The decision also stores `required_rank` and `human_post`, so a document approved under a human-post requirement is still posted by a person.
+
+   Note (catalog review, 2026-11-15): the decision also stores the actor evaluated: `actor_kind`, `actor_id` and `on_behalf_of_id` (DS-05-platform.sql; interim columns, since rule 5 evaluates the actor).
 9. Floors, applied by the dispatcher around the table:
    1. permission, record scope and `human_only` commands, before anything (ADR-0008 rule 5);
    2. segregation of duties for `Approve` (ADR-0017 rule 16);

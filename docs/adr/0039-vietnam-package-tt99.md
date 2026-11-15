@@ -169,6 +169,8 @@ Under ADR-0016 rule 12, production refuses unverified content until the author v
 
     Results: 209 combinations resolve for each legal form, the check passes, and the self-test passes. The first draft's defects are recorded as lab finding L-09.
 
+    Note (catalog review, 2026-11-15): in the chart template checks above, "rule 16" and "rule 17" are [ADR-0010](0010-system-chart-of-accounts.md)'s.
+
 ## Context
 
 DS-19 is the first item of step 1 ([steps-0-4.md](../runbook/steps-0-4.md)). TT99 replaced Circular 200 from 1 January 2026:

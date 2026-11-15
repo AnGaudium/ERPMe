@@ -2,6 +2,7 @@ verb,level,added_in,meaning
 Get,read,0.1.0,Query of one record.
 List,read,0.1.0,Query of records; computed queries also need read.
 Render,read,0.1.0,"Produces a file of data the caller may read, as a job (ADR-0049 rule 20); owner and record scope apply as for the data."
+Evaluate,read,0.1.0,"Query that computes a result from given inputs and stores nothing, as in EvaluateConfiguration (ADR-0046 rule 17; ADR-0004 rule 21 note)."
 Create,edit,0.1.0,
 Update,edit,0.1.0,
 Delete,edit,0.1.0,Only never-submitted drafts and unreferenced records.
@@ -27,6 +28,7 @@ Validate,edit,0.1.0,
 Import,edit,0.1.0,
 Set,edit,0.1.0,As in SetPriceListEntries (ADR-0045 rule 7).
 Verify,edit,0.1.0,"Checks a configuration against an outside system and records the result, as in VerifyMailboxAuthentication (ADR-0052 rule 14)."
+Raise,edit,0.1.0,"The system opens a work item for an exception it found (work.contract.raise_work_item, event WorkItemRaised; ADR-0042 rule 5); no command type uses it yet."
 Post,post,0.1.0,
 Issue,post,0.1.0,
 Record,post,0.1.0,

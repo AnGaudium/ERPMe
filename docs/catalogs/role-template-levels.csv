@@ -227,3 +227,6 @@ purchasing_manager,purchase_invoice,edit,true
 sales_manager,change_proposal,edit,true
 purchasing_manager,change_proposal,edit,true
 production_planner,change_proposal,edit,true
+accountant,change_proposal,edit,false
+sales_clerk,change_proposal,edit,false
+buyer,change_proposal,edit,false

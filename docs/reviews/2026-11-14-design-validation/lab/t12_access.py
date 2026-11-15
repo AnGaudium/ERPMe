@@ -41,8 +41,8 @@ check(f"01 every row of the {len(FILES)} catalog files the lab reads has its hea
 inv_codes = {r["code"] for r in read_csv("invariants.csv")}
 ec_codes = {r["code"] for r in read_csv("edge-cases.csv")}
 ec_gap = [r for r in read_csv("edge-cases.csv") if r["code"] in {f"EC-{n}" for n in range(97, 110)}]
-check("02 the access invariants INV-220 to INV-230 and edge cases EC-110 to EC-117 are in the catalogs; INV-217 to INV-219 stay unused (INV-216 is ADR-0050's), and no edge case EC-97 to EC-109 is ADR-0054's or ADR-0055's",
-      {f"INV-{n}" for n in range(220, 231)} <= inv_codes and {f"EC-{n}" for n in range(110, 118)} <= ec_codes
+check("02 the access invariants INV-220 to INV-231 and edge cases EC-110 to EC-118 are in the catalogs; INV-217 to INV-219 stay unused (INV-216 is ADR-0050's), and no edge case EC-97 to EC-109 is ADR-0054's or ADR-0055's",
+      {f"INV-{n}" for n in range(220, 232)} <= inv_codes and {f"EC-{n}" for n in range(110, 119)} <= ec_codes
       and "INV-216" in inv_codes and not ({f"INV-{n}" for n in range(217, 220)} & inv_codes) and not any("ADR-0054" in r["source"] or "ADR-0055" in r["source"] for r in ec_gap),
       [r["code"] for r in ec_gap])
 kinds = {r["code"]: r for r in read_csv("work-item-kinds.csv")}
@@ -603,10 +603,24 @@ except SodError:
 check("E3 assignment check, block: the same assignment is refused with segregation_conflict", blocked)
 check("E4 assignment check: buyer alone has no conflict", assignment_check(set(expand(TPL["buyer"])), enabled, "block") == [])
 owner_conflicts = assignment_check(set(expand(TPL["owner"])), enabled, "warn")
-check("E5 switching to block is refused while conflicts exist (the owner template holds both sides)", len(owner_conflicts) >= 4)
+check("E5 the owner template holds both sides of at least four seeded rules (rule 19's per-document check is its control)", len(owner_conflicts) >= 4)
 conflicts_by_template = {t: [h for _, h in assignment_check(EXP[t], enabled, "warn")] for t in sorted(TEMPLATES - {"owner"})}
 check("E5a every seeded template except owner is free of conflicts with the seeded segregation rules (ADR-0054 rule 11 note)",
       not any(conflicts_by_template.values()), {t: v for t, v in conflicts_by_template.items() if v})
+
+def block_switch_conflicts(assignments, enabled_rules):
+    """The switch to mode block (ADR-0054 rule 18) with the rule 17 note: assignments of the owner template are exempt;
+    the owner still meets rule 19's per-document check. assignments: (user, template) pairs."""
+    perms = {}
+    for user, template in assignments:
+        if template != "owner":
+            perms.setdefault(user, set()).update(EXP[template])
+    return sorted((u, h) for u, p in perms.items() for _, h in assignment_check(p, enabled_rules, "warn"))
+
+sw = block_switch_conflicts([("uO", "owner"), ("uB", "buyer"), ("uW", "warehouse_keeper")], enabled)
+check("E5b block mode can be enabled while only the owner template conflicts (ADR-0054 rule 17 note)", sw == [], sw)
+sw = block_switch_conflicts([("uO", "owner"), ("uO", "buyer"), ("uO", "warehouse_keeper")], enabled)
+check("E5c but not while a user, the owner included, holds both sides through other templates", sw == [("uO", "purchase_order_vs_goods_receipt")], sw)
 
 # Per-document check (ADR-0054 rule 19). actions: list of (human, permission, document).
 LINKS = {("g1", "referenced_order"): ["p1"], ("pay1", "settled_item"): ["inv1"], ("p1", "referenced_order"): [], ("inv1", "settled_item"): []}

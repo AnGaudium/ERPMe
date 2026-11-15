@@ -70,7 +70,7 @@ CREATE TABLE mailbox (
     UNIQUE (company_id, email_address),
     UNIQUE (company_id, id),
     -- only a completed negative probe clears the flag; a transport error keeps the last state (rule 11)
-    CONSTRAINT ck_mailbox_verified CHECK (NOT is_authentication_verified OR (authentication_checked_at IS NOT NULL AND authentication_probe_result IN ('passed', 'transport_error')))
+    CONSTRAINT ck_mailbox_verified CHECK (NOT is_authentication_verified OR (authentication_checked_at IS NOT NULL AND coalesce(authentication_probe_result IN ('passed', 'transport_error'), false)))
 );
 
 -- ===== Interactions [crm] (ADR-0052 rules 6-10) =====
@@ -391,7 +391,7 @@ CREATE TABLE outbound_message_delivery (                   -- late data of ADR-0
         AND (outcome IS NOT DISTINCT FROM 'sent') = (interaction_id IS NOT NULL)
         AND (outcome IS NOT DISTINCT FROM 'sent') = (sent_content_hash IS NOT NULL)),
     CONSTRAINT ck_outbound_message_delivery_failed CHECK (outcome IS DISTINCT FROM 'failed' OR failure_reason IS NOT NULL OR erased_at IS NOT NULL),
-    CONSTRAINT ck_outbound_message_delivery_reason CHECK (failure_reason IS NULL OR outcome IN ('failed', 'unknown'))
+    CONSTRAINT ck_outbound_message_delivery_reason CHECK (failure_reason IS NULL OR coalesce(outcome IN ('failed', 'unknown'), false))
 );
 -- At most one attempt in flight and at most one sent attempt per message.
 CREATE UNIQUE INDEX ux_outbound_message_delivery_open ON outbound_message_delivery (outbound_message_id) WHERE outcome IS NULL;

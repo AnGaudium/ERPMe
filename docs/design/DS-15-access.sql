@@ -216,7 +216,7 @@ CREATE TABLE user_invitation (
     CONSTRAINT ck_user_invitation_new CHECK (NOT is_new_account OR state = 'confirmed'),
     CONSTRAINT ck_user_invitation_decided CHECK ((state = 'pending') = (decided_at IS NULL)),
     -- an existing account's invitation is confirmed only by that account's own user (INV-231)
-    CONSTRAINT ck_user_invitation_confirmed_by_user CHECK (state <> 'confirmed' OR is_new_account OR decided_by_user_id = user_account_id)
+    CONSTRAINT ck_user_invitation_confirmed_by_user CHECK (state <> 'confirmed' OR is_new_account OR decided_by_user_id IS NOT DISTINCT FROM user_account_id)
 );
 CREATE UNIQUE INDEX ux_user_invitation_pending ON user_invitation (company_id, user_account_id) WHERE state = 'pending';
 

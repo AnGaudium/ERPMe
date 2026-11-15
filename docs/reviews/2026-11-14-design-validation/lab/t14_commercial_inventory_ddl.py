@@ -59,11 +59,13 @@ def trial(name, fn, match):
 
 
 # ======================================================================= A: load
-# Lab-only: the shared document row's columns (ADR-0009 rule 1; ADR-0052 rule 18) and document_version (documents).
+# Lab-only: the shared document row's columns (ADR-0009 rule 1; ADR-0052 rule 18), document_version (documents) and
+# work_item, which DS-05-platform.sql defines and the credit hold keys to (this lab does not load DS-05).
 EXTRA_STUBS = """SET search_path = erpme;
 ALTER TABLE document ADD COLUMN partner_id uuid, ADD COLUMN document_date date, ADD COLUMN number text, ADD COLUMN version integer NOT NULL DEFAULT 1,
   ADD COLUMN reversal_of_id uuid REFERENCES document (id), ADD COLUMN correction_of_id uuid REFERENCES document (id),
   ADD CONSTRAINT uq_document_company_id_id UNIQUE (company_id, id);
+CREATE TABLE work_item (id uuid PRIMARY KEY, company_id uuid NOT NULL, UNIQUE (company_id, id));
 CREATE TABLE document_version (id uuid PRIMARY KEY, company_id uuid NOT NULL, document_id uuid NOT NULL REFERENCES document (id),
   version integer NOT NULL, content jsonb NOT NULL, derived_from_version_id uuid, recorded_at timestamptz NOT NULL, UNIQUE (document_id, version));
 """

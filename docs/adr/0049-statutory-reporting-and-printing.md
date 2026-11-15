@@ -325,6 +325,8 @@ Statutory reports, books and printed documents are produced by one new layer-4 m
     - **Glossary:** report definition, report line, measure, counterpart attribution, statutory report filing, report comparative value, print template, print data contract, print profile, render job, generated file (with `contains_untrusted`); the verbs Render and File; Record's intent covers the render worker's outcome.
 
     Note: error `document_not_approved` (precondition; rule 28 note), shared with [ADR-0052](0052-minimal-crm.md) rule 28.
+
+    Note (catalog review, 2026-11-15): the loader error `report_definition_in_use` is catalogued in [DS-14](../design/DS-14-localization-package.md) (Loader errors), not in DS-04; the job outcome codes are this ADR's own enumeration, not error codes (DS-04 says so).
 32. CI and golden figures:
     - **Golden kind.** DS-16 gains the kind `report_line` (keys `report`, `line`, `from`, `to`; company amounts), compared through `GetStatutoryReport`. The naive recomputation of step 8 adds report lines from the definitions in the regime snapshot.
     - **Package CI** (ADR-0016 rule 15). Every definition parses; its selectors name accounts of the regime's chart template; formulas and `report:` terms refer to existing lines and have no cycle; book fields exist in the row source. Every statement with `is_fileable` has at least one golden scenario with `report_line` rows for it, as "statutory reports matching their sample figures".

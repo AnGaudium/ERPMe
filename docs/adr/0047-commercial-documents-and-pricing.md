@@ -211,6 +211,8 @@ The commercial documents are a thin layer over the core (B3). They hold what was
 
     Note: when `sales` sets `credit_hold` on an order's rows, it raises one work item `credit_hold` (subject the sales order, owner role `accountant`). The item is resolved by `ReleaseCreditHold`, or by the system when the hold is cleared because the exposure fell under the limit.
 
+    Note (catalog review, 2026-11-15): the stored states of a `credit_hold` row, `held`, `released`, `cleared` and `lapsed` (DS-22-09-42-commercial-inventory.sql), are interim: this rule does not name them.
+
 **Demand, supply and progress**
 
 19. Demand and supply rows ([ADR-0024](0024-planning.md) rule 8; ADR-0031 rule 5):
@@ -292,6 +294,8 @@ The commercial documents are a thin layer over the core (B3). They hold what was
       - new: a change order that changes a purchase price between two receipts and an invoice; a promotion with free goods and a document discount; an invoice within the price tolerance and one beyond it.
 
     Note: further rows: errors `demand_supply_not_released`, `sales_order_required`, `source_not_approved` and `partner_role_missing` (rules 2, 3, 6, 18); check result `price_list_currency_differs` ([ADR-0045](0045-master-data-and-price-lists.md) rule 5); work item kind `credit_hold` (`sales`, rule 18); transaction key `purchase_expense` (rule 12); policy condition `is_cost_unknown` (rule 22); company settings `master_data.default_partner_group.customer`, `master_data.default_partner_group.supplier` and `master_data.default_partner_group.employee` ([ADR-0045](0045-master-data-and-price-lists.md) rule 13).
+
+    Note (catalog review, 2026-11-15): the three new edge cases are EC-69 (a purchase price change between two receipts), EC-70 (free goods with a document discount) and EC-71 (purchase invoices within and beyond the price tolerance); [edge-cases.csv](../catalogs/edge-cases.csv) is authoritative.
 24. Lab check `t07_commercial.py` ([validation lab](../reviews/2026-11-14-design-validation/README.md)), pure functions:
     - GR/IR on 600 random sequences of receipts, invoices, returns, credits, reversals and change orders, with rounding to 0 and 2 decimals: the balance equals `round(V(I)) − round(V(R))` after every step, and is zero whenever received equals invoiced; reversals of non-latest postings are refused;
     - fixed GR/IR cases, including thirds of a unit, invoice first, a return after a change order, and the residual the receipt-price rule would leave;

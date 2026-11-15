@@ -56,6 +56,8 @@ Every code identifier is an English word or phrase from the glossary in [00-read
 19. The `snake_case` form of a command type is derived mechanically (`post_goods_receipt`) and used for the MCP tool name and the Python handler function. It is at most 64 characters, the tool-name limit of the Anthropic API used behind the LLM gateway (ADR-0002). The REST path is decided in DS-04 and uses one of the two forms.
 20. A new verb is added to the verb list, with its intent and event form, in the same change as the first command that needs it. A verb never takes a second meaning; a different action gets a different verb.
 21. Read-only operations are queries, not commands: `Get<Noun>` returns one record, `List<Noun>` returns a filtered list. They carry no idempotency key and change nothing. Query names follow the same format, `snake_case` derivation and 64-character limit as command types (rules 17 and 19).
+
+    Note (catalog review, 2026-11-15): `Evaluate<Noun>` is a third query form: it computes a result from the inputs it is given and stores nothing, as `EvaluateConfiguration` does ([ADR-0046](0046-product-configuration.md) rule 17). Its verb is in the glossary's verb list and in authorization-verb-levels.csv at level `read`, and the registry accepts `Get`, `List` and `Evaluate` as the first word of a query. `WorkItemRaised` takes the verb Raise, added to the same lists.
 22. An event type is `PascalCase` noun + the verb's event form from the verb list and names a fact that happened (`GoodsReceiptPosted`). A command `<Verb><Noun>` that succeeds emits `<Noun><event form>` when it emits an event. Event types are unique across modules; the event schema and its versioning are decided in DS-13.
 
 **Code**

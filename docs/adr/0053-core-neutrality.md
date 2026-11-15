@@ -91,6 +91,8 @@ Every amended ADR gets a note at the end of the amended rule, citing a rule of t
    Note: which deductibility rule is in force. Per (`tax_kind`, direction), across codes, the entry with the latest `effective_from` on or before the tax date is in force. An entry of the core condition type `none` (no parameters) ends the rule before it, so no condition applies from its date. Two entries overlap only when they share (`tax_kind`, direction, `effective_from`); the loader's `deductibility_rule_overlap` and `check_package.py` reject that and nothing else. DS-14 says the same (holistic review, 2026-11-15).
 
    Note: the threshold is tested in the threshold's `currency`. A document total in another currency converts at the transaction lookup rate (ADR-0011 rule 11) on the tax date, and that applied rate is recorded on the tax line (`threshold_applied_rate_id`). This replaces the company-currency comparison and its `regime_configuration_missing` (holistic review, 2026-11-15).
+
+   Note (catalog review, 2026-11-15): the loader error `deductibility_rule_overlap` is catalogued in [DS-14](../design/DS-14-localization-package.md) (Loader errors), not in DS-04; where this ADR lists it under DS-04, read DS-14.
 4. Work item kinds (catalog `work-item-kinds.csv`):
    - `input_vat_payment_evidence` becomes `tax_condition_pending`: a tax line's deductibility condition is not yet met. It resolves by the system when the condition is met or fails.
    - `input_vat_not_deductible` becomes `tax_deductibility_changed`: a tax line's deductibility fell by a `condition_failed` adjustment, for a person to review.
