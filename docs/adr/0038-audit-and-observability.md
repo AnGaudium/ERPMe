@@ -56,7 +56,7 @@ The retention periods and the strictness of scanning are flagged for the author.
    - **Failure.** A failed denial insert never fails the caller. It logs a structured error and raises a metric.
    - **Simulation.** A denial record is the one effect of a simulation that persists (ADR-0008 rule 9 gets a note).
 
-   Also `tool_not_allowed`, `tainted_read_out_of_scope`, `untrusted_read_not_allowed` and `tainted_run_not_allowed`; three denials stop a run ([ADR-0050](0050-agent-runtime-and-query-layer.md) rules 33, 55).
+   Also `tool_not_allowed`, `tainted_read_out_of_scope`, `untrusted_read_not_allowed` and `tainted_run_not_allowed`; three denials stop a run ([ADR-0050](0050-agent-runtime-and-query-layer.md) rules 33, 55). Also `automatic_send_not_allowed`; the CRM's reads outside a tainted run's scope use `tainted_read_out_of_scope` ([ADR-0052](0052-minimal-crm.md) rule 34).
 6. Storage:
    - **Protection.** Audit and change records are protected by append-only triggers (rule 4's exception aside) and the generated company policy. The trigger on `audit_denial` allows only `count` and `last_at` to change, and only upward.
    - **Partitions.** `audit_record` and `audit_change` are partitioned by month on `id`; ADR-0006 rules 22 and 23 get a note. The daily job of ADR-0022 creates partitions three months ahead, with a default partition. `audit_denial` is not partitioned, because its unique coalescing index cannot include `id`, and coalescing keeps it small.
@@ -78,7 +78,7 @@ The retention periods and the strictness of scanning are flagged for the author.
 9. Duties that other ADRs assigned to DS-36:
    - **Period state changes.** Recorded with `reason` (rule 2) and the approval through `policy_decision_id` (ADR-0012 rule 9).
    - **Enabling unverified regime rules.** Audited as tracked changes of regime settings (rule 3; ADR-0016).
-   - **Exports and erasures.** Write both an audit record and an entry in the personal data processing log (ADR-0019 rule 11). The breach notification procedure belongs to DS-40 under the existing open question on Law 91/2025; audit and denial records are its evidence.
+   - **Exports and erasures.** Write both an audit record and an entry in the personal data processing log (ADR-0019 rule 11). The breach notification procedure belongs to DS-40 under the existing open question on Law 91/2025; audit and denial records are its evidence. The processing log is owned by `audit` ([ADR-0052](0052-minimal-crm.md) rule 26).
    - **`erpme-check` against production** (DS-16) may run, only with the read-only role, on a standby replica or with `statement_timeout`, and never with write rights.
 
 **Observability**

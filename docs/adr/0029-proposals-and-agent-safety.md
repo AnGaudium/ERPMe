@@ -64,6 +64,7 @@ The hard floor on what a tainted run may read stays the literal spec 03 rule 1 u
    - agent changes to planned orders: `UpdatePlannedOrder`, `FirmPlannedOrder`, `ConvertPlannedOrder` ([ADR-0036](0036-multi-level-mrp.md) rule 12);
    - technical completion and reopening of production orders ([ADR-0034](0034-production-orders-and-shop-floor.md) rule 17);
    - releases of bills of materials and routings, production versions, work centers and production settings ([ADR-0033](0033-production-master-data.md) rule 2).
+   - CRM: new partners and contacts from e-mail with their domains, matches, interactions and follow-up tasks, summaries, complaints and processing bases ([ADR-0052](0052-minimal-crm.md) rules 10, 16, 19, 20, 23, 31).
 
    Also the promotion of an agent type to assisted mode (`UpdateAgentTypeSetting`, with a frozen evidence snapshot); its approver must differ from its submitter (`approver_is_submitter`) ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 14).
 
@@ -128,7 +129,7 @@ The hard floor on what a tainted run may read stays the literal spec 03 rule 1 u
 
     [ADR-0050](0050-agent-runtime-and-query-layer.md) rule 27 reads the literal rule as: scope rows, the run's work item, the drafts it or an earlier run of the same item wrote, and reference data (flagged, open question). [ADR-0051](0051-agent-workflows.md) rule 10 gives the effects on the quotation and purchase invoice workflows; the same question is asked for purchase invoices.
 
-    The outbound check also runs in draft plans through `GetOutboundContentCheck` ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 36). Runs on subjects that are outside content start tainted, and after taint no out-of-scope row may enter a prompt or a command input ([ADR-0050](0050-agent-runtime-and-query-layer.md) rules 15, 25).
+    The outbound check also runs in draft plans through `GetOutboundContentCheck` ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 36). Runs on subjects that are outside content start tainted, and after taint no out-of-scope row may enter a prompt or a command input ([ADR-0050](0050-agent-runtime-and-query-layer.md) rules 15, 25). The CRM's outbound checks, and `tainted_read_out_of_scope` for its timeline and duplicate queries outside the scope partner: [ADR-0052](0052-minimal-crm.md) rules 16, 18, 28.
 
 **Audit and checks**
 

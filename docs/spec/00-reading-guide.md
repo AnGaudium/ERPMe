@@ -261,10 +261,21 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Processing basis | processing\_basis | Lawful basis per data subject and purpose (contract, legal obligation, consent), withdrawable; checked before sending a message whose purpose needs consent |
 | Processing log | personal\_data\_processing\_log | Record of processing the law asks to log: personal fields sent to LLMs, lookups of individuals, exports, erasures |
 | Data-subject request | data\_subject\_request, EraseDataSubject | Access, correction or deletion request under the Personal Data Protection Law; a document; erasure is human only and the one command that blanks append-only content |
-| Interaction | interaction, interaction\_content | Append-only record of contact with a partner (email, note, call, meeting, chat); untrusted when from outside; the timeline adds documents by query |
+| Interaction | interaction, interaction\_content | Append-only record of contact with a partner (email, note, call, meeting, chat, task); untrusted when from outside; the timeline adds documents by query |
 | Mailbox | mailbox | Email intake per company with an owning human; messages become untrusted interactions, matched deterministically (reply thread, then authenticated sender); outside content never chooses an agent's read scope |
 | Partner item | partner\_item | A partner's own code, name and unit for one of our items; the stored mappings of the purchase invoice agent |
 | Partner insight, interaction summary | partner\_insight, interaction\_summary | What the system learned about a partner, as visible data: computed values with their method, summaries with their agent run |
+| Inbound message | inbound\_message | One fetched e-mail per mailbox with its natural key (provider key; `Message-ID` and content hashes), sender authentication and interaction; a copy in a second mailbox points to the canonical row ([ADR-0052](../adr/0052-minimal-crm.md)) |
+| Sender authentication | sender\_authentication, is\_sender\_authenticated | DMARC pass, or DKIM aligned exactly with the single `From` domain when DMARC is absent or none, read by an RFC 8601 parser only from the company's receiving server after a probe verified it; required for every automatic match |
+| Partner e-mail domain | partner\_email\_domain, public\_mail\_domain | Domains that identify a partner's e-mail; public mail domains (core and package list) never do |
+| Interaction link | interaction\_link, complaint\_document | References from a matched interaction or a complaint to documents or complaints of the same partner, never copies |
+| Match candidate | interaction\_match\_candidate | A partner a deterministic step suggests for an unmatched message, with its best reason and rank; evidence for a person, never a match |
+| Follow-up task | interaction kind task, follow\_up\_due | An interaction with a due date and an assignee; its work item holds its state |
+| Complaint | complaint: open, closed | A partner's complaint with linked documents; while one is open, dunning skips the customer ([ADR-0048](../adr/0048-cash-bank-receivables-payables.md) rule 17; [ADR-0052](../adr/0052-minimal-crm.md)) |
+| Processing purpose, lawful basis | processing\_purpose, lawful\_basis | A purpose of processing personal data, whether it needs consent and which outbound message types it covers; the lawful basis of a processing basis is contract, legal obligation or consent |
+| Outbound message, delivery attempt | outbound\_message: draft, approved, sending, closed; outbound\_message\_delivery: sent, failed, unknown | A message draft to a partner's contacts, a document type whose subject and body sit in a content row; a person sends it after the consent and scope checks; each send is a delivery attempt, and only a sent attempt closes the message |
+| Partner timeline | ListPartnerTimeline | Interactions, complaints and the partner's documents in date order, by query; untrusted fields only on request |
+| Partner search key | partner\_search\_key | Normalized name (marks removed, a fixed Latin-to-ASCII fold table, package stop words) and tax ID of a partner for the deterministic duplicate search |
 | Buyer | buyer\_id | The employee (a partner with the employee role) responsible for purchasing a product |
 | Data translation | data\_translation | Names users enter for company data in other languages (products, variant values, company units, classification values); an item's display name is the product name plus its variant values |
 | Data label | data\_label | public, internal, personal, sensitive\_personal |
@@ -402,7 +413,7 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Record | Store an outcome reported by an outside system, e.g. an e-invoice outcome | Recorded |
 | Recall | Take back a request sent to an outside system before it took effect | Recalled |
 | Complete | Finish a held step by a human, e.g. a posting after acceptance; or end the logistics of a production order (technical completion); or finish a migration; or finish an agent run with its outcome (`CompleteAgentRun`) | Completed |
-| Reopen | Return a document to draft after an outside step failed; or return a technically complete production order to in progress | Reopened |
+| Reopen | Return a document to draft after an outside step failed; or return a technically complete production order to in progress; or return a closed complaint to open | Reopened |
 | Erase | Remove a data subject's personal data irreversibly | Erased |
 | Request | Hand work to another module for execution, e.g. replenishment or an e-invoice | Requested |
 | Pack, Unpack | Put stock into or take it out of a handling unit | Packed, Unpacked |
@@ -419,7 +430,7 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Reserve | Hold stock for a demand line, e.g. components of a production order | Reserved |
 | Release | Make a draft revision of master data effective from its start date, e.g. a bill of materials revision | Released |
 | Convert | Turn a record into another form once, e.g. a planned order into draft documents | Converted |
-| Match, Unmatch | Link or unlink bank lines or documents; open items are settled against each other by an `open_item_matching` document | Matched, Unmatched |
+| Match, Unmatch | Link or unlink bank lines or documents, or an interaction and its partner; open items are settled against each other by an `open_item_matching` document | Matched, Unmatched |
 | Ignore | Set an imported line aside with a reason, so that no rule or person matches it ([ADR-0048](../adr/0048-cash-bank-receivables-payables.md) rule 8) | Ignored |
 | Transfer | Move records to another account or owner, e.g. a partner's open items | Transferred |
 | Allocate | Distribute an amount or quantity over targets | Allocated |
@@ -427,7 +438,7 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Run | Start a deterministic system job, e.g. period-end actual costing | Completed (`<job noun>Completed`) |
 | Assign | Set the owner of a work item or a warehouse task; or attach output serials to a production order | Assigned |
 | Start | A person begins work on an assigned warehouse task; or start a migration's loading or reconciliation; or start an agent run (`StartAgentRun`) | Started |
-| Close | End further activity on an approved record that has had some, e.g. an order, or a change proposal once executed | Closed |
+| Close | End further activity on an approved record that has had some, e.g. an order, or a change proposal once executed; or end a processing basis when consent is withdrawn or its purpose ends | Closed |
 | Restrict | Narrow who may post in a posting period (open to soft-locked) | Restricted |
 | Open | Let a restricted posting period accept postings from everyone with permission again (soft-locked to open) | Opened |
 | Lock | Stop all postings in a posting period (soft-locked to locked) | Locked |
@@ -436,6 +447,7 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Skip | Leave out an optional step with a reason, e.g. an optional close task | Skipped |
 | Retry | Try a held step again, e.g. a held event delivery | Retried |
 | Replay | Deliver retained events again to a consumer that has not handled them | Replayed |
+| Send | Hand a message to its outside channel for delivery, e.g. an outbound message; the outcome is recorded later | SendRequested |
 
 Work items get the verbs Claim and Unclaim ([ADR-0042](../adr/0042-work-queue.md)), because Lock belongs to posting periods and Release to master data revisions; a command batch needs no verb ([ADR-0008](../adr/0008-command-envelope-and-registry.md) rule 20). A posted document is never canceled: it is corrected by a correction document or, if its type is internal, reversed (Principle 5, [ADR-0009](../adr/0009-document-lifecycle.md) rules 19, 23), so Cancel never applies to posted documents.
 

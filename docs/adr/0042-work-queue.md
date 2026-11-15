@@ -67,7 +67,7 @@ Every exception, pending approval and other piece of business work is one `work_
      - `rule_owner` (a policy rule's owner, ADR-0043);
      - `company_owner` (the `owner` role);
      - `role:<role template>`, such as `role:accountant`, company-wide.
-   - **Fallback.** When a rule yields no one, or the person is deactivated, the owner is the `owner` role. When an owner is deactivated after the raise, `permissions` raises `owner_suspended` with that person's open items as evidence, and the company's owner reassigns them with `AssignWorkItem`.
+   - **Fallback.** When a rule yields no one, or the person is deactivated, the owner is the `owner` role. When an owner is deactivated after the raise, `permissions` raises `owner_suspended` with that person's open items as evidence, and the company's owner reassigns them with `AssignWorkItem`. Kind rules `subject_assignee` (the user the subject names as assignee, such as a follow-up task's) and `subject_owner` (the user the subject names as owner, such as a mailbox's `owner_user_id`) ([ADR-0052](0052-minimal-crm.md) rules 12, 19).
 8. Due rules give business dates through the company calendar (ADR-0024 rule 4; calendar days for layer-2 callers, rule 5):
    - `same_day`, or `days:<n>` business days after the raise;
    - `required_date` minus the lead time, for planning;

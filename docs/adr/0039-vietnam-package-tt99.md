@@ -130,7 +130,7 @@ Under ADR-0016 rule 12, production refuses unverified content until the author v
     - numbering formats (ADR-0009 interim);
     - the e-invoice adapter (DS-24);
     - bank readers (DS-25);
-    - data protection rules (DS-35);
+    - data protection rules (DS-35); Note: these are the `data_protection` package rules ([ADR-0052](0052-minimal-crm.md) rule 24).
     - the working calendar (ADR-0024).
 
     Note: `l10n_vn` owns the Vietnamese tax data (codes, rates, matrix, groups, return forms, package kinds and deductibility rules) under this ADR; DS-23 owns only their format. `l10n_vn`'s golden scenarios are to be listed with DS-19 (open question) ([ADR-0053](0053-core-neutrality.md) rules 10, 13).

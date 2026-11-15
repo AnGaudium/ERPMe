@@ -57,7 +57,7 @@ Checks:
 
    `agent_runs` (layer 2), `agents` and `query` (layer 5) and their imports: [ADR-0050](0050-agent-runtime-and-query-layer.md) rule 1.
 
-   Hooks: a module may declare a hook that another module of the same or a higher layer registers and `app` (layer 6) wires, so no import goes sideways or up; used for the auto-post evidence and the outbound content check ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 36; [ADR-0051](0051-agent-workflows.md) rule 18).
+   Hooks: a module may declare a hook that another module of the same or a higher layer registers and `app` (layer 6) wires, so no import goes sideways or up; used for the auto-post evidence and the outbound content check ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 36; [ADR-0051](0051-agent-workflows.md) rule 18). Also `master_data`'s partner e-mail domain hook, which `crm` registers ([ADR-0052](0052-minimal-crm.md) rule 5).
 
 3. Shape of each module:
    - A module that owns tables or commands has:

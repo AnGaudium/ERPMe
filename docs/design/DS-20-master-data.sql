@@ -294,9 +294,16 @@ CREATE TABLE contact (
     phone               text,
     preferred_language  text,
     is_active           boolean NOT NULL DEFAULT true,
-    FOREIGN KEY (company_id, partner_id) REFERENCES partner (company_id, id)
+    is_accounts_contact boolean NOT NULL DEFAULT false,      -- receives payment reminders (ADR-0052 rule 28)
+    UNIQUE (company_id, id),
+    UNIQUE (company_id, partner_id, id),                     -- keeps a crm row's contact inside its partner (ADR-0052 rule 3)
+    FOREIGN KEY (company_id, partner_id) REFERENCES partner (company_id, id),
+    CONSTRAINT ck_contact_email_lower CHECK (email = lower(email))   -- commands normalize addresses (ADR-0052 rule 4)
 );
 CREATE INDEX ix_contact_partner_id ON contact (partner_id);
+-- E-mail addresses and phones are stored normalized by the commands; crm matches and searches on them (ADR-0052 rules 4, 15, 17).
+CREATE INDEX ix_contact_company_id_email ON contact (company_id, email) WHERE email IS NOT NULL;
+CREATE INDEX ix_contact_company_id_phone ON contact (company_id, phone) WHERE phone IS NOT NULL;
 
 -- ===== Products and items [master_data] (ADR-0018) =====
 CREATE TABLE product_category (

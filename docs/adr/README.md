@@ -54,4 +54,5 @@ One file per decision, named `NNNN-short-title.md`, using [template.md](template
 | [ADR-0048](0048-cash-bank-receivables-payables.md) | Cash, bank, receivables and payables processes (DS-25) | Accepted (2026-11-15) |
 | [ADR-0050](0050-agent-runtime-and-query-layer.md) | Agent runtime and read-only query layer (DS-32, DS-33) | Accepted (2026-11-15) |
 | [ADR-0051](0051-agent-workflows.md) | Agent workflows (DS-34) | Accepted (2026-11-15) |
+| [ADR-0052](0052-minimal-crm.md) | Minimal CRM: partners, contacts, interaction timeline, email intake (DS-35) | Accepted (2026-11-15) |
 | [ADR-0053](0053-core-neutrality.md) | Core neutrality: Vietnamese accounting and tax as an overlay | Accepted (2026-11-15) |

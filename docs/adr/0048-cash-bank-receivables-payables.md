@@ -201,9 +201,9 @@ Allocation is always explicit. A deterministic query proposes it, and a person o
 
 17. Dunning:
     - **Side tables.** `open_item_collection` (open item, `dunning_level`, `last_reminder_date`, `is_payment_blocked`, `is_disputed`, dispute reason) and `partner_collection` (partner, `has_open_complaint`), owned by `cash` (ADR-0026 rule 1's side table).
-    - **Complaints.** A `cash` consumer of `crm`'s complaint events (DS-35) sets and clears `has_open_complaint`. `cash` never imports `crm`.
+    - **Complaints.** A `cash` consumer of `crm`'s complaint events (DS-35) sets and clears `has_open_complaint`. `cash` never imports `crm`. The events are `ComplaintCreated`, `ComplaintUpdated`, `ComplaintClosed` and `ComplaintReopened`; on each, the consumer reads the partner's open complaints with `ListComplaint`, so their order does not matter ([ADR-0052](0052-minimal-crm.md) rule 21).
     - **`RunDunning` (date).** It proposes reminder drafts per customer, for overdue items that are not blocked or disputed, by levels of days overdue (company setting `cash.dunning.levels`, default 7, 30 and 60). Customers with an open complaint are skipped (spec 13).
-    - **Sending.** Reminders are outbound message drafts. A person sends them, after the consent check (ADR-0019 rule 9). Interest on late payment comes later.
+    - **Sending.** Reminders are outbound message drafts. A person sends them, after the consent check (ADR-0019 rule 9). Interest on late payment comes later. The drafts are `crm` outbound messages, made by `crm`'s consumer of `RunDunning`'s completion event, which carries per customer the level and open item IDs; recipients are the contacts flagged `is_accounts_contact` ([ADR-0052](0052-minimal-crm.md) rule 28).
 
 **Ledger and tax seams**
 
