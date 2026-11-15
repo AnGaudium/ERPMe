@@ -58,6 +58,8 @@ components:
   translations: i18n
 ```
 
+A test package ([ADR-0053](../adr/0053-core-neutrality.md) rule 9) adds `is_test_package: true`. Its entries carry the basis `test_fixture` (`basis` in CSV files, `status: test_fixture` in YAML), which CI rejects in any other package. The loader refuses a test package at deploy time in a `production` installation; gate tests set the environment in the harness instead.
+
 ## Basis fields (every template entry and rule)
 
 | Field | When |
@@ -103,7 +105,9 @@ At package level under `tax/` ([ADR-0041](../adr/0041-tax-engine.md) rules 1–3
 
 | File | Columns |
 | --- | --- |
-| `tax_codes.csv` | `code`, names, `tax_kind`, `direction`, `calculation`, `sequence`, `base_includes` (kinds separated by `;`), `transaction_key`, `deductibility`, `import_treatment`, `fixed_asset_code`, `e_invoice_label` |
+| `tax_codes.csv` | `code`, names, `tax_kind` (`vat`, `sales_tax`, `excise`, `customs_duty`, `other`), `package_kind` (optional), `direction`, `calculation`, `sequence`, `base_includes` (core or package kinds separated by `;`), `transaction_key`, `deductibility`, `import_treatment`, `fixed_asset_code`, and, until DS-24 defines its own file, the e-invoice add-on's `e_invoice_label` ([ADR-0053](../adr/0053-core-neutrality.md) rules 2, 12) |
+| `package_kinds.csv` | `code` (never a core kind's code), `tax_kind` (the core kind it belongs to), names, basis columns ([ADR-0053](../adr/0053-core-neutrality.md) rule 2) |
+| `deductibility_rules.yaml` | A YAML list: `code`, `condition_type`, `applies_to` (`tax_kind`, `directions`), `parameters` (the condition type's schema), `effective_from`, and the basis fields of regime settings; at most one rule per tax kind and direction on a date ([ADR-0053](../adr/0053-core-neutrality.md) rule 3) |
 | `tax_rates.csv` | `tax_code`, `effective_from`, `rate_percent` |
 | `tax_matrix.csv` | `direction`, `partner_tax_group`, `item_tax_group`, `effective_from`, `tax_codes` (separated by `;`) |
 | `item_tax_groups.csv`, `partner_tax_groups.csv` | `code`, names, and for partner groups the `directions` they apply to |

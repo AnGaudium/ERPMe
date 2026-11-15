@@ -5,7 +5,8 @@ It applies what the package CI will (ADR-0016 rule 15):
   only leaves postable) and rule 17 (reachability, with stated exceptions), per declared legal form;
 - default determination: ADR-0015 rules 4, 9, 10 and 13;
 - bases: ADR-0016 rule 6 on every template entry and setting; open questions must exist;
-- required settings: the `movement_type.<code>.*` keys that movement-types.csv marks `regime`.
+- required settings: the `movement_type.<code>.*` keys that movement-types.csv marks `regime`;
+- tax files: ADR-0041 rule 20, with the neutral kinds, package kinds and deductibility rules of ADR-0053 rules 2-3.
 
 Usage:
   python3 -I check_package.py <docs dir> <package dir> <regime>
@@ -55,13 +56,16 @@ def run(docs, pkg, regime, quiet=False):
             if not (r['basis_document'] and r['basis_date']): fail(f'{where}: author_decision needs reference and date')
         elif b == 'unverified':
             oq_ok(r['basis_document'], where)
+        elif b == 'test_fixture':
+            if manifest.get('is_test_package') is not True: fail(f'{where}: basis test_fixture outside a test package (ADR-0053 rule 9)')
         else:
             fail(f'{where}: bad basis {b!r}')
         if (r.get('verified_by') or r.get('verified_on')) and b != 'legal_source': fail(f'{where}: verified_* without legal_source')
 
     def basis_yaml(e, where):
-        kinds = [k for k in ('legal_source', 'author_decision') if k in e] + (['unverified'] if e.get('status') == 'unverified' else [])
+        kinds = [k for k in ('legal_source', 'author_decision') if k in e] + ([e['status']] if e.get('status') in ('unverified', 'test_fixture') else [])
         if len(kinds) != 1: fail(f'{where}: needs exactly one basis, has {kinds}'); return
+        if kinds == ['test_fixture'] and manifest.get('is_test_package') is not True: fail(f'{where}: basis test_fixture outside a test package (ADR-0053 rule 9)')
         if kinds == ['unverified']: oq_ok(e.get('open_question', ''), where)
         if kinds == ['author_decision']:
             ad = e['author_decision']
@@ -230,14 +234,26 @@ def run(docs, pkg, regime, quiet=False):
         for name, rows, key in (('tax code', tcodes_rows, 'code'), ('rate', trates, 'tax_code'), ('matrix', tmatrix, 'item_tax_group'),
                                 ('item tax group', itg, 'code'), ('partner tax group', ptg, 'code')):
             for r in rows: basis_csv(r, f'{name} {r[key]}')
-        kinds = {'vat', 'import_duty', 'special_consumption', 'environmental_protection', 'trade_remedy'}
+        # Core tax kinds (ADR-0053 rule 2); a package names its own in tax/package_kinds.csv, each under one core kind.
+        kinds = {'vat', 'sales_tax', 'excise', 'customs_duty', 'other'}
+        _pk = os.path.join(tdir, 'package_kinds.csv')
+        pkinds_rows = load(_pk) if os.path.exists(_pk) else []
+        pkinds = {r['code']: r for r in pkinds_rows}
+        if len(pkinds) != len(pkinds_rows): fail('package kinds: duplicate code')
+        for r in pkinds_rows:
+            basis_csv(r, f'package kind {r["code"]}')
+            if r['tax_kind'] not in kinds: fail(f'package kind {r["code"]}: core kind {r["tax_kind"]!r}')
+            if r['code'] in kinds: fail(f'package kind {r["code"]}: shadows a core kind')
         enums = {'tax_kind': kinds, 'direction': {'sale', 'purchase', 'import'}, 'calculation': {'percent', 'none', 'assessed'},
                  'deductibility': {'', 'deductible', 'not_deductible'}, 'import_treatment': {'', 'capitalize', 'recoverable'},
-                 'e_invoice_label': {'', '0%', 'KCT', 'KKKNT'}}
+                 'e_invoice_label': {'', '0%', 'KCT', 'KKKNT'}}   # e-invoice add-on data kept in the draft (ADR-0053 rule 12)
         resolved = {d['tax_code'] for d in det if d['transaction_key']} | {''}
         for c, r in tcodes.items():
             for col, ok in enums.items():
                 if r[col] not in ok: fail(f'tax code {c}: {col} {r[col]!r}')
+            pk_ = r.get('package_kind', '')
+            if pk_ and pk_ not in pkinds: fail(f'tax code {c}: undeclared package kind {pk_}')
+            elif pk_ and pkinds[pk_]['tax_kind'] != r['tax_kind']: fail(f'tax code {c}: package kind {pk_} belongs to {pkinds[pk_]["tax_kind"]}, not {r["tax_kind"]}')
             if r['transaction_key'] not in TK: fail(f'tax code {c}: unknown transaction key {r["transaction_key"]}')
             elif not any(d['transaction_key'] == r['transaction_key'] and d['tax_code'] in ('', c) for d in det):
                 fail(f'tax code {c}: key {r["transaction_key"]} has no determination row (ADR-0015 rule 13)')
@@ -246,7 +262,7 @@ def run(docs, pkg, regime, quiet=False):
             if r['calculation'] == 'none' and r['direction'] == 'sale' and not r['e_invoice_label']: fail(f'tax code {c}: no e-invoice label')
             if r['calculation'] == 'percent' and r['e_invoice_label']: fail(f'tax code {c}: a percent code prints its rate, no label')
             for k in [x for x in r['base_includes'].split(';') if x]:
-                if k not in kinds: fail(f'tax code {c}: base_includes unknown kind {k}')
+                if k not in kinds and k not in pkinds: fail(f'tax code {c}: base_includes unknown kind {k}')
             if r['fixed_asset_code'] and (r['fixed_asset_code'] not in tcodes or tcodes[r['fixed_asset_code']]['direction'] != r['direction']):
                 fail(f'tax code {c}: bad fixed_asset_code {r["fixed_asset_code"]}')
         seen_r = set()
@@ -304,7 +320,41 @@ def run(docs, pkg, regime, quiet=False):
                             if b not in boxes: fail(f'return {fn} box {r["box"]}: formula refers to unknown box {b}')
                     else:
                         fail(f'return {fn} box {r["box"]}: bad source {part!r}')
-        tax_settings = {'tax.rate_date_basis', 'tax.declaration_date_basis', 'tax.rounding_level', 'tax.non_cash_payment_threshold',
+        # Deductibility conditions (ADR-0053 rule 3): package rules of core condition types, with one basis each.
+        dr_path = os.path.join(tdir, 'deductibility_rules.yaml')
+        if os.path.exists(dr_path):
+            cond_types = {'payment_evidence_threshold': {'threshold', 'aggregation', 'failing_methods', 'lapse', 'exempt_document_kinds'}}
+            methods = {'cash', 'bank_transfer', 'card', 'offset', 'third_party'}   # evidence_method values; none never fails
+            aggs = {'per_seller_per_day', 'per_document'}
+            seen_dr = set()
+            dr_codes = {}   # (tax_kind, direction) -> rule codes; rules have no end date, so two codes overlap
+            for e in yaml.safe_load(open(dr_path, encoding='utf-8')) or []:
+                where = f'deductibility rule {e.get("code")}'
+                ident = (e.get('code'), str(e.get('effective_from')))
+                if ident in seen_dr: fail(f'{where}: defined twice for {ident[1]}')
+                seen_dr.add(ident)
+                if not datere.match(ident[1]): fail(f'{where}: date {ident[1]!r}')
+                basis_yaml(e, where)
+                at = e.get('applies_to') or {}
+                for dn_ in at.get('directions') or []: dr_codes.setdefault((at.get('tax_kind'), dn_), set()).add(e.get('code'))
+                if at.get('tax_kind') not in kinds: fail(f'{where}: applies to unknown tax kind {at.get("tax_kind")!r}')
+                if not at.get('directions') or set(at['directions']) - {'purchase', 'import'}: fail(f'{where}: directions must be purchase or import')
+                ct = e.get('condition_type')
+                if ct not in cond_types: fail(f'{where}: unknown condition type {ct!r}'); continue
+                p = e.get('parameters') or {}
+                if set(p) != cond_types[ct]: fail(f'{where}: parameters {sorted(p)} != {sorted(cond_types[ct])}'); continue
+                th = p['threshold'] or {}
+                if not (th.get('amount') and th.get('currency') and isinstance(th.get('includes_tax'), bool)): fail(f'{where}: threshold needs amount, currency, includes_tax')
+                ag = p['aggregation'] or {}
+                if ag.get('default') not in aggs or any(v not in aggs for v in (ag.get('by_document_kind') or {}).values()): fail(f'{where}: bad aggregation')
+                if not p['failing_methods'] or set(p['failing_methods']) - methods: fail(f'{where}: bad failing_methods')
+                if p['lapse'] not in ('due_date', 'none'): fail(f'{where}: bad lapse')
+                if not isinstance(p['exempt_document_kinds'], list): fail(f'{where}: exempt_document_kinds must be a list')
+            for (tk_, dn_), codes_ in sorted(dr_codes.items()):
+                if len(codes_) > 1: fail(f'deductibility rules overlap for {tk_}/{dn_}: {sorted(codes_)} (one rule per tax kind and direction on a date)')
+            notes.append(f'deductibility: {len(seen_dr)} rules')
+        # tax.non_cash_payment_threshold is no longer a core key (ADR-0053 rule 3).
+        tax_settings = {'tax.rate_date_basis', 'tax.declaration_date_basis', 'tax.rounding_level',
                         'tax.stated_amount_tolerance', 'tax.apportionment', 'tax.return_period'}
         pkg_settings_path = os.path.join(pkg, 'settings.yaml')
         have = {e['key'] for e in (yaml.safe_load(open(pkg_settings_path, encoding='utf-8')) or [])} if os.path.exists(pkg_settings_path) else set()
@@ -363,6 +413,12 @@ def self_test(docs, pkg, regime):
         ('bad return source', lambda d: edit_pkg(d, 'tax/returns/01_gtgt.csv', 'formula:[35]-[25]', 'formula:[35]-[99]')),
         ('tax code without basis', lambda d: edit_pkg(d, 'tax/tax_codes.csv', ',unverified,"(DS-23) Vietnamese tax codes, matrix and 01/GTGT boxes",', ',,,')),
         ('stated unreached account removed', edit('unreached_system_accounts.csv', 'inventory_other,', 'inventory_otherx,')),
+        ('package kind under another tax kind', lambda d: edit_pkg(d, 'tax/tax_codes.csv', ',customs_duty,import_duty,import,', ',excise,import_duty,import,')),
+        ('undeclared kind in a VAT base', lambda d: edit_pkg(d, 'tax/tax_codes.csv', ',special_consumption;environmental_protection,', ',special_consumption;environmental,')),
+        ('unknown deductibility condition type', lambda d: edit_pkg(d, 'tax/deductibility_rules.yaml', 'condition_type: payment_evidence_threshold', 'condition_type: no_such_condition')),
+        ('deductibility rule without basis', lambda d: edit_pkg(d, 'tax/deductibility_rules.yaml', '  status: unverified\n', '')),
+        ('two deductibility rules for one kind and direction', lambda d: edit_pkg(d, 'tax/deductibility_rules.yaml', '- code: non_cash_payment_threshold\n', '- code: second_rule\n  condition_type: payment_evidence_threshold\n  applies_to: {tax_kind: vat, directions: [purchase]}\n  parameters:\n    threshold: {amount: "1", currency: VND, includes_tax: true}\n    aggregation: {default: per_document}\n    failing_methods: [cash]\n    lapse: none\n    exempt_document_kinds: []\n  effective_from: 2026-01-01\n  status: unverified\n  open_question: "(DS-23) Input VAT and non-cash payment"\n- code: non_cash_payment_threshold\n')),
+        ('test_fixture basis outside a test package', edit('account_determination.csv', ',unverified,(DS-19) TT99 default account determination,', ',test_fixture,,')),
     ]
     wrong = 0
     for name, apply in M:

@@ -122,6 +122,8 @@ Under ADR-0016 rule 12, production refuses unverified content until the author v
      - where accounts go: unabsorbed, abnormal and residual cost reach cost of goods sold through determination (rule 8);
      - the alternative accounting for processor stock, which would need a core change (ADR-0037 rule 1).
    - **Period pattern.** It is a package template, not a rule (ADR-0016 rule 5; ADR-0012 rule 1): `close_checklist.yaml` seeds monthly periods and one special period. Its tasks come in step 8.
+
+   Note: the package level also carries `documents.issuance_without_delay` (true, `unverified`), and the non-cash threshold left the settings for the deductibility rule `non_cash_payment_threshold` ([ADR-0053](0053-core-neutrality.md) rules 3, 8).
 10. Owned elsewhere, not shipped by DS-19:
     - tax codes, rates, `import_treatment` and item tax groups (DS-23, which ADR-0018 rule 16 and ADR-0021 rule 11 now point to);
     - statutory reports and close task content (DS-26, step 8);
@@ -130,6 +132,8 @@ Under ADR-0016 rule 12, production refuses unverified content until the author v
     - bank readers (DS-25);
     - data protection rules (DS-35);
     - the working calendar (ADR-0024).
+
+    Note: `l10n_vn` owns the Vietnamese tax data (codes, rates, matrix, groups, return forms, package kinds and deductibility rules) under this ADR; DS-23 owns only their format. `l10n_vn`'s golden scenarios are to be listed with DS-19 (open question) ([ADR-0053](0053-core-neutrality.md) rules 10, 13).
 
 **Validation**
 

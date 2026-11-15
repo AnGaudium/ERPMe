@@ -174,6 +174,8 @@ The web UI is one more client of the command and query layer. It writes data onl
     - **Vietnamese.** It is drafted and reviewed in Weblate; CI fails on an empty Vietnamese key in the core catalog.
     - **Terminology.** Accounting terms in a package's terminology catalog carry a basis like other package content (ADR-0016 rule 6), so the author verifies them.
     - **Untranslated content.** User-entered text is never translated.
+
+    Note: Vietnamese UI strings stay in the core catalog (D8). Vietnamese accounting names for system accounts and keys belong to `l10n_vn`'s terminology catalog, which also names `enum.partner_kind.sole_proprietorship` ([ADR-0053](0053-core-neutrality.md) rules 7, 16).
 16. Keyboard model (step 9's measure is keyboard-first, ADR-0003 R9):
     - **Global:** `Ctrl/Cmd+K` palette; `g` then a letter to go to an area; `?` shows every shortcut; `Esc` closes.
     - **Forms:** `Enter` moves to the next field and `Shift+Enter` back. `F2` or typing opens a lookup. `Alt+N` adds a line and `Alt+Delete` removes one. `Ctrl+Enter` reviews, then confirms.
@@ -211,6 +213,8 @@ The web UI is one more client of the command and query layer. It writes data onl
     - **Languages:** English and Vietnamese.
 
     It is enough to operate and test every command (spec 11, B6). From step 5 it also hosts, as generated screens, the desktop warehouse task confirmation (ADR-0023 rule 22), the work queue (a list of work items) and change proposals.
+
+    Note: Vietnamese here is a UI language, shipped by the core (D8), not overlay ([ADR-0053](0053-core-neutrality.md) rule 16).
 20. Owned elsewhere:
     - **Hand-built screens.** The UX spec of the six hand-built screens (sales invoice, goods receipt, goods issue, cash receipt, cash payment, journal entry) is written before step 9. It builds on DS-22 and DS-25, which define those documents. It follows these rules: header fields in keyboard order, the AG Grid line editor, the review shortcut, and lookups that type ahead.
     - **Production and planning screens** are generated over their queries (ADR-0034 rule 18; ADR-0024).

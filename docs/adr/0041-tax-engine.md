@@ -38,6 +38,8 @@ Tax codes, dated rates and a dated tax matrix are package rules, read live. The 
    - **Outputs:**
      - `e_invoice_label`: the label an e-invoice prints for a code without a computed rate (`0%`, `KCT`, `KKKNT`); a percent code prints its rate (DS-24).
      - Which return boxes a code feeds is defined by the return form (rule 19), not on the code.
+
+   Note: `tax_kind` is one of `vat`, `sales_tax`, `excise`, `customs_duty` or `other`. A package keeps its own names in `package_kind`, declared in `tax/package_kinds.csv`, and `base_includes` may name core kinds or package kinds. `l10n_vn` maps `import_duty` and `trade_remedy` to `customs_duty`, and `special_consumption` and `environmental_protection` to `excise`; the base example above is `l10n_vn`'s. `fixed_asset_code` is an optional capital-goods mapping usable by any regime: the code a purchase or import line uses instead when it acquires a fixed asset, so its tax reaches the regime's capital-goods input tax account. `e_invoice_label` leaves the core `tax_code` for the data of the e-invoice add-on (DS-24); the draft column stays in DS-19 until DS-24 defines its file ([ADR-0053](0053-core-neutrality.md) rules 2, 12).
 2. `tax_rate`: `tax_code`, `effective_from`, `rate_percent` (ADR-0006 rule 9) and basis.
    - **Temporary rates.** A temporary reduction is a rate row followed by a row restoring the rate.
    - **Used rows never change** (ADR-0016 rule 13).
@@ -53,6 +55,8 @@ Tax codes, dated rates and a dated tax matrix are package rules, read live. The 
    - `tax.stated_amount_tolerance` (per line, in minor units);
    - `tax.apportionment` (the return boxes whose sum is taxable revenue and total revenue);
    - `tax.return_period`, an option a company picks (`monthly` or `quarterly`, ADR-0016 rule 11).
+
+   Note: `tax.non_cash_payment_threshold` is no longer a core key. Its content is the parameters of a package-declared `payment_evidence_threshold` rule in `tax/deductibility_rules.yaml` ([ADR-0053](0053-core-neutrality.md) rule 3).
 
 **Document taxes**
 
@@ -95,6 +99,8 @@ Tax codes, dated rates and a dated tax matrix are package rules, read live. The 
     **Zero rows.** Zero-rated, not-subject and no-VAT codes write rows with zero tax, so return bases come from `tax_line` alone.
 
     A branch is a declaring unit when `is_declaring_unit` is set ([ADR-0045](0045-master-data-and-price-lists.md) rule 8).
+
+    Note: `initial_deductibility` takes the neutral states `deductible`, `conditional` or `not_deductible`. Each purchase or import row also records `deductibility_rule_id`, the package rule row in force on its tax date (null when none applies), fixed at posting ([ADR-0053](0053-core-neutrality.md) rule 3).
 12. Company currency and the journal:
     - **Journal tax lines.** The journal gets one tax line per tax code and entry, converted once by `convert_amount` (ADR-0011 rule 5) and carrying `tax_code_id`. Base lines carry no tax code (ADR-0014 rule 9).
     - **Tax rows.** Their company amounts are that journal line's company amount, spread over the rows by largest remainder over their exact converted values, so the subledger and the journal tie by construction.
@@ -107,6 +113,8 @@ Tax codes, dated rates and a dated tax matrix are package rules, read live. The 
     - **Columns:** `adjusts_tax_line_id`, `kind`, `deductible_delta` (in document and company currency; positive raises deductible VAT), `declaration_date`, `reason`, and the journal entry when one posts.
     - **Kinds:** `payment_evidence`, `cash_payment`, `due_date_lapse`, `apportionment`, `period_move`, `reversal_of_adjustment`.
     - **Postings.** An adjustment that moves VAT between input tax and expense posts a `tax_adjustment` document (`PostTaxAdjustment`, actor `system`) through `input_tax_non_deductible`. The posting carries the source line's dimensions (cost center, project, item) and posts on the adjustment's declaration date.
+
+    Note: the kinds are `condition_met`, `condition_failed` (with the condition type's reason in `reason`, e.g. `failing_method` or `lapsed`), `apportionment`, `period_move` and `reversal_of_adjustment`. `payment_evidence`, `cash_payment` and `due_date_lapse` are gone ([ADR-0053](0053-core-neutrality.md) rule 3).
 
 **Input VAT deductibility (Vietnam, flagged)**
 
@@ -128,6 +136,8 @@ Tax codes, dated rates and a dated tax matrix are package rules, read live. The 
     | `deductible_until_due` | matched against an advance | as the advance's method gives | as that row | as that row |
     | `deductible_until_due` | matched against a credit note | the evidence-requiring amount drops by the credit | yes | none |
 
+    Note: the core projection is neutral: states `deductible`, `conditional` (replacing `deductible_until_due`) and `not_deductible`, driven by package-declared conditions of core types. This table, the threshold and its legal sources are `l10n_vn`'s rule `non_cash_payment_threshold` of type `payment_evidence_threshold`, and "In box [25]" is its return box. The work items are `tax_condition_pending` and `tax_deductibility_changed` ([ADR-0053](0053-core-neutrality.md) rules 3, 4).
+
 15. Payment evidence travels by event, so `ledger` never imports `tax` (ADR-0022 rule 2): Settlements of opening open items, which have no tax rows, are skipped ([ADR-0044](0044-data-migration-and-export.md) rule 13).
     - **The method.** Every settlement of an open item (ADR-0026 rule 6) records `evidence_method`: `cash`, `bank_transfer`, `card`, `offset` or `third_party`. It is recorded on the settlement because offsets have no payment document.
     - **The event.** `ledger` emits `OpenItemSettled` (item, amount, date, method, `reversal_of`) through the outbox.
@@ -139,6 +149,8 @@ Tax codes, dated rates and a dated tax matrix are package rules, read live. The 
     - **The due-date job.** A daily job applies `due_date_lapse`.
 
     Value `none` is added (write-offs, payment discounts, credit note matchings, balance transfers); a matching against an advance or a payment on account copies that item's own method, which its origin line records. The value is stored on the journal line ([ADR-0048](0048-cash-bank-receivables-payables.md) rule 18).
+
+    Note: `evidence_method` records how a settlement was paid, in any regime; a condition's `failing_methods` decides what fails it. The due-date job applies `condition_failed` with reason `lapsed` where the condition has a lapse ([ADR-0053](0053-core-neutrality.md) rules 3, 11).
 16. Apportionment. Rows with `input_use: shared` are apportioned at period end by the ratio of `tax.apportionment` (taxable revenue boxes over total revenue boxes), with an annual true-up at fiscal year end. A close task posts the result as `apportionment` adjustments.
 17. Declaration date. It comes from `tax.declaration_date_basis`:
     - **Sales:** the invoice date.
@@ -180,6 +192,8 @@ Tax codes, dated rates and a dated tax matrix are package rules, read live. The 
     - **Settings:** the `tax.*` settings exist.
     - **Bases:** every row has one.
 
+    Note: the check also validates the neutral tax kinds, package kinds, `base_includes` and `deductibility_rules.yaml`, and no longer requires `tax.non_cash_payment_threshold` ([ADR-0053](0053-core-neutrality.md) rules 2, 3).
+
 **Vietnamese content (draft, all unverified)**
 
 21. The Vietnamese draft lives in `docs/design/DS-19-vietnam-tt99/tax/`:
@@ -192,6 +206,8 @@ Tax codes, dated rates and a dated tax matrix are package rules, read live. The 
       - assessed import duty, excise, environmental protection tax and trade remedy duty.
     - **The 01/GTGT form:** bases and taxes by rate, deductible [25] from `deductible:`, prior-period [37]/[38], [22] carried from [43], and the computed boxes, in the Circular 80/2021 layout pending the Circular 89/2026 form. [23]/[24] include imports, and [23a]/[24a] are the import subset.
     - **Unconfirmed points** are open questions: the 8% at import, 8% sales in [32]/[33], the reduction appendix to the return, and the late-deduction limit.
+
+    Note: this content is `l10n_vn`'s, owned by ADR-0039 ([ADR-0053](0053-core-neutrality.md) rule 13).
 22. Not in Phase 1 unless the author decides otherwise (open question): the direct VAT method, foreign contractor tax withholding, personal income tax withholding, and capitalizing non-deductible VAT into stock or assets (`input_tax_non_deductible` requires an expense).
 
 ## Context
@@ -220,6 +236,7 @@ SAP stores tax items per document and declares through its advance return; Odoo 
 
 - **Catalogs:**
   - transaction keys `input_tax_non_deductible`, `environmental_protection_tax`, `trade_remedy_duty`;
+    - note: `environmental_protection_tax` is replaced by `other_tax`, determined by tax code ([ADR-0053](0053-core-neutrality.md) rule 5);
   - invariants INV-300 and INV-301 (a new group for tax);
   - edge cases for the credit note across the rate change and for cash above the threshold.
 - **ADR notes:**

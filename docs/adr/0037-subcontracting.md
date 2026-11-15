@@ -83,6 +83,8 @@ Outsourced work runs on the production core:
      - leftover and report deadlines as regime settings;
      - the year-end disclosure of materials held for others (DS-26).
 
+   Note: "held in 154" reads "held in work in process (e.g. 154 in TT99)" ([ADR-0053](0053-core-neutrality.md) rule 14).
+
 **Checks and catalogs**
 
 9. Catalog changes, version 0.x. The transaction keys become 46 (ADR-0015):

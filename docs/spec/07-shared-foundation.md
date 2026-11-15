@@ -22,7 +22,7 @@ An accounting regime (`accounting_regime`) is part of a localization package (se
   - Rate and accounts used for period-end revaluation.
   - Rate source: the commercial bank the company uses, fetched daily.
 - **Balancing:** every journal entry balances in each transaction currency, in company currency and in group currency. Rounding differences from conversion go to a rounding line on a defined system account (DS-02 and DS-06 decide which).
-- **Realized FX differences** on payment post to 515 or 635 (Vietnam).
+- **Realized FX differences** on payment post to the realized FX keys (e.g. 515/635 in TT99).
 - **Period-end revaluation** of foreign-currency monetary items. Receivables and payables are revalued per open item; cash, bank and loan balances are revalued at balance level. Advances to suppliers and from customers are non-monetary and are not revalued. **Verify against the original TT99 text** (Appendix II, accounts 413, 515, 635): secondary sources disagree on whether buy and sell rates are still separated or an average transfer rate is used, and whether differences still pass through 413 or go straight to 515/635. This rule must therefore live in the package configuration.
 - **Inventory cost is always in company currency.** Foreign purchase prices convert at recognition. Import costs: see [Imports and purchase costs](08-l10n-vn.md#imports-and-purchase-costs).
 - **Rate types are separate:** a foreign-currency invoice stores its invoice rate separately from the book rate; the customs duty rate is separate from the accounting rate.

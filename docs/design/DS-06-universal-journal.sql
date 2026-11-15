@@ -178,7 +178,7 @@ CREATE TABLE journal_line (
     material_document_line_id  uuid          REFERENCES material_document_line (id),
     open_item_id               uuid          REFERENCES open_item (id),
     purchase_order_line_id     uuid,         -- ADR-0030 rule 3: GR/IR per order line; FK to purchase_order_line added at step 5
-    evidence_method            text          CONSTRAINT ck_journal_line_evidence_method CHECK (evidence_method IS NULL OR (open_item_id IS NOT NULL AND evidence_method IN ('cash', 'bank_transfer', 'card', 'offset', 'third_party', 'none'))),   -- lines of ADR-0048 rule 18
+    evidence_method            text          CONSTRAINT ck_journal_line_evidence_method CHECK (evidence_method IS NULL OR (open_item_id IS NOT NULL AND evidence_method IN ('cash', 'bank_transfer', 'card', 'offset', 'third_party', 'none'))),   -- lines of ADR-0048 rule 18; how a settlement was paid, in any regime (ADR-0053 rule 11)
     derivation_trace_id        uuid          REFERENCES derivation_trace (id),
     description                text,
     recorded_at                timestamptz   NOT NULL DEFAULT now(),

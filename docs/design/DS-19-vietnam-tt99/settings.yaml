@@ -40,7 +40,15 @@
   status: unverified
   open_question: "(DS-36) Attachment retention"
 
+# --- Documents (ADR-0053 rule 8): invoice law, so every regime ---
+- key: documents.issuance_without_delay
+  value: true
+  effective_from: 2026-01-01
+  status: unverified
+  open_question: "(DS-22, DS-24) Issuance without delay: must sales invoices and their correction documents be issued without waiting for an approval"
+
 # --- Tax (ADR-0041 rule 5) ---
+# The non-cash payment threshold is a deductibility rule in tax/deductibility_rules.yaml (ADR-0053 rule 3).
 - key: tax.rate_date_basis
   value: {sales_invoice: invoice_date, purchase_invoice: supplier_invoice_date, customs_declaration: declaration_date, correction: original_line_tax_date}
   effective_from: 2026-01-01
@@ -58,12 +66,6 @@
   effective_from: 2026-01-01
   status: unverified
   open_question: "(DS-23) VAT rounding level"
-
-- key: tax.non_cash_payment_threshold
-  value: {amount: "5000000", currency: VND, includes_tax: true, aggregate_same_day_same_seller: true}
-  effective_from: 2026-01-01
-  status: unverified
-  open_question: "(DS-23) Input VAT and non-cash payment"
 
 - key: tax.stated_amount_tolerance
   value: {per_line_minor_units: 1}

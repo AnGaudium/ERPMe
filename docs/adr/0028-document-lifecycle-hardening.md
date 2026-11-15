@@ -58,6 +58,8 @@ This ADR amends the document lifecycle (ADR-0009) in five places, before step 3 
 6. A document type declares `is_e_invoice_capable`. Whether an e-invoice is required for it is the regime's setting (DS-24; ADR-0016). For such a type, with the e-invoice required, the states are `draft → issuing → posted`, and back to `draft` on rejection. Approval hold stays unavailable (ADR-0009 rule 12).
    - **`issuing` is not final.** Header and lines are immutable in it, as in `posted` (ADR-0009 rule 14), because the content has been sent to the tax authority.
    - **Commands allowed in `issuing`:** the outcome commands of rule 7, and `Recall<Type>` (rule 10).
+
+   Note: for types with `is_approval_hold_allowed: regime`, while `documents.issuance_without_delay` is false the approval hold is available, and the states are `draft → pending_approval → approved → issuing → posted`. `Issue<Type>` is allowed only from `approved`, and a rejection returns the document to `draft`, to be submitted again. While the setting is true, this rule applies as written ([ADR-0053](0053-core-neutrality.md) rule 8).
 7. The flow:
    1. **`Issue<Type>`** (human or policy-allowed; verb Issue, event form `IssueRequested`; effect class `posting`). The dispatcher asks the policy here, and the decision is stored. The command:
       - runs the package validation of rule 8, and the same period checks and period share lock as `Post` (ADR-0009 rule 13; ADR-0012 rule 9);

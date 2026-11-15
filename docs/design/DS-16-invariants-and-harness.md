@@ -135,6 +135,8 @@ The product is `erpme` (ADR-0004 rule 7). Test tooling lives in separate top-lev
     - Examples run in one test database per worker (testcontainers PostgreSQL, ADR-0002), and RLS scopes every check to the example's company.
     - At session end, a global check confirms that no example changed another company's row fingerprints. This catches leaks that RLS-scoped checks cannot see.
     - Group currency is installation-wide and fixed after the first posting (ADR-0011 rule 6), so CI runs two installations: one without and one with a group currency.
+
+    Amendment ([ADR-0053](../adr/0053-core-neutrality.md) rule 9): core examples create their company with the fictional test package `l10n_xx` (regime `test`, `test_fixture` settings, a chart of about 30 accounts, two or three tax codes and one deductibility rule), not with the Vietnam package, so core property tests never depend on the overlay. `l10n_vn` runs in its package-level golden tests (`l10n/l10n_vn/tests/golden/`) and its dataset profiles (DS-17).
 19. Business dates move through `business_date_override` per company (ADR-0007 rule 15); `clock.now()` is never overridden. Backdated events choose earlier posting dates in open periods. The scenario runner does the same.
 20. Hypothesis profiles:
 

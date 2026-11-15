@@ -43,6 +43,8 @@ Allocation is always explicit. A deterministic query proposes it, and a person o
    - **`general_journal`** stays `ledger`'s (ADR-0014 rule 3). Rule 15 adds its approval and control-account rules.
    - **Spec 08's names:** cash receipt (phiếu thu) is `cash_receipt`, cash payment (phiếu chi) is `cash_payment`, and bank credit and debit advices are `bank_receipt` and `bank_payment`. The cash book is a report (DS-26).
 
+   Note: the Vietnamese voucher names are examples from spec 08; the types are neutral ([ADR-0053](0053-core-neutrality.md) rule 14).
+
 **Money accounts**
 
 2. `money_account` (company data, `master_data_change`, change-tracked; agents propose changes, ADR-0029 rule 5):
@@ -164,6 +166,8 @@ Allocation is always explicit. A deterministic query proposes it, and a person o
       - **Expenses below the advance** leave the rest open, repaid by a `cash_receipt`.
       - **Expenses above the advance:** the excess is paid to the employee first by a `cash_payment` or `bank_payment` with an `advance` line, and then settled. This is the common practice for account 141, `unverified`, and needs no payable account for employees. The open questions on employees as suppliers and on salaries per employee stay as they are.
 
+    Note: settling the excess as a further advance is regime-neutral: one open item per advance. The account-141 practice is `l10n_vn`'s reading ([ADR-0053](0053-core-neutrality.md) rule 14).
+
 **Close jobs**
 
 14. Close jobs (ADR-0027 rule 8; ADR-0012 rule 13). Both are system jobs that post ordinary documents as `system`. The documents are reversible, and the jobs are idempotent per period.
@@ -182,6 +186,8 @@ Allocation is always explicit. A deterministic query proposes it, and a person o
     - **Approval.** Spec 08 asks for approval. The core seeds a rule requiring `standard` approval for `submit` and `post` of `general_journal`, for every actor kind (flagged; small companies follow ADR-0043 rule 13).
     - **Control accounts.** Lines on accounts with a control kind are rejected with `manual_posting_to_control_account`, unless the regime setting `journal.manual_posting_to_control_accounts` is true (ADR-0014 rule 10 gets a note; Vietnam seeds false).
     - **Expenses without an order** may use a payment's `account` line or a purchase invoice's `expense` line (ADR-0047 rule 12). Both apply the supplier-invoice key.
+
+    Note: the approval seed is core segregation-of-duties practice, not a Vietnamese rule ([ADR-0053](0053-core-neutrality.md) rule 14).
 16. Reversals (ADR-0009 rules 18–19):
     - **When.** A payment, netting, write-off or settlement document may be reversed while no document that is not reversed or canceled refers to it.
     - **How.** The reversal mirrors its lines exactly, realized differences and evidence methods included (ADR-0026 rule 11; EC-52). A bank statement line matched to the document returns to `unmatched` in the same transaction.
@@ -247,6 +253,8 @@ Allocation is always explicit. A deterministic query proposes it, and a person o
       - an employee advance overspent and topped up before settlement.
 
       DS-17 adds events `cash_counted`, `currency_exchanged` and `advance_settled` to its cash group; EC-77 uses `period_closed`.
+
+    Note: `cash_surplus` and `cash_shortage` also list `non_operating_income` and `non_operating_expense`, and `bank_charge` lists `financial_expense`, as regime alternatives; the TT99 rows are unchanged ([ADR-0053](0053-core-neutrality.md) rule 6).
 21. Lab check `t08_cash.py` ([validation lab](../reviews/2026-11-14-design-validation/README.md)), pure functions:
     - the matching cascade: already-posted first, whole-token references within one partner, side and currency, partial references, shared accounts, subsets, and the same proposal for shuffled inputs;
     - allocation proposals; discounts by rule 7's gross-up; provision buckets;

@@ -106,7 +106,7 @@ Policy is a deterministic threshold table per company, as runbook B7 asks.
    For commands registered `is_policy_in_handler`, the floors run inside `context.evaluate_policy`.
 
    **On every post and issue.** Floors 3 to 6 are checked by the dispatcher on every `Post` and `Issue` command, including `Post` of an approved document, which asks no policy (ADR-0009 rule 11). A violation gives `human_only`. A `Post` of an approved document by an actor of another kind than the one its decision was made for is also a policy point (a note on ADR-0029 rule 6). So a document a person submitted is not posted by a non-human without its own decision.
-10. Documents that may not wait (`is_approval_hold_allowed: false`): a rank becomes `human_post` and the stored outcome is `human_only` (ADR-0009 rule 12 interim).
+10. Documents that may not wait (`is_approval_hold_allowed: false`): a rank becomes `human_post` and the stored outcome is `human_only` (ADR-0009 rule 12 interim). Note: for types with `is_approval_hold_allowed: regime` this applies while `documents.issuance_without_delay` is true for the document's date; while it is false they follow the ordinary approval path ([ADR-0053](0053-core-neutrality.md) rule 8).
 
 **Monotonic rule sets**
 

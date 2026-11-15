@@ -123,7 +123,7 @@ Before step 1 code freezes the platform modules, every entity that several modul
 
 **Catalog and glossary consistency**
 
-11. ADR-0015 rule 2 gets one exception, kept as data: a column `has_regime_alternatives` in `transaction-keys.csv` marks keys that share a system account's code while listing alternatives that are a regime choice under rule 4 (`price_difference`, `fx_gain_unrealized`, `fx_loss_unrealized`). CI reads that column. ADR-0015's key count becomes 38.
+11. ADR-0015 rule 2 gets one exception, kept as data: a column `has_regime_alternatives` in `transaction-keys.csv` marks keys that share a system account's code while listing alternatives that are a regime choice under rule 4 (`price_difference`, `fx_gain_unrealized`, `fx_loss_unrealized`). CI reads that column. ADR-0015's key count becomes 38. Note: the column also marks keys that do not share a system account's code, whenever the listed accounts are alternatives a regime or company chooses between (`cash_surplus`, `cash_shortage`, `bank_charge`, `production_abnormal_cost`, `production_unabsorbed_overhead`) ([ADR-0053](0053-core-neutrality.md) rule 6).
 12. Glossary fixes:
     - one definition of preliminary price, and one row for company and branch;
     - the stock quantity row with bin, status and handling unit;

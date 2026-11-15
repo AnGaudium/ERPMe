@@ -61,7 +61,7 @@ The simulator runs fictional companies day by day. It writes what happened in bu
    | Sales | `quotation_requested` (e-mail), `sales_ordered`, `sales_order_changed`, `sales_invoice_issued` (with installments from the payment term), `credit_note_issued` | 5 |
    | Cash | `payment_received`, `payment_made`, `bank_statement_received`, `netting_agreed`, `advance_paid`, `auto_post_confirmed` (the rule owner confirms auto-posts), `cash_counted`, `currency_exchanged`, `advance_settled` (ADR-0048) | 6 |
    | Safety | `bank_account_change_requested` (an e-mail asks to change a partner's bank account) | 5 |
-   | Tax | `tax_rate_changed`, `invoice_replaced`, `invoice_adjusted` | 7 |
+   | Tax | `tax_rate_changed`, `invoice_corrected` (a correction in the package's form; [ADR-0053](../adr/0053-core-neutrality.md) rule 10) | 7 |
    | E-invoice (stub adapter from step 5, ADR-0028 rule 12) | `e_invoice_rejected`, `e_invoice_outage` | 5 |
 
    A new type or optional field raises the schema's minor version; a change of meaning raises its major version and needs a migration note. Readers accept older minor versions of the same major version.
@@ -158,6 +158,8 @@ The simulator runs fictional companies day by day. It writes what happened in bu
     | `vn_trading_small@1` | One fictional Vietnamese trading company (TT99, VND, warehouse-level valuation, three physical warehouses and one transit warehouse, USD imports). Calendar 1 November 2027 to 15 February 2028: three months of operation, three month-end closes, a year-end close and a mid-month test tax-rate change inside. A few hundred documents. Every EC at least `min_small` times | CI |
     | `vn_trading_medium@1` | Same company, 12 months, about 10,000 documents | Nightly; step 4 gate |
     | `multi_company_large@1` | Defined at step 10 (adds the US company) | Load tests; step 10 gate |
+
+    Amendment ([ADR-0053](../adr/0053-core-neutrality.md) rule 15): profiles and the tax ID generator are supplied by localization packages (component "synthetic dataset parameters", ADR-0016 rule 5); the core simulator is country-neutral. `vn_trading_small@1`, `vn_trading_medium@1` and the planned `vn_manufacturing_*` profile move under `l10n_vn`, and rule 19's official tax ID format and prefix become `l10n_vn`'s generator. The test package `l10n_xx` supplies a minimal profile for core runs. EC-65 and EC-66 take their values from the active package; their Vietnamese versions become `l10n_vn` golden scenarios. Core CI runs `l10n_xx`'s profile `xx_core_small@1`, which carries the `min_small` check of every edge case; `l10n_vn` runs `vn_trading_small@1` with the same check in its package-level CI. The step gates keep the datasets spec 12 names, now run as `l10n_vn` profiles; changing them is the author's (ADR-0005 item 4).
 
 19. All generated data is fictional:
     - Names, addresses, e-mails, phone numbers, bank account numbers, invoice and customs numbers, and third parties (banks, carriers, customs offices) are generated from word lists the project writes itself and licenses CC0. E-mail domains use `example.com`-style reserved domains.

@@ -179,7 +179,7 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Cash count | cash\_count, cash\_count\_adjustment | A record of counted cash, kept as evidence; a difference is posted by the adjustment it creates ([ADR-0048](../adr/0048-cash-bank-receivables-payables.md) rule 4) |
 | Currency exchange | currency\_exchange | Moving money between two money accounts in different currencies, through the unrevalued clearing account ([ADR-0048](../adr/0048-cash-bank-receivables-payables.md) rule 12) |
 | Collection status | open\_item\_collection, partner\_collection | Dunning level, payment block, dispute and open complaint, kept beside open items and partners ([ADR-0048](../adr/0048-cash-bank-receivables-payables.md) rule 17) |
-| Evidence method | evidence\_method | How a settlement or an advance was paid: cash, bank transfer, card, offset, third party, or none; matchings against advances copy the advance's method ([ADR-0048](../adr/0048-cash-bank-receivables-payables.md) rule 18; ADR-0041 rule 15) |
+| Evidence method | evidence\_method | How a settlement or an advance was paid, in any regime (read by deductibility conditions, ADR-0053 rule 11): cash, bank transfer, card, offset, third party, or none; matchings against advances copy the advance's method ([ADR-0048](../adr/0048-cash-bank-receivables-payables.md) rule 18; ADR-0041 rule 15) |
 | Transaction, company, group currency | transaction\_currency, company\_currency, group\_currency |  |
 | Period-end actual costing | period\_end\_actual\_costing | Periodic weighted average |
 | Landed cost | landed\_cost | Receipt value adjustment: allocates amounts held on `purchase_cost_clearing` (duty, freight, price differences) to receipt lines. Same period: added to the receipt value before costing. Locked period: posted in the first unlocked period, split by consumer ([ADR-0021](../adr/0021-landed-cost.md)) |
@@ -201,9 +201,11 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Closing entry | is\_closing\_entry | Marker on journal entries posted by the closing job, so period-range reports can exclude them |
 | Accounting regime | accounting\_regime | Rule set inside a localization package; the Vietnam package has two: TT99 and TT133 |
 | Localization package | localization\_package | e.g. l10n\_vn, l10n\_us; a directory with a manifest, data files and interface code ([ADR-0016](../adr/0016-localization-package-structure.md)) |
+| Overlay | overlay | Country-specific content (values, enums, thresholds, account choices, legal rationale) that lives in a localization package; the core is regime-neutral and names a country only as a labelled example ([ADR-0053](../adr/0053-core-neutrality.md) rule 1) |
+| Test package | l10n\_xx, is\_test\_package, test\_fixture | Fictional localization package for core tests; its entries carry the basis `test_fixture`; refused in production installations ([ADR-0053](../adr/0053-core-neutrality.md) rule 9) |
 | Package template | package\_template | Package content copied into a company at setup and then owned by it: chart, determination, valuation classes, item groups, checklist, numbering, print templates |
 | Package rule | package\_rule | Package content read live and dated: regime settings, tax rates, statutory reports, data labels |
-| Basis | basis: legal\_source, author\_decision, unverified, company\_decision | What every package template entry and package rule rests on; only the author sets verification and decisions (ADR-0003 R10) |
+| Basis | basis: legal\_source, author\_decision, unverified, company\_decision, test\_fixture (test packages only) | What every package template entry and package rule rests on; only the author sets verification and decisions (ADR-0003 R10) |
 | Regime setting | regime\_setting | One dated rule of an accounting regime, read through `regime_setting(company, key, date)`; keys, schemas, date basis and company options registered by the core; a used row's value never changes |
 | Work queue item | work\_item | Business work; distinct from technical jobs (job) |
 | Permission, capability | permission | The name of a command type or query, or a registered capability such as `post_in_soft_locked_period` or `start_agent:<agent_type>`; generated, never hand-maintained ([ADR-0017](../adr/0017-permission-envelope.md)) |
@@ -231,7 +233,7 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Serial configuration | GetSerialConfiguration | A delivered unit's item-defining values, line options and as-built components together ([ADR-0046](../adr/0046-product-configuration.md) rule 16) |
 | Allowed value | product\_attribute\_value | A value a product allows for one of its attributes; none listed means every value ([ADR-0045](../adr/0045-master-data-and-price-lists.md) rule 15) |
 | Option extra | price\_list\_option\_extra | A price list's extra per inventory unit for a chosen line option value, for one product or all ([ADR-0045](../adr/0045-master-data-and-price-lists.md) rule 17) |
-| Declaring unit | is\_declaring\_unit | The company, or a branch that declares VAT with its own tax ID ([ADR-0041](../adr/0041-tax-engine.md) rule 11, [ADR-0045](../adr/0045-master-data-and-price-lists.md) rule 8) |
+| Declaring unit | is\_declaring\_unit | The company, or a branch that files tax returns separately with its own tax ID ([ADR-0041](../adr/0041-tax-engine.md) rule 11, [ADR-0045](../adr/0045-master-data-and-price-lists.md) rule 8) |
 | Cost center kind | cost\_center.kind | `production`, `production_service`, `selling`, `administration` or `other` ([ADR-0045](../adr/0045-master-data-and-price-lists.md) rule 9) |
 | Project state | project.state | `open` or `closed`; a posting to a closed project is rejected ([ADR-0045](../adr/0045-master-data-and-price-lists.md) rule 9) |
 | Item created on order | is\_item\_created\_on\_order | A product whose document lines may name a new combination of variant values; the item is created when the document leaves draft ([ADR-0045](../adr/0045-master-data-and-price-lists.md) rule 16) |
@@ -242,16 +244,18 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Classification scheme | classification\_scheme, classification\_value, product\_classification | Company-defined grouping of products for analysis; `product_line` is seeded and protected; one value per scheme per product |
 | Product category | product\_category | Built-in hierarchy of products that proposes defaults when a product is created |
 | Item tax group, partner tax group | item\_tax\_group, partner\_tax\_group | The two axes of the dated tax matrix (with direction) that proposes and checks a line's tax codes (DS-23) |
-| Tax code | tax\_code | Package rule naming one tax treatment: kind, direction, calculation, transaction key, deductibility, import treatment; rates dated per code ([ADR-0041](../adr/0041-tax-engine.md)) |
+| Tax code | tax\_code | Package rule naming one tax treatment: core kind (vat, sales\_tax, excise, customs\_duty, other) with an optional package kind, direction, calculation, transaction key, deductibility, import treatment; rates dated per code ([ADR-0041](../adr/0041-tax-engine.md)) |
 | Tax matrix | tax\_matrix | Dated map from direction, partner tax group and item tax group to tax codes, as a fiscal position does |
 | Document line tax | document\_line\_tax | Base, rate and tax per document line and code, part of the document's content and frozen with it |
 | Tax line | tax\_line | Immutable tax subledger row written at posting, tied to the journal tax line |
-| Tax line adjustment | tax\_line\_adjustment | Append-only later change of a tax line: payment evidence, cash payment, lapsed due date, apportionment, period move |
-| Deductibility state | deductible, deductible\_until\_due, not\_deductible | Projection of a purchase VAT row from its initial state and adjustments |
+| Tax line adjustment | tax\_line\_adjustment | Append-only later change of a tax line: condition met, condition failed, apportionment, period move, reversal of an adjustment ([ADR-0053](../adr/0053-core-neutrality.md) rule 3) |
+| Deductibility state | deductible, conditional, not\_deductible | Projection of a purchase or import tax row from its initial state and adjustments; `conditional` means deductible while a package-declared condition can still fail ([ADR-0053](../adr/0053-core-neutrality.md) rule 3) |
+| Deductibility condition | deductibility\_rules.yaml; condition\_type: payment\_evidence\_threshold | Package rule of a core condition type with the package's parameters, e.g. `l10n_vn`'s non-cash payment threshold ([ADR-0053](../adr/0053-core-neutrality.md) rule 3) |
+| Package kind | package\_kind | A package's own name for a tax kind, declared in `tax/package_kinds.csv` under one core kind ([ADR-0053](../adr/0053-core-neutrality.md) rule 2) |
 | Tax return | tax\_return | Immutable snapshot of a filed return; later changes appear as prior-period adjustments |
 | Declaration date | declaration\_date | The date that places a tax row or adjustment in a return period |
 | Tracking | tracking: none, lot, serial | Whether a product's stock movements carry lots or serial numbers |
-| Partner kind | partner\_kind: organization, household\_business, individual | Decides row-conditional data labels: name, tax ID, addresses, phones, emails and bank accounts of household businesses and individuals are personal; unknown kind is treated as personal ([ADR-0019](../adr/0019-partners-and-crm-foundation.md)) |
+| Partner kind | partner\_kind: organization, sole\_proprietorship, individual | Decides row-conditional data labels: name, tax ID, addresses, phones, emails and bank accounts of sole proprietorships (unincorporated businesses not registered as enterprises, whose identifiers are the owner's; in Vietnam, household businesses, named by `l10n_vn`) and individuals are personal; unknown kind is treated as personal ([ADR-0019](../adr/0019-partners-and-crm-foundation.md)) |
 | Partner role, profile | partner\_role; customer\_profile, supplier\_profile, employee\_profile | Roles added to one partner over time, deactivated not deleted; each role's own data in its profile, selected by the document's role. Employees are partners with the employee role |
 | Contact | contact | A person at a partner; every field labeled personal |
 | Processing basis | processing\_basis | Lawful basis per data subject and purpose (contract, legal obligation, consent), withdrawable; checked before sending a message whose purpose needs consent |

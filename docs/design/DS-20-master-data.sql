@@ -72,7 +72,7 @@ CREATE TABLE branch (
     code               text NOT NULL,
     name               text NOT NULL,
     tax_id             text,
-    is_declaring_unit  boolean NOT NULL DEFAULT false,             -- declares VAT on its own (ADR-0041 rule 11; ADR-0045 rule 8)
+    is_declaring_unit  boolean NOT NULL DEFAULT false,             -- files tax returns separately (ADR-0041 rule 11; ADR-0045 rule 8; ADR-0053 rule 14)
     address            jsonb,                                       -- the columns of partner_address as keys (ADR-0045 rule 8)
     is_active          boolean NOT NULL DEFAULT true,
     UNIQUE (company_id, code),
@@ -151,7 +151,7 @@ CREATE TABLE partner (
     code                      text NOT NULL,
     name                      text NOT NULL,
     legal_name                text,
-    partner_kind              text NOT NULL CONSTRAINT ck_partner_kind CHECK (partner_kind IN ('organization', 'household_business', 'individual')),
+    partner_kind              text NOT NULL CONSTRAINT ck_partner_kind CHECK (partner_kind IN ('organization', 'sole_proprietorship', 'individual')),   -- ADR-0019 rule 1; ADR-0053 rule 7
     tax_id                    text,                               -- normalized by the package rule (ADR-0019 rule 4)
     parent_partner_id         uuid,
     represents_company_id     uuid REFERENCES company (id),

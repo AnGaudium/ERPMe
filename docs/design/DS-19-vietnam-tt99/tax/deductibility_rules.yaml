@@ -1,0 +1,15 @@
+# Deductibility conditions of l10n_vn (ADR-0053 rule 3; ADR-0041 rules 13-15). Package rules, read live and dated.
+# The core registers the condition types and their parameter schemas; the values below are the package's.
+# Imports are aggregated per customs declaration (per shipment), as ADR-0041 rule 14 states.
+- code: non_cash_payment_threshold
+  condition_type: payment_evidence_threshold
+  applies_to: {tax_kind: vat, directions: [purchase, import]}
+  parameters:
+    threshold: {amount: "5000000", currency: VND, includes_tax: true}
+    aggregation: {default: per_seller_per_day, by_document_kind: {customs_declaration: per_document}}
+    failing_methods: [cash]
+    lapse: due_date
+    exempt_document_kinds: []
+  effective_from: 2026-01-01
+  status: unverified
+  open_question: "(DS-23) Input VAT and non-cash payment"

@@ -5,14 +5,14 @@ Draft package data decided by [ADR-0039](../../adr/0039-vietnam-package-tt99.md)
 | File | Content |
 | --- | --- |
 | [manifest.yaml](manifest.yaml) | Package manifest, with the legal forms that select chart rows |
-| [settings.yaml](settings.yaml) | Package rules for every regime: reversal, default posting dates, attachment retention |
+| [settings.yaml](settings.yaml) | Package rules for every regime: reversal, default posting dates, attachment retention, invoice issuance, tax settings |
 | [regimes/tt99/chart_template.csv](regimes/tt99/chart_template.csv) | All 184 TT99 codes, the package's detail accounts and 999, mapped to system accounts; `condition`; `cost_behavior` |
 | [regimes/tt99/account_determination.csv](regimes/tt99/account_determination.csv) | Default determination for every transaction key, with a note on each interim choice |
 | [regimes/tt99/unreached_system_accounts.csv](regimes/tt99/unreached_system_accounts.csv) | System accounts the template does not reach, and why (ADR-0010 rule 17) |
 | [regimes/tt99/valuation_classes.csv](regimes/tt99/valuation_classes.csv), [item_groups.csv](regimes/tt99/item_groups.csv), [partner_groups.csv](regimes/tt99/partner_groups.csv) | Seed codes used by the determination |
 | [regimes/tt99/close_checklist.yaml](regimes/tt99/close_checklist.yaml) | Period pattern and special periods; tasks come in step 8 |
 | [regimes/tt99/settings.yaml](regimes/tt99/settings.yaml) | Regime rules: FX, closing, movement types, landed cost, counts, production |
-| [tax/](tax/tax_codes.csv) | Tax codes, dated rates, tax matrix, item and partner tax groups, the 01/GTGT form ([ADR-0041](../adr/0041-tax-engine.md)) |
+| [tax/](tax/tax_codes.csv) | Tax codes with their package kinds ([package_kinds.csv](tax/package_kinds.csv)), dated rates, tax matrix, item and partner tax groups, the 01/GTGT form ([ADR-0041](../adr/0041-tax-engine.md)), and the non-cash payment condition ([deductibility_rules.yaml](tax/deductibility_rules.yaml); [ADR-0053](../../adr/0053-core-neutrality.md)) |
 
 Bases: TT99 rows that only restate Appendix II carry it as legal source (not yet verified). Every package choice is `unverified` and cites an open question, except the two author decisions (purchase invoice posting date; rounding to 515 and 635). Production refuses unverified content (ADR-0016 rule 12).
 

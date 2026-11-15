@@ -50,7 +50,8 @@ input_tax,,,,,import_vat_fa_10,,1332,unverified,(DS-19) TT99 default account det
 input_tax,,,,,import_vat_fa_reducible,,1332,unverified,(DS-19) TT99 default account determination,,,,,Fixed-asset input VAT (ADR-0041 rule 1)
 input_tax,,,,,import_vat_fa_5,,1332,unverified,(DS-19) TT99 default account determination,,,,,Fixed-asset input VAT (ADR-0041 rule 1)
 input_tax_non_deductible,,,,,,,6425,unverified,(DS-19) TT99 default account determination,,,,,Interim: non-deductible input VAT to administrative taxes and fees; alternatives the cost of the goods or 811 (ADR-0041 rule 11)
-environmental_protection_tax,,,,,,,33381,unverified,(DS-19) TT99 default account determination,,,,,
+other_tax,,,,,,,33382,unverified,(DS-19) TT99 default account determination,,,,,Interim: taxes without a key of their own go to other taxes (ADR-0053 rule 5)
+other_tax,,,,,import_environmental_protection,,33381,unverified,(DS-19) TT99 default account determination,,,,,Environmental protection tax (ADR-0053 rule 5)
 trade_remedy_duty,,,,,,,3333,unverified,(DS-19) TT99 default account determination,,,,,"Interim: with import duties, as practice books them; alternative 33382"
 output_tax,,,,,,,33311,unverified,(DS-19) TT99 default account determination,,,,,
 import_tax,,,,,,,33312,unverified,(DS-19) TT99 default account determination,,,,,

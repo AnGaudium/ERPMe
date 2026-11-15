@@ -157,6 +157,8 @@ The accounting choices are the author's (ADR-0005 item 1). Each one below is a r
 
     DS-26 builds the reports, including the product cost sheet (thẻ tính giá thành), from `production_order_period_cost`.
 
+    Note: the Vietnamese method names and the product cost sheet are `l10n_vn`'s content, owned by ADR-0039; the core keeps the views ([ADR-0053](0053-core-neutrality.md) rule 13).
+
 **Data, catalogs and checks**
 
 17. Tables and commands. All maintenance commands are `master_data_change`, because they change valuation:
@@ -185,6 +187,8 @@ The accounting choices are the author's (ADR-0005 item 1). Each one below is a r
     TT99 keys and the `cost_behavior` seeds: [ADR-0039](0039-vietnam-package-tt99.md) rules 6, 9.
 
     **Account mapping.** TT99 maps the leaves to 621, 622 and 627 and WIP to 154. TT133 maps them to sub-accounts of 154 per cost element plus one for WIP, because an operational account maps to one system account (ADR-0010 rule 11). The mapping is DS-19's and the author's (the DS-41 question).
+
+    Note: the neutral references are IAS 2 paragraph 16 (abnormal amounts) and paragraph 13 (normal capacity); VAS 02 paragraphs 11 and 08 are `l10n_vn`'s rationale ([ADR-0053](0053-core-neutrality.md) rule 6).
 19. Catalog changes, version 0.x:
     - **Movement types:**
 
@@ -213,6 +217,8 @@ The accounting choices are the author's (ADR-0005 item 1). Each one below is a r
       The leaf side of the transfer, the abnormal cost and allocations copy the source line's account.
 
       `consumption` also lists `production_cost_overhead`, for internal consumption to a factory cost center.
+
+    Note: `production_abnormal_cost` and `production_unabsorbed_overhead` list `cost_of_goods_sold;expense_other` as regime alternatives; TT99 keeps 6325 under 632 ([ADR-0053](0053-core-neutrality.md) rule 6).
 20. Catalog rows reserved in the production range (ADR-0033 rule 16):
     - **INV-106:** after the job, each order's `inventory_work_in_process` balance equals the closing amounts of its latest `production_order_period_cost`, and a technically complete order's is zero.
     - **INV-107:** after the job, each `cost_pool` cost object's balance on the production leaves is zero for the period.
