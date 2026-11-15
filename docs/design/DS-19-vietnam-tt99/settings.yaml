@@ -47,6 +47,12 @@
   status: unverified
   open_question: "(DS-22, DS-24) Issuance without delay: must sales invoices and their correction documents be issued without waiting for an approval"
 
+- key: documents.e_invoice_required
+  value: {sales_invoice: true, sales_return: true, credit_note: true, debit_note: true}
+  effective_from: 2026-01-01
+  status: unverified
+  open_question: "(DS-22, DS-24) E-invoice required: which sales documents must be issued as e-invoices before they post"
+
 # --- Tax (ADR-0041 rule 5) ---
 # The non-cash payment threshold is a deductibility rule in tax/deductibility_rules.yaml (ADR-0053 rule 3).
 - key: tax.rate_date_basis

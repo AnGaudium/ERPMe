@@ -60,6 +60,8 @@ Every command and query is checked against one permission model before it runs (
 13. System jobs and consumers hold the permissions declared when they are registered; their `on_behalf_of` names the accountable human ([03](../spec/03-agent-safety.md) rule 3) but does not limit them, except where an ADR sets a condition on that human (e.g. close jobs in a soft-locked period need an `on_behalf_of` with `post_in_soft_locked_period`, ADR-0012 rule 5). Integrations get role assignments on their `integration_client` per company, like users; their accountable human is for accountability. Narrowed: a consumer command for an event with an origin agent run uses the intersection of the consumer's, the agent type's and the human's permissions, with no policy exception; such a command never posts or changes master data ([ADR-0029](0029-proposals-and-agent-safety.md) rule 12).
 14. Agents never execute `human_only` commands; they may simulate them (ADR-0008 rule 2).
 
+    Note: struck for agents: every agent actor runs under a tool list that holds no `human_only` command ([ADR-0050](0050-agent-runtime-and-query-layer.md) rules 29–30), and the tool list is checked first, so the call is refused with `tool_not_allowed` and no agent simulates such a command ([DS-04](../design/DS-04-command-envelope.md#dispatcher-check-order)).
+
 **Approval and segregation of duties**
 
 15. `Approve<Type>` and `Reject<Type>` are executed only by human actors ([07](../spec/07-shared-foundation.md#approval-engine): agents never approve on a human's behalf).

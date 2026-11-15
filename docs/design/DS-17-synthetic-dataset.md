@@ -48,6 +48,7 @@ The simulator runs fictional companies day by day. It writes what happened in bu
    | Setup | `company_founded`, `exchange_rate_published` | 1 |
    | Setup | `partner_registered`, `product_registered`, `warehouse_opened`, `price_list_published` (`SetPriceListEntries`, [ADR-0045](../adr/0045-master-data-and-price-lists.md) rule 7) | 2 |
    | Setup | `partner_account_changed` (a partner's reconciliation account changes) | 5 |
+   | Setup | `user_registered` (a fictional user invited and confirmed), `role_assigned` (user, role template, owner scope, validity), `approval_pool_updated` (a pool's stages, members and selector rows as one change), `policy_rule_created` (a company policy rule: match, conditions, effect, procedure) ([ADR-0054](../adr/0054-users-roles-and-authorizations.md), [ADR-0055](../adr/0055-approval-pools-and-stages.md), [ADR-0043](../adr/0043-policy-and-approval.md)) | 5 |
    | Periods | `period_restricted`, `period_locked` (by a human, with area; ADR-0012 rule 7) | 1 |
    | Periods | `period_closed`, `year_closed` | 8 |
    | Journal | `journal_recorded`: balanced test entries for transactions without a document, and accountants' manual entries | 1 |
@@ -64,8 +65,11 @@ The simulator runs fictional companies day by day. It writes what happened in bu
    | Safety | `bank_account_change_requested` (an e-mail asks to change a partner's bank account) | 5 |
    | Tax | `tax_rate_changed`, `invoice_corrected` (a correction in the package's form; [ADR-0053](../adr/0053-core-neutrality.md) rule 10) | 7 |
    | E-invoice (stub adapter from step 5, ADR-0028 rule 12) | `e_invoice_rejected`, `e_invoice_outage` | 5 |
+   | Production (`l10n_vn` profile `vn_manufacturing_small@1`) | `production_structure_released` (bills of materials, routings, work centers and production versions set up and released), `cost_estimate_released`, `production_ordered` (a planner creates and releases an order, or converts a planned one), `components_issued`, `operation_confirmed`, `output_received`, `production_order_completed`, `service_received` (a processor's delivery; materials go there as `stock_transferred`). Planning keeps `replenishment_planned`; production cost closes with `period_closed` | production core step (number pending author) |
 
    A new type or optional field raises the schema's minor version; a change of meaning raises its major version and needs a migration note. Readers accept older minor versions of the same major version.
+
+   Note (flow review, 2026-11-15): the setup types `user_registered`, `role_assigned`, `approval_pool_updated` and `policy_rule_created` are new types, so they raise the log schema's minor version. They are executable from step 5, when DS-15 and DS-28 are in force, and let a profile set up its people and approval rules (rule 18 note).
 6. Payloads carry every business fact a recomputation needs, so results can be computed from the log alone (DS-16 rule 29):
    - All codes are business codes, all amounts and quantities canonical decimal strings (ADR-0006 rule 13), and there are no UUIDs.
    - Required for every type:
@@ -158,9 +162,28 @@ The simulator runs fictional companies day by day. It writes what happened in bu
     | --- | --- | --- |
     | `vn_trading_small@1` | One fictional Vietnamese trading company (TT99, VND, warehouse-level valuation, three physical warehouses and one transit warehouse, USD imports). Calendar 1 November 2027 to 15 February 2028: three months of operation, three month-end closes, a year-end close and a mid-month test tax-rate change inside. A few hundred documents. Every EC at least `min_small` times | CI |
     | `vn_trading_medium@1` | Same company, 12 months, about 10,000 documents | Nightly; step 4 gate |
+    | `vn_manufacturing_small@1` (`l10n_vn`) | One fictional Vietnamese manufacturing company (TT99, VND): multi-level bills of materials with a phantom, a co-product and a by-product; routings on capacity-relevant work centers; make-to-stock and make-to-order items, a configured product among them; one subcontracted operation at a processor location; at least two production cost closes. A few hundred documents. Every production EC at least `min_small` times | Gate of the production core step (number pending author) |
     | `multi_company_large@1` | Defined at step 10 (adds the US company) | Load tests; step 10 gate |
 
     Amendment ([ADR-0053](../adr/0053-core-neutrality.md) rule 15): profiles and the tax ID generator are supplied by localization packages (component "synthetic dataset parameters", ADR-0016 rule 5); the core simulator is country-neutral. `vn_trading_small@1`, `vn_trading_medium@1` and the planned `vn_manufacturing_*` profile move under `l10n_vn`, and rule 19's official tax ID format and prefix become `l10n_vn`'s generator. The test package `l10n_xx` supplies a minimal profile for core runs. EC-65 and EC-66 take their values from the active package; their Vietnamese versions become `l10n_vn` golden scenarios. Core CI runs `l10n_xx`'s profile `xx_core_small@1`, which carries the `min_small` check of every edge case; `l10n_vn` runs `vn_trading_small@1` with the same check in its package-level CI. The step gates keep the datasets spec 12 names, now run as `l10n_vn` profiles; changing them is the author's (ADR-0005 item 4).
+
+    Note (flow review, 2026-11-15): people and approval rules of the `vn_*` profiles, set up by the setup events of rule 5 so that the approval pools of [ADR-0055](../adr/0055-approval-pools-and-stages.md) are reachable while the core seed stays minimal (its rule 2 note). The values are profile test data, like rule 11's accounts, not rules of the product.
+    - **Cast** (`user_registered`, `role_assigned`), at least one user per template: owner, chief accountant, accountant, cashier, sales clerk, sales manager, buyer, purchasing manager, warehouse keeper; the manufacturing profile adds a production planner and a shop floor lead. A purchase-to-pay run with a mismatched supplier invoice needs the three finance users: the accountant posts the invoice, the chief accountant approves it and the cashier posts the payment ([ADR-0054](../adr/0054-users-roles-and-authorizations.md) rule 19 note).
+    - **Pools** (`approval_pool_updated`): the sales manager joins the `standard` stage of `sales`, and the purchasing manager that of `pr` and `po`; the `senior` stage of `po` needs two approvals (k = 2) among the purchasing manager, the chief accountant and the owner (EC-112).
+    - **Policy rules** (`policy_rule_created`; action `submit`, actor kind `human`, effect `require_approval`; amounts in VND):
+
+      | Document type | Condition | Procedure | Pool |
+      | --- | --- | --- | --- |
+      | `purchase_request` | `amount_company_min` 20,000,000 | `standard` | `pr` |
+      | `purchase_request` | `amount_company_min` 200,000,000 | `senior` | `pr` |
+      | `purchase_order` | `amount_company_min` 50,000,000 | `standard` | `po` |
+      | `purchase_order` | `amount_company_min` 500,000,000 | `senior` | `po` |
+      | `quotation` | `discount_percent_min` 10 | `standard` | `sales` |
+      | `quotation` | `margin_percent_max` 15 | `standard` | `sales` |
+      | `quotation` | `is_price_below_cost` | `senior` | `sales` |
+      | `production_order` | none (every release) | `standard` | `mo` |
+
+    - **Coverage.** The generators draw documents on both sides of every threshold.
 
 19. All generated data is fictional:
     - Names, addresses, e-mails, phone numbers, bank account numbers, invoice and customs numbers, and third parties (banks, carriers, customs offices) are generated from word lists the project writes itself and licenses CC0. E-mail domains use `example.com`-style reserved domains.

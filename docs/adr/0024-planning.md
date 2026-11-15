@@ -47,6 +47,8 @@ Planning answers, per item and warehouse: what to buy or move, how much, and by 
    | Strategy | `planning_strategy`: `make_to_stock` (default) or `make_to_order` ([ADR-0036](0036-multi-level-mrp.md) rule 9) |
 
    It is master data. People with the permission change it directly; changes proposed by agents await approval (spec 14: an agent's change of master data requires approval) and carry their evidence. It replaces the entry for it in ADR-0018's "deliberately elsewhere" list.
+
+   Note: open demand on a node without a row raises `planning_parameter_missing` with reason `planning_row_missing` (rule 21's note; [ADR-0036](0036-multi-level-mrp.md) rule 9's note) (holistic review 2026-11-15, item P5).
 2. Supplier data:
    - `supplier_item` is a new table keyed by (company, supplier partner, item). It holds:
      - `supplier_processing_days` (counted on the supplier's calendar);
@@ -116,6 +118,14 @@ Planning answers, per item and warehouse: what to buy or move, how much, and by 
       - Croston's method for intermittent items (at least 8 weeks with 2 or more non-zero).
       - Choice by the lowest mean absolute scaled error over `backtest_weeks`, with mean absolute error when the naive error is zero. Ties go to the simpler method.
     - **Inputs.** A planning run records the forecast run it used.
+
+    Note: forecast tiers, per (item, warehouse). n is the number of non-event weeks from the first week with history (posted or imported, rule 10) to the last complete week; weeks without sales count as zero (holistic review 2026-11-15, item F0):
+    - **n = 0:** no forecast, and the check result `forecast_history_insufficient` with `details.tier` `none`;
+    - **1 ≤ n < 8:** the mean of those n weeks, unindexed; check result tier `short_mean`;
+    - **8 ≤ n < 52:** the moving average of the last 8 non-event weeks, unindexed; check result tier `unindexed`;
+    - **n ≥ 52:** the 8-week moving average times the seasonal or event index, as above (tier `indexed`, no check result).
+
+    An event week of an event with no past occurrence in the history uses the week's seasonal index, or 1 where no index exists. The tier is stored on each `forecast_line` (rule 21's note), and the check results stay unhashed (rule 17).
 12. Forecast adjustments record item, warehouse, `start_date`, `end_date`, quantity or factor, author and reason. They never overwrite the statistical forecast, so accuracy stays measurable (DS-33). Agent-proposed adjustments are change proposals, and taint is read from document versions ([ADR-0029](0029-proposals-and-agent-safety.md) rules 5, 11).
     - Approval is human, and an adjustment proposed by a tainted agent run is never approved by policy (spec 03 rule 1; ADR-0013 rule 11). An e-mail therefore cannot move purchase quantities.
     - Whether policy may approve untainted adjustments is an open question.
@@ -140,6 +150,8 @@ Planning answers, per item and warehouse: what to buy or move, how much, and by 
     - **Inventory position.** Stock on hand + open supply − open demand within the horizon.
     - **Projection.** For `net_requirements`, projected available is stock plus supply minus demand (including forecast), day by day over the horizon. Each shortfall becomes a proposal with `need_date` d, and the projection continues with it.
     - **Dates for the other methods.** For `reorder_point` and `min_max`, `need_date` is the planning date plus lead time, and `release_date` is the planning date.
+
+    Note: forecast is demand only for `net_requirements` nodes. The inventory position of `reorder_point` and `min_max` nodes counts document demand only: open demand lines within the horizon, and dependent demand as [ADR-0036](0036-multi-level-mrp.md) rule 10 says. Forecast never enters it, because those levels already stand for expected demand (holistic review 2026-11-15, item P1).
 15. Lot sizing, in this order:
     1. the lot size method: exact shortfall, fixed lot (as many as needed), or demand of the next `supply_period_days`;
     2. the supplier's minimum;
@@ -179,6 +191,8 @@ Planning answers, per item and warehouse: what to buy or move, how much, and by 
     - `CancelPlannedOrder`, which cancels a proposed or firmed order; a later run may propose again if the need remains.
 
     Wrong states return `invalid_state_transition`.
+
+    Note: a *frozen* planned order is a `proposed` one whose release date lies inside the firm fence. A run changes nothing about it and counts it as supply (rule 8; [ADR-0036](0036-multi-level-mrp.md) rule 5) (holistic review 2026-11-15, item P22). The sentence on `earliest_start` belongs to the fence paragraph; "Commands:" introduces the list of commands that follows it (holistic review 2026-11-15, item P23).
 20. Pegging rows hold planned order, `pegging_target_kind` (`demand_line`, `forecast`, `safety_stock`, `stock_level`, `lot_size_excess`), target reference and quantity. A planned order's pegging sums exactly to its quantity (DS-16). Through a route, the destination's planned transfer pegs destination demand, and the source's dependent demand pegs that transfer. Demand-line targets are `demand_supply_line_id` ([ADR-0028](0028-document-lifecycle-hardening.md) rule 2). Dependent demand pegs with target kind `planned_order` ([ADR-0036](0036-multi-level-mrp.md) rule 5).
 21. Action messages and exceptions: Kinds `planning_exception` and `capacity_overload` ([ADR-0042](0042-work-queue.md) rule 18).
     - **Action messages** on existing supply: `expedite` and `cancel` in the first slice; `postpone` and `reduce` later. Each carries its projected effect.
@@ -194,6 +208,37 @@ Planning answers, per item and warehouse: what to buy or move, how much, and by 
       - `planning_parameter_missing` (no supplier, no route, no lead time). The run skips the item and continues.
       - `capacity_overload` (per work center and overloaded range; [ADR-0036](0036-multi-level-mrp.md) rule 11).
     - **Work items.** The consumer `planning_work_items` of `PlanningCompleted` keeps one work item per buyer (`buyer_id`, ADR-0018 rule 3) listing that buyer's open exceptions, and closes exceptions that a run no longer raises. Superseded: one work item per open exception, owned by the buyer; the per-buyer list is a query ([ADR-0031](0031-design-simplifications.md) rule 17).
+
+    Note: storage, adjustment commands and triggers (holistic review 2026-11-15, item P2).
+    - **Tables**, owned by `planning`:
+      - `planning_run`: one per run, with planning date, scope, requester, the forecast run used, counts, `input_hash` and `output_hash` (rule 17);
+      - `planned_order`, `planned_order_pegging` (rule 20), `planned_order_component` and `planned_order_operation` ([ADR-0036](0036-multi-level-mrp.md) rules 4–5);
+      - `planning_action_message`: run, supply line, kind, proposed date or quantity, projected effect;
+      - `planning_exception`: run, kind, node or work center, date range, evidence and `state` (`open`, `closed`); the subject of both work item kinds;
+      - `forecast_run`: one per `RunForecast`, with forecast date, method and history weeks used;
+      - `forecast_line`: run, item, warehouse, ISO week, statistical quantity, tier (rule 11's note), index applied, and the daily spread;
+      - `forecast_adjustment` (rule 12);
+      - `planning_state`: the company's lock row (rule 17).
+    - **Adjustment commands** on the authorization leaf `forecast`: `CreateForecastAdjustment` and `CancelForecastAdjustment`, effect class `master_data_change`, so agents reach them only through change proposals (rule 12; ADR-0029 rule 2). An adjustment is never edited: a change is a cancellation and a new adjustment.
+    - **Triggers.** Evaluated per node after netting; each is raised at most once per run and key:
+
+      | Kind | Raised when | Key |
+      | --- | --- | --- |
+      | `expedite` (message) | On a `net_requirements` node, an open supply line (not a planned order) is dated after the first day d on which projected available falls below safety stock, and moving it to d would cover the shortfall. Effect: days earlier and quantity covered | supply line |
+      | `cancel` (message) | An open purchase or transfer supply line without receipts that the projection never needs within the horizon: without it, projected available stays at or above safety stock, or the inventory position at or above the reorder point or minimum. Effect: quantity freed | supply line |
+      | `shortage_inside_lead_time` | A proposal's release date would fall before the planning date or inside the fence, so it is moved (rule 19), or a production plan is late ([ADR-0036](0036-multi-level-mrp.md) rule 4). Evidence: days late | node, need date |
+      | `below_safety_stock` | With every supply at its real availability date, proposals included, projected available is below safety stock but not below zero; once per contiguous range | node, first date |
+      | `above_maximum` | A `min_max` node whose inventory position with firmed and converted supply exceeds `maximum_quantity` | node |
+      | `supplier_minimum_excess` | A supplier minimum or multiple forces a quantity above the cap or the shortfall (rule 15) | planned order |
+      | `below_supplier_minimum_amount` | The proposals that conversion would group into one purchase (rule 22) total, at preliminary prices, less than the supplier's `minimum_order_amount` | supplier, warehouse, release window |
+      | `container_underfilled` | The same group fills its last container below 50 percent of both volume and weight (interim, flagged for the author) | supplier, warehouse, release window |
+      | `stock_expiring` | Rule 9 | lot |
+      | `firmed_order_overdue` | Rule 18 | planned order |
+      | `planning_parameter_missing` | A node or firmed order cannot be planned from its parameters; `details.reason`: `planning_row_missing` (open demand on a node without a row), `supplier_missing`, `route_missing`, `lead_time_missing`, `phantom_demand`, `production_version_missing`, `production_version_invalid`, `processor_route_missing`, `processor_location_missing` | node, reason |
+      | `capacity_overload` | [ADR-0036](0036-multi-level-mrp.md) rule 11 | work center, first bucket |
+
+    - **`capacity_overload`** is stored in `planning_exception` like the others, with the work center as subject, but its work item kind is `capacity_overload`, owned by `planning_owner`; it is never a `planning_exception` work item (holistic review 2026-11-15, item P24).
+    - **Owners.** Work items of kind `planning_exception` are owned by the kind rule `planning_node_owner`: the company's `planning_owner_id` when the node's replenishment source is `production`, otherwise the item's buyer ([ADR-0042](0042-work-queue.md) rule 7's note) (holistic review 2026-11-15, item P7).
 22. Conversion:
     - **Grouping.** `ConvertPlannedOrder` takes firmed or proposed planned orders. Purchase orders are grouped by supplier, warehouse, and release date within `conversion_window_days`; transfer orders by route. Production planned orders convert through `production.contract` ([ADR-0036](0036-multi-level-mrp.md) rule 8).
     - **Hand-over.** The command sets `converted` and calls the posting interface `inventory.contract.request_replenishment`, which writes one `replenishment_request` with a line per planned order (carrying `origin_planned_order_id`) and emits `ReplenishmentRequested` from `inventory`, so every importer imports downward (ADR-0022 rule 2).

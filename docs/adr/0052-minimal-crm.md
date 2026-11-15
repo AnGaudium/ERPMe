@@ -47,6 +47,8 @@ Leads, opportunities, marketing automation, appointments, chat connectors and se
    - **Marketing automation:** campaigns, lists, bulk sends, unsubscribe links.
    - **Appointments:** calendars, invitations and reminders outside the work queue (rule 19 has the minimal follow-ups).
    - **Channels and search:** chat connectors (Zalo Official Account), semantic search with pgvector, call recording.
+
+   Note: a quotation needs the active `customer` role ([ADR-0047](0047-commercial-documents-and-pricing.md) rule 3 note); a party known only from an e-mail becomes a customer through rule 16's proposal first.
 3. Database conventions are DS-20's:
    - **Row-level security.** Every `crm` table carries `company_id`, `FORCE ROW LEVEL SECURITY` and the generated company policy (ADR-0017 rule 19), except the global catalog `public_mail_domain`. The lab checks the list.
    - **Keys.** References inside a company are composite on (`company_id`, `id`).
@@ -277,6 +279,8 @@ Leads, opportunities, marketing automation, appointments, chat connectors and se
     - **Payment reminders.** `crm`'s consumer of `RunDunning`'s completion event (ADR-0048 rule 17) drafts one `payment_reminder` message per customer, owned by the human the run acted for. Recipients are the partner's active contacts with `is_accounts_contact` and an address (DS-20's flag, added by this ADR). DS-20 has no partner-level e-mail address, so when no contact is flagged the draft has no recipient and its note says so; a person adds one before sending. A person sends it. `cash` never imports `crm`.
 
     Note: for a generated file, check 3 reads the attachment's own columns through `attachments.contract`, never `reporting`: it passes the file only when `generated_kind` is `print`, `generated_audience` is `external`, and the partner of `generated_subject_document_id` is the message's partner; otherwise `outbound_content_out_of_scope` ([ADR-0049](0049-statutory-reporting-and-printing.md) rules 28, 29).
+
+    Note (flow review, 2026-11-15): check 3 also refuses a message whose linked document, or the source document of an attached print, is in `draft` or `pending_approval` at send, with `document_not_approved` ([ADR-0049](0049-statutory-reporting-and-printing.md) rule 28 note). For a quotation reply the order is therefore: approve the quotation, then send.
 
 **Personal data and untrusted content**
 

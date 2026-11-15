@@ -43,7 +43,7 @@ production_order,production,document_type,production,Production order,0.1.0,ADR-
 production_issue,production,document_type,production,Production issue,0.1.0,ADR-0034 rule 11.
 operation_confirmation,production,document_type,production,Operation confirmation,0.1.0,ADR-0034 rule 12.
 production_receipt,production,document_type,production,Production receipt,0.1.0,ADR-0034 rule 13.
-service_receipt,production,document_type,production,Service receipt,0.1.0,ADR-0037 rule 5.
+service_receipt,purchasing,document_type,purchasing,Service receipt,0.1.0,ADR-0037 rule 5; owned by purchasing.
 planning_run,planning,function,planning,Planning runs,0.1.0,ADR-0024; ADR-0036.
 planned_order,planning,function,planning,Planned orders,0.1.0,"Firm, update and convert planned orders (ADR-0024; ADR-0036 rule 12)."
 forecast,planning,function,planning,Forecasts,0.1.0,ADR-0024 rule 12.
@@ -92,24 +92,31 @@ production_structure,master_data,master_data,production,Production structures,0.
 change_proposal,master_data,document_type,documents,Change proposal,0.1.0,ADR-0029 rule 1.
 interaction,crm,function,crm,Interactions,0.1.0,"Interactions, participants, links, matching, partner e-mail domains, summaries, inbound messages and the partner timeline (ADR-0052 rules 5-10, 13, 18, 31)."
 complaint,crm,function,crm,Complaints,0.1.0,"Complaints; Close and Reopen need post (ADR-0052 rule 20)."
-outbound_message,crm,document_type,crm,Outbound message,0.1.0,"ADR-0052 rules 27-28; Send needs post; the outcome is recorded by the sender job at full."
+outbound_message,crm,document_type,crm,Outbound message,0.1.0,"ADR-0052 rules 27-28; Send needs post; the sender job records the outcome with an is_internal_only command (ADR-0054 rule 8)."
 data_subject_request,crm,document_type,crm,Data subject request,0.1.0,ADR-0052 rule 24.
-mailbox,crm,function,crm,Mailboxes,0.1.0,"Mailboxes, the authentication probe and the intake; the jobs' Record and Run commands at full (ADR-0052 rules 11-14)."
+mailbox,crm,function,crm,Mailboxes,0.1.0,"Mailboxes, the authentication probe and the intake; RunMailboxIntake at full; the probe's and the intake's Record commands are is_internal_only (ADR-0052 rules 11-14; ADR-0054 rule 8)."
 data_protection,crm,function,crm,Data protection,0.1.0,"Processing purposes and bases; EraseDataSubject at full (ADR-0052 rules 22-25)."
-partner_insight,crm,function,crm,Partner insights,0.1.0,"Insights, the duplicate scan and tax lookups; the jobs at full (ADR-0052 rules 17, 31)."
-general_access,administration,function,registry,General access,0.1.0,ListAllowedCommand; in every template at read (ADR-0040 rule 8).
+partner_insight,crm,function,crm,Partner insights,0.1.0,"Insights, the duplicate scan and tax lookups; the jobs' commands are is_internal_only (ADR-0052 rules 17, 31; ADR-0054 rule 8)."
+general_access,administration,function,registry,General access,0.1.0,"Commands and queries checked against their subject's or query's own permission and scope: ListAllowedCommand, printing and GetApprovalProgress at read, CreateAttachment and CreateListExport at edit; every template except auditor at edit (ADR-0040 rule 8; ADR-0054 rule 24)."
 work_queue,administration,function,work,Work queue,0.1.0,"ListWorkItem, GetWorkItem, ClaimWorkItem, UnclaimWorkItem, ResolveWorkItem, CreateWorkItemNote (ADR-0042)."
 work_queue_administration,administration,function,work,Work queue administration,0.1.0,"AssignWorkItem, CancelWorkItem and capability list_all_work_items at full (ADR-0042 rules 10, 12)."
 user_account,administration,function,permissions,Users,0.1.0,ADR-0054 rules 3-4.
 role,administration,function,permissions,Roles and assignments,0.1.0,ADR-0054 rules 9-12.
 delegation,administration,function,permissions,Delegations,0.1.0,ADR-0054 rule 21; capability delegate_for_others at full.
 segregation_rule,administration,function,permissions,Segregation of duties,0.1.0,"Segregation rules, conflicts, exceptions, reviews and the small-company mode (ADR-0054 rules 17-20)."
-policy,administration,function,policy,Policy and approval,0.1.0,"Policy rules, approval procedures and approval pools (ADR-0043; ADR-0055)."
+policy,administration,function,policy,Policy and approval,0.1.0,"Policy rules, approval procedures and approval pools, policy decisions, ConfirmAutoPost at post (the rule's owner only) and ClearTaint at full; RunApprovalEscalation is is_internal_only (ADR-0043; ADR-0055; ADR-0029 rules 8, 13; ADR-0054 rule 24)."
 company_setting,administration,function,registry,Company settings,0.1.0,"Company settings and numbering configuration (ADR-0009 rule 15)."
-agent,administration,function,agent_runs,Agents,0.1.0,Capabilities start_agent:<agent_type> at edit; agent schedules and intakes (ADR-0017 rules 11-12; DS-32).
+agent,administration,function,agents,Agents,0.1.0,"Agent type settings (UpdateAgentTypeSetting at full), promotion evidence, agent run queries, capability cancel_agent_runs at full, schedules and intakes; start_agent:<agent_type> is on each agent type's own leaf below (ADR-0050 rules 14-20; ADR-0054 rule 24)."
+agent_customer_onboarding,agent,function,agents,Customer onboarding agent,0.1.0,Capability start_agent:customer_onboarding at edit (ADR-0051; ADR-0054 rule 24).
+agent_quotation,agent,function,agents,Quotation agent,0.1.0,Capability start_agent:quotation at edit (ADR-0051; ADR-0054 rule 24).
+agent_bank_matching,agent,function,agents,Bank matching agent,0.1.0,Capability start_agent:bank_matching at edit (ADR-0051; ADR-0054 rule 24).
+agent_purchase_invoice,agent,function,agents,Purchase invoice agent,0.1.0,Capability start_agent:purchase_invoice at edit (ADR-0051; ADR-0054 rule 24).
+agent_planning,agent,function,agents,Planning agent,0.1.0,Capability start_agent:planning at edit (ADR-0051; ADR-0054 rule 24).
+agent_data_migration,agent,function,agents,Data migration agent,0.1.0,Capability start_agent:data_migration at edit (ADR-0051; ADR-0054 rule 24).
 agent_run_bodies,administration,function,agent_runs,Agent run bodies,0.1.0,"Capability read_agent_run_bodies at full; none in every template except owner (ADR-0050 rule 20; ADR-0054 rule 8)."
 audit,administration,function,audit,Audit log,0.1.0,"GetAuditRecord, ListAuditRecord, denials (ADR-0038)."
-print_template,administration,function,reporting,Print templates,0.1.0,"Print templates and print data contracts, no document data; GetPrintData is on general_access with the subject's own check; the render worker's outcome at full (ADR-0049 rules 20, 24-25)."
+event_delivery,administration,function,outbox,Event deliveries,0.1.0,"RetryEventDelivery and SkipEventDelivery at post, ReplayEvents at full, all human_only, for deliveries with a company; installation deliveries stay with the operator (ADR-0013 rules 8, 16; ADR-0054 rule 24)."
+print_template,administration,function,reporting,Print templates,0.1.0,"Print templates and print data contracts, no document data; GetPrintData is on general_access with the subject's own check; the render worker's outcome is is_internal_only (ADR-0049 rules 20, 24-25; ADR-0054 rule 8)."
 data_import,administration,function,imports,Data imports,0.1.0,Staged import batches (ADR-0030 rule 9; ADR-0044).
 data_export,administration,function,imports,Data export,0.1.0,Full company data export (ADR-0044).
 report_finance,reports,report,query,Financial reports,0.1.0,"Financial statements, books and the cash book (DS-26); FileStatutoryReport at post (ADR-0049 rule 19)."
@@ -118,3 +125,4 @@ report_inventory,reports,report,query,Inventory reports,0.1.0,Stock and valuatio
 report_sales,reports,report,query,Sales reports,0.1.0,Sales analysis (DS-26).
 report_purchasing,reports,report,query,Purchasing reports,0.1.0,Purchasing analysis (DS-26).
 report_production,reports,report,query,Production reports,0.1.0,Production and variance reports (DS-26; ADR-0035).
+production_cost_settlement,finance,document_type,production,Production cost settlement,0.1.0,"ADR-0035 rules 1, 5; written only by the period-end costing job."

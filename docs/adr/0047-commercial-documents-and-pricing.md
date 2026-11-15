@@ -44,6 +44,12 @@ The commercial documents are a thin layer over the core (B3). They hold what was
    Note: "Approval hold allowed" for `sales_invoice`, `sales_return`, `credit_note` and `debit_note` is derived from the regime setting `documents.issuance_without_delay`: "no" while it is true, as `l10n_vn` seeds it; the core default is false ([ADR-0053](0053-core-neutrality.md) rule 8). Corrections stay correction documents by the author's core decision of 2026-11-14; the adjustment and replacement invoice forms are `l10n_vn`'s and the e-invoice add-on's ([ADR-0053](0053-core-neutrality.md) rule 14).
 
    Note: every type in this table, and the stock documents, are `is_printable` and carry the optional header field `print_language` ([ADR-0049](0049-statutory-reporting-and-printing.md) rules 25, 27).
+
+   Note: registry flags of `service_receipt` ([ADR-0037](0037-subcontracting.md) rule 5) (holistic review 2026-11-15, item P15):
+
+   | Type | Module | Posting | Change orders | E-invoice capable | Approval hold allowed | Reversible | `is_item_creating` | Demand and supply |
+   | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+   | `service_receipt` | `purchasing` | yes | no | no | no | while no invoice refers to it (rule 13) | no | — |
 2. Lines, references and copying:
    - **Quantities.** Lines store the entered quantity and unit and the inventory quantity (ADR-0018 rule 11). GR/IR positions, correction limits and progress use inventory quantities.
    - **Line references** use the typed keys of ADR-0028 rule 2: `quotation_line_id`, `sales_order_line_id`, `delivery_line_id`, `return_from_customer_line_id`, `purchase_request_line_id`, `purchase_order_line_id`, `goods_receipt_line_id`, `return_to_supplier_line_id`, and `correction_of_line_id` on correction lines.
@@ -54,12 +60,20 @@ The commercial documents are a thin layer over the core (B3). They hold what was
    - **Currency.** Invoices, returns and notes of order lines are in the order's currency, otherwise `order_currency_mismatch`.
    - **Closing orders and requests.** An order or request closes automatically (`closed_reason` `fulfilled` on its header) when every line is done by quantity, net of returns and quantity credits: stock lines delivered or received and invoiced, other lines invoiced. A consumer in the owning module runs `Close<Type>` as `system` on the events that complete it, under the document's lock (ADR-0027 rule 10, class 1). `Close` by a person sets `closed_reason` `short`, and cancels the open rest: reservations, and the open quantity of the demand or supply rows. A closed document takes no new deliveries or receipts. Invoices are still accepted up to delivered or received net, and corrections still refer to its lines. This answers ADR-0009 rule 6.
 
+   Note: copy preconditions. `source_lines` may name only a document that is approved or later (approved, issued, posted, or closed), never one in draft, pending approval, rejected or canceled (`source_not_approved`). The pairs: quotation to sales order (within validity, rule 3); sales order to delivery, and to sales invoice for non-stock and service lines (released rows, rule 19); posted delivery to sales invoice and to return from customer; posted or issued sales invoice to sales return, credit note and debit note; purchase request to purchase order; purchase order to goods receipt, service receipt and purchase invoice (released rows); posted goods receipt to return to supplier; posted purchase invoice to purchase return and supplier notes. One `Create<Type>` copies the lines of one source document, deliveries included (pick batches release each document on its own, ADR-0023 rule 16), except that a purchase order may combine several purchase requests, and a sales or purchase invoice may combine deliveries, receipts and order lines of one partner in one currency. The target's partner is the source's.
+
+   Note: copying carries taint. On `Create<Type>` with `source_lines`, and on every `Update` that adds source lines, the new version's `is_tainted` is the OR of the effective taint, at that moment, of every source line's document version; `derived_from_version_id` names the first source document's version, and INV-88 reads the others through the lines' typed references ([ADR-0029](0029-proposals-and-agent-safety.md) rule 8). `inventory`'s stock documents and `production`'s orders created from source lines set it the same way ([ADR-0023](0023-warehouse-management.md) rule 16).
+
+   Note: `service_receipt_line_id` joins the typed line references, for purchase invoice service lines that clear GR/IR against a service receipt (rule 12; [ADR-0037](0037-subcontracting.md) rule 6).
+
 **Sales**
 
 3. `quotation`:
    - **Validity.** `valid_until` (a date). A copy to an order within validity keeps the quotation's prices and discounts. After it, the copy is rejected with `quotation_expired`, unless the client asks to `reprice`; then the lines are priced anew (rule 16).
    - **Closing.** Automatic when every line is fully ordered. A lost quotation is canceled with a reason.
    - **Not demand.** Quotations write no `demand_supply_line` and reserve nothing (ADR-0024 rule 8).
+
+   Note: a quotation holds the sales order's header and lines of rule 4, without demand, reservation or item creation. A line's warehouse is optional; the warehouse checks of an order line ([ADR-0046](0046-product-configuration.md) rule 10 included) run when the line is copied to an order, which requires one. The partner must hold the active `customer` role (ADR-0019 rule 2) at `Create`, `Update` and `Submit`, otherwise `partner_role_missing`.
 4. `sales_order`:
    - **Header:** customer, currency, price list (from the customer's profile, else the company's default sale list, ADR-0045 rule 5), payment term, salesperson, document discount percentage, requested delivery date.
    - **Lines:** item or configuration, quantity and unit, warehouse, planned delivery date (needed by FEFO, ADR-0023 rule 13), price steps (rule 16), taxes (ADR-0041 rule 6).
@@ -70,12 +84,16 @@ The commercial documents are a thin layer over the core (B3). They hold what was
    - **Quantity.** At most the line's open quantity: `ordered − (delivered − returned)`. More is rejected with `quantity_exceeds_open`. `inventory` reads it from the demand row it owns. Over-delivery is not allowed in Phase 1 (flagged).
    - **Posting.** Movement `sales_issue`, cost of goods sold at delivery. Free goods lines use movement `free_goods_issue` (rule 17).
    - **Credit hold.** Pick release and delivery of a line whose demand row is on hold are rejected with `demand_on_hold` (rule 18).
+
+   Note: returns of closed orders. A `return_from_customer` is accepted against delivery lines of a closed order, within rule 20's limits. It does not reopen the order: the quantity it frees is not deliverable, because a closed order takes no new deliveries, and a replacement is a new order. Rule 7's `sales_return_due` still applies.
 6. `sales_invoice`:
    - **Lines.** A stock line refers to a posted delivery line. Its quantity is at most `delivered net − invoiced net` of its order line, otherwise `invoice_exceeds_delivered`. A non-stock or service line refers to an order line, up to its open quantity (`invoice_exceeds_ordered`), or stands alone. Invoicing goods before delivery is not allowed; bill and hold stays the open question it is.
    - **Installments.** The payment term's schedule (ADR-0026 rule 5) is part of the invoice's content, so its due dates and amounts are in the plan. Open items are derived from it at posting and are not in the plan (ADR-0031 rule 1). This settles ADR-0026 rule 3 against ADR-0031 rule 1.
    - **Posting.** Revenue by `revenue_posting` per item group, output tax (ADR-0041), and one receivable control line per installment.
    - **Discounts on the invoice.** The regime setting `sales.discount_presentation` decides: line and document discounts either reduce revenue directly (`net`), or post gross with the discount to `revenue_deduction_trade_discount` (`gross`). Vietnam seeds `net`, `unverified`.
    - **E-invoice.** Issued through the seam of ADR-0028 rules 6–10. The type never waits for approval and is never reversible (ADR-0009 rules 12, 19).
+
+   Note: no stock sale without an order. A delivery line or a sales invoice line of a stock item without a sales order line is rejected with `sales_order_required`: the order comes first, so demand, credit and progress stay uniform, as `purchase_order_required` does for purchases (rule 12). Goods delivered before the cut-over keep rule 8's path.
 7. Sales returns:
    - **The goods.** `return_from_customer` (inventory) receives returned goods against delivery lines (`correction_of_id`: the delivery; ADR-0027 rule 7). `inventory` checks the quantity against the delivery line, which it owns: returned per delivery line ≤ delivered. The goods go to a `returns` bin as blocked (ADR-0023 rule 19). Their value follows the regime setting for `sales_return_receipt` (ADR-0020 rule 5).
    - **The money.** `sales_return` is the posting correction of ADR-0009 rule 23. `correction_of_id` is the sales invoice, and lines refer to the `return_from_customer` lines they credit. It posts `revenue_deduction_return` and output tax at the original line's price and tax data (ADR-0041 rule 8), and creates a `credit` item, which it may match to the invoice (ADR-0026 rule 9).
@@ -98,14 +116,20 @@ The commercial documents are a thin layer over the core (B3). They hold what was
 9. `purchase_request`:
    - **Sources.** People, or the `purchasing` consumer of `ReplenishmentRequested`, as `system` on behalf of the converter ([ADR-0024](0024-planning.md) rule 22). Lines carry item, quantity, requested date, suggested supplier, `origin_planned_order_id`, and `production_order_operation_id` for subcontracted operations (ADR-0037 rule 4).
    - **Open quantity** falls by what is ordered from the line. A request closes automatically when fully ordered.
+
+   Note (flow review, 2026-11-15): for a conversion executed from an approved change proposal (the planning agent's, [ADR-0051](0051-agent-workflows.md) rule 24), the converter is the approving human of [ADR-0029](0029-proposals-and-agent-safety.md) rule 3: the approver whose approval completed the proposal's plan ([ADR-0055](0055-approval-pools-and-stages.md) rule 16 note). The purchase requests are drafted on their behalf, so that person cannot approve them.
 10. `purchase_order`:
     - **Header:** supplier, currency, price list (the supplier's purchase list), payment term, buyer (the supplier profile's default, ADR-0027 rule 6), document discount percentage.
     - **Lines:** item, quantity and unit, receiving warehouse, requested date, price steps (rule 16, without promotions), taxes, `purchase_request_line_id`, and `origin_planned_order_id` and `production_order_operation_id` copied from the request. The supply row gets `ordered_date` at approval (ADR-0024 rule 8).
     - **The GR/IR price.** At approval and at each take-force, `purchasing` pushes each line's GR/IR unit price to `inventory` through `inventory.contract.set_order_line_gr_ir_price`. The price is the line's net amount after the document discount, without tax, divided by its inventory quantity, as an exact rational in the order's currency.
     - **Supply rows from draft** (ADR-0024 rule 8). A draft line whose row carries `origin_planned_order_id` or pegging cannot be removed, nor its draft deleted (`document_line_referenced`). Its quantity is set to zero or the document canceled, which closes the row with `closed_reason` `canceled` (ADR-0024 rule 22). Other draft lines removed by `Update`, or drafts deleted, delete their rows. Rows of documents that have left draft are never deleted. ADR-0024 rule 8 and ADR-0028 rule 2 get notes.
+
+    Note: when the supplier profile names no purchase list, the order takes the company's default purchase list, as a sales order takes the default sale list (rule 4). With neither, or with a list in another currency, the order carries no list and its prices are entered ([ADR-0045](0045-master-data-and-price-lists.md) rule 5 note).
 11. Goods receipts of order lines (`goods_receipt`, inventory):
     - **Quantity.** At most the line's open quantity, read from its supply row, times `1 + inventory.purchase_receipt_tolerance_percent / 100` (company setting, default 0). More is rejected with `receipt_exceeds_order`.
     - **Value.** Movement `purchase_receipt` at the GR/IR value of rule 13. The receipt credits GR/IR with `purchase_order_line_id` (ADR-0030 rule 3).
+
+    Note: returns of closed orders. A `return_to_supplier` is accepted against receipt lines of a closed order, within rule 20's limits. It does not reopen the order: a closed line takes no replacement receipt (rule 13's replacement receipt needs an open line), so a replacement is a new order. The GR/IR balance it leaves is cleared as rule 13 says for lines closed short, and rule 15's `supplier_credit_due` still applies.
 12. `purchase_invoice`:
     - **Header:** supplier, `partner_reference` (the supplier's invoice number; required), `supplier_invoice_date` (the tax date, ADR-0041 rule 7), posting date (DS-19's default), currency and invoice rate (ADR-0011 rule 12), payment term.
     - **Duplicates.** Where the regime declares a natural key for supplier invoices (ADR-0030 rule 10; Vietnam: seller tax ID, form, symbol, number), it applies. Otherwise the fallback key is supplier, `partner_reference` and the year of the supplier's date (flagged). Documents that are canceled or reversed do not count. A second arrival is rejected with `duplicate_external_document`.
@@ -118,6 +142,8 @@ The commercial documents are a thin layer over the core (B3). They hold what was
     - **Posting.** GR/IR debit by rule 13, the price difference as the regime sends it (ADR-0030 rule 4), input tax, and one payable control line per installment.
 
     Note: for a purchase invoice, the policy input `is_direct_expense` is true when no line references a purchase order line and every line is an expense or service line; it selects the `expense` approval pool ([ADR-0055](0055-approval-pools-and-stages.md) rule 3).
+
+    Note: `expense` lines, and `service` lines without a service receipt, post to the transaction key `purchase_expense` (determinant: item group; required system accounts `expense`, `prepaid_expense` and `construction_in_progress`). A line without an item, or one whose account is entered, takes the entered account, which the command checks against the key (ADR-0015 rules 4, 12). The TT99 template seeds one row, `unverified` ([DS-19](../design/DS-19-vietnam-tt99/README.md)).
 13. GR/IR per purchase order line, by unit positions. This details ADR-0030 rule 4:
     - **Positions.** The line's units, in its inventory unit, are positions in order. `R` is the received quantity net of returns, `I` the invoiced quantity net of quantity credits. When a receipt or an invoice first reaches a position, the position is priced at the line's GR/IR price then in force (rule 10). It keeps that price for the life of the line. Prices are stored as layers (from, to, price), exact rationals, in `purchase_order_line_gr_ir_layer`. `V(x)` is the exact value of positions 0 to `x`.
     - **Postings are differences of rounded cumulative values**, in the order's currency:
@@ -140,6 +166,8 @@ The commercial documents are a thin layer over the core (B3). They hold what was
       - price: the invoice unit price may differ from the order's GR/IR price by at most the larger of `purchasing.match.price_tolerance_percent` of it and `purchasing.match.price_tolerance_amount`. Otherwise `match_price_difference`.
     - **Invoice before receipt** is legitimate by default (ADR-0030 rule 4) and informs with `invoice_before_receipt`. Settings are company settings, defaulting to 0 and false, flagged.
     - **Policy.** A difference sets the new condition `is_match_exceeded` (ADR-0043 rule 3 gets a note), which is part of the invoice's `policy_input` and so of `policy_input_hash`. The seeded rule requires `standard` approval for both `submit` and `post` of a purchase invoice, for every actor kind, when it is true. A mismatched invoice therefore cannot pass by submitting first.
+
+    Note: the order price of the price check is the GR/IR value per unit of the positions the invoice reaches, `(V(I + q) − V(I)) / q`, exact, for an invoice of `q` inventory units at the line's layers (rule 13). It is compared with the invoice line's net amount after the document discount per inventory unit. With one order price this is rule 10's GR/IR price; after a change order it is the price of the very positions the invoice debits, so the tolerance check and the posted price difference agree.
 15. Purchase returns:
     - **The goods.** `return_to_supplier` (inventory; `correction_of_id`: the goods receipt) issues them with movement `purchase_return`, debiting GR/IR by rule 13. `inventory` checks returned ≤ received per receipt line.
     - **The money.** `purchase_return` records the supplier's adjustment for returned goods: `correction_of_id` is the purchase invoice, and lines refer to `return_to_supplier` lines. It credits GR/IR by rule 13 as a quantity credit. A `purchasing` consumer raises a work item `supplier_credit_due` when a stock return leaves invoiced net above received net on an order line.
@@ -159,6 +187,8 @@ The commercial documents are a thin layer over the core (B3). They hold what was
     - **The trace.** Each step is a `document_line_price_step` row (step, source table and row, value) in the line's content. It is in the plan and the version hash, and it reproduces the stored net unit price and the line amount (INV-93). Interim, with the open question on trace scope: pricing writes no `derivation_trace` rows; the steps on the line serve Principle 6.
     - **Re-pricing.** A draft line is priced again whenever its item, configuration, unit, quantity or the document date changes, unless its price is manual.
     - **Taxes** are computed by `tax.contract.compute_taxes` on the net amounts after the document discount, with `prices_include_tax` from the list (ADR-0045 rule 5).
+
+    Note: copied prices. A line copied with its price (rules 2–3) is marked `is_price_copied` and keeps the source line's price steps; like a manual price, it is not re-priced when its quantity or the document date changes. A change of its item, configuration or unit, or the client's `reprice`, prices it anew and clears the mark.
 17. Promotions (`promotion`; `sales` master data, `master_data_change`, change-tracked, proposal-bound):
     - **Fields:** `code`, `name`, `priority`, dates, optional customer, partner group or price list, scope (an item, a product or an item group), minimum line quantity, and `kind`:
       - `percent` off the base price;
@@ -177,12 +207,18 @@ The commercial documents are a thin layer over the core (B3). They hold what was
     - **Release.** `ReleaseCreditHold` (a sales order) is `human_only`, with its own permission, a required reason, and segregation from the order's author (ADR-0043 rule 13). Its effect class is `other`. The release lasts until the order's value grows by a change order.
     - **Amendment.** This replaces ADR-0030 rule 7's check at `PostDelivery`, which `inventory` could not compose without reading a higher layer (notes on that rule and on ADR-0030's decision table). EC-21's and EC-63's outcomes stay interim.
 
+    Note: holds generalised to a hold reason. `inventory.contract.set_demand_hold` becomes `inventory.contract.set_demand_supply_hold(rows, reason, is_held)`, with the reasons `not_approved` and `credit_hold`, stored as a set on each demand or supply row. Sales order demand rows and purchase order supply rows are created unreleased (`not_approved`, rule 19). `sales` and `purchasing` release them when the document is approved, or at `Submit` when no approval is required, and set `not_approved` again on `Reject`. `inventory` rejects pick release, delivery and receipt of a row held `not_approved` with `demand_supply_not_released`, and of a row held `credit_hold` with `demand_on_hold`; it still never reads `sales` or `purchasing`.
+
+    Note: when `sales` sets `credit_hold` on an order's rows, it raises one work item `credit_hold` (subject the sales order, owner role `accountant`). The item is resolved by `ReleaseCreditHold`, or by the system when the hold is cleared because the exposure fell under the limit.
+
 **Demand, supply and progress**
 
 19. Demand and supply rows ([ADR-0024](0024-planning.md) rule 8; ADR-0031 rule 5):
     - **Sales order lines** get demand rows at Submit. Take-force adjusts them. Close or cancel closes them (`closed_reason`).
     - **Purchase request and order lines** get supply rows from draft (rule 10). A request line's open quantity falls as orders are created from it.
     - **Progress.** Delivered and received quantities are read from the rows. Invoiced quantities, including `issuing`, are computed from invoice lines.
+
+    Note: release. Demand rows of sales order lines and supply rows of purchase order lines carry the hold reason `not_approved` until the document is approved (rule 18 note). Unreleased demand rows are not demand: planning, available to promise and reservations ignore them, and `Reject` sets `not_approved` on them again, so a rejected order is never demand and never reserves. Supply rows from draft stay supply for planning (rule 10; ADR-0024 rule 8), released or not, but goods are received against them only once released.
 
 **Corrections and limits**
 
@@ -217,6 +253,8 @@ The commercial documents are a thin layer over the core (B3). They hold what was
     | Supplier debit note | price difference, `input_tax` | `payable_reconciliation` |
     | GR/IR write-off (closed line, `R > I`) | `gr_ir_clearing` (rule 13) | price difference |
     | Release at order close (invoice-first) | `purchase_cost_clearing` | `price_difference` (ADR-0030 rule 4) |
+
+    Note (TT99 example, flow review 2026-11-15; accounts `unverified`, DS-19): a goods line with a price difference. A purchase order line of 100 kg of a raw material at 10,000 VND/kg; the goods receipt of 100 kg posts Dr 152 (`inventory_posting`) 1,000,000 / Cr 33881 (`gr_ir_clearing`) 1,000,000. The supplier invoices 100 kg at 10,500 VND/kg with VAT 10%. GR/IR is debited `round(V(100)) − round(V(0))` = 1,000,000 (rule 13), so the price difference is 50,000. TT99 sends `price_difference` for `raw_material` to 152, an inventory account, so the invoice posts the difference to 33882 (`purchase_cost_clearing`) instead ([ADR-0021](0021-landed-cost.md) rule 12): Dr 33881 1,000,000, Dr 33882 50,000, Dr 1331 (`input_tax`) 105,000 / Cr 331 (`payable_reconciliation`) 1,155,000. In the same transaction `inventory.contract.adjust_receipt_value` writes a `landed_cost` with `cost_type` `price_difference`, `posted`, targeting the receipt line ([ADR-0030](0030-commercial-seams-and-imports.md) rule 1): with the receipt's period open, Dr 152 50,000 / Cr 33882 50,000, so the receipt is valued at 1,050,000 and 33882 is back to zero. If the receipt's period is closed, the same 50,000 leaves 33882 split between the stock still on hand (152) and the consumers that took the goods (method `consumer_split`, ADR-0021 rules 6–7). A regime that sends `price_difference` to an expense account (the TT99 alternative 6324) posts the 50,000 there on the invoice, with no landed cost.
 22. Policy input of each type ([ADR-0043](0043-policy-and-approval.md) rule 4):
     - **Amount:** document total in company currency at the applied rate.
     - **`discount_percent`:** (Σ quantity × list price − net amount after the document discount) ÷ Σ quantity × list price. Lines without a list price count at their base price; free goods count at their list price.
@@ -225,6 +263,12 @@ The commercial documents are a thin layer over the core (B3). They hold what was
     - **`is_price_outside_list`:** a line's base price differs from its list price, or it has none.
     - **`is_credit_exceeded`** (sales orders) and **`is_match_exceeded`** (purchase invoices).
     - **Fields.** Cost and margin on documents are field classes `cost` and `margin` (ADR-0017 rule 10).
+
+    Note: `is_price_below_cost` compares a paid line's net amount after the document-discount allocation (rule 16, step 7), divided by its inventory quantity and converted to company currency at the applied rate, with its cost per inventory unit; free goods are excluded. This is the one definition; [ADR-0045](0045-master-data-and-price-lists.md) rule 5's "net unit price" gives way to it.
+
+    Note: `is_cost_unknown` is true when a paid line's cost per inventory unit is unknown: no preliminary price and, for a line without an item or preliminary price, no computable configuration estimate ([ADR-0046](0046-product-configuration.md) rule 14). `margin_percent` is then unknown and the line does not count as below cost, so rules on margin and below cost do not match; the seeded rule on `is_cost_unknown` requires approval instead ([ADR-0043](0043-policy-and-approval.md) rules 3, 15).
+
+    Note (flow review, 2026-11-15): quotations have no credit condition. `is_credit_exceeded` belongs to the sales order's policy input only (rules 4, 18): a quotation creates no demand, reservation or exposure (rule 3). The quotation agent's `GetCreditExposure` finding is information in its note ([ADR-0051](0051-agent-workflows.md) rule 15 note); credit is checked when the order is submitted.
 
 **Catalogs**
 
@@ -246,6 +290,8 @@ The commercial documents are a thin layer over the core (B3). They hold what was
     - **Edge cases:**
       - EC-20, EC-21, EC-22 and EC-63 get interim outcomes (rules 18, 20, 22), flagged for the author;
       - new: a change order that changes a purchase price between two receipts and an invoice; a promotion with free goods and a document discount; an invoice within the price tolerance and one beyond it.
+
+    Note: further rows: errors `demand_supply_not_released`, `sales_order_required`, `source_not_approved` and `partner_role_missing` (rules 2, 3, 6, 18); check result `price_list_currency_differs` ([ADR-0045](0045-master-data-and-price-lists.md) rule 5); work item kind `credit_hold` (`sales`, rule 18); transaction key `purchase_expense` (rule 12); policy condition `is_cost_unknown` (rule 22); company settings `master_data.default_partner_group.customer`, `master_data.default_partner_group.supplier` and `master_data.default_partner_group.employee` ([ADR-0045](0045-master-data-and-price-lists.md) rule 13).
 24. Lab check `t07_commercial.py` ([validation lab](../reviews/2026-11-14-design-validation/README.md)), pure functions:
     - GR/IR on 600 random sequences of receipts, invoices, returns, credits, reversals and change orders, with rounding to 0 and 2 decimals: the balance equals `round(V(I)) − round(V(R))` after every step, and is zero whenever received equals invoiced; reversals of non-latest postings are refused;
     - fixed GR/IR cases, including thirds of a unit, invoice first, a return after a change order, and the residual the receipt-price rule would leave;

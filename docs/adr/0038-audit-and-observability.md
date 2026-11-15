@@ -35,6 +35,8 @@ The retention periods and the strictness of scanning are flagged for the author.
    - **Result:** `plan_hash`, `trace_id`, and `check_codes`, the codes of the command's check results ([ADR-0040](0040-ui-architecture.md) rule 10).
 
    Note: `delegated_from_user_id` when a substitute acts ([ADR-0054](0054-users-roles-and-authorizations.md) rule 21).
+
+   Note: the command columns also hold `is_draft_only` as registered at the time, read by INV-216 ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 55 note).
 3. Field changes, in `audit_change` (`id`, `company_id`, `audit_record_id`, `subject_table`, `row_id`, `field`, `before`, `after`, `erased_at`):
    - **Which tables.** A closed set, `is_change_tracked` in each module's table declarations and checked by CI: master data, settings including enabled regime settings (ADR-0016), role assignments, period area state and production structures. Documents rely on `document_version`. Balances, counters, open items and other derived rows are not tracked.
    - **How it is captured.** Only `context`'s write helpers capture it. They read the before row and compute the diff with the canonical forms and diff code of ADR-0029 rule 1. Handlers never build changes by hand.
@@ -59,6 +61,8 @@ The retention periods and the strictness of scanning are flagged for the author.
    - **Simulation.** A denial record is the one effect of a simulation that persists (ADR-0008 rule 9 gets a note).
 
    Also `tool_not_allowed`, `tainted_read_out_of_scope`, `untrusted_read_not_allowed` and `tainted_run_not_allowed`; three denials stop a run ([ADR-0050](0050-agent-runtime-and-query-layer.md) rules 33, 55). Also `automatic_send_not_allowed`; the CRM's reads outside a tainted run's scope use `tainted_read_out_of_scope` ([ADR-0052](0052-minimal-crm.md) rule 34).
+
+   Note: the complete list of codes that write denial records: `permission_denied`, `human_only`, `proposal_required`, `policy_denied`, `outbound_content_out_of_scope`, `segregation_of_duties`, `tool_not_allowed`, `tainted_read_out_of_scope`, `untrusted_read_not_allowed`, `tainted_run_not_allowed`, `automatic_send_not_allowed` and `origin_run_submit_not_allowed`, and the refusals only people meet: `approver_not_eligible`, `approver_is_submitter`, `grant_exceeds_own_rights`, `segregation_conflict` and `organization_self_change`. None is written for `work_item_claim_lost` (a person took the item), `approval_already_given` or `approval_would_strand_stage` (preconditions), or `llm_routing_refused`, which the gateway records on the run step ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 19). The three-denial stop of [ADR-0050](0050-agent-runtime-and-query-layer.md) rule 33 counts every code of the list returned to a run; the people-only codes cannot reach a run, whose tool list holds none of their commands.
 6. Storage:
    - **Protection.** Audit and change records are protected by append-only triggers (rule 4's exception aside) and the generated company policy. The trigger on `audit_denial` allows only `count` and `last_at` to change, and only upward.
    - **Partitions.** `audit_record` and `audit_change` are partitioned by month on `id`; ADR-0006 rules 22 and 23 get a note. The daily job of ADR-0022 creates partitions three months ahead, with a default partition. `audit_denial` is not partitioned, because its unique coalescing index cannot include `id`, and coalescing keeps it small.

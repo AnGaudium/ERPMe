@@ -40,6 +40,8 @@ The accounting choices are the author's (ADR-0005 item 1). Each one below is a r
 **Cost objects and collection**
 
 1. `cost_object` (ADR-0025 rule 2, owned by `production`) has `kind`, which is `production_order` (one per order, ADR-0034 rule 15) or `cost_pool` (one per cost center that collects production cost); `production_order_id` or `cost_center_id`, matching the kind; and `state` (`open`, `closed`).
+
+   Note: cost object states (holistic review 2026-11-15, item P27). A `production_order` cost object becomes `closed` when its order is closed ([ADR-0034](0034-production-orders-and-shop-floor.md) rule 7). A `cost_pool` cost object becomes `closed` when its cost center is deactivated and the period's job has left its balance at zero. A line naming a closed cost object is rejected with `cost_object_closed`, except the lines of `production_cost_settlement`, which may still post to it when a period is reopened and solved again ([ADR-0034](0034-production-orders-and-shop-floor.md) rule 6's table).
 2. Collection:
    - **Material** reaches orders through issues.
    - **Labor and overhead** reach the cost center's pool through their own documents: payroll journals, depreciation, service invoices, and internal consumption to a factory cost center. A posting handler fills the pool of the line's cost center when a line on a production cost leaf names a cost center and no cost object. With neither, the line is rejected (`control_dimension_missing`).
@@ -72,6 +74,8 @@ The accounting choices are the author's (ADR-0005 item 1). Each one below is a r
    - **Documents.** The job writes one internal document per run, `production_cost_settlement`, with lines keyed by (cost object, cost component, step).
    - **Reruns** post only the differences per key (ADR-0012 rule 15).
    - **Simulation.** The job can be simulated like any command (ADR-0008 rule 9). Its plan lists the journal lines and the period cost records, and the document version follows ADR-0031 rule 1.
+
+   Note: registry flags of `production_cost_settlement`: module `production`; posting; internal; no change orders; not e-invoice capable; `is_approval_hold_allowed: false`, because the job writes it as actor `system`; not reversible, because a rerun posts the differences (ADR-0012 rule 15); not item-creating; no demand or supply. Its authorization leaf `production_cost_settlement` sits under Finance beside `costing_adjustment`, and its commands are the job's (`full`, [ADR-0054](0054-users-roles-and-authorizations.md) rule 8) (holistic review 2026-11-15, item P27).
 6. Unknowns and linearity:
    - **Unknowns.** One price per stock node (item, valuation area).
    - **Linear forms.** Pool values (constants plus indirect issues at those prices), allocations, order pools, WIP, outputs and abnormal cost are all linear forms in those prices. Allocation weights, units in process, completion shares and normal capacities are quantities or constants.
@@ -106,6 +110,14 @@ The accounting choices are the author's (ADR-0005 item 1). Each one below is a r
    - **`direct_material`** (interim default): material WIP = material pool × U ÷ (R + U). Conversion goes wholly to the outputs.
    - **`equivalent_units`:** per component, WIP = pool × U·s ÷ (R + U·s). The share s is 1 for material and, for conversion, the share of routing hours confirmed, or the company's `wip_completion_percent` when set.
    - **`planned_cost`:** WIP = U × the released estimate's cost up to the last confirmed operation, a constant. If the solve gives the order's outputs a negative value, its WIP is capped at its pool and the system is solved again, at most once per order. The order gets the check result `planned_wip_capped` and its outputs are valued at zero, as a degenerate case of ADR-0020 rule 13.
+
+   Note: E when no non-fixed `manual` line qualifies (holistic review 2026-11-15, item P17):
+   - the order has operations and a `backflush_at_operation` component: E = cumulative (yield + scrap) of the order's first operation × G ÷ Q;
+   - otherwise (every component `backflush_at_receipt`, no component, or no routing): E = cumulative main output received, so U = 0.
+
+   This replaces "No qualifying line. E = G", which gave an order that had not started units in process. The lab [t13_production.py](../reviews/2026-11-14-design-validation/lab/t13_production.py) checks these cases. Whether this reading of units in process is right stays flagged for the author with the units-in-process definition (rule 18).
+
+   Note: for a `disassembly` order, progress is the net input issued. E = the net issued quantity of the header item; D = the smallest, over output lines, of cumulative net received × G ÷ the line's planned quantity; U = max(0, E − D), and R is the period's increase of D (holistic review 2026-11-15, item P16).
 10. Technically complete orders keep no WIP:
     - **Abnormal cost.** Assessed once, at completion, over the whole order. Per component line, the excess is the net issued quantity minus required × (cumulative received ÷ G) × (1 + tolerance), floored at 0. It is valued at the period's actual price and posted to cost of goods sold (key `production_abnormal_cost`). The same applies to activity quantities against standards. A reopen reverses it, and the next completion assesses it again.
     - **No output in the period.** A completed order whose pool is not zero but which received no output in the period sends that cost to cost of goods sold as a residual (key `production_residual_cost`), flagged. Examples: late allocations, consumer-split shares, late confirmations. A completed order with no good output at all does the same with its whole cost.
@@ -139,6 +151,8 @@ The accounting choices are the author's (ADR-0005 item 1). Each one below is a r
     - **Commands.** `CreateCostEstimate` computes it on the server. `ReleaseCostEstimate` freezes it as the version's benchmark. Both are effect class `other`, because estimates never value stock.
 
     An estimate for a configured item names the item (`item_id`) with the product-level version, and is computed and released by the system when the item is created ([ADR-0046](0046-product-configuration.md) rules 11, 14).
+
+    Note: `cost_estimate` gains `costing_lot_quantity`, the quantity the estimate is computed for: fixed quantities and setup are spread over it, and the versions of made components are selected for it. It lies in the version's lot range and defaults to the version's `minimum_lot_quantity`, or one inventory unit when that is zero. The estimate valid for a version on a date is the latest released one, by costing date and then release time, whose costing date is on or before that date; target cost (rule 15) and the order's `policy_input` use it. For the preliminary price of an item without history (rule 4), the version is the one [ADR-0033](0033-production-master-data.md) rule 13 selects on the posting date for the line's warehouse and quantity (for a production receipt, the order's own version), and its valid estimate gives the unit cost (holistic review 2026-11-15, item P18).
 15. Variance analysis:
     - **Target cost.** The released estimate valid on the order's explosion date, scaled to the received quantity.
     - **Query.** `GetProductionOrderVariance` splits actual minus target into input price, input quantity, resource usage, scrap, lot size and remaining.
@@ -193,6 +207,8 @@ The accounting choices are the author's (ADR-0005 item 1). Each one below is a r
     **Account mapping.** TT99 maps the leaves to 621, 622 and 627 and WIP to 154. TT133 maps them to sub-accounts of 154 per cost element plus one for WIP, because an operational account maps to one system account (ADR-0010 rule 11). The mapping is DS-19's and the author's (the DS-41 question).
 
     Note: the neutral references are IAS 2 paragraph 16 (abnormal amounts) and paragraph 13 (normal capacity); VAS 02 paragraphs 11 and 08 are `l10n_vn`'s rationale ([ADR-0053](0053-core-neutrality.md) rule 6).
+
+    Note: setting keys, with the interim value a regime package seeds until it has a basis (holistic review 2026-11-15, item P19): `production.wip_method` (`direct_material`), `production.abnormal_cost.applies` (true), `production.abnormal_cost.tolerance_percent` (0), `production.normal_capacity.applies` (true), `production.co_product_split` (`cost_coefficient`), `production.estimate_price_basis` (`actual_average`). TT99 seeds exactly these ([ADR-0039](0039-vietnam-package-tt99.md) rule 9). `wip_completion_percent` and the pool allocation rules are company data. The other points of this list are fixed core behavior, flagged: unabsorbed, abnormal and residual cost to cost of goods sold; abnormal cost at period actual; the units-in-process definition (rule 9 and its notes); the negative residual offset; zero value under a capped planned WIP; the by-product value source `regime` (rule 13); the disassembly split; the singular fallback; `cost_behavior` as account data; subledger activation before the first release.
 19. Catalog changes, version 0.x:
     - **Movement types:**
 
@@ -223,6 +239,8 @@ The accounting choices are the author's (ADR-0005 item 1). Each one below is a r
       `consumption` also lists `production_cost_overhead`, for internal consumption to a factory cost center.
 
     Note: `production_abnormal_cost` and `production_unabsorbed_overhead` list `cost_of_goods_sold;expense_other` as regime alternatives; TT99 keeps 6325 under 632 ([ADR-0053](0053-core-neutrality.md) rule 6).
+
+    Note: for a `disassembly` order the determinant of `production_output` and `production_wip_transfer` is the valuation class of the header item, the input being taken apart, because its outputs are co-product lines (holistic review 2026-11-15, item P16).
 20. Catalog rows reserved in the production range (ADR-0033 rule 16):
     - **INV-106:** after the job, each order's `inventory_work_in_process` balance equals the closing amounts of its latest `production_order_period_cost`, and a technically complete order's is zero.
     - **INV-107:** after the job, each `cost_pool` cost object's balance on the production leaves is zero for the period.

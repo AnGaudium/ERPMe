@@ -59,6 +59,8 @@ The product is `erpme` (ADR-0004 rule 7). Test tooling lives in separate top-lev
    - a row whose `first_step` is at or below `[tool.erpme] build_step` (DS-18) and has no check fails;
    - a check without a row fails;
    - a row above the current step may have a check, which runs in report-only mode.
+
+   Note: INV-100 to INV-112 are in the catalog with an empty `first_step` and the `flagged` value "ADR-0032 rule 7: production core step (number pending author)". Until the author numbers the step, an empty `first_step` counts as above the current step: a check may exist and runs report-only. Numbering the step fills the column ([ADR-0033](../adr/0033-production-master-data.md) rule 16) (holistic review 2026-11-15, item P20).
 6. The author decides (ADR-0005 item 3):
    - removing or weakening an invariant;
    - changing a check so a failure passes;

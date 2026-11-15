@@ -60,3 +60,4 @@ bad_debt_allowance,Bad debt allowance,,receivable_allowance,,false,0.1.0,"The al
 bad_debt_recovery,Bad debt recovery,,non_operating_income,,false,0.1.0,"A receipt of a debt written off earlier. (ADR-0048)."
 payable_release_income,Payable release,,non_operating_income,,false,0.1.0,"A payable no longer owed, written off. (ADR-0048)."
 currency_exchange_clearing,Currency exchange clearing,,currency_exchange_clearing,,false,0.1.0,"Clearing between the two sides of a currency exchange, never revalued (ADR-0011 rule 4; ADR-0048 rule 12)."
+purchase_expense,Purchase expense,item_group,expense;prepaid_expense;construction_in_progress,,false,0.1.0,"Purchase invoice expense lines, and service lines without a service receipt, by the item group; an entered account is checked against the key (ADR-0047 rule 12)."

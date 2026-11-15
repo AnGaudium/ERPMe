@@ -74,4 +74,4 @@ The author's decision (Vinh An Tran, 2026-11-15): the e-invoice provider connect
 
 | ID | Design item | Output | Depends on | Needed by |
 | --- | --- | --- | --- | --- |
-| DS-24 | E-invoice adapter interface, BKAV adapter, incoming invoice intake. E-invoice records and intents live in `tax` (ADR-0027 rule 8). Natural keys of external documents (ADR-0030 rule 10). | Spec | DS-23 | Add-on, after the core design; before a pilot that must issue e-invoices |
+| DS-24 | E-invoice adapter interface, BKAV adapter, incoming invoice intake. E-invoice records and intents live in `tax` (ADR-0027 rule 8). Natural keys of external documents (ADR-0030 rule 10). The core names the incoming intake seam the add-on fills: `e_invoice_record` (direction `incoming`), `ImportEInvoiceRecord`, the package interface `EInvoiceRecordReader`, `ConfirmEInvoiceSupplier` and the raise of `supplier_invoice_received` ([ADR-0051](../adr/0051-agent-workflows.md) rule 20 note). | Spec | DS-23 | Add-on, after the core design; before a pilot that must issue e-invoices |

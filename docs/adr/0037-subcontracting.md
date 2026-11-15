@@ -32,11 +32,15 @@ Outsourced work runs on the production core:
    - **Components.** Components assigned to the operation have the supplier's processor location as their issue warehouse. They are demand lines there, so planning supplies them through a transfer route from the production warehouse to that location. A missing route raises `planning_parameter_missing` (ADR-0034 rule 9 and ADR-0036 rule 1 get notes).
    - **Backflush.** ADR-0034 rule 2's backflush-warehouse rule gets an exception: such components are consumed at the processor location by the service receipt (rule 5). Serial-tracked components are issued there manually.
    - **Whole-item subcontracting.** A routing whose only operation is external.
+
+   Note: when the supplier chosen for an external operation that has components has no active processor location, `CreateProductionOrder`, its updates and change orders are rejected with `processor_location_missing`, naming the supplier. A planning run meeting the case for a version's default supplier raises `planning_parameter_missing` with reason `processor_location_missing` (holistic review 2026-11-15, item P9).
 3. Lead time:
    - **The value.** An external operation's duration is `supplier_processing_days` of the supplier's `supplier_item` for the service item, on the supplier's calendar, plus the transit days of the routes to the processor and back (ADR-0024 rules 2, 3). Without a `supplier_item`, its routing durations apply, on the production warehouse's calendar.
    - **Where it applies.** Order scheduling (ADR-0034 rule 3) and `plan_production` both use this duration.
    - **Use.** `plan_production` (ADR-0036 rule 3) receives these values with the structures it loads.
    - **Load.** External operations load no work center.
+
+   Note: an external operation's duration is `supplier_processing_days` on the supplier's calendar plus the transit days of the return route, the `transfer_route` from the processor location to the production warehouse (ADR-0024 rule 3). The outbound transit is not added: components reach the processor by their own planned transfer (rule 2), whose route lead time already offsets them. A missing return route raises `planning_parameter_missing` (reason `processor_route_missing`) in a run; order scheduling then counts zero transit and returns the same check result (holistic review 2026-11-15, item P8).
 4. Buying the service:
    - **Drafting.** Releasing an order emits its approval event (ADR-0009 rule 22). A `purchasing` consumer drafts one purchase request line per external operation (ADR-0024 rule 22 pattern, actor `system`), for the service item and the operation's planned quantity at the supplier's price. The line carries `production_order_operation_id`, a typed line reference that ADR-0028 rule 2 reserves to the author under B3, so it is flagged (open question).
    - **Repeat release.** A re-release drafts nothing twice: the consumer's key is the operation.
@@ -57,6 +61,8 @@ Outsourced work runs on the production core:
    - **Missing stock.** Too little stock at the processor rejects the receipt with `negative_stock`.
    - **Reversal.** Refused once an invoice refers to the receipt. Otherwise it reverses, in this order: the automatic receipt, the backflush, the cost and the progress.
    - **Agents.** A receipt drafted from a processor's delivery note is tainted (ADR-0029 rule 10), so a human posts it. Simulation applies as for any command.
+
+   Note: `service_receipt` is `purchasing`'s: its authorization leaf sits under Purchasing ([authorization-areas.csv](../catalogs/authorization-areas.csv)), its registry flags are in [ADR-0047](0047-commercial-documents-and-pricing.md) rule 1's note, and templates `buyer` and `warehouse_keeper` hold `post` on it ([ADR-0054](0054-users-roles-and-authorizations.md) rule 11's note) (holistic review 2026-11-15, item P15).
 6. Afterwards:
    - **Invoice differences.** The invoice clears GR/IR at the order price (ADR-0030 rule 4). A service has no pending receipt adjustment, so a difference posts straight to the order's `production_cost_other` while the order is not closed, and after close to the price-difference account, never the stock-bound path, since a service has no receipt lines. Both are interim and flagged. After close the difference posts without a valuation class, so it reaches the generic price difference row ([ADR-0039](0039-vietnam-package-tt99.md) rule 8).
    - **Actual consumption.** When the processor reports actual consumption, a `production_issue` or return at the processor location adjusts the order.
@@ -105,9 +111,13 @@ Outsourced work runs on the production core:
       - an invoice difference before and after the order closes;
       - a supplier change after release;
       - a reversal of a service receipt.
+
+    Note: INV-112 covers every `operation_progress_component` line, whatever its calling document ([ADR-0034](0034-production-orders-and-shop-floor.md) rule 12's note) (holistic review 2026-11-15, item P11).
 11. Commands and errors:
     - **Commands.** Document commands follow ADR-0009. Posting a service receipt is effect class `posting`, under policy as a purchase document (DS-28).
     - **Errors and check results:** `movement_not_allowed_at_processor`, `negative_stock` (existing), and `service_receipt_without_operation` for a line without `production_order_operation_id`.
+
+    Note: `service_receipt` records the processor's delivery, a fact: `is_approval_hold_allowed: false`, so it reaches no approval pool and a rank becomes `human_post` ([ADR-0055](0055-approval-pools-and-stages.md) rule 2's note) (holistic review 2026-11-15, item P12).
 
 ## Context
 

@@ -64,6 +64,8 @@ Agents read the structures through deterministic queries. They draft revisions f
    - **Definition.** Every explosion, version selection and revision selection uses one `explosion_date`: the planned start date of the order or planned order, in the company's time zone (ADR-0007).
    - **Users.** MRP (DS-54), order creation (DS-52), cost estimates (DS-53; their costing date acts as the `explosion_date`) and the explosion query (rule 15) all use it.
    - **Snapshot.** A production order copies the revisions valid on its `explosion_date` and keeps their IDs. DS-52 states whether a change of the planned start date before release explodes the order again.
+
+   Note: one version-selection rule for every caller (holistic review 2026-11-15, item P3). Forward scheduling selects the version (rule 13) on the start date. Backward scheduling selects it on the end date, schedules backward, and requires the selected version to be valid on the resulting start too: active, its dates and lot range covering it, and its bill of materials and routing each with a released revision valid there. Otherwise the next version in rule 13's order that is valid on the end date is tried, and when none is valid on both dates the result is `production_version_missing`. When a backward schedule is moved forward from `earliest_start` ([ADR-0036](0036-multi-level-mrp.md) rule 3), the same check applies at the new start. The explosion uses the revisions valid on the resulting start.
 6. `bill_of_materials_component` rows of a revision:
    - **Fields.**
      - `position`;
@@ -101,6 +103,8 @@ Agents read the structures through deterministic queries. They draft revisions f
    - **Low-level codes.** `item_low_level_code` (company, item, `low_level_code`) is a read model owned by `production`. It is recomputed downward for every item the release reaches: the longest path from an item that is never a component or an output, so 0 for top items. A code may fall when a component is removed. MRP plans in that order (DS-54).
    - **Operations.** For every production version that pairs this bill of materials with a routing on dates from the revision's `start_date`, each `operation_number` must exist in the routing revision valid on that date. Otherwise the release is rejected with `operation_not_in_routing`.
    - **Locking.** Releases, production version saves, production setting saves and deactivations of bills of materials and routings lock the company's `production_structure` row (created with the company) at class 3 of ADR-0027 rule 10, beside the planning state row. Two concurrent changes therefore cannot create a cycle or break an operation reference together.
+
+   Note: a configurable product with a product-level bill of materials ([ADR-0046](0046-product-configuration.md) rule 12) is a node of the cycle graph, with edges to its components and outputs. A configured item has no structure of its own, so it counts as its product: an edge into a configured item is an edge into the product node, and a configured item's `item_low_level_code` is its product's. INV-100 covers product nodes (holistic review 2026-11-15, item P6).
 
 **Routings**
 

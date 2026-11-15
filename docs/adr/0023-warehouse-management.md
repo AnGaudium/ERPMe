@@ -208,6 +208,8 @@ A small shop and a managed distribution warehouse run on the same model.
 
       No database ID takes part (ADR-0006 rule 6).
     - **No stock.** When no eligible stock exists, the line is short: the command succeeds with the check result `no_pickable_stock`, and the shortage becomes an exception.
+
+    Note: a demand line without a reservation (with `sales.reserve_on_approval` false, or a backorder that stock now covers) is first reserved by `RunPickRelease`, up to available to promise by rule 13, in the same transaction and under the same `stock_value` locks; its tasks are then created from that reservation, and what cannot be reserved is short (`no_pickable_stock`). Rows not released or on hold are refused with `demand_supply_not_released` or `demand_on_hold` ([ADR-0047](0047-commercial-documents-and-pricing.md) rules 18–19).
 15. Confirming a task:
     - `ConfirmWarehouseTask` records the scanned source and target bins, the handling units, lot or serials, and the actual quantity, which may not exceed the task's (`task_quantity_exceeded`). A smaller quantity requires a `shortage_reason`. The scanned target may differ from the proposal (rule 12).
     - Every confirmed pick moves the goods to a non-pickable bin (rule 7), so no later release allocates them again.
@@ -221,6 +223,8 @@ A small shop and a managed distribution warehouse run on the same model.
     - In a plain warehouse there are no tasks: `CreateDelivery` takes stock from the warehouse's default bin ([ADR-0031](0031-design-simplifications.md)), and the reservation goes straight to `fulfilled` at `PostDelivery`.
     - Value and ownership change only at `PostDelivery` (ADR-0020).
     - Pick batches and waves (second slice) group the pick tasks of several demand documents, sorted by zone and `pick_sequence`. Each document is released as its own internal command, so locks stay small.
+
+    Note: `CreateDelivery`, and `inventory`'s other documents created from source lines (receipts and returns), set the new version's `is_tainted` as the OR of the effective taint of every source line's document version, on create and on every update that adds lines ([ADR-0029](0029-proposals-and-agent-safety.md) rule 8; [ADR-0047](0047-commercial-documents-and-pricing.md) rule 2). A delivery also refuses rows not released (`demand_supply_not_released`) or on hold (`demand_on_hold`).
 17. Replenishment uses `bin_item`: one pick face per item per warehouse, with `minimum_quantity` and `maximum_quantity`. A replenishment task is created when a pick task's creation would take the face below its minimum, and by the daily job in the second slice, with at most one open task per `bin_item`.
 
 **Counting and returns**

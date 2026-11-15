@@ -103,6 +103,8 @@ Numbers join lists: a characteristic may take a number in a range with a step, s
 
    The quotation agent's configuring loop: [ADR-0051](0051-agent-workflows.md) rule 15.
 
+   Note: `leads_to_violation` is true only when evaluating with that value adds a violation (code, rule or table, and characteristics) that the result without it does not have; violations already present never mark a value. The lookahead covers every characteristic without a user or rule value, including one that took a default, whose default the tried value replaces.
+
 **Configurations**
 
 9. `product_configuration`:
@@ -113,6 +115,8 @@ Numbers join lists: a characteristic may take a number in a range with a step, s
    - **Completeness.** Only complete, valid configurations are stored. A draft line holds its chosen values as canonical JSON in its content. Each save evaluates them and returns the result. When they are complete, the line references the configuration found or created.
    - **No personal data.** Free text for `is_custom` values (ADR-0045 rule 15) stays on the line, in `document_line_custom_text` (line, attribute, text), labeled `personal` and `is_untrusted`, so the shared record never needs erasure.
    - **Lines of any product.** A line's choices are a configuration for any product with line options, and for every configurable product. ADR-0045 rule 15's `document_line_option` rows become the configuration's values (a note there).
+
+   Note: a product with line options and no configuration model (not configurable) is evaluated by an implicit model: its line options' domains limited by `product_attribute_value`, the `is_required` options required, and no rules, tables or defaults. Missing options and values not allowed are reported as `line_option_required` and `line_option_value_not_allowed` ([ADR-0045](0045-master-data-and-price-lists.md) rule 15), and a complete set of choices is stored as a `product_configuration` like any other. The line keeps no model revision, and a copy re-checks only allowed values and required options.
 10. Configurations on documents:
     - **Leaving draft.** A line of a configurable product may leave draft only with a complete configuration (`configuration_incomplete`, listing the missing characteristics and the violations).
     - **Warehouse.** The line's warehouse must be the production warehouse of one of the product's product-level versions (`configuration_warehouse_not_produced`), so make-to-order supply and reservation meet it (ADR-0034 rule 14). Transfers of configured units are later.
@@ -133,6 +137,8 @@ Numbers join lists: a characteristic may take a number in a range with a step, s
     - **The cost estimate.** A system consumer of `ConfiguredItemCreated` computes and releases the item's cost estimate (rule 14).
 
     Sales and production orders carry the registry flag `is_item_creating` ([ADR-0047](0047-commercial-documents-and-pricing.md) rule 1).
+
+    Note: a sales line of a configured item in a warehouse without its `make_to_order` row is rejected, and open demand on a node without a planning row raises `planning_parameter_missing` (reason `planning_row_missing`) ([ADR-0036](0036-multi-level-mrp.md) rule 9's note) (holistic review 2026-11-15, item P5).
 12. Production structures of a configurable product:
     - **Product-level versions.** `production_version` gains `product_id`, exclusive with `item_id`: a version of a configurable product applies to every configured item of it. Version selection for a configured item looks for an item-level version first, then a product-level one (ADR-0033 rule 13).
     - **The super bill of materials.** `bill_of_materials` gains `product_id`, exclusive with `item_id`, for the product-level bill of materials, whose main output at explosion is the configured item.
@@ -145,6 +151,8 @@ Numbers join lists: a characteristic may take a number in a range with a step, s
     - **Only item-defining characteristics.** Conditions and sizing may name only item-defining characteristics of the product (`configuration_characteristic_not_item_defining`), checked at bill of materials and routing release and at model release (rule 4). This keeps one item, one structure, one cost: a line option can never change what is built.
     - **Revisions after an item exists.** A configured item's structure is the product-level revision valid on the explosion date, like any item's (ADR-0033 rules 4–5). A new revision changes what later orders of an existing configured item use, as it does for any item. Because estimates are made at once for new configured items, they pin revisions early, and the withdrawal rule (`revision_in_use`) rarely applies.
     - **Phase 1 limit.** Values are not passed to subassemblies. A component that varies is chosen among fixed items by conditions; a phantom component is exploded with its own structure.
+
+    Note: the product is a node of the cycle check and of low-level codes, and its configured items inherit its low-level code ([ADR-0033](0033-production-master-data.md) rule 8's note) (holistic review 2026-11-15, item P6).
 13. Explosion. `production.contract`'s explosion (ADR-0033 rules 5–6; [ADR-0036](0036-multi-level-mrp.md) rule 3) takes the item-defining values:
     - **Selection and sizing.** It keeps the components and operations whose condition is true, and sizes them, before the requirement formula of ADR-0033 rule 6. Quantities stay exact rationals and are rounded once per order line.
     - **One function.** MRP, `CreateProductionOrder`, cost estimates, `estimate_configuration` and the explosion query all use it, so a planned order, the real order and the estimate agree.
@@ -161,6 +169,12 @@ Numbers join lists: a characteristic may take a number in a range with a step, s
     - **Make to order.** Strategy `make_to_order` reserves the output to the sales line (ADR-0034 rule 14), so a configured unit is never delivered to another customer by accident. A returned unit returns to its own item's stock.
     - **Free stock.** Free stock of a configured item (a return, a cancelled order) is not netted by make-to-order planning (ADR-0036 rule 9). A planning run that plans an order for a line while free stock of the same item exists returns the check result `configured_stock_available`, naming the stock, and a person may reserve it.
     - **Line options carry no cost** (rule 12). Their price extras are pure price. ADR-0045 rule 15's open point on the cost and stock of options is closed by this split.
+
+    Note: `configured_stock_available` is side information of a planning run, so it is unhashed like `planning_parameter_missing` ([ADR-0040](0040-ui-architecture.md) rule 10; DS-04 `checks`) (holistic review 2026-11-15, item P26).
+
+    Note: an unknown cost sets the policy condition `is_cost_unknown`, and the seeded rule requires approval ([ADR-0043](0043-policy-and-approval.md) rules 3, 15; [ADR-0047](0047-commercial-documents-and-pricing.md) rule 22).
+
+    Note: the item's estimate is a `cost_estimate` ([ADR-0035](0035-production-costing.md) rule 14) with `item_id`. Where an estimate is read ([ADR-0020](0020-inventory-and-costing-model.md) rule 11, ADR-0035 rule 4), it is the latest released estimate for the item whose costing date is on or before the posting date, preferring one whose version's production warehouse is in the line's valuation area; its price basis is ADR-0035 rule 14's default, `actual_average` (flagged). When the consumer fails, the item stays usable on quotations and orders, whose cost checks use `estimate_configuration`; a production receipt of the item, which has no history and no released estimate, is rejected with `preliminary_price_missing` until an estimate is released or a person sets a preliminary price, as ADR-0035 rule 4 says. "Take their provisional value" above means exactly this.
 
 **Price**
 
@@ -202,6 +216,8 @@ Numbers join lists: a characteristic may take a number in a range with a step, s
       - a table narrowing that leaves one value;
       - a change order on a configured line with an open production order;
       - free stock of a configured item when a new line asks for it.
+
+    Note: INV-113 reads: every non-draft line of a configurable product on a document of an `is_item_creating` type, and every stock document line of one, names a complete configuration and an item whose variant values equal the configuration's item-defining values; a non-draft quotation line names a complete configuration, and an item only when one with those values exists ([ADR-0018](0018-product-and-item-model.md) rule 2).
 19. Lab check `t06_configuration.py` ([validation lab](../reviews/2026-11-14-design-validation/README.md)). The DDL loads with DS-20 and DS-06. On a neutral configurable product with numeric and list characteristics, rules, a table with ranges, and defaults, it checks:
     - evaluation: narrowing, derived values, defaults, each kind of violation with its message codes, completeness, step and range, the lookahead;
     - order independence and idempotence on 300 random models, with the bound never reached;
@@ -212,6 +228,8 @@ Numbers join lists: a characteristic may take a number in a range with a step, s
     - configured prices, including an item entry replacing the item-defining part;
     - that estimates of two configurations differ;
     - the immutability triggers, including a row moved out of a released revision and a configuration saved inside a savepoint, and `company_id` on every DS-56 table.
+
+    Note: the lab also checks that the lookahead marks only values that add a violation absent from the result without them (rule 8).
 
 ## Context
 

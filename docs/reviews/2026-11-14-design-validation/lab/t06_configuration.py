@@ -229,10 +229,11 @@ def evaluate(m, chosen, lookahead=True):
     req = set(m.required) | {r[2] for r in true_rules if r[0] == "require"}
     missing = sorted(k for k in req if k not in val)
     look = {}
-    if lookahead:
+    if lookahead:                                 # characteristics without a user or rule value, defaulted ones included
+        base = set(viol)                          # a value leads to a violation only if it adds one absent from the baseline
         for k in unset:
             if m.ch[k][1] == "list":
-                look[k] = {v: bool(evaluate(m, {**chosen, k: v}, lookahead=False)["violations"]) for v in sorted(shown[k])}
+                look[k] = {v: bool(set(evaluate(m, {**chosen, k: v}, lookahead=False)["violations"]) - base) for v in sorted(shown[k])}
     return {"values": val, "source": src, "domain": shown, "violations": sorted(viol, key=str), "missing": missing,
             "complete": not viol and not missing, "lookahead": look}
 
@@ -411,6 +412,10 @@ check("E15 input order and number spelling do not matter (600 = 600.0)", canon(r
 cfg_long = {"width": "1900", "material": "steel", "color": "grey"}
 check("E16 a configuration valid under revision 1 is refused under revision 2 (copy re-evaluates: configuration_invalid)",
       (evaluate(MODEL, cfg_long)["complete"], codes(evaluate(MODEL2, cfg_long))), (True, ["width_limit"]))
+r = evaluate(MODEL, {"width": "625", "height": "1100"})
+check("E17 lookahead marks only new violations: with the off-step width already out of range, only wall adds one; the defaulted mounting is looked ahead, the rule-set size class is not",
+      (r["source"].get("mounting"), r["lookahead"].get("mounting"), "size_class" in r["lookahead"], [v[:2] for v in r["violations"]]),
+      ("default", {"floor": False, "none": False, "wall": True}, False, [("configuration_value_out_of_range", "width")]))
 
 # ---- R: order independence and idempotence on random models ----
 def random_model(rng):

@@ -49,6 +49,8 @@ That last check failed until make-to-order supply carried its demand line, a req
      - the operation schedule;
      - the components with quantities and dates.
    - **Fixed lead time.** A version with lead time method `fixed` has no operation schedule. Its components are due at the start, and it loads no work center.
+
+   Note: mode `backward` selects on `required_date` and requires the version to be valid on the resulting start, else the next version in order, else `production_version_missing` ([ADR-0033](0033-production-master-data.md) rule 5's note) (holistic review 2026-11-15, item P3). `UpdatePlannedOrder` calls the function once, in mode `forward` from the order's start (the new one when it sets one), and stores the selected version and dates; every later run, and conversion, use mode `fixed` with them (holistic review 2026-11-15, item P4).
 4. A planned order with `order_type` `production`:
    - **Business key.** Item, warehouse, `need_date` and `sequence` (ADR-0024 rule 18), plus the demand line for `make_to_order` (rule 9). The version is an attribute, not part of the key, so a quantity change keeps the order's identity.
    - **New columns.** `production_version_id`, `planned_start_date`, `planned_end_date`, `availability_date` (planned end + the node's `receiving_days`), and `planned_order_operation` rows.
@@ -102,6 +104,8 @@ That last check failed until make-to-order supply carried its demand line, a req
    - **Status.** The strategies and their defaults are the author's (open question).
 
    Configured items get `make_to_order` rows when they are created ([ADR-0046](0046-product-configuration.md) rule 11).
+
+   Note: a sales order line whose item has no planning row in the line's warehouse, while the item has a `make_to_order` row in another warehouse, is rejected with `make_to_order_warehouse_mismatch`; configurable lines already get `configuration_warehouse_not_produced` ([ADR-0046](0046-product-configuration.md) rule 10). Independently, a run raises `planning_parameter_missing` with reason `planning_row_missing` for every node that has open demand lines and no `item_warehouse_planning` row, whatever the item, so no demand stays unplanned silently. Phantoms keep rule 1 (holistic review 2026-11-15, item P5).
 
 **Reorder point and min-max across levels**
 

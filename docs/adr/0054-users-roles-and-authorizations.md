@@ -38,6 +38,8 @@ ADR-0017 fixed the envelope: permissions are the names of registered commands, q
    - **The period resolver**, from `periods`: the posting period of a date, for the review items of rule 20.
    - **Stage eligibility, plan and work item visibility** of ADR-0055 (its rule 1): `policy` registers the stage reader, and the dispatcher combines it with effective rights and document actors. `work` filters items through a registered visibility function (rule 15), so it never reads assignments or stages itself.
 
+   Note: the document-actors function also returns the submitter of each round (the human of the `Submit`: its actor, or its `on_behalf_of`), which `approver_is_submitter` reads ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 14).
+
 **Users**
 
 3. `user_account` (installation data, label `personal`, spec 17):
@@ -94,6 +96,8 @@ ADR-0017 fixed the envelope: permissions are the names of registered commands, q
    - **Every permission has one leaf.** Commands and queries of a document type belong to its leaf, and those of a master data noun to that noun's leaf. Every other command, query and capability declares its leaf when it is registered (a note on ADR-0008 rule 1). CI fails when a permission has no leaf or names one outside the catalog.
    - **Generation.** The catalog is seeded by this ADR and generated from the registry once it exists, like the work item kinds (ADR-0042 rule 1).
    - **Installation-scoped commands** (package loading, installation roles, the operator variants of rule 3) stay with the `operator` role (ADR-0017 rule 7) and are outside the tree. `ConfirmUserInvitation` and the invited person's `CancelUserInvitation` need no leaf either: their check is that the caller is the invitation's user (rule 3).
+
+   Note: new leaves: one per agent type under `agent` (`agent_customer_onboarding`, `agent_quotation`, `agent_bank_matching`, `agent_purchase_invoice`, `agent_planning`, `agent_data_migration`), each holding `start_agent:<agent_type>`, and `event_delivery` under Administration; `agent` belongs to module `agents`. `StartAgentRun` and `CancelAgentRun` need no leaf of their own: their check is a capability (rule 24 note), as the invitation commands' check is the caller. Commands registered `is_internal_only` keep their leaf for grouping, and no level reaches them (rule 8 note).
 8. The level a permission needs:
    - **Levels are ordered:** `none` < `read` < `edit` < `post` < `full`.
    - **Queries** (`Get`, `List`, computed queries) need `read`.
@@ -109,6 +113,8 @@ ADR-0017 fixed the envelope: permissions are the names of registered commands, q
    - **Capabilities** declare their leaf and level when registered: `post_in_soft_locked_period` is `full` on `posting_period` (so spec 07's chief accountant holds it through Finance `full`), `start_agent:<agent_type>` is `edit` on `agent`, `list_all_work_items` is `full` on `work_queue_administration`, `delegate_for_others` is `full` on `delegation`, and `read_agent_run_bodies` (ADR-0050 rule 20) is `full` on its own leaf `agent_run_bodies`, which every template except `owner` sets to `none`.
    - **New verbs.** A verb in the glossary must have a row in the verb catalog; CI fails otherwise. This ADR adds the rows for Send, File, Render and Verify (`VerifyMailboxAuthentication`, ADR-0052), and the glossary rows for Set, which DS-20's price list commands already use, and for Verify.
    - **`human_only`** stays a registry flag beside the level. No level gives an agent a `human_only` command (ADR-0017 rule 14).
+
+   Note: commands that only a registered system job or consumer runs are registered `is_internal_only` instead ([ADR-0008](0008-command-envelope-and-registry.md) rule 1 note): the expansion skips them, so no role holds them at any level, `owner` included, and they have no REST endpoint, MCP tool or tool definition. They are `CompleteAgentRun`, `Record<Type>EInvoiceOutcome`, `RecordInboundMessage`, `RecordMailboxIntakeOutcome`, `RecordMailboxAuthenticationCheck`, `RecordOutboundMessageOutcome`, `RecordPartnerTaxLookup`, `RecordRenderOutcome`, `RunApprovalEscalation`, `RunAgentQualityCheck`, `RunPartnerDuplicateScan` and `RunPartnerInsightComputation`, and every later command of that kind. A declared `full` stays only for system commands a person may also start, such as `RunMailboxIntake`.
 9. Role levels and their expansion:
    - **`role_level`** (role, node, `level`, `can_approve`) may be set on any node. A leaf's effective level and approval flag come from the nearest node at or above it that has a row; with none, `none` and false. So "Sales: `post`" with "credit_note: `read`" gives `post` on every sales leaf except credit notes, as in Business One's tree.
    - **`can_approve`** needs a level of at least `read` on the same row. It adds `Approve<Type>` and `Reject<Type>` of the document types below.
@@ -161,6 +167,19 @@ ADR-0017 fixed the envelope: permissions are the names of registered commands, q
     - **Renamed owner rules.** `role:sales` becomes `role:sales_clerk` in [work-item-kinds.csv](../catalogs/work-item-kinds.csv) (kinds `interaction_unmatched`, `sales_return_due`, the matched inbound message kind and `complaint_open`), with notes on ADR-0019 rule 15, ADR-0051 rule 30 and ADR-0052 rule 20.
     - **Interim.** The template contents are defaults that the author may change (flagged; open question).
 
+    Note: template changes from the production review. `production_planner` gets `post` with `can_approve` on `production_order` and `edit` on `delegation`, and is a member of pool `mo`'s `standard` stage (interim, flagged for the author). `buyer` and `warehouse_keeper` get `post` on `service_receipt`, a Purchasing leaf ([ADR-0037](0037-subcontracting.md) rule 5's note). `production_planner` therefore joins the approving templates (holistic review 2026-11-15, item P14).
+
+    Note: every template except `auditor` has `edit` on `general_access`, which now also holds `CreateAttachment`, `CreateListExport` and `GetApprovalProgress`, each checked against its subject's or query's own permission (rule 24 note). Interim seed, flagged for the author: `start_agent:<agent_type>` at `edit` on the agent type's leaf for `sales_manager` (`quotation`, `customer_onboarding`), `chief_accountant` (`bank_matching`, `purchase_invoice`) and `production_planner` (`planning`); `owner` and `it_administrator` hold every agent type through Administration `full`, and `owner` is the one for `data_migration`. The recommended workflow owner of each agent type ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 14) is a holder of the same template; the hard floor keeps that person from approving the agent's drafts, so another approver does (open question).
+
+    Note (flow review, 2026-11-15): the templates other than `owner` now hold no both sides of a seeded segregation rule (rule 17). The changes, in [role-template-levels.csv](../catalogs/role-template-levels.csv) and [role-templates.csv](../catalogs/role-templates.csv):
+    - `accountant`: `partner` `read` (was `edit`; `partner_vs_purchase_invoice`); `cash_payment` and `bank_payment` `edit` with approval (was `post` through Banking; `purchase_invoice_vs_payment`): an accountant drafts, submits and approves payments and does not post them;
+    - `chief_accountant`: `cash_payment` and `bank_payment` `edit` with approval (`purchase_invoice_vs_payment`); `partner_bank_account` `read` (was `edit`; `bank_account_vs_payment`), so partner bank accounts are the owner's by default, and a company may give them to a role without payment rights;
+    - `cashier`: `bank_payment` `post`: the cashier posts the payments accountants prepare (in Phase 1 a bank payment records a transfer made outside ERPMe, [ADR-0048](0048-cash-bank-receivables-payables.md) rule 3);
+    - `sales_manager`: `price_list` `read` (was `edit`; `price_list_vs_sales_approval`), and `sales_clerk`: `price_list` `edit` (was `read`): price lists are maintained by the sales clerk, who approves nothing, while prices outside the list or below cost still reach the sales manager through policy (ADR-0043 rule 3);
+    - `purchasing_manager`: `purchase_invoice` `edit` with approval (was `post` through Purchasing; `partner_vs_purchase_invoice`): accountants post supplier invoices.
+
+    Payment reversals (`full`) stay with `owner`. `owner` keeps every permission (rule 12), so its conflicts remain and rule 19's per-document check is its control; for every other template this replaces the bullet **Seeded conflicts**. Lab check `t12_access.py` checks that no other template holds both sides of a seeded rule. Also ([ADR-0055](0055-approval-pools-and-stages.md) rule 5 note): `sales_manager`, `purchasing_manager` and `production_planner` have `edit` with `can_approve` on `change_proposal`, so they submit and approve change proposals, and `production_planner` has `edit` on `delegation` as an approving template. Interim, flagged with the template contents (open question).
+
 **Assignments, record scope and owner scope**
 
 12. `role_assignment` (company data, change-tracked):
@@ -193,6 +212,8 @@ ADR-0017 fixed the envelope: permissions are the names of registered commands, q
       | every other type | the creating user's employee |
 
     - **No owner.** An owner field naming an employee without a user account still works through `department` and `team`; a document with no owner employee is reached through `own` only by its creator.
+
+    Note: agent workflows set a draft's owner field from the scope partner's profile: `salesperson_id` from `customer_profile.salesperson_id`, `buyer_id` from `supplier_profile.buyer_id`, left empty when the profile names none ([ADR-0051](0051-agent-workflows.md) rule 8 note). The person holding the claim of the work item a draft is linked to reads and edits that draft while the claim holds, whatever their owner scope (record scope and permissions still apply), through the visibility function of rule 2 ([ADR-0042](0042-work-queue.md) rule 10 note).
 15. How the scopes combine:
     - **Per assignment:** row-level security (company) AND record scope AND owner scope. Across assignments: a row is visible or editable when any assignment that grants the permission allows it (ADR-0017 rule 6).
     - **Outside the scope:** a command gets `record_not_found`, and a query leaves the row out with `is_scope_filtered: true` (ADR-0017 rule 9). The read-only layer's views apply the same filters (DS-33).
@@ -214,6 +235,8 @@ ADR-0017 fixed the envelope: permissions are the names of registered commands, q
     - **Agents.** An agent run's rights stay as ADR-0050 rule 31 states: its agent type's declared permissions (the fixed tool list, ADR-0017 rule 11) intersected with the rights of the human it acts for, re-evaluated at every call. Agent types get no role assignments. The human's owner scope binds the run, as their record scope does (a note on ADR-0050 rule 31).
     - **Integrations** keep ADR-0017 rule 13, with roles and record scope and no owner scope.
     - **Never.** No role or level lets an agent approve (ADR-0017 rule 15), receive a delegation (rule 21), or run a `human_only` command.
+
+    Note: the agent type's declared permissions and its fixed tool list are one set, and the agent type also declares field classes (default none) and no record scope ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 12 note).
 
 **Segregation of duties**
 
@@ -238,6 +261,8 @@ ADR-0017 fixed the envelope: permissions are the names of registered commands, q
     - **Company enablement.** `company_segregation_rule` (rule code, `is_enabled`, `basis`). Every catalog rule is enabled at company setup. `EnableSegregationRule` and `DisableSegregationRule` are `human_only` and change-tracked.
     - **Price list rule.** Permissions cannot see "below cost", so the rule separates maintaining prices from approving sales at all. The below-cost check itself stays a policy condition (ADR-0043 rule 3).
     - **Catalog names.** CI checks that every permission in the catalog is registered.
+
+    Note: the seeded templates other than `owner` hold no both sides of these rules (rule 11 note).
 18. Check on every change of rights:
     - **When.** On every path that changes a person's effective rights: `CreateRoleAssignment`, `UpdateRoleAssignment`, `UpdateRole` (for every holder), `EnableUserAccount`, `CreateDelegation` of both kinds (the substitute's own rights plus what is lent), `ConfirmUserInvitation` (the pending assignments), `ConfirmRolePermissionHold` (every holder of the role), `EnableSegregationRule` (for every user), and the re-expansion on upgrade (rule 9).
     - **The test.** A rule conflicts when the union of a user's permissions from assignments and delegations in force on any common day holds at least one permission of each side.
@@ -248,6 +273,8 @@ ADR-0017 fixed the envelope: permissions are the names of registered commands, q
     - **The test.** Before a side-B permission runs on a document, the dispatcher asks the related-documents function for the documents linked by the rule's relation, and the document-actors function for who acted on them. If the acting human performed a side-A command on a related document, the command is refused with `segregation_of_duties`, with the rule and the related document in `details`. The same holds the other way round, A after B.
     - **The acting human** is the human actor, or the `on_behalf_of` of a non-human actor, and also the delegator when a substitute acts (rule 21).
     - **Always on.** It applies in both assignment modes, and in simulation. ADR-0017 rule 16 and ADR-0055 rule 7 are separate and unchanged.
+
+    Note (flow review, 2026-11-15): the minimum cast of a purchase-to-pay run with a mismatched supplier invoice, under these rules and the seeded templates (rule 11 note), is three finance users: A (an accountant) drafts and posts the invoice; B, an eligible approver of the `po` pool's current stage other than A, who wrote it ([ADR-0055](0055-approval-pools-and-stages.md) rule 7), approves it; C (a cashier) posts the payment, because `purchase_invoice_vs_payment` refuses A and B. Whoever last changed the supplier's bank account (by default the owner) may neither post nor approve that payment (`bank_account_vs_payment`), and whoever wrote or approved the purchase order may not post its goods receipt (`purchase_order_vs_goods_receipt`), so a warehouse keeper does. [DS-17](../design/DS-17-synthetic-dataset.md)'s `vn_*` profiles seed this cast (its rule 18 note).
 20. Small companies (open question, flagged for the author: ADR-0017 rule 17):
     - **The mode.** Company setting `permissions.small_company_mode`, changed by `EnableSmallCompanyMode` and `DisableSmallCompanyMode` (`human_only`; level `full` on `segregation_rule`).
     - **The bound.** Only while at most two active users hold any permission of effect class `posting` or any approval permission in the company; otherwise `small_company_mode_not_allowed`. While it is on, every path of rule 18 that would make a third such user is refused with `small_company_mode_active`, and the upgrade turns the gain into a hold (rule 9). INV-223 checks the bound.
@@ -262,6 +289,8 @@ ADR-0017 fixed the envelope: permissions are the names of registered commands, q
       - `ConfirmSegregationReview` resolves it and writes a `segregation_review` row (period, count, who, when);
       - every exception is in the audit log (ADR-0038).
     - **The gap.** In a one-person company the owner reviews their own actions, which is weaker than four eyes. Whether the mode is acceptable, and whether the review must block the period lock, is for the author.
+
+    Note: interim, flagged for the author: the mode never lifts [ADR-0029](0029-proposals-and-agent-safety.md) rule 4's bank-account rule either; a bank account proposal is approved by a human who wrote no version of it (open question).
 
 **Delegation**
 
@@ -317,6 +346,28 @@ ADR-0017 fixed the envelope: permissions are the names of registered commands, q
     - **Backlog DS-15 (teams of one or two):** rule 20, flagged, and ADR-0055 rule 20's walk-throughs.
     - **Still open:** integrations and `human_only` (ADR-0008 rule 2), TOTP for every user, and the small-company questions (ADR-0017 rule 17).
 
+    Note: agent and platform commands whose leaf no rule stated ([ADR-0050](0050-agent-runtime-and-query-layer.md) rules 14–20; [ADR-0013](0013-outbox-and-events.md) rules 8, 16; [ADR-0029](0029-proposals-and-agent-safety.md) rules 8, 13; [ADR-0038](0038-audit-and-observability.md) rule 13; [ADR-0043](0043-policy-and-approval.md) rule 18; [ADR-0055](0055-approval-pools-and-stages.md) rule 17):
+
+    | Command, query or capability | Leaf | Level | Flags |
+    | --- | --- | --- | --- |
+    | `start_agent:<agent_type>` | `agent_<agent_type>` | `edit` | capability |
+    | `StartAgentRun` | none: its check is `start_agent:<agent_type>` of the payload's agent type, held by the human actor or, for `system` from a wake-up or schedule, by the human acted for | — | `other`; on no tool list |
+    | `CancelAgentRun` | none: `start_agent:<agent_type>` of the run's agent type, or `cancel_agent_runs` | — | `other`; on no tool list |
+    | `cancel_agent_runs` | `agent` | `full` | capability; replaces "or the company's owner" |
+    | `UpdateAgentTypeSetting` | `agent` | `full` (declared) | `master_data_change`, `is_proposal_bound`, on no tool list; the resulting `workflow_owner_id` must hold `start_agent:<agent_type>` (`workflow_owner_not_permitted`) |
+    | `CreateAgentPromotionEvidence` | `agent` | `edit` | `other`; a person's command; on no tool list |
+    | `GetAgentTypeSetting`, `GetAgentShadowEvaluation`, `ListAgentRun`, `GetAgentRun` | `agent` | `read` | bodies need `read_agent_run_bodies` |
+    | `CompleteAgentRun`, `RunAgentQualityCheck` | `agent` | — | `is_internal_only` |
+    | `ClearTaint` | `policy` | `full` | `human_only` |
+    | `ConfirmAutoPost` | `policy` | `post` | only the rule's owner (ADR-0043 rule 14) |
+    | `ListPolicyDecision` | `policy` | `read` | — |
+    | `RunApprovalEscalation` | `policy` | — | `is_internal_only` |
+    | `GetApprovalProgress` | `general_access` | `read` | checks the document's own `Get<Type>` and read scope, like `GetPrintData` |
+    | `CreateAttachment` | `general_access` | `edit` | linking the file to a record needs that record's own `Update` |
+    | `CreateListExport` | `general_access` | `edit` | its consumer pages the exported query as the requester, so that query's permission and scope apply; on no tool list |
+    | `RetryEventDelivery`, `SkipEventDelivery` | `event_delivery` | `post` | `human_only`; deliveries with a company; installation deliveries stay the operator's |
+    | `ReplayEvents` | `event_delivery` | `full` | `human_only` |
+
 **Catalogs and lab**
 
 25. Catalog rows:
@@ -335,6 +386,8 @@ ADR-0017 fixed the envelope: permissions are the names of registered commands, q
       - **INV-229:** while `permissions.segregation_assignment_mode` is `block`, no user's permissions in force on any day hold both sides of an enabled segregation rule;
       - **INV-231:** no role assignment naming an invitation was in force before that invitation was confirmed by its own user (the actor of `ConfirmUserInvitation`), unless it created a new account, and none naming a pending, canceled or expired invitation is in force; and every user assignment that was its user's first link to a company (no current or future link there when it was created) names a confirmed invitation, except the bootstrap owner's.
     - **Edge cases** (block EC-110 to EC-129; EC-97 to EC-109 follow the reporting block of ADR-0049, which starts at EC-92 and takes what it needs, and this ADR uses none of them): EC-110, an owner-scoped sales clerk and their manager; EC-111, a user who holds both the buyer and the warehouse keeper role writes a purchase order and then tries to post its goods receipt; EC-116, an IT administrator of one company tries to reset the password of a user shared with another company; EC-118, two people, one login: a company invites an existing login meaning someone else, and the account's owner never gains or loses anything.
+
+    Note: INV-216 is now [ADR-0050](0050-agent-runtime-and-query-layer.md)'s (rule 55 note); INV-217 to INV-219 stay unused.
 26. Lab check `t12_access.py` ([validation lab](../reviews/2026-11-14-design-validation/README.md)), on DS-15-access.sql loaded with DS-20 and DS-06:
     - the field counts of every catalog file it reads, and every glossary verb against the verb catalog;
     - level expansion: inheritance and overrides, verbs against effect classes, declared minimum levels, the approval flag, capabilities, the templates' delegation and agent run body rights, and the same set for shuffled inputs;
@@ -349,6 +402,8 @@ ADR-0017 fixed the envelope: permissions are the names of registered commands, q
     - the approval engine of ADR-0055 (its rule 19).
 
     The result is recorded as the next lab finding of the validation lab README.
+
+    Note: the lab also checks that `is_internal_only` commands are in no template's expansion, the interim `start_agent` seed, and the leaves of rule 24's table note.
 
 ## Context
 

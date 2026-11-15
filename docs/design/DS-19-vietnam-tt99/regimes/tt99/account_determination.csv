@@ -87,3 +87,4 @@ bad_debt_allowance,,,,,,,2293,unverified,(DS-19) TT99 default account determinat
 bad_debt_recovery,,,,,,,711,unverified,(DS-19) TT99 default account determination,,,,,"Interim (ADR-0048 rule 20)."
 payable_release_income,,,,,,,711,unverified,(DS-19) TT99 default account determination,,,,,"Interim (ADR-0048 rule 20)."
 currency_exchange_clearing,,,,,,,998,unverified,(DS-19) TT99 default account determination,,,,,"Interim (ADR-0048 rule 20): a technical account."
+purchase_expense,,,,,,,6427,unverified,(DS-19) TT99 default account determination,,,,,"Interim: purchased services and expenses of administration (ADR-0047 rule 12); 6417 (selling), 6277 (production) or 242 (prepaid) by a row the company adds or an entered account."

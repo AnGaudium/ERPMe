@@ -113,13 +113,15 @@ def deny(run, code):
 
 def query(run, view, include_untrusted=False, commit_ok=True, required_perm=None):
     perm = required_perm or "List" + view
-    if perm not in run.tools: deny(run, "tool_not_allowed")
-    if perm not in run.perms: deny(run, "permission_denied")
     decl, rows = VIEWS[view], [dict(r) for r in ROWS[view]]
+    # DS-04 dispatcher check order: run gates (step 2), then permission (step 4), then visibility (step 5)
+    if perm not in run.tools: deny(run, "tool_not_allowed")
     if include_untrusted and not run.may_read_untrusted: deny(run, "untrusted_read_not_allowed")
-    if run.tainted_at is not None and not decl.get("reference"):
+    in_taint = run.tainted_at is not None and not decl.get("reference")
+    if in_taint and decl["partner_col"] is None: deny(run, "tainted_read_out_of_scope")
+    if perm not in run.perms: deny(run, "permission_denied")
+    if in_taint:
         col = decl["partner_col"]
-        if col is None: deny(run, "tainted_read_out_of_scope")
         rows = [r for r in rows if r[col] == run.scope_id or r["id"] in run.own_drafts]
     if not include_untrusted:
         for r in rows:
@@ -210,6 +212,23 @@ def command_check(run, effect_class):
 check("P05 a tainted run may draft but not post, change master data or send",
       [command_check(t, e) for e in ["other", "posting", "master_data_change", "outbound_send"]],
       ["ok", "tainted_run_not_allowed", "tainted_run_not_allowed", "tainted_run_not_allowed"])
+
+# P: the dispatcher's check order (DS-04; holistic platform review): tool list, agent-chain refusals, permission,
+# then the replay lookup before any check that reads the subject's state
+ALLOWED_TARGET = {"UpdatePartnerBankAccount"}
+def dispatch(actor, cmd, tools=None, origin_run=None, perms=(), stored=None, state_ok=True):
+    if tools is not None and cmd not in tools: return "tool_not_allowed"                      # step 2
+    if cmd in ALLOWED_TARGET and (actor == "agent" or origin_run): return "proposal_required"   # step 3
+    if cmd not in perms: return "permission_denied"                                           # step 4
+    if stored is not None: return stored                                                      # step 6
+    if not state_ok: return "approval_already_given"                                          # step 8
+    return "executed"
+check("P06 EC-56 and replays under one check order: an agent run's direct call is tool_not_allowed, a consumer on its chain gets proposal_required, a replay returns the stored response before state checks",
+      [dispatch("agent", "UpdatePartnerBankAccount", tools={"CreateChangeProposal"}, perms={"UpdatePartnerBankAccount"}),
+       dispatch("system", "UpdatePartnerBankAccount", origin_run="r1", perms={"UpdatePartnerBankAccount"}),
+       dispatch("human", "ApprovePurchaseOrder", perms={"ApprovePurchaseOrder"}, stored="stored response", state_ok=False),
+       dispatch("human", "ApprovePurchaseOrder", perms={"ApprovePurchaseOrder"}, state_ok=False)],
+      ["tool_not_allowed", "proposal_required", "stored response", "approval_already_given"])
 
 # ---------------- O: structured output ----------------
 def validate(out, schema):

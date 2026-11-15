@@ -42,6 +42,10 @@ ADR-0043 decides whether a document needs approval and at which rank, and approv
    - **Companies** may add pools (for example `payment`) and change the mapping with `UpdateApprovalPool`. The seeded mapping is interim (open question).
    - **`general` stays active.** It is the pool of last resort (rule 3), so it cannot be deactivated (`approval_pool_invalid`).
    - **Types that may not wait** never reach a pool (rule 15). For `sales_invoice`, `sales_return`, `credit_note` and `debit_note` this depends on the regime: `is_approval_hold_allowed` is derived from the regime setting `documents.issuance_without_delay` on the document date ([ADR-0053](0053-core-neutrality.md) rule 8). The core default lets them wait, so they keep their `sales` mapping; where a package sets the setting true, rule 15 applies and the mapping is unused. The pool design itself holds no country rule.
+
+   Note: shop-floor facts never wait: `operation_confirmation`, `production_receipt` and `service_receipt` are registered `is_approval_hold_allowed: false`, so they reach no pool (rule 15). Pool `mo` holds `production_order` only. `production_issue` moves to `consumption`, beside the inventory consumption issues, because an issue above requirement may wait for approval (`is_above_requirement`, [ADR-0034](0034-production-orders-and-shop-floor.md) rule 5's note) (holistic review 2026-11-15, item P12).
+
+   Note (flow review, 2026-11-15): the core seed stays minimal. Under [ADR-0043](0043-policy-and-approval.md) rule 15's seed, a person's `Submit` of a purchase request, purchase order, quotation or production order matches no rule, gets no rank and goes straight to `approved`, so pools `pr`, `po`, `mo` and, for quotations, `sales` are reached only through company rules. The core seeds no thresholds; DS-17's `vn_*` profiles add sample company rules and stage members through setup events ([DS-17](../design/DS-17-synthetic-dataset.md) rules 5 and 18, notes).
 3. `approval_pool_document_type` (company data) holds the selector:
    - **Columns:** `document_type`, `position`, `condition_input`, `approval_pool_id`.
    - **The default row** has position 0 and no condition. The database allows exactly one per document type and company.
@@ -76,6 +80,10 @@ ADR-0043 decides whether a document needs approval and at which rank, and approv
      - `standard`: `min_rank` 10, k 1, members `accountant`, `chief_accountant` and `owner`. These are the procedure `standard`'s approver role, the role that could satisfy rank 10 through `senior` under ADR-0043 rule 2, and the owner, so that a company always has someone in every stage;
      - `senior`: `min_rank` 20, k 1, members `chief_accountant` and `owner`.
    - **What changes.** Under ADR-0043 one chief accountant's approval satisfied rank 20. Now rank 20 needs two different people, one per stage. This is the cumulative meaning of stages that the author asked for, and it is flagged. Members per pool (for example a sales manager for `sales`) are the company's choice.
+
+   Note: pool `mo`'s first stage `standard` also seeds the role with template `production_planner` as a member. That template gets `can_approve` on `production_order`, with `edit` on `delegation` as every approving template has, so a planner can release orders at rank 10 ([ADR-0054](0054-users-roles-and-authorizations.md) rule 11's note). Interim, flagged for the author (holistic review 2026-11-15, item P14).
+
+   Note (flow review, 2026-11-15): the `general` pool's `standard` stage also has the role members `sales_manager`, `purchasing_manager` and `production_planner`, and these templates have `edit` with `can_approve` on `change_proposal` ([ADR-0054](0054-users-roles-and-authorizations.md) rule 11 note), so they submit change proposals and approve them. Eligibility still needs the target permissions (rule 7; ADR-0043 rule 12): planning proposals are approved by the production planner, the purchasing manager or the owner (accountants and chief accountants read planning only); partner proposals (customer onboarding, supplier item mappings) by the sales manager, the purchasing manager or the owner; price-list proposals by the purchasing manager or the owner. The other pools keep the seed.
 6. The decision records the plan. At every policy point that gives a rank, `policy_decision` (ADR-0029 rule 7) also stores:
    - `approval_pool_id`;
    - `approval_plan`: the required stages with their ID, `sequence`, `code`, `min_rank`, k, `scope_binding`, `escalation_role_id` and `due_days`, as they were in force on `clock.today`;
@@ -106,6 +114,8 @@ ADR-0043 decides whether a document needs approval and at which rank, and approv
    - **Stage complete.** When a stage reaches k, the next required stage becomes current on that day, and its work item is raised in the same transaction (rule 12).
    - **Document approved.** When the last required stage reaches k, the document becomes `approved` (ADR-0009 rule 4) and `<Type>Approved` is emitted. The round stays open until the document is posted, so a context change at `Post` can still continue it.
    - **Order.** Approvals are recorded only for the current stage, so stage s is never approved before stages 1 to s−1 are complete (INV-226).
+
+   Note: for types with no posting step (orders, production orders, change proposals, period unlock requests), a round ends when the last required stage completes and the document becomes `approved`. For an e-invoiced document it ends with `Issue`, whose decision the completion `Post` carries ([ADR-0043](0043-policy-and-approval.md) rule 5 note). `Submit` from an actor carrying an origin agent run is refused with `origin_run_submit_not_allowed`: a person submits what an agent chain drafted ([ADR-0029](0029-proposals-and-agent-safety.md) rule 6 note).
 9. The `approval` row (ADR-0009 rule 11) gains:
    - `approval_stage_id` and `approval_pool_id`;
    - `delegated_from_user_id`, empty unless a substitute acted;
@@ -144,6 +154,8 @@ ADR-0043 decides whether a document needs approval and at which rank, and approv
     - **Change proposals and period unlock requests** go to the `general` pool by default.
     - **Floors.** ADR-0043 rule 9's floors are unchanged. Floor 7 (change proposals) and floor 8 (types with no posting step) give at least the lowest rank, which requires at least the first stage.
     - **Reversals** keep no policy step (ADR-0043 rule 9.9).
+
+    Note (flow review, 2026-11-15): "the approving human" of [ADR-0029](0029-proposals-and-agent-safety.md) rule 3, on whose behalf an approved change proposal executes, is the approver whose approval completed the plan: the counted approval that brought the last required stage to k (rule 8). That human is the converter of the drafts the execution creates ([ADR-0047](0047-commercial-documents-and-pricing.md) rule 9; [ADR-0024](0024-planning.md) rule 22), so a writer of those drafts who cannot approve them (rule 7, condition 5); approvers at earlier stages are not.
 
 **Commands, queries and catalogs**
 

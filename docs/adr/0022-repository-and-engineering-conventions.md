@@ -63,6 +63,8 @@ Checks:
 
    Note: access and approval decisions use functions that `master_data`, `documents`, `permissions`, `periods` and `policy` register with the dispatcher, wired by `app`; work item visibility is a registered function too. No new import between layer-2 modules is needed ([ADR-0054](0054-users-roles-and-authorizations.md) rule 2; [ADR-0055](0055-approval-pools-and-stages.md) rule 1).
 
+   Note: layer 2 lists `work` twice; it is one module.
+
 3. Shape of each module:
    - A module that owns tables or commands has:
      - `contract.py`, the only part other modules import (rule 4);

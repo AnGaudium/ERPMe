@@ -77,6 +77,8 @@ It adds only what production needs:
    - **Backflush warehouse.** A backflush component must be issued from the production warehouse (`backflush_outside_production_warehouse`). Exception: components of an external operation are consumed at the processor location by the service receipt ([ADR-0037](0037-subcontracting.md) rule 5).
 
    For a configured item, the explosion selects and sizes the product-level structures with the item's item-defining values ([ADR-0046](0046-product-configuration.md) rule 13).
+
+   Note: backward scheduling selects the version on `planned_end_date` and requires it to be valid on the resulting start, else the next version in order, else `production_version_missing` ([ADR-0033](0033-production-master-data.md) rule 5's note) (holistic review 2026-11-15, item P3).
 3. Scheduling:
    - **The rule.** Operation dates come from `setup_duration`, `run_duration` × expected quantity / base quantity, `queue_time` and `move_time`, on the work centers' calendars (ADR-0033 rules 10, 11), at infinite capacity. An order without operations uses the version's fixed lead time. External operations use the supplier lead time and route transit of [ADR-0037](0037-subcontracting.md) rule 3.
    - **Load view.** `ListWorkCenterLoad` (work center, day or week buckets) adds up the remaining scheduled hours of draft and approved orders that are not technically complete, against available hours. Real orders only; planned orders are added by planning's `ListCapacityLoad` ([ADR-0036](0036-multi-level-mrp.md) rule 11).
@@ -98,6 +100,10 @@ It adds only what production needs:
      - leaves staged stock in the supply bin, with move tasks back proposed by the putaway rules.
 
    In Phase 1 no agent tool list holds `Submit`, so people release production orders ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 30).
+
+   Note: `policy_input` ([ADR-0043](0043-policy-and-approval.md) rule 4) (holistic review 2026-11-15, item P13).
+   - **`production_order`:** `amount` is the unit cost of the released estimate valid for the order's version on `planned_start_date` ([ADR-0035](0035-production-costing.md) rule 14's note) times G or, without one, the components' required quantities at their preliminary prices. Booleans: `has_component_shortage` (available to promise below a component's open requirement at `Submit`), `is_content_edited`, and `is_rework` (`order_type` `rework`).
+   - **`production_issue`:** `amount` is the lines' quantities at preliminary prices. Boolean: `is_above_requirement` (a line above its component line's open requirement, rule 11).
 6. Execution state, `production_order.execution_state`:
    - **`not_started`:** approved, nothing posted.
    - **`in_progress`:** from the first posting. It stays so when every posting has been reversed.
@@ -181,6 +187,8 @@ It adds only what production needs:
     - **Agents.** The capture agent drafts confirmations from messages, photos or voice. Its runs are tainted, so a human posts them (ADR-0029 rule 11).
     - **Activities.** Recorded for costing; DS-53 values them.
 
+    Note: one table holds every generated backflush line: the production-owned `operation_progress_component` (calling document type and ID, order component line, material document line). Confirmations, service receipts and backflush at receipt (rule 13) all write it. `operation_confirmation_component` and `production_receipt_component` are dropped; plans and traceability read the one table, and INV-112 covers every calling document (holistic review 2026-11-15, item P11).
+
 **Output: receipt, inspection and make to order**
 
 13. `production_receipt` is an internal posting document (reversible):
@@ -198,6 +206,8 @@ It adds only what production needs:
       - a tolerance failure rejects the confirmation.
 
       Serial-tracked output is never received automatically.
+
+    Note: backflush at receipt writes its lines to `operation_progress_component`, keyed by the receipt, not to `production_receipt_component` (rule 12's note) (holistic review 2026-11-15, item P11).
 14. Make to order:
     - **The rule.** When `for_demand_supply_line_id` is set and that demand is in the same warehouse, `available` output is reserved for it, up to that demand's unreserved open quantity. Output in inspection is reserved when it is released: a `production` consumer of `WarehouseTaskConfirmed` runs the reservation (effect class `other`). Planning nets the line against this order through the supply link ([ADR-0036](0036-multi-level-mrp.md) rule 9).
     - **Status.** Interim, flagged: this automatic reservation is business behavior (open question).
@@ -225,6 +235,8 @@ It adds only what production needs:
     - **Rescheduling by an agent** is a drafted update or change order.
 
     The production and capture agents are later agents ([ADR-0051](0051-agent-workflows.md) rule 29).
+
+    Note: registry flags. `production_order` and `production_issue` have `is_approval_hold_allowed: true`. `operation_confirmation` and `production_receipt` record facts on the floor and have `is_approval_hold_allowed: false`, so they never wait in a pool and a rank becomes `human_post` ([ADR-0043](0043-policy-and-approval.md) rule 10). Pools: `production_order` in `mo`, `production_issue` in `consumption` ([ADR-0055](0055-approval-pools-and-stages.md) rule 2's note) (holistic review 2026-11-15, item P12).
 18. Events, permissions and queries:
     - **Events.** Beyond ADR-0009 rule 22's document events: `ProductionOrderCompleted` and `ProductionOrderReopened`. Reservations emit ADR-0023's events.
     - **Permissions.** Record scope for production documents uses `production_warehouse_id` as the warehouse dimension (ADR-0017 rule 9 gets a note). DS-15 adds a shop-floor role template. It is `shop_floor_lead` ([ADR-0054](0054-users-roles-and-authorizations.md) rule 11).

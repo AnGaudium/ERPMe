@@ -41,9 +41,9 @@ check(f"01 every row of the {len(FILES)} catalog files the lab reads has its hea
 inv_codes = {r["code"] for r in read_csv("invariants.csv")}
 ec_codes = {r["code"] for r in read_csv("edge-cases.csv")}
 ec_gap = [r for r in read_csv("edge-cases.csv") if r["code"] in {f"EC-{n}" for n in range(97, 110)}]
-check("02 the access invariants INV-220 to INV-230 and edge cases EC-110 to EC-117 are in the catalogs; INV-216 to INV-219 stay unused, and no edge case EC-97 to EC-109 is ADR-0054's or ADR-0055's",
+check("02 the access invariants INV-220 to INV-230 and edge cases EC-110 to EC-117 are in the catalogs; INV-217 to INV-219 stay unused (INV-216 is ADR-0050's), and no edge case EC-97 to EC-109 is ADR-0054's or ADR-0055's",
       {f"INV-{n}" for n in range(220, 231)} <= inv_codes and {f"EC-{n}" for n in range(110, 118)} <= ec_codes
-      and not ({f"INV-{n}" for n in range(216, 220)} & inv_codes) and not any("ADR-0054" in r["source"] or "ADR-0055" in r["source"] for r in ec_gap),
+      and "INV-216" in inv_codes and not ({f"INV-{n}" for n in range(217, 220)} & inv_codes) and not any("ADR-0054" in r["source"] or "ADR-0055" in r["source"] for r in ec_gap),
       [r["code"] for r in ec_gap])
 kinds = {r["code"]: r for r in read_csv("work-item-kinds.csv")}
 check("03 no owner rule role:sales is left; approval_pending uses approval_stage and stage_due_days",
@@ -272,6 +272,24 @@ for n, spec in REPORTING.items():
     REG.append((n, spec[0], "command", verb_of(n), spec[1]) + tuple(spec[2:]))
 for n, leaf in REPORTING_QUERIES.items():
     REG.append((n, leaf, "query", verb_of(n), None))
+# Agent and platform commands of ADR-0054 rule 24's table note (holistic platform review).
+AGENT_TYPES = ("customer_onboarding", "quotation", "bank_matching", "purchase_invoice", "planning", "data_migration")
+REG += [(f"start_agent:{a}", f"agent_{a}", "capability", None, "edit") for a in AGENT_TYPES]
+REG += [("cancel_agent_runs", "agent", "capability", None, "full"),
+        ("UpdateAgentTypeSetting", "agent", "command", "Update", "master_data_change", "full"),
+        ("CreateAgentPromotionEvidence", "agent", "command", "Create", "other"), ("ListAgentRun", "agent", "query", "List", None),
+        ("CompleteAgentRun", "agent", "command", "Complete", "other"), ("RunAgentQualityCheck", "agent", "command", "Run", "other"),
+        ("ClearTaint", "policy", "command", "Clear", "other"), ("ConfirmAutoPost", "policy", "command", "Confirm", "other"),
+        ("ListPolicyDecision", "policy", "query", "List", None), ("RunApprovalEscalation", "policy", "command", "Run", "other"),
+        ("GetApprovalProgress", "general_access", "query", "Get", None), ("CreateAttachment", "general_access", "command", "Create", "other"),
+        ("CreateListExport", "general_access", "command", "Create", "other"),
+        ("RetryEventDelivery", "event_delivery", "command", "Retry", "other"), ("SkipEventDelivery", "event_delivery", "command", "Skip", "other"),
+        ("ReplayEvents", "event_delivery", "command", "Replay", "other"),
+        ("RecordSalesInvoiceEInvoiceOutcome", "sales_invoice", "command", "Record", "other")]
+# Commands registered is_internal_only (ADR-0008 rule 1 note; ADR-0054 rule 8 note): outside the level expansion.
+INTERNAL = {"CompleteAgentRun", "RunAgentQualityCheck", "RunApprovalEscalation", "RecordSalesInvoiceEInvoiceOutcome",
+            "RecordInboundMessage", "RecordMailboxIntakeOutcome", "RecordMailboxAuthenticationCheck", "RecordOutboundMessageOutcome",
+            "RecordPartnerTaxLookup", "RecordRenderOutcome", "RunPartnerDuplicateScan", "RunPartnerInsightComputation"}
 
 def need(entry):
     perm, leaf, kind, verb, effect = entry[:5]
@@ -297,6 +315,8 @@ def effective(rows, leaf):
 def expand(rows, registry=REG):
     out = set()
     for e in registry:
+        if e[0] in INTERNAL:                               # is_internal_only: no level grants it
+            continue
         lvl, appr = effective(rows, e[1])
         n = need(e)
         if (n == "approve" and appr and ORDER[lvl] >= 1) or (n != "approve" and ORDER[lvl] >= ORDER[n]):
@@ -359,7 +379,7 @@ check("C14 a declared minimum level: UpdateEmployeeOrganization needs full on or
       and "UpdateEmployeeOrganization" in EXP["it_administrator"] and "UpdateEmployeeOrganization" in EXP["owner"])
 approvers = {t for t in TEMPLATES if any(a for _, a in TPL[t].values())}
 check("C15 every approving template can delegate its own approvals; delegate_for_others only owner and it_administrator",
-      approvers == {"owner", "chief_accountant", "accountant", "sales_manager", "purchasing_manager"}
+      approvers == {"owner", "chief_accountant", "accountant", "sales_manager", "purchasing_manager", "production_planner"}
       and all({"CreateDelegation", "CancelDelegation"} <= EXP[t] for t in approvers)
       and {t for t in TEMPLATES if "delegate_for_others" in EXP[t]} == {"owner", "it_administrator"})
 check("C16 IT administrator: no data import, no agent run bodies", not ({"ValidateImportBatch", "read_agent_run_bodies"} & EXP["it_administrator"]))
@@ -434,10 +454,27 @@ check("C21 CRM levels: the sales clerk edits interactions, complaints and outbou
       and not ({"SendOutboundMessage", "ApproveOutboundMessage", "CloseComplaint", "EraseDataSubject"} & sc)
       and {"ApproveOutboundMessage", "SendOutboundMessage", "CloseComplaint"} <= sm)
 full_on = lambda t, leaf: effective(TPL[t], leaf)[0] == "full"
-check("C22 CRM levels: the IT administrator has mailbox full; EraseDataSubject only the owner; system-only commands only where a template has full on their leaf",
+check("C22 CRM levels: the IT administrator has mailbox full; EraseDataSubject only the owner; system commands a person may start only where a template has full on their leaf (internal-only ones: C27)",
       {"CreateMailbox", "VerifyMailboxAuthentication", "RunMailboxIntake", "ListMailbox"} <= it_
       and [t for t in TEMPLATES if "EraseDataSubject" in EXP[t]] == ["owner"] and "RunPartnerDuplicateScan" not in sm
-      and all({t for t in TEMPLATES if n in EXP[t]} == {t for t in TEMPLATES if full_on(t, spec[0])} for n, spec in CRM.items() if spec[2:] == ("full",)))
+      and all({t for t in TEMPLATES if n in EXP[t]} == {t for t in TEMPLATES if full_on(t, spec[0])} for n, spec in CRM.items() if spec[2:] == ("full",) and n not in INTERNAL))
+# holistic platform review: internal-only commands, the interim agent start seed, the platform command leaves
+ALL_ROOTS_FULL = {r: ("full", True) for r, p in PARENT.items() if p is None}
+check("C27 is_internal_only commands are in no template's expansion, owner included, nor in one with full and approve on every root",
+      INTERNAL <= set(by_name) and not any(INTERNAL & EXP[t] for t in TEMPLATES) and not (INTERNAL & set(expand(ALL_ROOTS_FULL))))
+starts = lambda t: {p.split(":", 1)[1] for p in EXP[t] if p.startswith("start_agent:")}
+SEED = {"sales_manager": {"quotation", "customer_onboarding"}, "chief_accountant": {"bank_matching", "purchase_invoice"},
+        "production_planner": {"planning"}, "owner": set(AGENT_TYPES), "it_administrator": set(AGENT_TYPES)}
+check("C28 start_agent follows the interim seed per agent type leaf; UpdateAgentTypeSetting and cancel_agent_runs need full on agent",
+      all(starts(t) == SEED.get(t, set()) for t in TEMPLATES) and all(f"agent_{a}" in PARENT and PARENT[f"agent_{a}"] == "agent" for a in AGENT_TYPES)
+      and {t for t in TEMPLATES if "UpdateAgentTypeSetting" in EXP[t]} == {"owner", "it_administrator"}
+      and not ({"UpdateAgentTypeSetting", "cancel_agent_runs"} & set(expand({"agent": ("post", False)})))
+      and "start_agent:quotation" in expand({"agent": ("edit", False)}))
+check("C29 general_access at edit for every template but the auditor (uploads, list exports, approval progress); event deliveries only owner and IT administrator; ClearTaint owner and chief accountant",
+      all({"CreateAttachment", "CreateListExport", "GetApprovalProgress"} <= EXP[t] for t in TEMPLATES - {"auditor"})
+      and "CreateAttachment" not in EXP["auditor"] and "GetApprovalProgress" in EXP["auditor"]
+      and {t for t in TEMPLATES if "RetryEventDelivery" in EXP[t]} == {"owner", "it_administrator"}
+      and {t for t in TEMPLATES if "ClearTaint" in EXP[t]} == {"owner", "chief_accountant"})
 # stored expansion and INV-220
 perms = expand(TPL["sales_manager"])
 X("update role set expansion_hash=%s, registry_version='lab' where id=%s", (ehash(perms), I["role"]))
@@ -567,6 +604,9 @@ check("E3 assignment check, block: the same assignment is refused with segregati
 check("E4 assignment check: buyer alone has no conflict", assignment_check(set(expand(TPL["buyer"])), enabled, "block") == [])
 owner_conflicts = assignment_check(set(expand(TPL["owner"])), enabled, "warn")
 check("E5 switching to block is refused while conflicts exist (the owner template holds both sides)", len(owner_conflicts) >= 4)
+conflicts_by_template = {t: [h for _, h in assignment_check(EXP[t], enabled, "warn")] for t in sorted(TEMPLATES - {"owner"})}
+check("E5a every seeded template except owner is free of conflicts with the seeded segregation rules (ADR-0054 rule 11 note)",
+      not any(conflicts_by_template.values()), {t: v for t, v in conflicts_by_template.items() if v})
 
 # Per-document check (ADR-0054 rule 19). actions: list of (human, permission, document).
 LINKS = {("g1", "referenced_order"): ["p1"], ("pay1", "settled_item"): ["inv1"], ("p1", "referenced_order"): [], ("inv1", "settled_item"): []}

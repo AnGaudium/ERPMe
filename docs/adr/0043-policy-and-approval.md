@@ -63,6 +63,8 @@ Policy is a deterministic threshold table per company, as runbook B7 asks.
    Condition `is_match_exceeded` (a purchase invoice outside the three-way match tolerances) is added ([ADR-0047](0047-commercial-documents-and-pricing.md) rule 14).
 
     Conditions `is_direct_expense`, `is_bank_account_recent` and `is_rate_unusual` are added for payment documents ([ADR-0048](0048-cash-bank-receivables-payables.md) rules 3, 12).
+
+   Note: condition `is_cost_unknown` (true matches only true) is added: a paid line's cost per inventory unit is unknown ([ADR-0047](0047-commercial-documents-and-pricing.md) rule 22; [ADR-0046](0046-product-configuration.md) rule 14). The seeded rule (rule 15) turns the "human confirmation" above into an approval.
 4. Policy input. Each document type registers a `policy_input` function, which gives:
    - amounts in company currency at the rates applied;
    - discount and margin;
@@ -78,6 +80,8 @@ Policy is a deterministic threshold table per company, as runbook B7 asks.
    - **Unattended postings.** Scheduled jobs and workflow auto-posts (DS-34) are evaluated as `system`.
 
    The only unattended workflow posting is the deterministic bank cascade's auto-post ([ADR-0051](0051-agent-workflows.md) rule 18).
+
+   Note: the completion `Post<Type>` that the consumer runs from `issuing` after `EInvoiceAccepted` ([ADR-0028](0028-document-lifecycle-hardening.md) rule 7.3) is registered `is_consequence_posting` and evaluated as the issuer: it carries the decision of the `Issue` stored with its `posting_intent` and is not a policy point of its own. It is accepted only from that internal caller, with the stored plan hash and an accepted e-invoice record, so it posts exactly what the issuer's decision covered.
 6. Rules in force. They are the enabled versions in force on `clock.today` when the command runs, not on the document's date, so backdating cannot select old rules.
 7. Combining:
    - **Denials.** Any matching `deny` gives `denied`.
@@ -112,6 +116,8 @@ Policy is a deterministic threshold table per company, as runbook B7 asks.
    For commands registered `is_policy_in_handler`, the floors run inside `context.evaluate_policy`.
 
    **On every post and issue.** Floors 3 to 6 are checked by the dispatcher on every `Post` and `Issue` command, including `Post` of an approved document, which asks no policy (ADR-0009 rule 11). A violation gives `human_only`. A `Post` of an approved document by an actor of another kind than the one its decision was made for is also a policy point (a note on ADR-0029 rule 6). So a document a person submitted is not posted by a non-human without its own decision.
+
+   Note: floors 3 to 6 and the actor-kind policy point are applied at `Issue`, and not again at the completion `Post` of an e-invoiced document (rule 5 note), which `system` may run although `Post<CorrectionType>` is `human_only` ([ADR-0027](0027-cross-cutting-ownership.md) rule 12 note). For corrections by non-humans the one rule is the registry flag of [ADR-0009](0009-document-lifecycle.md) rule 23: `Post<CorrectionType>` and `Issue<CorrectionType>` are `human_only`, refused to agents and, while the interim holds, integrations at step 3 of the check order ([DS-04](../design/DS-04-command-envelope.md#dispatcher-check-order)); `system` runs `Post<CorrectionType>` only as that completion. Floor 6 and the tool list reach no further case; floor 6 stays as a defensive check with the same reach.
 10. Documents that may not wait (`is_approval_hold_allowed: false`): a rank becomes `human_post` and the stored outcome is `human_only` (ADR-0009 rule 12 interim). Note: for types with `is_approval_hold_allowed: regime` this applies while `documents.issuance_without_delay` is true for the document's date; while it is false they follow the ordinary approval path ([ADR-0053](0053-core-neutrality.md) rule 8).
 
 **Monotonic rule sets**
@@ -143,6 +149,8 @@ Policy is a deterministic threshold table per company, as runbook B7 asks.
     Exception to the interim: a proposal promoting an agent type to assisted mode must be approved by a person other than its submitter (`approver_is_submitter`), so a one-person company cannot promote an agent until the author decides ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 14).
 
     Note: who may approve is now stage eligibility. Writers of any version are excluded by default, replacing the interim above (flagged; small companies: [ADR-0054](0054-users-roles-and-authorizations.md) rule 20), and `approval_stage_unsatisfiable` replaces `policy_no_eligible_approver` for stages, on save and at `Submit` ([ADR-0055](0055-approval-pools-and-stages.md) rules 4, 7–9).
+
+    Note: `CreatePolicyRule` and `UpdatePolicyRule` no longer return `policy_no_eligible_approver`; the code is retired, and `approval_stage_unsatisfiable` (on pools, procedures and at `Submit`) is the one satisfiability check ([ADR-0055](0055-approval-pools-and-stages.md) rule 4).
 14. Auto-posts and confirmation:
     - **Scope.** `is_confirmation_required` applies only to `post` and `issue` by `system` or `integration` actors.
     - **Work items.** Each such posting adds evidence to one `auto_post_unconfirmed` work item per rule and period (ADR-0042).
@@ -163,6 +171,8 @@ Policy is a deterministic threshold table per company, as runbook B7 asks.
 
     Note: the seed migrates to approval pools whose stages are `standard` (minimum rank 10, roles `accountant`, `chief_accountant` and `owner`) and `senior` (minimum rank 20, roles `chief_accountant` and `owner`); rank 20 then needs two people ([ADR-0055](0055-approval-pools-and-stages.md) rules 2, 5).
 
+    Note: a rule requiring `standard` approval at `submit` of every document type, for every actor kind, when `is_cost_unknown` is seeded ([ADR-0047](0047-commercial-documents-and-pricing.md) rule 22).
+
 **Specific points**
 
 16. Unlocking a period. `UnlockPostingPeriod` (`human_only`, ADR-0012) takes the ID of an approved `period_unlock_request`. That is a non-posting document (period, area, reason) whose `Submit` is a policy point, which always requires at least the lowest-rank procedure. The unlock closes the request in the same transaction, so one request unlocks once, and records the request's `policy_decision_id` in its audit record (ADR-0038 rule 2).
@@ -171,6 +181,8 @@ Policy is a deterministic threshold table per company, as runbook B7 asks.
     - **Stock counts** post through the usual points (ADR-0023 rule 18).
     - **Production orders.** Their release is `submit` of type `production_order` (ADR-0034 rule 4); there is no `release` action.
     - **None in Phase 1, defaults apply:** automatic conversion of planned orders and automatic release (ADR-0024 rule 22; ADR-0036), and further record-scope dimensions (ADR-0017 rule 9). Flagged.
+
+    Note: the release citation reads [ADR-0034](0034-production-orders-and-shop-floor.md) rule 5, not rule 4 (holistic review 2026-11-15, item P27).
 
 **Commands and queries**
 

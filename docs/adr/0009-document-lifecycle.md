@@ -106,6 +106,8 @@ Every document has one row in a shared `document` table (type, company, state, v
 
     Agents may create correction drafts but not submit them: no `Submit`, `Post` or `Issue` is on an agent tool list, so people submit ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 30).
 
+    Note: the registry flag is the one rule for corrections by non-humans: `Issue<CorrectionType>` is registered `human_only` like `Post<CorrectionType>`, so agents and, under the interim, integrations neither post nor issue a correction, and `system` runs `Post<CorrectionType>` only as the completion of an `Issue` ([ADR-0043](0043-policy-and-approval.md) rule 9 note; [ADR-0028](0028-document-lifecycle-hardening.md) rule 7 note).
+
 ## Context
 
 DS-05 is needed by DS-06 (journal), DS-09 (inventory), DS-12 (periods), DS-22 (commercial documents) and DS-28 (approval). Constraints:

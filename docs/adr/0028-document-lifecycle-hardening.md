@@ -26,6 +26,8 @@ This ADR amends the document lifecycle (ADR-0009) in five places, before step 3 
    - **Lifecycle.** `demand_supply_line` rows are never deleted or rebuilt, are unique per source line and direction, are created before the first reservation, and are closed with `closed_reason` when a line is removed when a change takes force.
 
    A draft purchase request or order line whose supply row carries `origin_planned_order_id` or pegging cannot be removed (its quantity goes to zero, or the document is canceled, closing the row as `canceled`). Other draft lines removed in draft delete their rows. Rows are never deleted once their document has left draft ([ADR-0047](0047-commercial-documents-and-pricing.md) rule 10).
+
+   Note: interim for the simulation and the DDL drafts, until the author decides under B3: the columns `production_order_component_id`, `production_order_output_id`, `for_demand_supply_line_id` and `owner_partner_id` on `demand_supply_line`, and `production_order_operation_id` on purchase lines, are assumed to exist. The flag and its open question stay, flagged for the author; dropping them later is a DDL change before step 3 (holistic review 2026-11-15, item P10).
 3. Once another document refers to a line:
    - the line cannot be deleted (`document_line_referenced`);
    - its item, unit and warehouse cannot change (`referenced_line_immutable`);
@@ -60,6 +62,8 @@ This ADR amends the document lifecycle (ADR-0009) in five places, before step 3 
    - **Commands allowed in `issuing`:** the outcome commands of rule 7, and `Recall<Type>` (rule 10). Outbound messages use the same pattern with the non-final state `sending` ([ADR-0052](0052-minimal-crm.md) rule 27).
 
    Note: for types with `is_approval_hold_allowed: regime`, while `documents.issuance_without_delay` is false the approval hold is available, and the states are `draft → pending_approval → approved → issuing → posted`. `Issue<Type>` is allowed only from `approved`, and a rejection returns the document to `draft`, to be submitted again. While the setting is true, this rule applies as written ([ADR-0053](0053-core-neutrality.md) rule 8).
+
+   Note: the setting is `documents.e_invoice_required`, per document type, core default false ([ADR-0053](0053-core-neutrality.md) rule 8 note).
 7. The flow:
    1. **`Issue<Type>`** (human or policy-allowed; verb Issue, event form `IssueRequested`; effect class `posting`). The dispatcher asks the policy here, and the decision is stored. The command:
       - runs the package validation of rule 8, and the same period checks and period share lock as `Post` (ADR-0009 rule 13; ADR-0012 rule 9);
@@ -76,6 +80,8 @@ This ADR amends the document lifecycle (ADR-0009) in five places, before step 3 
       - Where the e-invoice is required, `Post<Type>` is accepted only from this internal caller, in state `issuing`, with an `accepted` e-invoice record and the stored `expected_plan_hash`; anything else returns `invalid_state_transition`.
       - If posting fails (a changed plan, a soft-locked or locked period, a changed account), the delivery is held with a work item. A human completes it with `Complete<Type>Posting` (verb Complete; `human_only`, effect class `posting`, same preconditions; with `post_in_soft_locked_period` where needed), and corrects it afterwards with an adjustment document if needed. The consumer is idempotent: an already posted document counts as done, so the held delivery resolves.
    4. **On `EInvoiceRejected`**, a consumer runs `Reopen<Type>`, which returns the document to `draft` with the rejection reason and creates a work item for the issuer.
+
+   Note: that completion `Post<Type>` is registered `is_consequence_posting` and carries the issuer's decision: floors 3 to 6 and the actor-kind policy point are applied at `Issue` and not repeated, so an e-invoiced correction or an agent-drafted e-invoiced invoice posts without a held delivery ([ADR-0043](0043-policy-and-approval.md) rules 5 and 9 notes; [ADR-0027](0027-cross-cutting-ownership.md) rule 12 note).
 8. Package validation:
    - **The interface.** Before the request, `EInvoiceValidator` checks schema, buyer tax ID format, registered symbol and dates. It is published by the core and implemented by the localization package (ADR-0016 rule 17). It is network-free and deterministic, and runs in simulation and at `Issue`.
    - **Errors.** Failures return `e_invoice_invalid`, with the package's code in `details`.

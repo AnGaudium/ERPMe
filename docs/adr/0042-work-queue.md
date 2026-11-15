@@ -27,6 +27,8 @@ Every exception, pending approval and other piece of business work is one `work_
    - **Registration:** code, owning module, subject table, owner rule, due rule, `resolution` (`system` when the exception ends, `command` for the `resolution_command` it names, `person` for `ResolveWorkItem`), `is_agent_resolvable`, and meaning.
    - **Catalog.** [docs/catalogs/work-item-kinds.csv](../catalogs/work-item-kinds.csv) is seeded by this ADR with the kinds earlier ADRs named. Once `work` exists, the generator writes it from the registry.
    - **Names.** Kinds are `snake_case` names of the exception (ADR-0004), such as `short_pick` or `approval_pending`.
+
+   Note: registration also names, for the kind rules `subject_owner` and `subject_assignee`, the subject column that holds the user (rule 7 note). A kind with a `resolution_command` has resolution `command`. `bank_line_unmatched` becomes `system` (closed when its line is matched or ignored) with no resolution command, and `is_agent_resolvable` is false for every Phase 1 kind, since resolve commands are on no tool list ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 30).
 2. `work_item` columns:
    - **Identity:** `id`, `company_id`, `kind`, `subject_table`, `subject_id`, `open_key`.
    - **State:** `state` (`open`, `claimed`, `done`, `canceled`).
@@ -44,6 +46,8 @@ Every exception, pending approval and other piece of business work is one `work_
    The table has `company_id`, row-level security and the generated company policy (ADR-0017 rule 19).
 
    Note: owner kind `approval_stage` with `owner_approval_stage_id`; the item is visible to everyone eligible for the stage ([ADR-0055](0055-approval-pools-and-stages.md) rule 12).
+
+   Note: `owner_role` stores the symbolic rule, a template code or `company_owner`, with its scope dimensions, never a role ID. Who holds it, and the fallback to `company_owner` when no active role has the template, are resolved when the item is read, by the registered visibility function ([ADR-0054](0054-users-roles-and-authorizations.md) rules 2, 11). So the holders of every active role with that template code own the item, and a role created later counts at once.
 3. `work_item_link` (`work_item_id`, `target_table`, `target_id`, `link_kind`: `evidence`, `draft`, `result`) holds the evidence and what was done about it, such as a derivation trace, a pegging row, a task, a delivery, or a draft the agent made.
    - **Notes.** `work_item_note` (author, text, `created_at`) is append-only. A note an agent writes from outside content is marked untrusted (ADR-0029 rule 10).
 4. Uniqueness. A unique partial index on (`company_id`, `kind`, `open_key`) where `state` is `open` or `claimed` allows one open item per exception.
@@ -57,6 +61,8 @@ Every exception, pending approval and other piece of business work is one `work_
    - **Taint.** `is_tainted` is the OR of the item's value and the raising event's or actor's taint, so a tainted re-raise taints an open item; `origin_agent_run_id` is kept from the first raise.
    - **Locks.** Work item rows are the last lock class (ADR-0027 rule 10), taken in (`kind`, `open_key`) order, so two commands raising items cannot deadlock.
    - **The plan.** Raised items are listed in the plan like events and never hashed (ADR-0008 rule 12).
+
+   Note: the calling module computes user-kind owners and applies their fallback at raise. A role-kind owner is stored as the symbolic rule (rule 2 note) and resolved at read time, so layer-2 callers need no import to learn whether a role with the template exists.
 6. `work.contract.resolve_work_item(kind, open_key, resolution)` closes the open item when the exception ends: a planning run no longer raises it (ADR-0024 rule 21), or a held posting completes (ADR-0028 rule 7). It sets `state: done`, `resolution` and `resolved_at`, and drops any claim. Resolving a key with no open item does nothing.
 7. Owner rules:
    - **Kind rules:**
@@ -72,6 +78,10 @@ Every exception, pending approval and other piece of business work is one `work_
    - **Fallback.** When a rule yields no one, or the person is deactivated, the owner is the `owner` role. When an owner is deactivated after the raise, `permissions` raises `owner_suspended` with that person's open items as evidence, and the company's owner reassigns them with `AssignWorkItem`. Kind rules `subject_assignee` (the user the subject names as assignee, such as a follow-up task's) and `subject_owner` (the user the subject names as owner, such as a mailbox's `owner_user_id`) ([ADR-0052](0052-minimal-crm.md) rules 12, 19).
 
    Note: the kind rule `approver_role` becomes `approval_stage`, whose item falls back to `company_owner` with a reason when nobody could approve ([ADR-0055](0055-approval-pools-and-stages.md) rule 12). `role:<template>` and `company_owner` resolve through `role.template_code`, never role codes; when no active role has the template, the owner is `company_owner`. `role:sales` becomes `role:sales_clerk` ([ADR-0054](0054-users-roles-and-authorizations.md) rule 11).
+
+   Note: kind rule `planning_node_owner`: the company's `planning_owner_id` when the subject node's `replenishment_source` is `production`, otherwise `buyer`. Kind `planning_exception` uses it ([ADR-0024](0024-planning.md) rule 21's note) (holistic review 2026-11-15, item P7).
+
+   Note: the kind rules, completed. `run_on_behalf_of` is `agent_run.on_behalf_of_id` of the subject run, or of the raising run when the subject is not a run (`agent_run_stopped`, whose subject is the agent type); a re-raise keeps it (rule 5). `document_owner` is the document's `created_by_user_id` ([ADR-0054](0054-users-roles-and-authorizations.md) rule 14), not its owner employee. `issuer` is the human of the `Issue`: its actor, or its `on_behalf_of`. `subject_owner:<column>` and `subject_assignee:<column>` join the kind rules (moved from the Fallback bullet): the user is read from the subject column the kind's registration names (rule 1 note), which may go through one reference as `<reference column>.<column>`. Catalog values: `mailbox_unreachable` `subject_owner:owner_user_id`; `follow_up_due` `subject_assignee:assignee_user_id`; `attachment_rejected` `subject_owner:created_by_user_id`, the uploader (the human of `CreateAttachment`, a column the attachment row gains); `import_duplicate_suspected` `subject_owner:import_batch_id.created_by_user_id`, the batch creator. `warehouse_role` is the template `warehouse_keeper` scoped to the subject's warehouse. "The `owner` role" in the Fallback is `company_owner`.
 8. Due rules give business dates through the company calendar (ADR-0024 rule 4; calendar days for layer-2 callers, rule 5):
    - `same_day`, or `days:<n>` business days after the raise;
    - `required_date` minus the lead time, for planning;
@@ -89,6 +99,8 @@ Every exception, pending approval and other piece of business work is one `work_
    - **Transactions.** Claims run in their own transactions (ADR-0027 rule 10) and take no document or stock lock.
    - **No overlap with a takeover.** `ClaimWorkItem`, `AssignWorkItem` and the expiry job take the item row `FOR UPDATE`. Every command of an agent run bound to an item takes that row `FOR KEY SHARE` in its own transaction, first after its idempotency record (a note on ADR-0027 rule 10), and checks that the run still holds the claim. So no agent command commits after a person's claim. Raises and lease renewals are plain updates of non-key columns, which do not conflict with a key-share lock.
    - **Lease expiry.** A claim is valid while `claim_expires_at` is in the future. Renewal is a separate transaction. A job emits `WorkItemUnclaimed` for expired claims and sets the item back to `open`.
+
+   Note: "first after its idempotency record" places the claim check at step 7 of the dispatcher's check order, after the idempotency lookup of step 6: a replay returns its stored response before it, simulations run it at the same position without writing a record, and shadow runs skip it ([DS-04](../design/DS-04-command-envelope.md#dispatcher-check-order)).
 10. Who may claim:
     - **Visibility.** An item is visible to a caller who holds `ListWorkItem` and has the item's subject in their record scope, and who is its owner, holds its owner role in the item's scope, or holds the capability `list_all_work_items`.
     - **Claiming.** It needs `ClaimWorkItem` on a visible item.
@@ -98,6 +110,8 @@ Every exception, pending approval and other piece of business work is one `work_
     Agent claims are taken by `StartAgentRun` and renewed by the runner ([ADR-0050](0050-agent-runtime-and-query-layer.md) rules 15–16).
 
     Note: an item whose subject is a document, or a line of one, is visible only when the caller's read owner scope reaches the document; `work` applies it through a registered visibility function ([ADR-0054](0054-users-roles-and-authorizations.md) rules 2, 15).
+
+    Note: a run from a wake-up claims an item when its agent type declares the kind; ownership is not checked on the workflow owner it acts for, who need not hold the item's owner role. A run a person starts on an item still checks ownership on that person. The person holding a work item's claim also reads and edits the drafts linked to it (`link_kind` `draft`) while the claim holds, beyond their owner scope but within their permissions and record scope ([ADR-0054](0054-users-roles-and-authorizations.md) rule 14 note).
 11. Precedence and exclusion (Principle 8):
     - **A person over an agent.** A person's `ClaimWorkItem` on an item an agent run holds takes the claim. The dispatcher then rejects every later command of that run with `work_item_claim_lost` (rule 11, agent commands), so the agent stops and never works at the same time as a person.
     - **A person over a person.** Taking a claim from another person needs `AssignWorkItem`.
