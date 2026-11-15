@@ -2,7 +2,7 @@
 
 # Data map (generated)
 
-Tables per owner module, from the DDL drafts in `docs/design/*.sql` and the owners their SQL comments state (ADR-0022 rule 7). Purpose is the table's own comment, else the comment above it, else its section title. Part of [architecture-overview.md](../architecture-overview.md), Part C.
+Tables per owner module, from the DDL drafts in `docs/design/*.sql` and the owners their SQL comments state (ADR-0022 rule 7). Purpose is the table's own comment on its CREATE TABLE line, else the first sentence of its own leading comment block that names it (or, when the block names no other table, its first sentence); it is empty when no comment belongs to the table. The DDL drafts have no `COMMENT ON`. Section is the DDL section title. Part of [architecture-overview.md](../architecture-overview.md), Part C.
 
 ## Count per module
 
@@ -34,431 +34,431 @@ Tables per owner module, from the DDL drafts in `docs/design/*.sql` and the owne
 
 ## `agent_runs`
 
-| Table | Purpose | Key references | Source |
-| --- | --- | --- | --- |
-| `agent_budget_usage` | reservation is one guarded UPDATE; the check below is the guard, so a failed reservation reserves nothing. | `agent_type` | docs/design/DS-05-platform.sql:276 |
-| `agent_promotion_evidence` | immutable; computed once by CreateAgentPromotionEvidence | `agent_type`, `attachment`, `user_account` | docs/design/DS-05-platform.sql:946 |
-| `agent_run` | company data, not partitioned (rule 18) | `agent_run`, `agent_type_version`, `partner`, `user_account`, `work_item` | docs/design/DS-05-platform.sql:149 |
-| `agent_run_step` | its call, the response or result row after it. | `agent_run` | docs/design/DS-05-platform.sql:224 |
-| `agent_type` | installation data |  | docs/design/DS-05-platform.sql:36 |
-| `agent_type_setting` | company data, change-tracked (rule 14) | `agent_type`, `agent_type_version`, `user_account` | docs/design/DS-05-platform.sql:133 |
-| `agent_type_version` | installation data; immutable (trigger below) | `agent_type` | docs/design/DS-05-platform.sql:43 |
-| `data_processing_permission` | company data, change-tracked; SetDataProcessingPermission only from an approved proposal | `attachment`, `user_account` | docs/design/DS-36-document-intake.sql:227 |
+| Table | Purpose | Section | Key references | Source |
+| --- | --- | --- | --- | --- |
+| `agent_budget_usage` | Rule 23: one row per (company, agent type, business date), (company, business date) and (installation, day). | Agent settings, runs and budgets | `agent_type` | docs/design/DS-05-platform.sql:276 |
+| `agent_promotion_evidence` | immutable; computed once by CreateAgentPromotionEvidence | Agent promotion evidence | `agent_type`, `attachment`, `user_account` | docs/design/DS-05-platform.sql:946 |
+| `agent_run` | company data, not partitioned (rule 18) | Agent settings, runs and budgets | `agent_run`, `agent_type_version`, `partner`, `user_account`, `work_item` | docs/design/DS-05-platform.sql:149 |
+| `agent_run_step` | Rule 19: append-only, partitioned by month on id (partitions in the last section). | Agent settings, runs and budgets | `agent_run` | docs/design/DS-05-platform.sql:224 |
+| `agent_type` | installation data | Agent types |  | docs/design/DS-05-platform.sql:36 |
+| `agent_type_setting` | company data, change-tracked (rule 14) | Agent settings, runs and budgets | `agent_type`, `agent_type_version`, `user_account` | docs/design/DS-05-platform.sql:133 |
+| `agent_type_version` | installation data; immutable (trigger below) | Agent types | `agent_type` | docs/design/DS-05-platform.sql:43 |
+| `data_processing_permission` | company data, change-tracked; SetDataProcessingPermission only from an approved proposal | Data-processing permissions | `attachment`, `user_account` | docs/design/DS-36-document-intake.sql:227 |
 
 ## `attachments`
 
-| Table | Purpose | Key references | Source |
-| --- | --- | --- | --- |
-| `attachment` | Attachments | `document` | docs/design/DS-05-platform.sql:836 |
-| `attachment_link` | polymorphic target, checked by INV-83 | `attachment` | docs/design/DS-05-platform.sql:862 |
-| `document_extraction` | one per attachment and purpose (rule 3) | `attachment`, `document_reader`, `inbound_message`, `partner`, `user_account` | docs/design/DS-36-document-intake.sql:36 |
-| `document_reader` | installation data; immutable (trigger below) |  | docs/design/DS-36-document-intake.sql:21 |
-| `extraction_confirmation` | A person's confirmation of a field row (rule 23); one per row; append-only. | `extraction_field`, `user_account` | docs/design/DS-36-document-intake.sql:158 |
-| `extraction_field` | append-only; a correction is a new row superseding an earlier one (rule 8) | `agent_run`, `document_extraction`, `document_reader`, `user_account` | docs/design/DS-36-document-intake.sql:100 |
-| `extraction_result_link` | The subjects an extraction led to (rule 19): the e-invoice record, proposals, the created contact and partner, documents. | `document_extraction` | docs/design/DS-36-document-intake.sql:168 |
-| `extraction_rule_run` | extraction's highest run number. Confirmations start no run. | `extraction_field` | docs/design/DS-36-document-intake.sql:143 |
-| `extraction_word` | OCR and text-layer words with normalized boxes and reading-order lines (rule 9); personal and untrusted with their extraction. | `document_extraction` | docs/design/DS-36-document-intake.sql:78 |
+| Table | Purpose | Section | Key references | Source |
+| --- | --- | --- | --- | --- |
+| `attachment` |  | Attachments | `document` | docs/design/DS-05-platform.sql:836 |
+| `attachment_link` | polymorphic target, checked by INV-83 | Attachments | `attachment` | docs/design/DS-05-platform.sql:862 |
+| `document_extraction` | one per attachment and purpose (rule 3) | Extractions | `attachment`, `document_reader`, `inbound_message`, `partner`, `user_account` | docs/design/DS-36-document-intake.sql:36 |
+| `document_reader` | installation data; immutable (trigger below) | Readers |  | docs/design/DS-36-document-intake.sql:21 |
+| `extraction_confirmation` | A person's confirmation of a field row (rule 23) | Extractions | `extraction_field`, `user_account` | docs/design/DS-36-document-intake.sql:158 |
+| `extraction_field` | append-only; a correction is a new row superseding an earlier one (rule 8) | Extractions | `agent_run`, `document_extraction`, `document_reader`, `user_account` | docs/design/DS-36-document-intake.sql:100 |
+| `extraction_result_link` | The subjects an extraction led to (rule 19): the e-invoice record, proposals, the created contact and partner, documents. | Extractions | `document_extraction` | docs/design/DS-36-document-intake.sql:168 |
+| `extraction_rule_run` | Rule runs (rule 14): one row per run, field and rule | Extractions | `extraction_field` | docs/design/DS-36-document-intake.sql:143 |
+| `extraction_word` | OCR and text-layer words with normalized boxes and reading-order lines (rule 9) | Extractions | `document_extraction` | docs/design/DS-36-document-intake.sql:78 |
 
 ## `audit`
 
-| Table | Purpose | Key references | Source |
-| --- | --- | --- | --- |
-| `audit_change` | field changes of change-tracked tables; partitioned by month on id (rules 3, 6) | `audit_record` | docs/design/DS-05-platform.sql:786 |
-| `audit_denial` | Rule 5: coalesced, written outside the refused transaction; only denial_count and last_at move, upward (trigger below). |  | docs/design/DS-05-platform.sql:803 |
-| `audit_record` | one per executed command or batch item; partitioned by month on id (rule 6) | `policy_decision` | docs/design/DS-05-platform.sql:739 |
-| `personal_data_processing_log` | IDs and field names only, never values; append-only (trigger below) |  | docs/design/DS-35-crm.sql:472 |
+| Table | Purpose | Section | Key references | Source |
+| --- | --- | --- | --- | --- |
+| `audit_change` | field changes of change-tracked tables; partitioned by month on id (rules 3, 6) | Audit | `audit_record` | docs/design/DS-05-platform.sql:786 |
+| `audit_denial` | Rule 5: coalesced, written outside the refused transaction | Audit |  | docs/design/DS-05-platform.sql:803 |
+| `audit_record` | one per executed command or batch item; partitioned by month on id (rule 6) | Audit | `policy_decision` | docs/design/DS-05-platform.sql:739 |
+| `personal_data_processing_log` | IDs and field names only, never values; append-only (trigger below) | Processing log |  | docs/design/DS-35-crm.sql:472 |
 
 ## `configuration`
 
-| Table | Purpose | Key references | Source |
-| --- | --- | --- | --- |
-| `artifact_monitor_snapshot` | immutable; one per artifact version in force and day (rule 21) | `artifact_transition` | docs/design/DS-28-34-configuration-artifacts.sql:414 |
-| `artifact_promotion_evidence` | immutable; computed once by CreateArtifactEvidence (rule 14) | `user_account` | docs/design/DS-28-34-configuration-artifacts.sql:296 |
-| `artifact_shadow_outcome` | automation_execution in mode shadow instead. |  | docs/design/DS-28-34-configuration-artifacts.sql:380 |
-| `artifact_transition` | immutable; one per lifecycle or pointer move (rule 13) | `artifact_promotion_evidence`, `change_proposal`, `user_account` | docs/design/DS-28-34-configuration-artifacts.sql:347 |
-| `automation_execution` | Non-matches are not recorded (rule 11). | `agent_run`, `automation_rule_version`, `user_account` | docs/design/DS-28-34-configuration-artifacts.sql:96 |
-| `automation_rule` | company data; the identity of a versioned rule (rule 8) | `user_account` | docs/design/DS-28-34-configuration-artifacts.sql:30 |
-| `automation_rule_version` | are the same on the three version tables (ADR-0059 rule 12). | `agent_run`, `automation_rule`, `change_proposal`, `user_account` | docs/design/DS-28-34-configuration-artifacts.sql:55 |
-| `automation_scope_skip` | ADR-0058 rule 9: subjects outside the owner's scope are not evaluated; a value-free count per rule and business date. | `automation_rule` | docs/design/DS-28-34-configuration-artifacts.sql:145 |
-| `configuration_state` | ADR-0058 rule 15: one row per company, locked by every activation, enable, rollback and demotion (ADR-0027 rule 10, class 3). |  | docs/design/DS-28-34-configuration-artifacts.sql:155 |
-| `decision_table` | company data; the identity of a versioned table | `user_account` | docs/design/DS-28-34-configuration-artifacts.sql:163 |
-| `decision_table_row` | frozen with its version (trigger below) | `decision_table_version` | docs/design/DS-28-34-configuration-artifacts.sql:212 |
-| `decision_table_version` | immutable once out of draft (trigger below) | `agent_run`, `change_proposal`, `decision_table`, `user_account` | docs/design/DS-28-34-configuration-artifacts.sql:176 |
-| `golden_case_label` | company data; append-only, retired_at set once (rule 22) | `user_account` | docs/design/DS-28-34-configuration-artifacts.sql:397 |
-| `parameter_set` | company data; one per company and tunable function (rule 4) | `user_account` | docs/design/DS-28-34-configuration-artifacts.sql:226 |
-| `parameter_set_value` | frozen with its version (trigger below). | `parameter_set_version` | docs/design/DS-28-34-configuration-artifacts.sql:270 |
-| `parameter_set_version` | immutable once out of draft (trigger below) | `agent_run`, `change_proposal`, `parameter_set`, `user_account` | docs/design/DS-28-34-configuration-artifacts.sql:238 |
+| Table | Purpose | Section | Key references | Source |
+| --- | --- | --- | --- | --- |
+| `artifact_monitor_snapshot` | immutable; one per artifact version in force and day (rule 21) | Golden case labels and monitoring | `artifact_transition` | docs/design/DS-28-34-configuration-artifacts.sql:414 |
+| `artifact_promotion_evidence` | immutable; computed once by CreateArtifactEvidence (rule 14) | Lifecycle, evidence and shadow outcomes | `user_account` | docs/design/DS-28-34-configuration-artifacts.sql:296 |
+| `artifact_shadow_outcome` |  | Lifecycle, evidence and shadow outcomes |  | docs/design/DS-28-34-configuration-artifacts.sql:380 |
+| `artifact_transition` | immutable; one per lifecycle or pointer move (rule 13) | Lifecycle, evidence and shadow outcomes | `artifact_promotion_evidence`, `change_proposal`, `user_account` | docs/design/DS-28-34-configuration-artifacts.sql:347 |
+| `automation_execution` | One row per matched rule version and event and mode, never updated or deleted (rules 11, 17; ADR-0059 rule 23). | Automation rules | `agent_run`, `automation_rule_version`, `user_account` | docs/design/DS-28-34-configuration-artifacts.sql:96 |
+| `automation_rule` | company data; the identity of a versioned rule (rule 8) | Automation rules | `user_account` | docs/design/DS-28-34-configuration-artifacts.sql:30 |
+| `automation_rule_version` | Immutable once out of draft (trigger below; ADR-0058 rule 21). | Automation rules | `agent_run`, `automation_rule`, `change_proposal`, `user_account` | docs/design/DS-28-34-configuration-artifacts.sql:55 |
+| `automation_scope_skip` | ADR-0058 rule 9: subjects outside the owner's scope are not evaluated | Automation rules | `automation_rule` | docs/design/DS-28-34-configuration-artifacts.sql:145 |
+| `configuration_state` | ADR-0058 rule 15: one row per company, locked by every activation, enable, rollback and demotion (ADR-0027 rule 10, class 3). | Automation rules |  | docs/design/DS-28-34-configuration-artifacts.sql:155 |
+| `decision_table` | company data; the identity of a versioned table | Decision tables | `user_account` | docs/design/DS-28-34-configuration-artifacts.sql:163 |
+| `decision_table_row` | frozen with its version (trigger below) | Decision tables | `decision_table_version` | docs/design/DS-28-34-configuration-artifacts.sql:212 |
+| `decision_table_version` | immutable once out of draft (trigger below) | Decision tables | `agent_run`, `change_proposal`, `decision_table`, `user_account` | docs/design/DS-28-34-configuration-artifacts.sql:176 |
+| `golden_case_label` | company data; append-only, retired_at set once (rule 22) | Golden case labels and monitoring | `user_account` | docs/design/DS-28-34-configuration-artifacts.sql:397 |
+| `parameter_set` | company data; one per company and tunable function (rule 4) | Parameter sets | `user_account` | docs/design/DS-28-34-configuration-artifacts.sql:226 |
+| `parameter_set_value` | One per declared parameter, with the declaration's type, default and bounds copied at the version's function version | Parameter sets | `parameter_set_version` | docs/design/DS-28-34-configuration-artifacts.sql:270 |
+| `parameter_set_version` | immutable once out of draft (trigger below) | Parameter sets | `agent_run`, `change_proposal`, `parameter_set`, `user_account` | docs/design/DS-28-34-configuration-artifacts.sql:238 |
 
 ## `documents`
 
-| Table | Purpose | Key references | Source |
-| --- | --- | --- | --- |
-| `approval` | owned by documents; one immutable row per decision at a stage (ADR-0055 rule 1) | `approval_stage`, `document_version`, `policy_decision`, `user_account` | docs/design/DS-05-platform.sql:544 |
-| `change_proposal` | typed header of a non-posting document type (rule 1) | `document` | docs/design/DS-05-platform.sql:619 |
-| `change_proposal_execution` | immutable; written by the executing consumer (rule 3, Success) | `change_proposal`, `document_version` | docs/design/DS-05-platform.sql:651 |
-| `change_proposal_execution_item` | The audit row of each executed item (rule 3, Success). interim: not stated in ADR-0029 as a table. | `audit_record`, `change_proposal_execution` | docs/design/DS-05-platform.sql:664 |
-| `change_proposal_item` | lines of this header (ADR-0004 rule 10). | `change_proposal` | docs/design/DS-05-platform.sql:634 |
-| `document` | Documents | `branch`, `document`, `partner`, `user_account`, `work_item` | docs/design/DS-05-platform.sql:406 |
-| `document_version` | Rule 9: one row per version, never updated; deleted only with its draft (trigger below). | `agent_run`, `document`, `document_version`, `user_account` | docs/design/DS-05-platform.sql:458 |
-| `numbering_configuration` | per document type: prefix, per-branch series, format (ADR-0009 rule 15) |  | docs/design/DS-05-platform.sql:383 |
-| `numbering_series` | created on first use; the counter moves only through the numbering lock helper (rule 15) | `branch`, `fiscal_year` | docs/design/DS-05-platform.sql:393 |
-| `posting_intent` | One per Issue attempt, never reused; the frozen plan, rates and hash are immutable (trigger below). | `document_version`, `policy_decision` | docs/design/DS-05-platform.sql:595 |
-| `taint_clearance` | immutable; one per version (ADR-0029 rule 8) | `document_version`, `user_account` | docs/design/DS-05-platform.sql:483 |
+| Table | Purpose | Section | Key references | Source |
+| --- | --- | --- | --- | --- |
+| `approval` | owned by documents; one immutable row per decision at a stage (ADR-0055 rule 1) | Policy decisions and approvals | `approval_stage`, `document_version`, `policy_decision`, `user_account` | docs/design/DS-05-platform.sql:544 |
+| `change_proposal` | typed header of a non-posting document type (rule 1) | Change proposals | `document` | docs/design/DS-05-platform.sql:619 |
+| `change_proposal_execution` | immutable; written by the executing consumer (rule 3, Success) | Change proposals | `change_proposal`, `document_version` | docs/design/DS-05-platform.sql:651 |
+| `change_proposal_execution_item` | The audit row of each executed item (rule 3, Success). | Change proposals | `audit_record`, `change_proposal_execution` | docs/design/DS-05-platform.sql:664 |
+| `change_proposal_item` | The items of rule 1, an ADR-0008 rule 20 batch: one row per item, in batch order. | Change proposals | `change_proposal` | docs/design/DS-05-platform.sql:634 |
+| `document` |  | Documents | `branch`, `document`, `partner`, `user_account`, `work_item` | docs/design/DS-05-platform.sql:406 |
+| `document_version` | Rule 9: one row per version, never updated | Documents | `agent_run`, `document`, `document_version`, `user_account` | docs/design/DS-05-platform.sql:458 |
+| `numbering_configuration` | per document type: prefix, per-branch series, format (ADR-0009 rule 15) | Documents |  | docs/design/DS-05-platform.sql:383 |
+| `numbering_series` | created on first use; the counter moves only through the numbering lock helper (rule 15) | Documents | `branch`, `fiscal_year` | docs/design/DS-05-platform.sql:393 |
+| `posting_intent` | One per Issue attempt, never reused | Posting intents | `document_version`, `policy_decision` | docs/design/DS-05-platform.sql:595 |
+| `taint_clearance` | immutable; one per version (ADR-0029 rule 8) | Documents | `document_version`, `user_account` | docs/design/DS-05-platform.sql:483 |
 
 ## `outbox`
 
-| Table | Purpose | Key references | Source |
-| --- | --- | --- | --- |
-| `event_consumer` | installation data |  | docs/design/DS-05-platform.sql:684 |
-| `event_delivery` | one per subscribed consumer, unpartitioned (rule 6) | `event_consumer`, `outbox_event` | docs/design/DS-05-platform.sql:717 |
-| `event_subject` | installation data, unpartitioned; the only ordering of events (rule 3) |  | docs/design/DS-05-platform.sql:675 |
-| `outbox_event` | partitioned by month on id (rule 2); no unique index but its key |  | docs/design/DS-05-platform.sql:693 |
+| Table | Purpose | Section | Key references | Source |
+| --- | --- | --- | --- | --- |
+| `event_consumer` | installation data | Outbox and delivery |  | docs/design/DS-05-platform.sql:684 |
+| `event_delivery` | one per subscribed consumer, unpartitioned (rule 6) | Outbox and delivery | `event_consumer`, `outbox_event` | docs/design/DS-05-platform.sql:717 |
+| `event_subject` | installation data, unpartitioned; the only ordering of events (rule 3) | Outbox and delivery |  | docs/design/DS-05-platform.sql:675 |
+| `outbox_event` | partitioned by month on id (rule 2); no unique index but its key | Outbox and delivery |  | docs/design/DS-05-platform.sql:693 |
 
 ## `permissions`
 
-| Table | Purpose | Key references | Source |
-| --- | --- | --- | --- |
-| `company_segregation_rule` | enablement of segregation-rules.csv rows |  | docs/design/DS-15-access.sql:298 |
-| `credential_reset` | one-time password reset token (ADR-0054 rule 4) | `user_account` | docs/design/DS-15-access.sql:58 |
-| `delegation` | Delegation | `user_account` | docs/design/DS-15-access.sql:272 |
-| `delegation_role_assignment` | kind role_assignments only; the delegator's own assignments (command check) | `delegation`, `role_assignment` | docs/design/DS-15-access.sql:288 |
-| `installation_role_assignment` | ADR-0017 rule 7 | `user_account` | docs/design/DS-15-access.sql:87 |
-| `integration_client` | ADR-0017 rules 1, 3, 13 | `user_account` | docs/design/DS-15-access.sql:71 |
-| `integration_token` | stored only as a hash, at most one year (ADR-0017 rule 3) | `integration_client` | docs/design/DS-15-access.sql:78 |
-| `role` | Roles and levels |  | docs/design/DS-15-access.sql:132 |
-| `role_assignment` | Assignments and scopes | `integration_client`, `role`, `user_account`, `user_invitation` | docs/design/DS-15-access.sql:224 |
-| `role_assignment_scope` | needs at least one row and company none: a command rule and INV-221, since it spans rows. | `branch`, `role_assignment`, `warehouse` | docs/design/DS-15-access.sql:259 |
-| `role_level` | one level per node of the area tree; inherited downward | `role` | docs/design/DS-15-access.sql:152 |
-| `role_permission` | the expansion minus holds in force, read by the dispatcher (ADR-0054 rule 9) | `role` | docs/design/DS-15-access.sql:162 |
-| `role_permission_hold` | ends them (state ended). | `role`, `user_account` | docs/design/DS-15-access.sql:172 |
-| `segregation_exception` | small-company mode only; immutable (ADR-0054 rule 20) | `audit_record`, `document`, `user_account` | docs/design/DS-15-access.sql:305 |
-| `segregation_review` | one per posting period with exceptions, by ConfirmSegregationReview | `posting_period`, `user_account` | docs/design/DS-15-access.sql:319 |
-| `user_account` | personal data (spec 17); installation data |  | docs/design/DS-15-access.sql:19 |
-| `user_invitation` | Pending invitations expire after the installation setting invitation_expiry_days (default 30). | `user_account` | docs/design/DS-15-access.sql:200 |
-| `user_session` | server-side sessions (ADR-0017 rule 2; ADR-0040 rule 12) | `user_account` | docs/design/DS-15-access.sql:46 |
+| Table | Purpose | Section | Key references | Source |
+| --- | --- | --- | --- | --- |
+| `company_segregation_rule` | enablement of segregation-rules.csv rows | Segregation of duties |  | docs/design/DS-15-access.sql:298 |
+| `credential_reset` | one-time password reset token (ADR-0054 rule 4) | Users and credentials | `user_account` | docs/design/DS-15-access.sql:58 |
+| `delegation` |  | Delegation | `user_account` | docs/design/DS-15-access.sql:272 |
+| `delegation_role_assignment` | kind role_assignments only; the delegator's own assignments (command check) | Delegation | `delegation`, `role_assignment` | docs/design/DS-15-access.sql:288 |
+| `installation_role_assignment` | ADR-0017 rule 7 | Users and credentials | `user_account` | docs/design/DS-15-access.sql:87 |
+| `integration_client` | ADR-0017 rules 1, 3, 13 | Users and credentials | `user_account` | docs/design/DS-15-access.sql:71 |
+| `integration_token` | stored only as a hash, at most one year (ADR-0017 rule 3) | Users and credentials | `integration_client` | docs/design/DS-15-access.sql:78 |
+| `role` |  | Roles and levels |  | docs/design/DS-15-access.sql:132 |
+| `role_assignment` |  | Assignments and scopes | `integration_client`, `role`, `user_account`, `user_invitation` | docs/design/DS-15-access.sql:224 |
+| `role_assignment_scope` | Record scope: a branch or a warehouse per row | Assignments and scopes | `branch`, `role_assignment`, `warehouse` | docs/design/DS-15-access.sql:259 |
+| `role_level` | one level per node of the area tree; inherited downward | Roles and levels | `role` | docs/design/DS-15-access.sql:152 |
+| `role_permission` | the expansion minus holds in force, read by the dispatcher (ADR-0054 rule 9) | Roles and levels | `role` | docs/design/DS-15-access.sql:162 |
+| `role_permission_hold` |  | Roles and levels | `role`, `user_account` | docs/design/DS-15-access.sql:172 |
+| `segregation_exception` | small-company mode only; immutable (ADR-0054 rule 20) | Segregation of duties | `audit_record`, `document`, `user_account` | docs/design/DS-15-access.sql:305 |
+| `segregation_review` | one per posting period with exceptions, by ConfirmSegregationReview | Segregation of duties | `posting_period`, `user_account` | docs/design/DS-15-access.sql:319 |
+| `user_account` | personal data (spec 17); installation data | Users and credentials |  | docs/design/DS-15-access.sql:19 |
+| `user_invitation` | CreateUserAccount writes one per call. | Invitations | `user_account` | docs/design/DS-15-access.sql:200 |
+| `user_session` | server-side sessions (ADR-0017 rule 2; ADR-0040 rule 12) | Users and credentials | `user_account` | docs/design/DS-15-access.sql:46 |
 
 ## `policy`
 
-| Table | Purpose | Key references | Source |
-| --- | --- | --- | --- |
-| `approval_pool` | (ADR-0055 rule 1). Pool general cannot be deactivated, and no selector row names an inactive pool (command checks). |  | docs/design/DS-15-access.sql:331 |
-| `approval_pool_document_type` | policy input of that type and are tried in position order (ADR-0055 rule 3). | `approval_pool` | docs/design/DS-15-access.sql:343 |
-| `approval_procedure` | named ranks; approver role and scope binding moved to stages (ADR-0055 rule 5) |  | docs/design/DS-05-platform.sql:299 |
-| `approval_stage` | Approval pools and stages | `approval_pool`, `role` | docs/design/DS-15-access.sql:353 |
-| `approval_stage_member` | Approval pools and stages | `approval_stage`, `role`, `user_account` | docs/design/DS-15-access.sql:372 |
-| `policy_rule` | the identity of a versioned rule; ties go to the lowest ID (rule 7) |  | docs/design/DS-05-platform.sql:312 |
-| `policy_rule_version` | interim: not stated in ADR-0043 as a table (rule 3 says the rule is versioned and decisions record the version used). | `approval_procedure`, `policy_rule`, `user_account` | docs/design/DS-05-platform.sql:322 |
+| Table | Purpose | Section | Key references | Source |
+| --- | --- | --- | --- | --- |
+| `approval_pool` |  | Approval pools and stages |  | docs/design/DS-15-access.sql:331 |
+| `approval_pool_document_type` | Selector: position 0 is the one default row per document type | Approval pools and stages | `approval_pool` | docs/design/DS-15-access.sql:343 |
+| `approval_procedure` | named ranks; approver role and scope binding moved to stages (ADR-0055 rule 5) | Policy rules and procedures |  | docs/design/DS-05-platform.sql:299 |
+| `approval_stage` |  | Approval pools and stages | `approval_pool`, `role` | docs/design/DS-15-access.sql:353 |
+| `approval_stage_member` |  | Approval pools and stages | `approval_stage`, `role`, `user_account` | docs/design/DS-15-access.sql:372 |
+| `policy_rule` | the identity of a versioned rule; ties go to the lowest ID (rule 7) | Policy rules and procedures |  | docs/design/DS-05-platform.sql:312 |
+| `policy_rule_version` | Rule 3: a change writes a new version with effective_from | Policy rules and procedures | `approval_procedure`, `policy_rule`, `user_account` | docs/design/DS-05-platform.sql:322 |
 
 ## `registry`
 
-| Table | Purpose | Key references | Source |
-| --- | --- | --- | --- |
-| `extension_point` | installation data; declared by a module, written at startup; no runtime in Phase 1 |  | docs/design/DS-28-settings.sql:135 |
-| `setting_definition` | installation data; one row per registered key, written at startup |  | docs/design/DS-28-settings.sql:22 |
-| `setting_value` | company data (installation values with company_id null); never updated or deleted | `change_proposal`, `setting_definition`, `user_account` | docs/design/DS-28-settings.sql:86 |
+| Table | Purpose | Section | Key references | Source |
+| --- | --- | --- | --- | --- |
+| `extension_point` | installation data; declared by a module, written at startup; no runtime in Phase 1 | Extension points |  | docs/design/DS-28-settings.sql:135 |
+| `setting_definition` | installation data; one row per registered key, written at startup | Setting definitions |  | docs/design/DS-28-settings.sql:22 |
+| `setting_value` | company data (installation values with company_id null); never updated or deleted | Setting values | `change_proposal`, `setting_definition`, `user_account` | docs/design/DS-28-settings.sql:86 |
 
 ## `work`
 
-| Table | Purpose | Key references | Source |
-| --- | --- | --- | --- |
-| `work_item` | Work queue | `agent_run`, `approval_stage`, `branch`, `user_account`, `warehouse` | docs/design/DS-05-platform.sql:56 |
-| `work_item_link` | evidence and what was done about it (rule 3) | `work_item` | docs/design/DS-05-platform.sql:107 |
-| `work_item_note` | append-only (rule 3; trigger below); created_at of rule 3 is recorded_at | `work_item` | docs/design/DS-05-platform.sql:118 |
+| Table | Purpose | Section | Key references | Source |
+| --- | --- | --- | --- | --- |
+| `work_item` |  | Work queue | `agent_run`, `approval_stage`, `branch`, `user_account`, `warehouse` | docs/design/DS-05-platform.sql:56 |
+| `work_item_link` | evidence and what was done about it (rule 3) | Work queue | `work_item` | docs/design/DS-05-platform.sql:107 |
+| `work_item_note` | append-only (rule 3; trigger below); created_at of rule 3 is recorded_at | Work queue | `work_item` | docs/design/DS-05-platform.sql:118 |
 
 ## `inventory`
 
-| Table | Purpose | Key references | Source |
-| --- | --- | --- | --- |
-| `bin` | Warehouses and bins | `warehouse`, `zone` | docs/design/DS-20-master-data.sql:688 |
-| `delivery` | Stock documents | `document`, `partner` | docs/design/DS-22-09-42-commercial-inventory.sql:559 |
-| `delivery_line` | demand_supply_line by inventory. | `delivery`, `item`, `product_configuration`, `sales_order_line`, `uom`, `warehouse` | docs/design/DS-22-09-42-commercial-inventory.sql:579 |
-| `demand_supply_line` | owner_partner_id are the B3 columns: the author's (ADR-0028 rule 2), present here as the holistic review's interim. | `demand_supply_line`, `item`, `partner`, `planned_order`, `production_order_component`, `production_order_output`, `warehouse` | docs/design/DS-43-54-planning-production.sql:275 |
-| `goods_receipt` | entry. Each receipt or return line of an order line stores its GR/IR position range in inventory units (ADR-0047 rule 13). | `document`, `partner` | docs/design/DS-22-09-42-commercial-inventory.sql:450 |
-| `goods_receipt_line` | rounding tolerance (receipt_exceeds_order, ADR-0047 rule 11; ADR-0056 rules 10, 11). | `bin`, `goods_receipt`, `item`, `lot`, `purchase_order_line`, `uom`, `warehouse` | docs/design/DS-22-09-42-commercial-inventory.sql:469 |
-| `handling_unit` | Stock: handling units | `bin`, `handling_unit`, `handling_unit_type`, `warehouse` | docs/design/DS-22-09-42-commercial-inventory.sql:425 |
-| `lot` | ADR-0020 rule 17 | `item` | docs/design/DS-20-master-data.sql:715 |
-| `material_document` | Material documents | `document` | docs/design/DS-22-09-42-commercial-inventory.sql:1207 |
-| `material_document_line` | Material documents | `bin`, `cost_object`, `derivation_trace`, `handling_unit`, `item`, `lot`, `material_document`, `movement_type` … | docs/design/DS-22-09-42-commercial-inventory.sql:1217 |
-| `movement_type` | global catalog, uuid5 IDs, loaded from the catalog file |  | docs/design/DS-22-09-42-commercial-inventory.sql:39 |
-| `pending_receipt_adjustment` | Invoice first: the stock-bound difference for quantities not yet received waits here until the receipt (ADR-0030 rule 4). | `journal_line`, `purchase_invoice_line`, `purchase_order_line` | docs/design/DS-22-09-42-commercial-inventory.sql:1505 |
-| `preliminary_price` | Preliminary price | `derivation_trace`, `item`, `posting_period`, `user_account`, `warehouse` | docs/design/DS-22-09-42-commercial-inventory.sql:1300 |
-| `purchase_order_line_gr_ir_layer` | their first price for the life of the line. | `purchase_order_line` | docs/design/DS-22-09-42-commercial-inventory.sql:1457 |
-| `purchase_order_line_gr_ir_posting` | no header or line table; it never counts as latest and a later posting on the line reverses it first (ADR-0056 rule 10). | `document`, `purchase_order_line`, `purchase_order_line_gr_ir_posting` | docs/design/DS-22-09-42-commercial-inventory.sql:1479 |
-| `replenishment_request` | The line copies what purchasing and inventory need, so neither imports planning (ADR-0022 rule 2). | `user_account` | docs/design/DS-43-54-planning-production.sql:810 |
-| `replenishment_request_line` | Replenishment hand-over | `item`, `partner`, `planned_order`, `replenishment_request`, `transfer_route`, `uom`, `warehouse` | docs/design/DS-43-54-planning-production.sql:817 |
-| `return_from_customer` | Stock documents | `document`, `partner` | docs/design/DS-22-09-42-commercial-inventory.sql:612 |
-| `return_from_customer_line` | Goods arrive in a returns bin as blocked (ADR-0023 rule 19). | `bin`, `delivery_line`, `item`, `product_configuration`, `return_from_customer`, `uom`, `warehouse` | docs/design/DS-22-09-42-commercial-inventory.sql:629 |
-| `return_to_supplier` | Stock documents | `document`, `partner` | docs/design/DS-22-09-42-commercial-inventory.sql:506 |
-| `return_to_supplier_line` | correction_of_id on the document row is the goods receipt; returned <= received per receipt line (inventory, ADR-0047 rule 15). | `bin`, `goods_receipt_line`, `item`, `return_to_supplier`, `uom`, `warehouse` | docs/design/DS-22-09-42-commercial-inventory.sql:522 |
-| `serial_number` | ADR-0020 rule 17 | `item` | docs/design/DS-20-master-data.sql:725 |
-| `stock_quantity` | Stock balances | `bin`, `handling_unit`, `item`, `lot`, `partner`, `serial_number`, `warehouse` | docs/design/DS-22-09-42-commercial-inventory.sql:1272 |
-| `stock_reservation` | lock of the item and warehouse (ADR-0023 rule 10). | `bin`, `demand_supply_line`, `item`, `lot`, `partner`, `stock_reservation`, `warehouse` | docs/design/DS-22-09-42-commercial-inventory.sql:1320 |
-| `stock_value` | the lock row per (item, warehouse), created on first use | `item`, `warehouse` | docs/design/DS-22-09-42-commercial-inventory.sql:1261 |
-| `warehouse_movement` | Moves inside one warehouse: no value, no journal; per (item, warehouse, lot or serial) they net to zero (ADR-0023 rule 8). | `bin`, `handling_unit`, `item`, `lot`, `partner`, `serial_number`, `warehouse`, `warehouse_task` | docs/design/DS-22-09-42-commercial-inventory.sql:1420 |
-| `warehouse_task` | Reservations and warehouse tasks | `bin`, `demand_supply_line`, `document`, `handling_unit`, `item`, `lot`, `partner`, `uom` … | docs/design/DS-22-09-42-commercial-inventory.sql:1379 |
-| `zone` | Warehouses and bins | `warehouse` | docs/design/DS-20-master-data.sql:683 |
+| Table | Purpose | Section | Key references | Source |
+| --- | --- | --- | --- | --- |
+| `bin` |  | Warehouses and bins | `warehouse`, `zone` | docs/design/DS-20-master-data.sql:688 |
+| `delivery` |  | Stock documents | `document`, `partner` | docs/design/DS-22-09-42-commercial-inventory.sql:559 |
+| `delivery_line` |  | Stock documents | `delivery`, `item`, `product_configuration`, `sales_order_line`, `uom`, `warehouse` | docs/design/DS-22-09-42-commercial-inventory.sql:579 |
+| `demand_supply_line` |  | Demand and supply read model | `demand_supply_line`, `item`, `partner`, `planned_order`, `production_order_component`, `production_order_output`, `warehouse` | docs/design/DS-43-54-planning-production.sql:275 |
+| `goods_receipt` | Order line references are reserved at step 3 and filled from step 5 (ADR-0027 rule 7). | Stock documents | `document`, `partner` | docs/design/DS-22-09-42-commercial-inventory.sql:450 |
+| `goods_receipt_line` | A receipt of an order line is rejected while its supply row is unreleased (demand_supply_not_released, holistic review B2) and when received net would exceed the ordered inventory quantity times the … | Stock documents | `bin`, `goods_receipt`, `item`, `lot`, `purchase_order_line`, `uom`, `warehouse` | docs/design/DS-22-09-42-commercial-inventory.sql:469 |
+| `handling_unit` |  | Stock: handling units | `bin`, `handling_unit`, `handling_unit_type`, `warehouse` | docs/design/DS-22-09-42-commercial-inventory.sql:425 |
+| `lot` | ADR-0020 rule 17 | Warehouses and bins | `item` | docs/design/DS-20-master-data.sql:715 |
+| `material_document` |  | Material documents | `document` | docs/design/DS-22-09-42-commercial-inventory.sql:1207 |
+| `material_document_line` |  | Material documents | `bin`, `cost_object`, `derivation_trace`, `handling_unit`, `item`, `lot`, `material_document`, `movement_type` … | docs/design/DS-22-09-42-commercial-inventory.sql:1217 |
+| `movement_type` | global catalog, uuid5 IDs, loaded from the catalog file | Movement types |  | docs/design/DS-22-09-42-commercial-inventory.sql:39 |
+| `pending_receipt_adjustment` | Invoice first: the stock-bound difference for quantities not yet received waits here until the receipt (ADR-0030 rule 4). | GR/IR by unit positions | `journal_line`, `purchase_invoice_line`, `purchase_order_line` | docs/design/DS-22-09-42-commercial-inventory.sql:1505 |
+| `preliminary_price` |  | Preliminary price | `derivation_trace`, `item`, `posting_period`, `user_account`, `warehouse` | docs/design/DS-22-09-42-commercial-inventory.sql:1300 |
+| `purchase_order_line_gr_ir_layer` | Layers (from, to, price): each position is priced once, when a receipt or an invoice first reaches it, at the line's GR/IR price then in force, an exact rational in the order's currency … | GR/IR by unit positions | `purchase_order_line` | docs/design/DS-22-09-42-commercial-inventory.sql:1457 |
+| `purchase_order_line_gr_ir_posting` | One row per GR/IR posting on a line: postings are differences of rounded cumulative values (rule 13), so the line's balance, the sum of gr_ir_amount (debit positive), is round(V(I)) - round(V(R)) … | GR/IR by unit positions | `document`, `purchase_order_line`, `purchase_order_line_gr_ir_posting` | docs/design/DS-22-09-42-commercial-inventory.sql:1479 |
+| `replenishment_request` | Written by inventory.contract.request_replenishment, one line per converted purchase or transfer planned order | Replenishment hand-over | `user_account` | docs/design/DS-43-54-planning-production.sql:810 |
+| `replenishment_request_line` |  | Replenishment hand-over | `item`, `partner`, `planned_order`, `replenishment_request`, `transfer_route`, `uom`, `warehouse` | docs/design/DS-43-54-planning-production.sql:817 |
+| `return_from_customer` |  | Stock documents | `document`, `partner` | docs/design/DS-22-09-42-commercial-inventory.sql:612 |
+| `return_from_customer_line` | correction_of_id on the document row is the delivery | Stock documents | `bin`, `delivery_line`, `item`, `product_configuration`, `return_from_customer`, `uom`, `warehouse` | docs/design/DS-22-09-42-commercial-inventory.sql:629 |
+| `return_to_supplier` |  | Stock documents | `document`, `partner` | docs/design/DS-22-09-42-commercial-inventory.sql:506 |
+| `return_to_supplier_line` | correction_of_id on the document row is the goods receipt | Stock documents | `bin`, `goods_receipt_line`, `item`, `return_to_supplier`, `uom`, `warehouse` | docs/design/DS-22-09-42-commercial-inventory.sql:522 |
+| `serial_number` | ADR-0020 rule 17 | Warehouses and bins | `item` | docs/design/DS-20-master-data.sql:725 |
+| `stock_quantity` |  | Stock balances | `bin`, `handling_unit`, `item`, `lot`, `partner`, `serial_number`, `warehouse` | docs/design/DS-22-09-42-commercial-inventory.sql:1272 |
+| `stock_reservation` |  | Reservations and warehouse tasks | `bin`, `demand_supply_line`, `item`, `lot`, `partner`, `stock_reservation`, `warehouse` | docs/design/DS-22-09-42-commercial-inventory.sql:1320 |
+| `stock_value` | the lock row per (item, warehouse), created on first use | Stock balances | `item`, `warehouse` | docs/design/DS-22-09-42-commercial-inventory.sql:1261 |
+| `warehouse_movement` | Moves inside one warehouse: no value, no journal | Reservations and warehouse tasks | `bin`, `handling_unit`, `item`, `lot`, `partner`, `serial_number`, `warehouse`, `warehouse_task` | docs/design/DS-22-09-42-commercial-inventory.sql:1420 |
+| `warehouse_task` |  | Reservations and warehouse tasks | `bin`, `demand_supply_line`, `document`, `handling_unit`, `item`, `lot`, `partner`, `uom` … | docs/design/DS-22-09-42-commercial-inventory.sql:1379 |
+| `zone` |  | Warehouses and bins | `warehouse` | docs/design/DS-20-master-data.sql:683 |
 
 ## `ledger`
 
-| Table | Purpose | Key references | Source |
-| --- | --- | --- | --- |
-| `derivation_trace` | DS-20-master-data.sql (ADR-0045); the lab loads both files together. derivation_trace is owned by ledger. |  | docs/design/DS-06-universal-journal.sql:14 |
-| `fixed_asset` |  |  | docs/design/DS-06-universal-journal.sql:45 |
-| `opening_turnover` | FORCE ROW LEVEL SECURITY and the generated company policy. | `account` | docs/design/DS-06-universal-journal.sql:440 |
-| `payment_term` | ADR-0026: open-item core, owned by ledger. RLS: FORCE ROW LEVEL SECURITY and the generated company policy. |  | docs/design/DS-06-universal-journal.sql:89 |
+| Table | Purpose | Section | Key references | Source |
+| --- | --- | --- | --- | --- |
+| `derivation_trace` | derivation_trace is owned by ledger. |  |  | docs/design/DS-06-universal-journal.sql:14 |
+| `fixed_asset` |  |  |  | docs/design/DS-06-universal-journal.sql:45 |
+| `opening_turnover` | ADR-0044 rule 10; ADR-0049 rule 14: year-to-date turnover before a mid-year cut-over, non-posting, read by statutory reports. |  | `account` | docs/design/DS-06-universal-journal.sql:440 |
+| `payment_term` | ADR-0026: open-item core, owned by ledger. |  |  | docs/design/DS-06-universal-journal.sql:89 |
 
 ## `master_data`
 
-| Table | Purpose | Key references | Source |
-| --- | --- | --- | --- |
-| `barcode` | label never resolves to another object, and the same owner may take it back. |  | docs/design/DS-20-master-data.sql:786 |
-| `branch` | Organization |  | docs/design/DS-20-master-data.sql:85 |
-| `classification_scheme` | Products and items |  | docs/design/DS-20-master-data.sql:624 |
-| `classification_value` | Products and items | `classification_scheme`, `classification_value` | docs/design/DS-20-master-data.sql:629 |
-| `code_series` | master-data code sequences, without fiscal year or branch (ADR-0062 rules 9, 19) | `product_category` | docs/design/DS-20-master-data.sql:597 |
-| `company` | Organization | `currency`, `user_account` | docs/design/DS-20-master-data.sql:69 |
-| `company_currency_activation` | a company activates the currencies it uses (ADR-0011 rule 7) | `currency` | docs/design/DS-20-master-data.sql:27 |
-| `configuration_default` | ADR-0046 rule 8 | `configuration_model_revision`, `product_variant_attribute` | docs/design/DS-56-product-configuration.sql:91 |
-| `configuration_model` | Configuration models | `product` | docs/design/DS-56-product-configuration.sql:12 |
-| `configuration_model_revision` | Configuration models | `configuration_model`, `configuration_model_revision` | docs/design/DS-56-product-configuration.sql:25 |
-| `configuration_rule` | ADR-0046 rule 6 | `configuration_model_revision`, `product_variant_attribute` | docs/design/DS-56-product-configuration.sql:45 |
-| `configuration_table` | ADR-0046 rule 7 | `configuration_model_revision` | docs/design/DS-56-product-configuration.sql:61 |
-| `configuration_table_column` | Configuration models | `configuration_table`, `product_variant_attribute` | docs/design/DS-56-product-configuration.sql:71 |
-| `configuration_table_row` | Configuration models | `configuration_table` | docs/design/DS-56-product-configuration.sql:82 |
-| `contact` | Price lists | `partner` | docs/design/DS-20-master-data.sql:326 |
-| `cost_center` | Organization | `branch`, `cost_center` | docs/design/DS-20-master-data.sql:116 |
-| `currency` | Currencies and units |  | docs/design/DS-20-master-data.sql:21 |
-| `customer_profile` | Price lists | `account`, `currency`, `partner`, `payment_term`, `price_list` | docs/design/DS-20-master-data.sql:249 |
-| `data_translation` | ADR-0018 rule 17 |  | docs/design/DS-20-master-data.sql:148 |
-| `department` | Organization for access | `department`, `partner` | docs/design/DS-15-access.sql:96 |
-| `employee_profile` | personal data (ADR-0019 rule 7) | `account`, `branch`, `cost_center`, `department`, `partner`, `user_account` | docs/design/DS-20-master-data.sql:283 |
-| `extraction_mapping_rule` | company data, change-tracked; master_data_change, proposals for agents | `partner` | docs/design/DS-36-document-intake.sql:208 |
-| `gs1_company_prefix` | the company's GS1 company prefixes (ADR-0061 rule 11) |  | docs/design/DS-20-master-data.sql:812 |
-| `handling_unit_type` | ADR-0023 rule 6 | `uom` | docs/design/DS-20-master-data.sql:367 |
-| `item` | Products and items | `product`, `uom` | docs/design/DS-20-master-data.sql:516 |
-| `item_barcode` | one barcode per packaging unit of an item (ADR-0018 rule 14) | `item`, `uom` | docs/design/DS-20-master-data.sql:556 |
-| `item_group` | Groups copied from package templates |  | docs/design/DS-20-master-data.sql:168 |
-| `item_manufacturer_part` | a manufacturer's part number for an item, step 4 of component resolution (ADR-0062 rules 7, 19) | `item` | docs/design/DS-20-master-data.sql:582 |
-| `item_tax_group` | read by the tax matrix (ADR-0041 rule 3) |  | docs/design/DS-20-master-data.sql:176 |
-| `item_variant_value` | one per variant-mode attribute of the item's product | `item`, `product_variant_attribute` | docs/design/DS-20-master-data.sql:541 |
-| `partner` | Partners | `partner`, `partner_group`, `partner_tax_group` | docs/design/DS-20-master-data.sql:182 |
-| `partner_address` | Price lists | `partner` | docs/design/DS-20-master-data.sql:300 |
-| `partner_bank_account` | changed only through change proposals (ADR-0029 rule 4) | `currency`, `partner` | docs/design/DS-20-master-data.sql:313 |
-| `partner_group` | Groups copied from package templates |  | docs/design/DS-20-master-data.sql:159 |
-| `partner_item` | a partner's own code, name and unit for an item (ADR-0019 rule 6) | `item`, `partner`, `uom` | docs/design/DS-20-master-data.sql:567 |
-| `partner_role` | Partners | `partner` | docs/design/DS-20-master-data.sql:219 |
-| `partner_tax_group` | read by the tax matrix (ADR-0041 rule 3) |  | docs/design/DS-20-master-data.sql:163 |
-| `price_list` | Price lists | `currency` | docs/design/DS-20-master-data.sql:229 |
-| `price_list_characteristic_rate` | Number rates | `price_list`, `product`, `product_variant_attribute`, `variant_attribute` | docs/design/DS-56-product-configuration.sql:135 |
-| `price_list_entry` | Price list entries | `item`, `price_list`, `product`, `uom` | docs/design/DS-20-master-data.sql:734 |
-| `price_list_option_extra` | extra per inventory unit for a chosen value: a line option, or any value of a configurable product (ADR-0045 rule 17; ADR-0046 rule 15) | `price_list`, `product` | docs/design/DS-20-master-data.sql:757 |
-| `print_profile` | print header of the company (branch_id null) or a branch (ADR-0049 rule 26) | `branch` | docs/design/DS-20-master-data.sql:98 |
-| `product` | Products and items | `handling_unit_type`, `item_group`, `item_tax_group`, `partner`, `product_category`, `storage_condition`, `uom`, `valuation_class` | docs/design/DS-20-master-data.sql:383 |
-| `product_attribute_value` | values a product allows for an attribute, of either mode; none listed = every value (ADR-0045 rule 15) | `product`, `product_variant_attribute`, `variant_attribute_value` | docs/design/DS-20-master-data.sql:506 |
-| `product_category` | Products and items | `item_group`, `item_tax_group`, `product_category`, `uom`, `valuation_class` | docs/design/DS-20-master-data.sql:348 |
-| `product_category_requirement` | readiness rules per category, rules as data (ADR-0062 rules 9, 11, 19) | `classification_scheme`, `product_category`, `variant_attribute` | docs/design/DS-20-master-data.sql:608 |
-| `product_classification` | one value per scheme per product (ADR-0018 rule 15) | `classification_scheme`, `classification_value`, `product` | docs/design/DS-20-master-data.sql:640 |
-| `product_configuration` | immutable, content-addressed; only complete, valid configurations | `product` | docs/design/DS-56-product-configuration.sql:105 |
-| `product_configuration_value` | Configurations | `product_configuration`, `product_variant_attribute`, `variant_attribute`, `variant_attribute_value` | docs/design/DS-56-product-configuration.sql:117 |
-| `product_uom` | other units of one product, or of one item: the item master's conversions (ADR-0018 rule 10; ADR-0056 rules 4-5, 15) | `item`, `product`, `uom` | docs/design/DS-20-master-data.sql:421 |
-| `product_variant_attribute` | the attributes of a product, of either mode | `product`, `variant_attribute` | docs/design/DS-20-master-data.sql:495 |
-| `project` | Partners | `partner` | docs/design/DS-20-master-data.sql:206 |
-| `storage_condition` | ADR-0023 rule 3 |  | docs/design/DS-20-master-data.sql:363 |
-| `supplier_profile` | Price lists | `account`, `currency`, `partner`, `payment_term`, `price_list`, `working_calendar` | docs/design/DS-20-master-data.sql:267 |
-| `team` | Organization for access | `department` | docs/design/DS-15-access.sql:110 |
-| `team_member` | employee partners (command check: active employee role) | `partner`, `team` | docs/design/DS-15-access.sql:121 |
-| `uom` | ADR-0018 rule 8; core rows have company_id null |  | docs/design/DS-20-master-data.sql:32 |
-| `uom_alias` | unit text as partners and old systems write it, for intake (ADR-0056 rule 19) | `uom` | docs/design/DS-20-master-data.sql:57 |
-| `uom_conversion` | core catalog unit-conversions.csv: units of one kind, exact ratio of two positive integers (ADR-0006 rule 11; ADR-0018 rule 8; ADR-0056 rule 3) | `uom` | docs/design/DS-20-master-data.sql:44 |
-| `valuation_class` | Groups copied from package templates |  | docs/design/DS-20-master-data.sql:172 |
-| `variant_attribute` | ADR-0018 rule 6; variant_mode: ADR-0045 rule 15 | `uom` | docs/design/DS-20-master-data.sql:454 |
-| `variant_attribute_value` | carries its attribute's mode, so the mode cannot change once values exist |  | docs/design/DS-20-master-data.sql:475 |
-| `warehouse` | Warehouses and bins | `bin`, `branch`, `partner`, `warehouse`, `working_calendar` | docs/design/DS-20-master-data.sql:652 |
-| `working_calendar` | ADR-0024 rule 4 |  | docs/design/DS-20-master-data.sql:130 |
-| `working_calendar_holiday` | copied from a package template entry, or added by the company (ADR-0045 rule 10) | `working_calendar` | docs/design/DS-20-master-data.sql:139 |
+| Table | Purpose | Section | Key references | Source |
+| --- | --- | --- | --- | --- |
+| `barcode` | One row per barcode of a company across every type, so a scan never means two things. | Barcode registry |  | docs/design/DS-20-master-data.sql:786 |
+| `branch` |  | Organization |  | docs/design/DS-20-master-data.sql:85 |
+| `classification_scheme` |  | Products and items |  | docs/design/DS-20-master-data.sql:624 |
+| `classification_value` |  | Products and items | `classification_scheme`, `classification_value` | docs/design/DS-20-master-data.sql:629 |
+| `code_series` | master-data code sequences, without fiscal year or branch (ADR-0062 rules 9, 19) | Products and items | `product_category` | docs/design/DS-20-master-data.sql:597 |
+| `company` |  | Organization | `currency`, `user_account` | docs/design/DS-20-master-data.sql:69 |
+| `company_currency_activation` | a company activates the currencies it uses (ADR-0011 rule 7) | Currencies and units | `currency` | docs/design/DS-20-master-data.sql:27 |
+| `configuration_default` | ADR-0046 rule 8 | Configuration models | `configuration_model_revision`, `product_variant_attribute` | docs/design/DS-56-product-configuration.sql:91 |
+| `configuration_model` |  | Configuration models | `product` | docs/design/DS-56-product-configuration.sql:12 |
+| `configuration_model_revision` |  | Configuration models | `configuration_model`, `configuration_model_revision` | docs/design/DS-56-product-configuration.sql:25 |
+| `configuration_rule` | ADR-0046 rule 6 | Configuration models | `configuration_model_revision`, `product_variant_attribute` | docs/design/DS-56-product-configuration.sql:45 |
+| `configuration_table` | ADR-0046 rule 7 | Configuration models | `configuration_model_revision` | docs/design/DS-56-product-configuration.sql:61 |
+| `configuration_table_column` |  | Configuration models | `configuration_table`, `product_variant_attribute` | docs/design/DS-56-product-configuration.sql:71 |
+| `configuration_table_row` |  | Configuration models | `configuration_table` | docs/design/DS-56-product-configuration.sql:82 |
+| `contact` |  | Price lists | `partner` | docs/design/DS-20-master-data.sql:326 |
+| `cost_center` |  | Organization | `branch`, `cost_center` | docs/design/DS-20-master-data.sql:116 |
+| `currency` |  | Currencies and units |  | docs/design/DS-20-master-data.sql:21 |
+| `customer_profile` |  | Price lists | `account`, `currency`, `partner`, `payment_term`, `price_list` | docs/design/DS-20-master-data.sql:249 |
+| `data_translation` | ADR-0018 rule 17 | Organization |  | docs/design/DS-20-master-data.sql:148 |
+| `department` |  | Organization for access | `department`, `partner` | docs/design/DS-15-access.sql:96 |
+| `employee_profile` | personal data (ADR-0019 rule 7) | Price lists | `account`, `branch`, `cost_center`, `department`, `partner`, `user_account` | docs/design/DS-20-master-data.sql:283 |
+| `extraction_mapping_rule` | company data, change-tracked; master_data_change, proposals for agents | Mapping rules | `partner` | docs/design/DS-36-document-intake.sql:208 |
+| `gs1_company_prefix` | the company's GS1 company prefixes (ADR-0061 rule 11) | Barcode registry |  | docs/design/DS-20-master-data.sql:812 |
+| `handling_unit_type` | ADR-0023 rule 6 | Products and items | `uom` | docs/design/DS-20-master-data.sql:367 |
+| `item` |  | Products and items | `product`, `uom` | docs/design/DS-20-master-data.sql:516 |
+| `item_barcode` | one barcode per packaging unit of an item (ADR-0018 rule 14) | Products and items | `item`, `uom` | docs/design/DS-20-master-data.sql:556 |
+| `item_group` |  | Groups copied from package templates |  | docs/design/DS-20-master-data.sql:168 |
+| `item_manufacturer_part` | a manufacturer's part number for an item, step 4 of component resolution (ADR-0062 rules 7, 19) | Products and items | `item` | docs/design/DS-20-master-data.sql:582 |
+| `item_tax_group` | read by the tax matrix (ADR-0041 rule 3) | Groups copied from package templates |  | docs/design/DS-20-master-data.sql:176 |
+| `item_variant_value` | one per variant-mode attribute of the item's product | Products and items | `item`, `product_variant_attribute` | docs/design/DS-20-master-data.sql:541 |
+| `partner` |  | Partners | `partner`, `partner_group`, `partner_tax_group` | docs/design/DS-20-master-data.sql:182 |
+| `partner_address` |  | Price lists | `partner` | docs/design/DS-20-master-data.sql:300 |
+| `partner_bank_account` | changed only through change proposals (ADR-0029 rule 4) | Price lists | `currency`, `partner` | docs/design/DS-20-master-data.sql:313 |
+| `partner_group` |  | Groups copied from package templates |  | docs/design/DS-20-master-data.sql:159 |
+| `partner_item` | a partner's own code, name and unit for an item (ADR-0019 rule 6) | Products and items | `item`, `partner`, `uom` | docs/design/DS-20-master-data.sql:567 |
+| `partner_role` |  | Partners | `partner` | docs/design/DS-20-master-data.sql:219 |
+| `partner_tax_group` | read by the tax matrix (ADR-0041 rule 3) | Groups copied from package templates |  | docs/design/DS-20-master-data.sql:163 |
+| `price_list` |  | Price lists | `currency` | docs/design/DS-20-master-data.sql:229 |
+| `price_list_characteristic_rate` |  | Number rates | `price_list`, `product`, `product_variant_attribute`, `variant_attribute` | docs/design/DS-56-product-configuration.sql:135 |
+| `price_list_entry` |  | Price list entries | `item`, `price_list`, `product`, `uom` | docs/design/DS-20-master-data.sql:734 |
+| `price_list_option_extra` | extra per inventory unit for a chosen value: a line option, or any value of a configurable product (ADR-0045 rule 17; ADR-0046 rule 15) | Price list entries | `price_list`, `product` | docs/design/DS-20-master-data.sql:757 |
+| `print_profile` | print header of the company (branch_id null) or a branch (ADR-0049 rule 26) | Organization | `branch` | docs/design/DS-20-master-data.sql:98 |
+| `product` |  | Products and items | `handling_unit_type`, `item_group`, `item_tax_group`, `partner`, `product_category`, `storage_condition`, `uom`, `valuation_class` | docs/design/DS-20-master-data.sql:383 |
+| `product_attribute_value` | values a product allows for an attribute, of either mode; none listed = every value (ADR-0045 rule 15) | Products and items | `product`, `product_variant_attribute`, `variant_attribute_value` | docs/design/DS-20-master-data.sql:506 |
+| `product_category` |  | Products and items | `item_group`, `item_tax_group`, `product_category`, `uom`, `valuation_class` | docs/design/DS-20-master-data.sql:348 |
+| `product_category_requirement` | readiness rules per category, rules as data (ADR-0062 rules 9, 11, 19) | Products and items | `classification_scheme`, `product_category`, `variant_attribute` | docs/design/DS-20-master-data.sql:608 |
+| `product_classification` | one value per scheme per product (ADR-0018 rule 15) | Products and items | `classification_scheme`, `classification_value`, `product` | docs/design/DS-20-master-data.sql:640 |
+| `product_configuration` | immutable, content-addressed; only complete, valid configurations | Configurations | `product` | docs/design/DS-56-product-configuration.sql:105 |
+| `product_configuration_value` |  | Configurations | `product_configuration`, `product_variant_attribute`, `variant_attribute`, `variant_attribute_value` | docs/design/DS-56-product-configuration.sql:117 |
+| `product_uom` | other units of one product, or of one item: the item master's conversions (ADR-0018 rule 10; ADR-0056 rules 4-5, 15) | Products and items | `item`, `product`, `uom` | docs/design/DS-20-master-data.sql:421 |
+| `product_variant_attribute` | the attributes of a product, of either mode | Products and items | `product`, `variant_attribute` | docs/design/DS-20-master-data.sql:495 |
+| `project` |  | Partners | `partner` | docs/design/DS-20-master-data.sql:206 |
+| `storage_condition` | ADR-0023 rule 3 | Products and items |  | docs/design/DS-20-master-data.sql:363 |
+| `supplier_profile` |  | Price lists | `account`, `currency`, `partner`, `payment_term`, `price_list`, `working_calendar` | docs/design/DS-20-master-data.sql:267 |
+| `team` |  | Organization for access | `department` | docs/design/DS-15-access.sql:110 |
+| `team_member` | employee partners (command check: active employee role) | Organization for access | `partner`, `team` | docs/design/DS-15-access.sql:121 |
+| `uom` | ADR-0018 rule 8; core rows have company_id null | Currencies and units |  | docs/design/DS-20-master-data.sql:32 |
+| `uom_alias` | unit text as partners and old systems write it, for intake (ADR-0056 rule 19) | Currencies and units | `uom` | docs/design/DS-20-master-data.sql:57 |
+| `uom_conversion` | core catalog unit-conversions.csv: units of one kind, exact ratio of two positive integers (ADR-0006 rule 11; ADR-0018 rule 8; ADR-0056 rule 3) | Currencies and units | `uom` | docs/design/DS-20-master-data.sql:44 |
+| `valuation_class` |  | Groups copied from package templates |  | docs/design/DS-20-master-data.sql:172 |
+| `variant_attribute` | ADR-0018 rule 6; variant_mode: ADR-0045 rule 15 | Products and items | `uom` | docs/design/DS-20-master-data.sql:454 |
+| `variant_attribute_value` | carries its attribute's mode, so the mode cannot change once values exist | Products and items |  | docs/design/DS-20-master-data.sql:475 |
+| `warehouse` |  | Warehouses and bins | `bin`, `branch`, `partner`, `warehouse`, `working_calendar` | docs/design/DS-20-master-data.sql:652 |
+| `working_calendar` | ADR-0024 rule 4 | Organization |  | docs/design/DS-20-master-data.sql:130 |
+| `working_calendar_holiday` | copied from a package template entry, or added by the company (ADR-0045 rule 10) | Organization | `working_calendar` | docs/design/DS-20-master-data.sql:139 |
 
 ## `production`
 
-| Table | Purpose | Key references | Source |
-| --- | --- | --- | --- |
-| `activity_rate` | planned rates (rule 14) | `activity_type`, `posting_period`, `work_center` | docs/design/DS-43-54-planning-production.sql:1284 |
-| `activity_type` | e.g. setup, machine, labor (ADR-0033 rule 12) | `uom` | docs/design/DS-43-54-planning-production.sql:336 |
-| `bill_of_materials` | ADR-0033 rule 3; product_id for a configurable product (ADR-0046 rule 12) | `change_proposal_item`, `item`, `product` | docs/design/DS-43-54-planning-production.sql:383 |
-| `bill_of_materials_component` | ADR-0033 rule 6; selection and sizing: ADR-0046 rule 12 | `bill_of_materials_revision`, `change_proposal_item`, `item`, `uom`, `variant_attribute` | docs/design/DS-43-54-planning-production.sql:424 |
-| `bill_of_materials_output` | co-products and by-products besides the main output (ADR-0033 rule 7) | `bill_of_materials_revision`, `item`, `uom` | docs/design/DS-43-54-planning-production.sql:464 |
-| `bill_of_materials_revision` | immutable once released (ADR-0033 rules 3-4) | `bill_of_materials`, `bill_of_materials_revision` | docs/design/DS-43-54-planning-production.sql:402 |
-| `cost_estimate` | benchmark for target cost and variances; never values stock (rule 14) | `bill_of_materials_revision`, `cost_estimate`, `item`, `production_version`, `routing_revision` | docs/design/DS-43-54-planning-production.sql:1207 |
-| `cost_estimate_gap` | what a draft estimate could not price: listed, never zero, never released (ADR-0062 rule 12) | `activity_type`, `bill_of_materials_component`, `cost_estimate`, `item`, `routing_operation`, `work_center` | docs/design/DS-43-54-planning-production.sql:1256 |
-| `cost_estimate_line` | rolled up level by level from released estimates of made components (rule 14) | `activity_type`, `cost_center`, `cost_estimate`, `item` | docs/design/DS-43-54-planning-production.sql:1234 |
-| `cost_object` | fixed_asset stays a stub owned by ledger until the assets module (Phase 3). Placed after company and cost_center (lab finding L-01). | `cost_center`, `production_order` | docs/design/DS-06-universal-journal.sql:29 |
-| `item_low_level_code` | read model owned by production, recomputed at release (ADR-0033 rule 8) | `item`, `product` | docs/design/DS-43-54-planning-production.sql:612 |
-| `item_production_setting` | ADR-0033 rule 14 | `item`, `warehouse` | docs/design/DS-43-54-planning-production.sql:602 |
-| `normal_capacity` | per (cost center, driver, period) in the driver's unit (rule 7) | `activity_type`, `cost_center`, `posting_period` | docs/design/DS-43-54-planning-production.sql:1316 |
-| `operation_confirmation` | an internal operation of the order (rule 12) | `document`, `lot`, `partner`, `production_order`, `team` | docs/design/DS-43-54-planning-production.sql:1064 |
-| `operation_confirmation_activity` | actual activity quantities, defaulting to the standards (rule 12) | `activity_type`, `operation_confirmation` | docs/design/DS-43-54-planning-production.sql:1095 |
-| `operation_progress_component` | operation_confirmation_component and production_receipt_component (ADR-0034 rules 12-13; ADR-0037 rule 5; INV-112). | `bin`, `document`, `lot`, `material_document_line`, `operation_confirmation`, `production_order`, `production_receipt`, `uom` | docs/design/DS-43-54-planning-production.sql:1165 |
-| `overhead_surcharge` | interim: not stated in ADR-0035 (the table holding "a planned surcharge per cost center", rule 14) | `cost_center`, `posting_period` | docs/design/DS-43-54-planning-production.sql:1295 |
-| `pool_allocation_rule` | one rule per (cost center, group) (rules 7, 17) | `activity_type`, `cost_center` | docs/design/DS-43-54-planning-production.sql:1304 |
-| `production_cost_settlement` | one internal document per run of the period-end job (rule 5) | `document`, `posting_period` | docs/design/DS-43-54-planning-production.sql:1329 |
-| `production_cost_settlement_line` | keyed by (cost object, cost component, step); reruns post differences per key (rule 5) | `cost_object`, `production_cost_settlement` | docs/design/DS-43-54-planning-production.sql:1337 |
-| `production_issue` | consumption; operation_confirmation, production_receipt and service_receipt are facts with is_approval_hold_allowed false. | `document`, `production_order` | docs/design/DS-43-54-planning-production.sql:1008 |
-| `production_issue_line` | Shop-floor posting documents | `bin`, `lot`, `material_document_line`, `production_issue`, `production_order`, `production_order_output_serial`, `serial_number`, `uom` | docs/design/DS-43-54-planning-production.sql:1019 |
-| `production_order` | typed header of a non-posting document type with change orders (rule 1) | `bill_of_materials_revision`, `cost_object`, `demand_supply_line`, `document`, `item`, `planned_order`, `product_configuration`, `production_version` … | docs/design/DS-43-54-planning-production.sql:855 |
-| `production_order_component` | rule 1; external-operation components at the processor location (ADR-0037 rule 2) | `item`, `partner`, `production_order`, `warehouse` | docs/design/DS-43-54-planning-production.sql:893 |
-| `production_order_operation` | copied from the routing revision (rule 1); external: chosen supplier (ADR-0037 rule 2) | `item`, `partner`, `production_order`, `work_center` | docs/design/DS-43-54-planning-production.sql:941 |
-| `production_order_operation_activity` | activity standards copied with the operation (rule 1) | `activity_type`, `production_order_operation` | docs/design/DS-43-54-planning-production.sql:975 |
-| `production_order_output` | main output (planned quantity G), co-products and by-products (rule 1) | `item`, `partner`, `production_order` | docs/design/DS-43-54-planning-production.sql:918 |
-| `production_order_output_serial` | assigned serials; not version content (rules 1, 16) | `production_order_output`, `serial_number` | docs/design/DS-43-54-planning-production.sql:986 |
-| `production_order_period_cost` | written only by the job; row source of the cost sheet (rules 12, 16) | `posting_period`, `production_cost_settlement`, `production_order` | docs/design/DS-43-54-planning-production.sql:1349 |
-| `production_receipt` | rule 13 | `document`, `operation_confirmation`, `production_order` | docs/design/DS-43-54-planning-production.sql:1105 |
-| `production_receipt_line` | Shop-floor posting documents | `bin`, `lot`, `material_document_line`, `production_order`, `production_order_output_serial`, `production_receipt`, `uom` | docs/design/DS-43-54-planning-production.sql:1121 |
-| `production_version` | the one explicit way to make an item in a production warehouse (ADR-0033 rule 13) | `bill_of_materials`, `item`, `product`, `routing`, `warehouse` | docs/design/DS-43-54-planning-production.sql:566 |
-| `routing` | may serve several items; with conditions, one configurable product (ADR-0033 rule 9; ADR-0046 rule 12) |  | docs/design/DS-43-54-planning-production.sql:485 |
-| `routing_operation` | one linear sequence (ADR-0033 rule 10); external operations: ADR-0037 rule 2 | `item`, `partner`, `routing_revision`, `variant_attribute`, `work_center` | docs/design/DS-43-54-planning-production.sql:514 |
-| `routing_operation_activity` | standard activity quantities, inside the revision and its hash (rule 10) | `activity_type`, `routing_operation` | docs/design/DS-43-54-planning-production.sql:554 |
-| `routing_revision` | rules 3 and 4 apply as to bill of materials revisions | `routing`, `routing_revision` | docs/design/DS-43-54-planning-production.sql:495 |
-| `work_center` | ADR-0033 rule 11 | `bin`, `cost_center`, `warehouse`, `working_calendar` | docs/design/DS-43-54-planning-production.sql:347 |
-| `work_center_activity` | activity types a work center records, with defaults copied into new operations | `activity_type`, `work_center` | docs/design/DS-43-54-planning-production.sql:372 |
+| Table | Purpose | Section | Key references | Source |
+| --- | --- | --- | --- | --- |
+| `activity_rate` | planned rates (rule 14) | Costing | `activity_type`, `posting_period`, `work_center` | docs/design/DS-43-54-planning-production.sql:1284 |
+| `activity_type` | e.g. setup, machine, labor (ADR-0033 rule 12) | Production master data | `uom` | docs/design/DS-43-54-planning-production.sql:336 |
+| `bill_of_materials` | ADR-0033 rule 3; product_id for a configurable product (ADR-0046 rule 12) | Production master data | `change_proposal_item`, `item`, `product` | docs/design/DS-43-54-planning-production.sql:383 |
+| `bill_of_materials_component` | ADR-0033 rule 6; selection and sizing: ADR-0046 rule 12 | Production master data | `bill_of_materials_revision`, `change_proposal_item`, `item`, `uom`, `variant_attribute` | docs/design/DS-43-54-planning-production.sql:424 |
+| `bill_of_materials_output` | co-products and by-products besides the main output (ADR-0033 rule 7) | Production master data | `bill_of_materials_revision`, `item`, `uom` | docs/design/DS-43-54-planning-production.sql:464 |
+| `bill_of_materials_revision` | immutable once released (ADR-0033 rules 3-4) | Production master data | `bill_of_materials`, `bill_of_materials_revision` | docs/design/DS-43-54-planning-production.sql:402 |
+| `cost_estimate` | benchmark for target cost and variances; never values stock (rule 14) | Costing | `bill_of_materials_revision`, `cost_estimate`, `item`, `production_version`, `routing_revision` | docs/design/DS-43-54-planning-production.sql:1207 |
+| `cost_estimate_gap` | what a draft estimate could not price: listed, never zero, never released (ADR-0062 rule 12) | Costing | `activity_type`, `bill_of_materials_component`, `cost_estimate`, `item`, `routing_operation`, `work_center` | docs/design/DS-43-54-planning-production.sql:1256 |
+| `cost_estimate_line` | rolled up level by level from released estimates of made components (rule 14) | Costing | `activity_type`, `cost_center`, `cost_estimate`, `item` | docs/design/DS-43-54-planning-production.sql:1234 |
+| `cost_object` | cost_object is owned by production (ADR-0032; ADR-0034 rule 15) with kinds per ADR-0035 rule 1 |  | `cost_center`, `production_order` | docs/design/DS-06-universal-journal.sql:29 |
+| `item_low_level_code` | read model owned by production, recomputed at release (ADR-0033 rule 8) | Production master data | `item`, `product` | docs/design/DS-43-54-planning-production.sql:612 |
+| `item_production_setting` | ADR-0033 rule 14 | Production master data | `item`, `warehouse` | docs/design/DS-43-54-planning-production.sql:602 |
+| `normal_capacity` | per (cost center, driver, period) in the driver's unit (rule 7) | Costing | `activity_type`, `cost_center`, `posting_period` | docs/design/DS-43-54-planning-production.sql:1316 |
+| `operation_confirmation` | an internal operation of the order (rule 12) | Shop-floor posting documents | `document`, `lot`, `partner`, `production_order`, `team` | docs/design/DS-43-54-planning-production.sql:1064 |
+| `operation_confirmation_activity` | actual activity quantities, defaulting to the standards (rule 12) | Shop-floor posting documents | `activity_type`, `operation_confirmation` | docs/design/DS-43-54-planning-production.sql:1095 |
+| `operation_progress_component` | Backflushed and processor-consumed component lines, generated at Post by production.contract.record_operation_progress or the receipt's backflush, keyed by the calling posting document. | Shop-floor posting documents | `bin`, `document`, `lot`, `material_document_line`, `operation_confirmation`, `production_order`, `production_receipt`, `uom` | docs/design/DS-43-54-planning-production.sql:1165 |
+| `overhead_surcharge` | interim: not stated in ADR-0035 (the table holding "a planned surcharge per cost center", rule 14) | Costing | `cost_center`, `posting_period` | docs/design/DS-43-54-planning-production.sql:1295 |
+| `pool_allocation_rule` | one rule per (cost center, group) (rules 7, 17) | Costing | `activity_type`, `cost_center` | docs/design/DS-43-54-planning-production.sql:1304 |
+| `production_cost_settlement` | one internal document per run of the period-end job (rule 5) | Costing | `document`, `posting_period` | docs/design/DS-43-54-planning-production.sql:1329 |
+| `production_cost_settlement_line` | keyed by (cost object, cost component, step); reruns post differences per key (rule 5) | Costing | `cost_object`, `production_cost_settlement` | docs/design/DS-43-54-planning-production.sql:1337 |
+| `production_issue` | Approval pools (ADR-0055 rule 2, holistic decision 12): production_issue maps to pool consumption | Shop-floor posting documents | `document`, `production_order` | docs/design/DS-43-54-planning-production.sql:1008 |
+| `production_issue_line` |  | Shop-floor posting documents | `bin`, `lot`, `material_document_line`, `production_issue`, `production_order`, `production_order_output_serial`, `serial_number`, `uom` | docs/design/DS-43-54-planning-production.sql:1019 |
+| `production_order` | typed header of a non-posting document type with change orders (rule 1) | Production orders | `bill_of_materials_revision`, `cost_object`, `demand_supply_line`, `document`, `item`, `planned_order`, `product_configuration`, `production_version` … | docs/design/DS-43-54-planning-production.sql:855 |
+| `production_order_component` | rule 1; external-operation components at the processor location (ADR-0037 rule 2) | Production orders | `item`, `partner`, `production_order`, `warehouse` | docs/design/DS-43-54-planning-production.sql:893 |
+| `production_order_operation` | copied from the routing revision (rule 1); external: chosen supplier (ADR-0037 rule 2) | Production orders | `item`, `partner`, `production_order`, `work_center` | docs/design/DS-43-54-planning-production.sql:941 |
+| `production_order_operation_activity` | activity standards copied with the operation (rule 1) | Production orders | `activity_type`, `production_order_operation` | docs/design/DS-43-54-planning-production.sql:975 |
+| `production_order_output` | main output (planned quantity G), co-products and by-products (rule 1) | Production orders | `item`, `partner`, `production_order` | docs/design/DS-43-54-planning-production.sql:918 |
+| `production_order_output_serial` | assigned serials; not version content (rules 1, 16) | Production orders | `production_order_output`, `serial_number` | docs/design/DS-43-54-planning-production.sql:986 |
+| `production_order_period_cost` | written only by the job; row source of the cost sheet (rules 12, 16) | Costing | `posting_period`, `production_cost_settlement`, `production_order` | docs/design/DS-43-54-planning-production.sql:1349 |
+| `production_receipt` | rule 13 | Shop-floor posting documents | `document`, `operation_confirmation`, `production_order` | docs/design/DS-43-54-planning-production.sql:1105 |
+| `production_receipt_line` |  | Shop-floor posting documents | `bin`, `lot`, `material_document_line`, `production_order`, `production_order_output_serial`, `production_receipt`, `uom` | docs/design/DS-43-54-planning-production.sql:1121 |
+| `production_version` | the one explicit way to make an item in a production warehouse (ADR-0033 rule 13) | Production master data | `bill_of_materials`, `item`, `product`, `routing`, `warehouse` | docs/design/DS-43-54-planning-production.sql:566 |
+| `routing` | may serve several items; with conditions, one configurable product (ADR-0033 rule 9; ADR-0046 rule 12) | Production master data |  | docs/design/DS-43-54-planning-production.sql:485 |
+| `routing_operation` | one linear sequence (ADR-0033 rule 10); external operations: ADR-0037 rule 2 | Production master data | `item`, `partner`, `routing_revision`, `variant_attribute`, `work_center` | docs/design/DS-43-54-planning-production.sql:514 |
+| `routing_operation_activity` | standard activity quantities, inside the revision and its hash (rule 10) | Production master data | `activity_type`, `routing_operation` | docs/design/DS-43-54-planning-production.sql:554 |
+| `routing_revision` | rules 3 and 4 apply as to bill of materials revisions | Production master data | `routing`, `routing_revision` | docs/design/DS-43-54-planning-production.sql:495 |
+| `work_center` | ADR-0033 rule 11 | Production master data | `bin`, `cost_center`, `warehouse`, `working_calendar` | docs/design/DS-43-54-planning-production.sql:347 |
+| `work_center_activity` | activity types a work center records, with defaults copied into new operations | Production master data | `activity_type`, `work_center` | docs/design/DS-43-54-planning-production.sql:372 |
 
 ## `tax`
 
-| Table | Purpose | Key references | Source |
-| --- | --- | --- | --- |
-| `document_line_tax` | base, tax and computed_tax of rule 6 are named by ADR-0004 rule 13, in document (transaction) currency. | `derivation_trace`, `document`, `tax_code` | docs/design/DS-05-platform.sql:879 |
-| `tax_line` | the immutable tax subledger, written at posting (rule 11) | `branch`, `currency`, `document`, `journal_entry`, `tax_code` | docs/design/DS-05-platform.sql:896 |
-| `tax_line_adjustment` | append-only (rule 13 as amended by ADR-0053 rule 3) | `journal_entry`, `tax_line`, `tax_line_adjustment` | docs/design/DS-05-platform.sql:927 |
+| Table | Purpose | Section | Key references | Source |
+| --- | --- | --- | --- | --- |
+| `document_line_tax` | Part of the document's content: replaced by Create and Update while the document can change, frozen with it. | Taxes | `derivation_trace`, `document`, `tax_code` | docs/design/DS-05-platform.sql:879 |
+| `tax_line` | the immutable tax subledger, written at posting (rule 11) | Taxes | `branch`, `currency`, `document`, `journal_entry`, `tax_code` | docs/design/DS-05-platform.sql:896 |
+| `tax_line_adjustment` | append-only (rule 13 as amended by ADR-0053 rule 3) | Taxes | `journal_entry`, `tax_line`, `tax_line_adjustment` | docs/design/DS-05-platform.sql:927 |
 
 ## `cash`
 
-| Table | Purpose | Key references | Source |
-| --- | --- | --- | --- |
-| `bank_statement` | Money accounts, statements and payments | `attachment`, `money_account`, `user_account` | docs/design/DS-05-platform.sql:989 |
-| `bank_statement_line` | suggestions are is_untrusted (ADR-0029 rule 10); descriptions and counterparty fields are personal (ADR-0050 rule 9). | `agent_run`, `bank_statement`, `document` | docs/design/DS-05-platform.sql:1012 |
-| `money_account` | company data, master_data_change, change-tracked (rule 2) | `account`, `currency` | docs/design/DS-05-platform.sql:966 |
-| `open_item_collection` | change-tracked (ADR-0038), so INV-98 reads the block at a posting | `open_item` | docs/design/DS-05-platform.sql:1158 |
-| `payment` | their tables (ADR-0009 rule 1 names a typed header per type). | `bank_statement_line`, `document`, `money_account`, `partner`, `partner_bank_account` | docs/design/DS-05-platform.sql:1079 |
-| `payment_line` | Money accounts, statements and payments | `account`, `cost_center`, `open_item`, `partner`, `payment`, `project` | docs/design/DS-05-platform.sql:1112 |
+| Table | Purpose | Section | Key references | Source |
+| --- | --- | --- | --- | --- |
+| `bank_statement` |  | Money accounts, statements and payments | `attachment`, `money_account`, `user_account` | docs/design/DS-05-platform.sql:989 |
+| `bank_statement_line` | Append-only except the match, proposal and suggestion columns (trigger below). | Money accounts, statements and payments | `agent_run`, `bank_statement`, `document` | docs/design/DS-05-platform.sql:1012 |
+| `money_account` | company data, master_data_change, change-tracked (rule 2) | Money accounts, statements and payments | `account`, `currency` | docs/design/DS-05-platform.sql:966 |
+| `open_item_collection` | change-tracked (ADR-0038), so INV-98 reads the block at a posting | Money accounts, statements and payments | `open_item` | docs/design/DS-05-platform.sql:1158 |
+| `payment` | The typed header of the four payment types (rule 3). | Money accounts, statements and payments | `bank_statement_line`, `document`, `money_account`, `partner`, `partner_bank_account` | docs/design/DS-05-platform.sql:1079 |
+| `payment_line` |  | Money accounts, statements and payments | `account`, `cost_center`, `open_item`, `partner`, `payment`, `project` | docs/design/DS-05-platform.sql:1112 |
 
 ## `crm`
 
-| Table | Purpose | Key references | Source |
-| --- | --- | --- | --- |
-| `complaint` | Complaints and links | `contact`, `interaction`, `partner` | docs/design/DS-35-crm.sql:196 |
-| `complaint_document` | links, never copies (rule 9); the document's partner is the command's check | `complaint`, `document` | docs/design/DS-35-crm.sql:222 |
-| `data_subject_request` | typed header of a non-posting document type (ADR-0009 rule 1); no personal text | `contact`, `document`, `interaction`, `partner` | docs/design/DS-35-crm.sql:304 |
-| `data_subject_request_content` | personal text of a request, outside the header and the version (rule 24) | `document` | docs/design/DS-35-crm.sql:288 |
-| `inbound_message` | append-only except erasure (rule 7) | `attachment`, `interaction`, `mailbox` | docs/design/DS-35-crm.sql:139 |
-| `interaction` | append-only except matching and erasure (rule 7) | `contact`, `interaction`, `partner`, `user_account` | docs/design/DS-35-crm.sql:79 |
-| `interaction_content` | personal; untrusted when the interaction is | `interaction` | docs/design/DS-35-crm.sql:112 |
-| `interaction_link` | links, never copies (rule 9); only from a matched interaction | `complaint`, `document`, `interaction` | docs/design/DS-35-crm.sql:233 |
-| `interaction_match_candidate` | evidence for a person, never a match; replaced on UnmatchInteraction (rule 15) | `interaction`, `partner` | docs/design/DS-35-crm.sql:181 |
-| `interaction_participant` | Interactions | `contact`, `interaction`, `user_account` | docs/design/DS-35-crm.sql:120 |
-| `interaction_summary` | an agent's summary arrives by an approved change proposal (rule 31) | `agent_run`, `interaction`, `partner`, `user_account` | docs/design/DS-35-crm.sql:417 |
-| `mailbox` | Mailboxes | `user_account` | docs/design/DS-35-crm.sql:46 |
-| `outbound_message` | typed header of a non-posting document type (ADR-0009 rule 1); no personal text | `document`, `interaction`, `mailbox`, `partner` | docs/design/DS-35-crm.sql:337 |
-| `outbound_message_content` | subject and body, outside the header and the version (rule 27) | `document` | docs/design/DS-35-crm.sql:324 |
-| `outbound_message_delivery` | late data of ADR-0009 rule 14: one row per attempt (rule 28) | `interaction`, `outbound_message` | docs/design/DS-35-crm.sql:372 |
-| `outbound_message_delivery_recipient` | the addresses used by one attempt, copied at send; personal | `contact`, `outbound_message_delivery` | docs/design/DS-35-crm.sql:401 |
-| `outbound_message_recipient` | only contacts of the message's partner, held by the two composite keys |  | docs/design/DS-35-crm.sql:359 |
-| `partner_email_domain` | a public mail domain is refused by the command (public_mail_domain) | `partner` | docs/design/DS-35-crm.sql:30 |
-| `partner_insight` | computed by RunPartnerInsightComputation, with its method; deleted by erasure | `partner`, `user_account` | docs/design/DS-35-crm.sql:434 |
-| `partner_search_key` | kept by crm's consumer of partner and contact events; deleted by erasure | `partner` | docs/design/DS-35-crm.sql:460 |
-| `partner_tax_lookup` | dated snapshot of a tax ID lookup; result is untrusted | `partner` | docs/design/DS-35-crm.sql:447 |
-| `processing_basis` | append-only; ended_at and end_reason set once (rule 7) | `contact`, `interaction`, `partner`, `processing_purpose` | docs/design/DS-35-crm.sql:265 |
-| `processing_purpose` | company data seeded from the package; basis as in DS-20 |  | docs/design/DS-35-crm.sql:251 |
-| `public_mail_domain` | global catalog: core rows plus the active package's rows |  | docs/design/DS-35-crm.sql:23 |
+| Table | Purpose | Section | Key references | Source |
+| --- | --- | --- | --- | --- |
+| `complaint` |  | Complaints and links | `contact`, `interaction`, `partner` | docs/design/DS-35-crm.sql:196 |
+| `complaint_document` | links, never copies (rule 9); the document's partner is the command's check | Complaints and links | `complaint`, `document` | docs/design/DS-35-crm.sql:222 |
+| `data_subject_request` | typed header of a non-posting document type (ADR-0009 rule 1); no personal text | Consent and data subjects | `contact`, `document`, `interaction`, `partner` | docs/design/DS-35-crm.sql:304 |
+| `data_subject_request_content` | personal text of a request, outside the header and the version (rule 24) | Consent and data subjects | `document` | docs/design/DS-35-crm.sql:288 |
+| `inbound_message` | append-only except erasure (rule 7) | Inbound messages | `attachment`, `interaction`, `mailbox` | docs/design/DS-35-crm.sql:139 |
+| `interaction` | append-only except matching and erasure (rule 7) | Interactions | `contact`, `interaction`, `partner`, `user_account` | docs/design/DS-35-crm.sql:79 |
+| `interaction_content` | personal; untrusted when the interaction is | Interactions | `interaction` | docs/design/DS-35-crm.sql:112 |
+| `interaction_link` | links, never copies (rule 9); only from a matched interaction | Complaints and links | `complaint`, `document`, `interaction` | docs/design/DS-35-crm.sql:233 |
+| `interaction_match_candidate` | evidence for a person, never a match; replaced on UnmatchInteraction (rule 15) | Inbound messages | `interaction`, `partner` | docs/design/DS-35-crm.sql:181 |
+| `interaction_participant` |  | Interactions | `contact`, `interaction`, `user_account` | docs/design/DS-35-crm.sql:120 |
+| `interaction_summary` | an agent's summary arrives by an approved change proposal (rule 31) | What the system learned, and search keys | `agent_run`, `interaction`, `partner`, `user_account` | docs/design/DS-35-crm.sql:417 |
+| `mailbox` |  | Mailboxes | `user_account` | docs/design/DS-35-crm.sql:46 |
+| `outbound_message` | typed header of a non-posting document type (ADR-0009 rule 1); no personal text | Outgoing messages | `document`, `interaction`, `mailbox`, `partner` | docs/design/DS-35-crm.sql:337 |
+| `outbound_message_content` | subject and body, outside the header and the version (rule 27) | Outgoing messages | `document` | docs/design/DS-35-crm.sql:324 |
+| `outbound_message_delivery` | late data of ADR-0009 rule 14: one row per attempt (rule 28) | Outgoing messages | `interaction`, `outbound_message` | docs/design/DS-35-crm.sql:372 |
+| `outbound_message_delivery_recipient` | the addresses used by one attempt, copied at send; personal | Outgoing messages | `contact`, `outbound_message_delivery` | docs/design/DS-35-crm.sql:401 |
+| `outbound_message_recipient` | only contacts of the message's partner, held by the two composite keys | Outgoing messages |  | docs/design/DS-35-crm.sql:359 |
+| `partner_email_domain` | a public mail domain is refused by the command (public_mail_domain) | E-mail domains | `partner` | docs/design/DS-35-crm.sql:30 |
+| `partner_insight` | computed by RunPartnerInsightComputation, with its method; deleted by erasure | What the system learned, and search keys | `partner`, `user_account` | docs/design/DS-35-crm.sql:434 |
+| `partner_search_key` | kept by crm's consumer of partner and contact events; deleted by erasure | What the system learned, and search keys | `partner` | docs/design/DS-35-crm.sql:460 |
+| `partner_tax_lookup` | dated snapshot of a tax ID lookup; result is untrusted | What the system learned, and search keys | `partner` | docs/design/DS-35-crm.sql:447 |
+| `processing_basis` | append-only; ended_at and end_reason set once (rule 7) | Consent and data subjects | `contact`, `interaction`, `partner`, `processing_purpose` | docs/design/DS-35-crm.sql:265 |
+| `processing_purpose` | company data seeded from the package; basis as in DS-20 | Consent and data subjects |  | docs/design/DS-35-crm.sql:251 |
+| `public_mail_domain` | global catalog: core rows plus the active package's rows | E-mail domains |  | docs/design/DS-35-crm.sql:23 |
 
 ## `planning`
 
-| Table | Purpose | Key references | Source |
-| --- | --- | --- | --- |
-| `demand_event` | e.g. tet; company data (rule 10) |  | docs/design/DS-43-54-planning-production.sql:195 |
-| `demand_event_window` | the event's window of dates per year, so a moving holiday stays aligned | `demand_event` | docs/design/DS-43-54-planning-production.sql:204 |
-| `forecast_adjustment` | CreateForecastAdjustment, CancelForecastAdjustment; agent proposals are change proposals (rule 12) | `item`, `user_account`, `warehouse` | docs/design/DS-43-54-planning-production.sql:248 |
-| `forecast_line` | statistical forecast per day after the weekday spread; never overwritten by adjustments (rules 10-12) | `demand_event`, `forecast_run`, `item`, `warehouse` | docs/design/DS-43-54-planning-production.sql:227 |
-| `forecast_run` | RunForecast, a long job (rules 11, 17); table named by the holistic review (ADR-0024 rule 21 note) | `user_account` | docs/design/DS-43-54-planning-production.sql:215 |
-| `item_warehouse_planning` | an item without a row in a warehouse is not planned there (ADR-0024 rule 1) | `item`, `transfer_route`, `warehouse` | docs/design/DS-43-54-planning-production.sql:90 |
-| `planned_order` | Planned orders, pegging, messages and exceptions | `demand_supply_line`, `item`, `partner`, `planning_run`, `production_version`, `transfer_route`, `uom`, `warehouse` | docs/design/DS-43-54-planning-production.sql:626 |
-| `planned_order_component` | dependent demand, rewritten by each run and by UpdatePlannedOrder (ADR-0036 rule 5) | `item`, `planned_order`, `warehouse` | docs/design/DS-43-54-planning-production.sql:683 |
-| `planned_order_operation` | the operation schedule of rule 3's function (ADR-0036 rule 4) | `planned_order`, `work_center` | docs/design/DS-43-54-planning-production.sql:701 |
-| `planned_order_pegging` | a planned order's pegging sums exactly to its quantity (INV-60, a run check); rules 20 and ADR-0036 rule 5 | `demand_supply_line`, `planned_order`, `planned_order_component` | docs/design/DS-43-54-planning-production.sql:717 |
-| `planning_action_message` | on existing supply, with its projected effect (rule 21); table named by the holistic review | `demand_supply_line`, `planning_run` | docs/design/DS-43-54-planning-production.sql:741 |
-| `planning_exception` | one work item per open exception, closed when a run no longer raises it (rule 21; ADR-0031 rule 17) | `demand_supply_line`, `item`, `partner`, `planned_order`, `planning_run`, `production_order`, `warehouse`, `work_center` | docs/design/DS-43-54-planning-production.sql:760 |
-| `sales_history` | weeks before the first posting, written by ImportSalesHistory (rule 10) | `item`, `warehouse` | docs/design/DS-43-54-planning-production.sql:184 |
-| `supplier_item` | the only home of supplier minimums, multiples and preference (ADR-0024 rule 2) | `item`, `partner`, `partner_item`, `uom` | docs/design/DS-43-54-planning-production.sql:128 |
-| `supplier_item_lead_time` | measured, refreshed by the forecast job, never applied without approval (ADR-0024 rule 2) | `forecast_run`, `item`, `partner` | docs/design/DS-43-54-planning-production.sql:168 |
-| `supplier_purchasing_term` | one row per supplier partner (ADR-0024 rule 2) | `currency`, `partner`, `uom` | docs/design/DS-43-54-planning-production.sql:151 |
-| `transfer_route` | ADR-0024 rule 3; also the return route from a processor location (ADR-0037 rule 3) | `warehouse` | docs/design/DS-43-54-planning-production.sql:73 |
+| Table | Purpose | Section | Key references | Source |
+| --- | --- | --- | --- | --- |
+| `demand_event` | e.g. tet; company data (rule 10) | Demand history and forecast |  | docs/design/DS-43-54-planning-production.sql:195 |
+| `demand_event_window` | the event's window of dates per year, so a moving holiday stays aligned | Demand history and forecast | `demand_event` | docs/design/DS-43-54-planning-production.sql:204 |
+| `forecast_adjustment` | CreateForecastAdjustment, CancelForecastAdjustment; agent proposals are change proposals (rule 12) | Demand history and forecast | `item`, `user_account`, `warehouse` | docs/design/DS-43-54-planning-production.sql:248 |
+| `forecast_line` | statistical forecast per day after the weekday spread; never overwritten by adjustments (rules 10-12) | Demand history and forecast | `demand_event`, `forecast_run`, `item`, `warehouse` | docs/design/DS-43-54-planning-production.sql:227 |
+| `forecast_run` | RunForecast, a long job (rules 11, 17); table named by the holistic review (ADR-0024 rule 21 note) | Demand history and forecast | `user_account` | docs/design/DS-43-54-planning-production.sql:215 |
+| `item_warehouse_planning` | an item without a row in a warehouse is not planned there (ADR-0024 rule 1) | Planning master data | `item`, `transfer_route`, `warehouse` | docs/design/DS-43-54-planning-production.sql:90 |
+| `planned_order` |  | Planned orders, pegging, messages and exceptions | `demand_supply_line`, `item`, `partner`, `planning_run`, `production_version`, `transfer_route`, `uom`, `warehouse` | docs/design/DS-43-54-planning-production.sql:626 |
+| `planned_order_component` | dependent demand, rewritten by each run and by UpdatePlannedOrder (ADR-0036 rule 5) | Planned orders, pegging, messages and exceptions | `item`, `planned_order`, `warehouse` | docs/design/DS-43-54-planning-production.sql:683 |
+| `planned_order_operation` | the operation schedule of rule 3's function (ADR-0036 rule 4) | Planned orders, pegging, messages and exceptions | `planned_order`, `work_center` | docs/design/DS-43-54-planning-production.sql:701 |
+| `planned_order_pegging` | a planned order's pegging sums exactly to its quantity (INV-60, a run check); rules 20 and ADR-0036 rule 5 | Planned orders, pegging, messages and exceptions | `demand_supply_line`, `planned_order`, `planned_order_component` | docs/design/DS-43-54-planning-production.sql:717 |
+| `planning_action_message` | on existing supply, with its projected effect (rule 21); table named by the holistic review | Planned orders, pegging, messages and exceptions | `demand_supply_line`, `planning_run` | docs/design/DS-43-54-planning-production.sql:741 |
+| `planning_exception` | one work item per open exception, closed when a run no longer raises it (rule 21; ADR-0031 rule 17) | Planned orders, pegging, messages and exceptions | `demand_supply_line`, `item`, `partner`, `planned_order`, `planning_run`, `production_order`, `warehouse`, `work_center` | docs/design/DS-43-54-planning-production.sql:760 |
+| `sales_history` | weeks before the first posting, written by ImportSalesHistory (rule 10) | Demand history and forecast | `item`, `warehouse` | docs/design/DS-43-54-planning-production.sql:184 |
+| `supplier_item` | the only home of supplier minimums, multiples and preference (ADR-0024 rule 2) | Planning master data | `item`, `partner`, `partner_item`, `uom` | docs/design/DS-43-54-planning-production.sql:128 |
+| `supplier_item_lead_time` | measured, refreshed by the forecast job, never applied without approval (ADR-0024 rule 2) | Planning master data | `forecast_run`, `item`, `partner` | docs/design/DS-43-54-planning-production.sql:168 |
+| `supplier_purchasing_term` | one row per supplier partner (ADR-0024 rule 2) | Planning master data | `currency`, `partner`, `uom` | docs/design/DS-43-54-planning-production.sql:151 |
+| `transfer_route` | ADR-0024 rule 3; also the return route from a processor location (ADR-0037 rule 3) | Planning master data | `warehouse` | docs/design/DS-43-54-planning-production.sql:73 |
 
 ## `purchasing`
 
-| Table | Purpose | Key references | Source |
-| --- | --- | --- | --- |
-| `gr_ir_write_off` | gr_ir_write_off: internal posting, human_only; moves I up to R at the positions' value on a line closed short (rule 13). | `document` | docs/design/DS-22-09-42-commercial-inventory.sql:1128 |
-| `gr_ir_write_off_line` | Purchasing: invoice and supplier corrections | `gr_ir_write_off`, `purchase_order_line` | docs/design/DS-22-09-42-commercial-inventory.sql:1138 |
-| `purchase_credit_note` | Purchasing: invoice and supplier corrections | `currency`, `document`, `partner` | docs/design/DS-22-09-42-commercial-inventory.sql:1047 |
-| `purchase_credit_note_line` | Quantity lines are quantity credits on I (rule 13) within the invoice line's invoiced net; price lines are price-only. | `item`, `purchase_credit_note`, `purchase_invoice_line`, `uom` | docs/design/DS-22-09-42-commercial-inventory.sql:1065 |
-| `purchase_debit_note` | Purchasing: invoice and supplier corrections | `currency`, `document`, `partner` | docs/design/DS-22-09-42-commercial-inventory.sql:1097 |
-| `purchase_debit_note_line` | Purchasing: invoice and supplier corrections | `purchase_debit_note`, `purchase_invoice_line` | docs/design/DS-22-09-42-commercial-inventory.sql:1113 |
-| `purchase_invoice` | or reversed documents do not count, so the key is checked by the command (duplicate_external_document). | `currency`, `document`, `partner`, `payment_term` | docs/design/DS-22-09-42-commercial-inventory.sql:926 |
-| `purchase_invoice_line` | Purchasing: invoice and supplier corrections | `account`, `cost_center`, `item`, `purchase_invoice`, `purchase_order_line`, `service_receipt_line`, `uom` | docs/design/DS-22-09-42-commercial-inventory.sql:950 |
-| `purchase_order` | Purchasing: purchase request and purchase order | `currency`, `document`, `partner`, `payment_term`, `price_list` | docs/design/DS-22-09-42-commercial-inventory.sql:355 |
-| `purchase_order_line` | Purchasing: purchase request and purchase order | `item`, `planned_order`, `production_order_operation`, `purchase_order`, `purchase_request_line`, `uom`, `warehouse` | docs/design/DS-22-09-42-commercial-inventory.sql:378 |
-| `purchase_request` | Purchasing: purchase request and purchase order | `document`, `partner` | docs/design/DS-22-09-42-commercial-inventory.sql:306 |
-| `purchase_request_line` | quantity goes to zero (ADR-0047 rule 10; ADR-0028 rule 2). | `item`, `partner`, `planned_order`, `production_order_operation`, `purchase_request`, `uom`, `warehouse` | docs/design/DS-22-09-42-commercial-inventory.sql:320 |
-| `purchase_return` | Purchasing: invoice and supplier corrections | `currency`, `document`, `partner` | docs/design/DS-22-09-42-commercial-inventory.sql:998 |
-| `purchase_return_line` | correction_of_id on the document row is the purchase invoice; a quantity credit on I by rule 13 (rule 15). | `item`, `purchase_invoice_line`, `purchase_return`, `return_to_supplier_line`, `uom` | docs/design/DS-22-09-42-commercial-inventory.sql:1016 |
-| `service_receipt` | Service receipt | `document`, `partner` | docs/design/DS-22-09-42-commercial-inventory.sql:664 |
-| `service_receipt_line` | Service receipt | `lot`, `purchase_order_line`, `service_receipt`, `uom` | docs/design/DS-22-09-42-commercial-inventory.sql:679 |
+| Table | Purpose | Section | Key references | Source |
+| --- | --- | --- | --- | --- |
+| `gr_ir_write_off` | gr_ir_write_off: internal posting, human_only | Purchasing: invoice and supplier corrections | `document` | docs/design/DS-22-09-42-commercial-inventory.sql:1128 |
+| `gr_ir_write_off_line` |  | Purchasing: invoice and supplier corrections | `gr_ir_write_off`, `purchase_order_line` | docs/design/DS-22-09-42-commercial-inventory.sql:1138 |
+| `purchase_credit_note` |  | Purchasing: invoice and supplier corrections | `currency`, `document`, `partner` | docs/design/DS-22-09-42-commercial-inventory.sql:1047 |
+| `purchase_credit_note_line` | Quantity lines are quantity credits on I (rule 13) within the invoice line's invoiced net | Purchasing: invoice and supplier corrections | `item`, `purchase_credit_note`, `purchase_invoice_line`, `uom` | docs/design/DS-22-09-42-commercial-inventory.sql:1065 |
+| `purchase_debit_note` |  | Purchasing: invoice and supplier corrections | `currency`, `document`, `partner` | docs/design/DS-22-09-42-commercial-inventory.sql:1097 |
+| `purchase_debit_note_line` |  | Purchasing: invoice and supplier corrections | `purchase_debit_note`, `purchase_invoice_line` | docs/design/DS-22-09-42-commercial-inventory.sql:1113 |
+| `purchase_invoice` | Duplicates: the regime's natural key, else supplier, partner_reference and the year of supplier_invoice_date | Purchasing: invoice and supplier corrections | `currency`, `document`, `partner`, `payment_term` | docs/design/DS-22-09-42-commercial-inventory.sql:926 |
+| `purchase_invoice_line` |  | Purchasing: invoice and supplier corrections | `account`, `cost_center`, `item`, `purchase_invoice`, `purchase_order_line`, `service_receipt_line`, `uom` | docs/design/DS-22-09-42-commercial-inventory.sql:950 |
+| `purchase_order` |  | Purchasing: purchase request and purchase order | `currency`, `document`, `partner`, `payment_term`, `price_list` | docs/design/DS-22-09-42-commercial-inventory.sql:355 |
+| `purchase_order_line` |  | Purchasing: purchase request and purchase order | `item`, `planned_order`, `production_order_operation`, `purchase_order`, `purchase_request_line`, `uom`, `warehouse` | docs/design/DS-22-09-42-commercial-inventory.sql:378 |
+| `purchase_request` |  | Purchasing: purchase request and purchase order | `document`, `partner` | docs/design/DS-22-09-42-commercial-inventory.sql:306 |
+| `purchase_request_line` | Quantity may be zero: a draft line whose supply row carries origin_planned_order_id or pegging is not removed, its quantity goes to zero (ADR-0047 rule 10; ADR-0028 rule 2). | Purchasing: purchase request and purchase order | `item`, `partner`, `planned_order`, `production_order_operation`, `purchase_request`, `uom`, `warehouse` | docs/design/DS-22-09-42-commercial-inventory.sql:320 |
+| `purchase_return` |  | Purchasing: invoice and supplier corrections | `currency`, `document`, `partner` | docs/design/DS-22-09-42-commercial-inventory.sql:998 |
+| `purchase_return_line` | correction_of_id on the document row is the purchase invoice | Purchasing: invoice and supplier corrections | `item`, `purchase_invoice_line`, `purchase_return`, `return_to_supplier_line`, `uom` | docs/design/DS-22-09-42-commercial-inventory.sql:1016 |
+| `service_receipt` |  | Service receipt | `document`, `partner` | docs/design/DS-22-09-42-commercial-inventory.sql:664 |
+| `service_receipt_line` |  | Service receipt | `lot`, `purchase_order_line`, `service_receipt`, `uom` | docs/design/DS-22-09-42-commercial-inventory.sql:679 |
 
 ## `sales`
 
-| Table | Purpose | Key references | Source |
-| --- | --- | --- | --- |
-| `credit_hold` | The work item kind credit_hold (holistic review S8) is resolved by the release or by clearing. | `currency`, `partner`, `sales_order`, `user_account`, `work_item` | docs/design/DS-22-09-42-commercial-inventory.sql:272 |
-| `credit_note` | Sales: invoice and its corrections | `currency`, `document`, `partner` | docs/design/DS-22-09-42-commercial-inventory.sql:839 |
-| `credit_note_line` | A quantity credit is round_amount(quantity x original net unit price after the document discount) (rule 8). | `credit_note`, `item`, `sales_invoice_line`, `uom` | docs/design/DS-22-09-42-commercial-inventory.sql:858 |
-| `debit_note` | Sales: invoice and its corrections | `currency`, `document`, `partner` | docs/design/DS-22-09-42-commercial-inventory.sql:891 |
-| `debit_note_line` | Sales: invoice and its corrections | `debit_note`, `sales_invoice_line` | docs/design/DS-22-09-42-commercial-inventory.sql:908 |
-| `promotion` | Promotions | `item`, `item_group`, `partner`, `partner_group`, `price_list`, `product` | docs/design/DS-22-09-42-commercial-inventory.sql:54 |
-| `quotation` | Sales: quotation | `contact`, `currency`, `document`, `partner`, `payment_term`, `price_list` | docs/design/DS-22-09-42-commercial-inventory.sql:95 |
-| `quotation_line` | a configuration (the key product_configuration (company_id, id, product_id)). Quotations never create items (ADR-0047 rule 1). | `configuration_model_revision`, `item`, `product`, `product_configuration`, `promotion`, `quotation`, `uom`, `warehouse` | docs/design/DS-22-09-42-commercial-inventory.sql:128 |
-| `sales_invoice` | Installments are content (document_installment, rule 6); taxes are document_line_tax rows (ADR-0041 rule 6; DS-05-platform.sql). | `currency`, `document`, `partner`, `payment_term` | docs/design/DS-22-09-42-commercial-inventory.sql:714 |
-| `sales_invoice_line` | line or to nothing (rule 6). A stock sale needs an order (sales_order_required, holistic review S9). | `delivery_line`, `item`, `product`, `product_configuration`, `promotion`, `sales_invoice`, `sales_order_line`, `uom` | docs/design/DS-22-09-42-commercial-inventory.sql:737 |
-| `sales_order` | Sales: sales order | `contact`, `currency`, `document`, `partner`, `payment_term`, `price_list` | docs/design/DS-22-09-42-commercial-inventory.sql:181 |
-| `sales_order_line` | (ADR-0045 rule 16; ADR-0046 rule 11; INV-113, checked by the command and the invariant, since state lives on document). | `configuration_model_revision`, `item`, `product`, `product_configuration`, `promotion`, `quotation_line`, `sales_order`, `uom` … | docs/design/DS-22-09-42-commercial-inventory.sql:210 |
-| `sales_return` | before the migration cut-over (ADR-0047 rule 8; ADR-0044 rule 13): number, date, net amounts, tax date and rates. | `currency`, `document`, `partner` | docs/design/DS-22-09-42-commercial-inventory.sql:789 |
-| `sales_return_line` | Sales: invoice and its corrections | `item`, `return_from_customer_line`, `sales_invoice_line`, `sales_return`, `uom` | docs/design/DS-22-09-42-commercial-inventory.sql:806 |
+| Table | Purpose | Section | Key references | Source |
+| --- | --- | --- | --- | --- |
+| `credit_hold` | A hold is set by a sales command that raises exposure over the limit, and the same command adds credit_hold to hold_reasons of the order's open demand rows through inventory.contract.set_demand_hold | Credit holds | `currency`, `partner`, `sales_order`, `user_account`, `work_item` | docs/design/DS-22-09-42-commercial-inventory.sql:272 |
+| `credit_note` |  | Sales: invoice and its corrections | `currency`, `document`, `partner` | docs/design/DS-22-09-42-commercial-inventory.sql:839 |
+| `credit_note_line` | A quantity credit is round_amount(quantity x original net unit price after the document discount) (rule 8). | Sales: invoice and its corrections | `credit_note`, `item`, `sales_invoice_line`, `uom` | docs/design/DS-22-09-42-commercial-inventory.sql:858 |
+| `debit_note` |  | Sales: invoice and its corrections | `currency`, `document`, `partner` | docs/design/DS-22-09-42-commercial-inventory.sql:891 |
+| `debit_note_line` |  | Sales: invoice and its corrections | `debit_note`, `sales_invoice_line` | docs/design/DS-22-09-42-commercial-inventory.sql:908 |
+| `promotion` |  | Promotions | `item`, `item_group`, `partner`, `partner_group`, `price_list`, `product` | docs/design/DS-22-09-42-commercial-inventory.sql:54 |
+| `quotation` |  | Sales: quotation | `contact`, `currency`, `document`, `partner`, `payment_term`, `price_list` | docs/design/DS-22-09-42-commercial-inventory.sql:95 |
+| `quotation_line` |  | Sales: quotation | `configuration_model_revision`, `item`, `product`, `product_configuration`, `promotion`, `quotation`, `uom`, `warehouse` | docs/design/DS-22-09-42-commercial-inventory.sql:128 |
+| `sales_invoice` |  | Sales: invoice and its corrections | `currency`, `document`, `partner`, `payment_term` | docs/design/DS-22-09-42-commercial-inventory.sql:714 |
+| `sales_invoice_line` | A stock line refers to a posted delivery line (invoice_exceeds_delivered) | Sales: invoice and its corrections | `delivery_line`, `item`, `product`, `product_configuration`, `promotion`, `sales_invoice`, `sales_order_line`, `uom` | docs/design/DS-22-09-42-commercial-inventory.sql:737 |
+| `sales_order` |  | Sales: sales order | `contact`, `currency`, `document`, `partner`, `payment_term`, `price_list` | docs/design/DS-22-09-42-commercial-inventory.sql:181 |
+| `sales_order_line` | item_id is empty only on a draft line of an item created on order | Sales: sales order | `configuration_model_revision`, `item`, `product`, `product_configuration`, `promotion`, `quotation_line`, `sales_order`, `uom` … | docs/design/DS-22-09-42-commercial-inventory.sql:210 |
+| `sales_return` | correction_of_id on the document row is the sales invoice, or empty with external_original for an original from before the migration cut-over (ADR-0047 rule 8; ADR-0044 rule 13): number, date, net … | Sales: invoice and its corrections | `currency`, `document`, `partner` | docs/design/DS-22-09-42-commercial-inventory.sql:789 |
+| `sales_return_line` |  | Sales: invoice and its corrections | `item`, `return_from_customer_line`, `sales_invoice_line`, `sales_return`, `uom` | docs/design/DS-22-09-42-commercial-inventory.sql:806 |
 
 ## `query`
 
-| Table | Purpose | Key references | Source |
-| --- | --- | --- | --- |
-| `analysis_example` | company data, change-tracked; immutable once released | `analysis_example`, `analysis_question`, `user_account` | docs/design/DS-33-analysis.sql:173 |
-| `analysis_question` | the subject of an analysis run (scope kind subject) | `agent_run`, `user_account` | docs/design/DS-33-analysis.sql:22 |
-| `saved_analysis` | company data, change-tracked | `user_account` | docs/design/DS-33-analysis.sql:93 |
-| `saved_analysis_version` | immutable once released; drafts are replaced by new versions | `agent_run`, `saved_analysis`, `user_account` | docs/design/DS-33-analysis.sql:113 |
+| Table | Purpose | Section | Key references | Source |
+| --- | --- | --- | --- | --- |
+| `analysis_example` | company data, change-tracked; immutable once released | Analysis examples: verified question and plan pairs, versioned | `analysis_example`, `analysis_question`, `user_account` | docs/design/DS-33-analysis.sql:173 |
+| `analysis_question` | the subject of an analysis run (scope kind subject) | Questions and answers | `agent_run`, `user_account` | docs/design/DS-33-analysis.sql:22 |
+| `saved_analysis` | company data, change-tracked | Saved analyses and KPIs | `user_account` | docs/design/DS-33-analysis.sql:93 |
+| `saved_analysis_version` | immutable once released; drafts are replaced by new versions | Saved analyses and KPIs | `agent_run`, `saved_analysis`, `user_account` | docs/design/DS-33-analysis.sql:113 |
 
 ## `(no owner stated)`
 
-| Table | Purpose | Key references | Source |
-| --- | --- | --- | --- |
-| `account_period_balance` | Rule 18: period balance cache, written when a period's general area is locked. | `account`, `currency`, `posting_period` | docs/design/DS-06-universal-journal.sql:414 |
-| `auto_post_confirmation` | immutable (ADR-0029 rule 13; ADR-0043 rule 14) | `policy_decision`, `user_account` | docs/design/DS-05-platform.sql:573 |
-| `document_installment` | derived from it at posting. interim: table not named in ADR-0047. | `document` | docs/design/DS-22-09-42-commercial-inventory.sql:1192 |
-| `document_line_custom_text` | Free text for is_custom values (ADR-0046 rule 9; ADR-0045 rule 15): personal and untrusted. | `document`, `variant_attribute` | docs/design/DS-22-09-42-commercial-inventory.sql:1179 |
-| `document_line_price_step` | with reprice) clears the flag and writes new steps with source_kind procedure. | `document` | docs/design/DS-22-09-42-commercial-inventory.sql:1159 |
-| `journal_entry` |  | `close_task`, `document`, `fiscal_year`, `posting_period` | docs/design/DS-06-universal-journal.sql:66 |
-| `journal_line` |  | `account`, `applied_rate`, `branch`, `cost_center`, `cost_object`, `currency`, `derivation_trace`, `fixed_asset` … | docs/design/DS-06-universal-journal.sql:153 |
-| `open_item` |  | `account`, `currency`, `document`, `open_item`, `partner`, `payment_term` | docs/design/DS-06-universal-journal.sql:109 |
-| `payment_term_line` |  | `payment_term` | docs/design/DS-06-universal-journal.sql:97 |
-| `period_unlock_request` | typed header of a non-posting document type (ADR-0043 rule 16) | `document`, `posting_period` | docs/design/DS-05-platform.sql:583 |
-| `planning_run` | RunPlanning, a long job (ADR-0024 rule 17) | `forecast_run`, `user_account` | docs/design/DS-43-54-planning-production.sql:42 |
-| `planning_setting` | one per company (ADR-0024 rule 7; ADR-0036 rules 4, 11) | `user_account` | docs/design/DS-43-54-planning-production.sql:31 |
-| `planning_state` | the company's planning state row; RunPlanning locks it, so a second run gets planning_run_in_progress (ADR-0024 rule 17) | `planning_run` | docs/design/DS-43-54-planning-production.sql:61 |
-| `policy_decision` | never updated or deleted (ADR-0009 rule 14) | `approval_pool`, `approval_procedure`, `document_version`, `policy_decision`, `policy_rule`, `policy_rule_version`, `user_account` | docs/design/DS-05-platform.sql:497 |
-| `production_structure` | created with the company; releases, version and setting saves lock it at class 3 (ADR-0033 rule 8; ADR-0027 rule 10) |  | docs/design/DS-43-54-planning-production.sql:67 |
-| `subledger_activation` | ADR-0025 rule 4: activation of a gated control kind, read by journal_line_check_insert (lab finding L-03). | `document` | docs/design/DS-06-universal-journal.sql:55 |
+| Table | Purpose | Section | Key references | Source |
+| --- | --- | --- | --- | --- |
+| `account_period_balance` | Rule 18: period balance cache, written when a period's general area is locked. |  | `account`, `currency`, `posting_period` | docs/design/DS-06-universal-journal.sql:414 |
+| `auto_post_confirmation` | immutable (ADR-0029 rule 13; ADR-0043 rule 14) | Policy decisions and approvals | `policy_decision`, `user_account` | docs/design/DS-05-platform.sql:573 |
+| `document_installment` | The installment schedule of an invoice, part of its content (ADR-0047 rule 6; ADR-0026 rule 5) | Line content shared by every document type | `document` | docs/design/DS-22-09-42-commercial-inventory.sql:1192 |
+| `document_line_custom_text` | Free text for is_custom values (ADR-0046 rule 9; ADR-0045 rule 15): personal and untrusted. | Line content shared by every document type | `document`, `variant_attribute` | docs/design/DS-22-09-42-commercial-inventory.sql:1179 |
+| `document_line_price_step` | The pricing trace (ADR-0047 rule 16): one row per step, in the line's content, reproducing the stored net unit price and line amount (INV-93). | Line content shared by every document type | `document` | docs/design/DS-22-09-42-commercial-inventory.sql:1159 |
+| `journal_entry` |  |  | `close_task`, `document`, `fiscal_year`, `posting_period` | docs/design/DS-06-universal-journal.sql:66 |
+| `journal_line` |  |  | `account`, `applied_rate`, `branch`, `cost_center`, `cost_object`, `currency`, `derivation_trace`, `fixed_asset` … | docs/design/DS-06-universal-journal.sql:153 |
+| `open_item` |  |  | `account`, `currency`, `document`, `open_item`, `partner`, `payment_term` | docs/design/DS-06-universal-journal.sql:109 |
+| `payment_term_line` |  |  | `payment_term` | docs/design/DS-06-universal-journal.sql:97 |
+| `period_unlock_request` | typed header of a non-posting document type (ADR-0043 rule 16) | Policy decisions and approvals | `document`, `posting_period` | docs/design/DS-05-platform.sql:583 |
+| `planning_run` | RunPlanning, a long job (ADR-0024 rule 17) | Company rows that serialize changes | `forecast_run`, `user_account` | docs/design/DS-43-54-planning-production.sql:42 |
+| `planning_setting` | one per company (ADR-0024 rule 7; ADR-0036 rules 4, 11) | Company rows that serialize changes | `user_account` | docs/design/DS-43-54-planning-production.sql:31 |
+| `planning_state` | the company's planning state row; RunPlanning locks it, so a second run gets planning_run_in_progress (ADR-0024 rule 17) | Company rows that serialize changes | `planning_run` | docs/design/DS-43-54-planning-production.sql:61 |
+| `policy_decision` | never updated or deleted (ADR-0009 rule 14) | Policy decisions and approvals | `approval_pool`, `approval_procedure`, `document_version`, `policy_decision`, `policy_rule`, `policy_rule_version`, `user_account` | docs/design/DS-05-platform.sql:497 |
+| `production_structure` | created with the company; releases, version and setting saves lock it at class 3 (ADR-0033 rule 8; ADR-0027 rule 10) | Company rows that serialize changes |  | docs/design/DS-43-54-planning-production.sql:67 |
+| `subledger_activation` | ADR-0025 rule 4: activation of a gated control kind, read by journal_line_check_insert (lab finding L-03). |  | `document` | docs/design/DS-06-universal-journal.sql:55 |
 
 ## Cross-module foreign keys (report)
 

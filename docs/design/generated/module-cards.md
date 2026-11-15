@@ -2,7 +2,7 @@
 
 # Module cards (generated)
 
-One card per module of ADR-0022 rule 2, with the module's note in that table. Tables are those whose DDL states this owner. Events are those whose noun names one of its tables (see [event-matrix.md](event-matrix.md)). Commands and queries are names in backticks in the ADRs whose noun names one of its tables: a reading aid until the registry exists. Settings, work item kinds and authorization areas come from their catalogs' `area` or `module` columns.
+One card per module of ADR-0022 rule 2, with the module's note in that table. Tables are those whose DDL states this owner. Events are those whose noun names one of its tables (see [event-matrix.md](event-matrix.md)). Commands and queries are names in backticks in the ADRs whose noun names one of its tables: a reading aid until the registry exists. Settings, work item kinds and authorization areas come from their catalogs' `area` or `module` columns. **Declared** ADRs of a module are those ADR-0022 rule 2 names for it (links in its note in the layer table; the ADR of the note that adds the module) and those the DDL cites in the section header, the CREATE TABLE comment or the table's own leading comment of a table it owns. ADR status lines name design items, not modules, and the backlog maps design items to no module, so they cannot be read as a module declaration. Declared lists therefore miss ADRs whose tables have no DDL or no stated owner (for example ADR-0014 for the journal tables, whose DS-06 DDL states no owner). **Mentions** are a separate count: modules named at least 3 times in backticks in the ADR (tables counted for their stated owner), at most 4; a reading aid, not complete and not ownership.
 
 ## `app` (layer 6)
 
@@ -13,7 +13,8 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Settings (0):** none in settings.csv
 - **Work item kinds (0):** none
 - **Authorization areas (0):** none
-- **ADRs:** see [adr-index.md](adr-index.md)
+- **ADRs (declared):** none declared
+- **ADRs that name this module most (mentions; not complete):** —
 
 ## `agents` (layer 5)
 
@@ -24,7 +25,8 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Settings (5):** `agents.<agent_type>.drift_action`, `agents.<agent_type>.wake_up_mode.<kind>`, `agents.tainted_reference_reads`, `production.agent.readiness_horizon_days`, `production.agent.shortage_candidate_kinds`
 - **Work item kinds (7):** `agent_budget_exhausted`, `agent_denials_repeated`, `agent_mode_degraded`, `agent_quality_below_threshold`, `agent_run_stopped`, `agent_task`, `data_processing_permission_suspended`
 - **Authorization areas (14):** `agent`, `agent_analysis`, `agent_bank_matching`, `agent_customer_onboarding`, `agent_data_migration`, `agent_document_reader`, `agent_planning`, `agent_product_engineering`, `agent_production`, `agent_production_capture`, `agent_production_variance`, `agent_purchase_invoice`, `agent_quotation`, `data_processing`
-- **ADRs:** [ADR-0050](../../adr/0050-agent-runtime-and-query-layer.md), [ADR-0063](../../adr/0063-configurable-policy-settings.md)
+- **ADRs (declared):** none declared
+- **ADRs that name this module most (mentions; not complete):** [ADR-0050](../../adr/0050-agent-runtime-and-query-layer.md), [ADR-0063](../../adr/0063-configurable-policy-settings.md)
 
 ## `api` (layer 5)
 
@@ -35,7 +37,8 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Settings (0):** none in settings.csv
 - **Work item kinds (0):** none
 - **Authorization areas (0):** none
-- **ADRs:** see [adr-index.md](adr-index.md)
+- **ADRs (declared):** none declared
+- **ADRs that name this module most (mentions; not complete):** —
 
 ## `automation` (layer 5)
 
@@ -46,7 +49,8 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Settings (8):** `automation.breaker_consecutive`, `automation.breaker_failures`, `automation.breaker_window_minutes`, `automation.dispatch_paused`, `automation.max_active_rules`, `automation.max_executions_per_rule_per_hour`, `automation.replay_min_events`, `automation.replay_window_days`
 - **Work item kinds (9):** `artifact_demoted`, `artifact_function_changed`, `artifact_invalidated`, `artifact_reference_deprecated`, `automation_notice`, `automation_owner_scope_narrowed`, `automation_rule_disabled`, `automation_rule_rate_limited`, `automation_task`
 - **Authorization areas (1):** `automation`
-- **ADRs:** [ADR-0058](../../adr/0058-configurable-workflows.md), [ADR-0059](../../adr/0059-ai-tuning-and-development-of-deterministic-functions.md)
+- **ADRs (declared):** [ADR-0022](../../adr/0022-repository-and-engineering-conventions.md), [ADR-0058](../../adr/0058-configurable-workflows.md)
+- **ADRs that name this module most (mentions; not complete):** [ADR-0058](../../adr/0058-configurable-workflows.md), [ADR-0059](../../adr/0059-ai-tuning-and-development-of-deterministic-functions.md)
 
 ## `imports` (layer 5)
 
@@ -57,7 +61,8 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Settings (0):** none in settings.csv
 - **Work item kinds (1):** `import_duplicate_suspected`
 - **Authorization areas (4):** `data_export`, `data_import`, `opening_balance_entry`, `opening_open_item_entry`
-- **ADRs:** [ADR-0030](../../adr/0030-commercial-seams-and-imports.md)
+- **ADRs (declared):** [ADR-0030](../../adr/0030-commercial-seams-and-imports.md)
+- **ADRs that name this module most (mentions; not complete):** [ADR-0030](../../adr/0030-commercial-seams-and-imports.md)
 
 ## `query` (layer 5)
 
@@ -68,7 +73,8 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Settings (0):** none in settings.csv
 - **Work item kinds (2):** `analysis_answer_disputed`, `analysis_catalog_request`
 - **Authorization areas (9):** `analysis_debug`, `analysis_question`, `report_finance`, `report_inventory`, `report_production`, `report_purchasing`, `report_sales`, `report_tax`, `saved_analysis`
-- **ADRs:** [ADR-0022](../../adr/0022-repository-and-engineering-conventions.md), [ADR-0050](../../adr/0050-agent-runtime-and-query-layer.md), [ADR-0060](../../adr/0060-agent-assisted-reporting-and-analysis.md)
+- **ADRs (declared):** [ADR-0060](../../adr/0060-agent-assisted-reporting-and-analysis.md)
+- **ADRs that name this module most (mentions; not complete):** [ADR-0022](../../adr/0022-repository-and-engineering-conventions.md), [ADR-0050](../../adr/0050-agent-runtime-and-query-layer.md), [ADR-0060](../../adr/0060-agent-assisted-reporting-and-analysis.md)
 
 ## `sdk` (layer 5)
 
@@ -79,7 +85,8 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Settings (0):** none in settings.csv
 - **Work item kinds (0):** none
 - **Authorization areas (0):** none
-- **ADRs:** see [adr-index.md](adr-index.md)
+- **ADRs (declared):** none declared
+- **ADRs that name this module most (mentions; not complete):** —
 
 ## `cash` (layer 4)
 
@@ -90,7 +97,8 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Settings (5):** `cash.auto_post.accept_llm_originated_rules`, `cash.bank_charge.auto_post_ceiling`, `cash.bank_charge.codes`, `cash.bank_charge.min_evidence_lines`, `cash.bank_charge.min_statement_months`
 - **Work item kinds (1):** `bank_line_unmatched`
 - **Authorization areas (16):** `advance_settlement`, `bank_payment`, `bank_receipt`, `bank_statement`, `cash_count`, `cash_count_adjustment`, `cash_payment`, `cash_receipt`, `currency_exchange`, `dunning`, `money_account`, `money_transfer`, `partner_netting`, `prepaid_amortization`, `provision_entry`, `write_off`
-- **ADRs:** [ADR-0026](../../adr/0026-open-item-core.md), [ADR-0048](../../adr/0048-cash-bank-receivables-payables.md), [ADR-0051](../../adr/0051-agent-workflows.md), [ADR-0052](../../adr/0052-minimal-crm.md), [ADR-0059](../../adr/0059-ai-tuning-and-development-of-deterministic-functions.md)
+- **ADRs (declared):** [ADR-0029](../../adr/0029-proposals-and-agent-safety.md), [ADR-0030](../../adr/0030-commercial-seams-and-imports.md), [ADR-0038](../../adr/0038-audit-and-observability.md), [ADR-0048](../../adr/0048-cash-bank-receivables-payables.md), [ADR-0050](../../adr/0050-agent-runtime-and-query-layer.md)
+- **ADRs that name this module most (mentions; not complete):** [ADR-0026](../../adr/0026-open-item-core.md), [ADR-0048](../../adr/0048-cash-bank-receivables-payables.md), [ADR-0051](../../adr/0051-agent-workflows.md), [ADR-0052](../../adr/0052-minimal-crm.md), [ADR-0059](../../adr/0059-ai-tuning-and-development-of-deterministic-functions.md)
 
 ## `crm` (layer 4)
 
@@ -101,7 +109,8 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Settings (0):** none in settings.csv
 - **Work item kinds (9):** `complaint_open`, `data_subject_request_due`, `data_subject_request_received`, `follow_up_due`, `inbound_message_matched`, `interaction_unmatched`, `mailbox_unreachable`, `outbound_message_failed`, `partner_duplicate_suspected`
 - **Authorization areas (7):** `complaint`, `data_protection`, `data_subject_request`, `interaction`, `mailbox`, `outbound_message`, `partner_insight`
-- **ADRs:** [ADR-0009](../../adr/0009-document-lifecycle.md), [ADR-0019](../../adr/0019-partners-and-crm-foundation.md), [ADR-0045](../../adr/0045-master-data-and-price-lists.md), [ADR-0048](../../adr/0048-cash-bank-receivables-payables.md), [ADR-0050](../../adr/0050-agent-runtime-and-query-layer.md), [ADR-0051](../../adr/0051-agent-workflows.md), [ADR-0052](../../adr/0052-minimal-crm.md), [ADR-0057](../../adr/0057-document-intake-and-extraction.md)
+- **ADRs (declared):** [ADR-0009](../../adr/0009-document-lifecycle.md), [ADR-0019](../../adr/0019-partners-and-crm-foundation.md), [ADR-0052](../../adr/0052-minimal-crm.md)
+- **ADRs that name this module most (mentions; not complete):** [ADR-0009](../../adr/0009-document-lifecycle.md), [ADR-0019](../../adr/0019-partners-and-crm-foundation.md), [ADR-0045](../../adr/0045-master-data-and-price-lists.md), [ADR-0048](../../adr/0048-cash-bank-receivables-payables.md), [ADR-0050](../../adr/0050-agent-runtime-and-query-layer.md), [ADR-0051](../../adr/0051-agent-workflows.md), [ADR-0052](../../adr/0052-minimal-crm.md), [ADR-0057](../../adr/0057-document-intake-and-extraction.md)
 
 ## `planning` (layer 4)
 
@@ -112,7 +121,9 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Settings (3):** `planning.production_reschedule_in_tolerance_days`, `planning.production_reschedule_out_tolerance_days`, `planning.production_rescheduling_horizon_days`
 - **Work item kinds (3):** `capacity_overload`, `planning_exception`, `production_order_exception`
 - **Authorization areas (4):** `forecast`, `planned_order`, `planning_run`, `supplier_item`
-- **ADRs:** [ADR-0024](../../adr/0024-planning.md), [ADR-0036](../../adr/0036-multi-level-mrp.md), [ADR-0037](../../adr/0037-subcontracting.md), [ADR-0051](../../adr/0051-agent-workflows.md), [ADR-0056](../../adr/0056-multiple-units-of-measure.md), [ADR-0064](../../adr/0064-production-agent.md)
+- **Tables in DS-43-54-planning-production.sql with no stated owner:** `planning_run` (section names planning, production), `planning_setting` (section names planning, production), `planning_state` (section names planning, production), `production_structure` (section names planning, production) ([data-map findings](data-map.md#findings-tables-without-an-owner-and-lab-stubs))
+- **ADRs (declared):** [ADR-0024](../../adr/0024-planning.md), [ADR-0031](../../adr/0031-design-simplifications.md), [ADR-0036](../../adr/0036-multi-level-mrp.md), [ADR-0037](../../adr/0037-subcontracting.md)
+- **ADRs that name this module most (mentions; not complete):** [ADR-0024](../../adr/0024-planning.md), [ADR-0036](../../adr/0036-multi-level-mrp.md), [ADR-0037](../../adr/0037-subcontracting.md), [ADR-0051](../../adr/0051-agent-workflows.md), [ADR-0056](../../adr/0056-multiple-units-of-measure.md), [ADR-0064](../../adr/0064-production-agent.md)
 
 ## `purchasing` (layer 4)
 
@@ -123,7 +134,9 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Settings (0):** none in settings.csv
 - **Work item kinds (3):** `duplicate_document_review`, `supplier_credit_due`, `supplier_invoice_extracted`
 - **Authorization areas (10):** `customs_declaration`, `gr_ir_rounding_clearing`, `gr_ir_write_off`, `purchase_credit_note`, `purchase_debit_note`, `purchase_invoice`, `purchase_order`, `purchase_request`, `purchase_return`, `service_receipt`
-- **ADRs:** [ADR-0037](../../adr/0037-subcontracting.md), [ADR-0047](../../adr/0047-commercial-documents-and-pricing.md), [ADR-0054](../../adr/0054-users-roles-and-authorizations.md), [ADR-0056](../../adr/0056-multiple-units-of-measure.md)
+- **Tables in DS-22-09-42-commercial-inventory.sql with no stated owner:** `document_installment` (section names sales, purchasing), `document_line_custom_text` (section names sales, purchasing), `document_line_price_step` (section names sales, purchasing) ([data-map findings](data-map.md#findings-tables-without-an-owner-and-lab-stubs))
+- **ADRs (declared):** [ADR-0028](../../adr/0028-document-lifecycle-hardening.md), [ADR-0037](../../adr/0037-subcontracting.md), [ADR-0047](../../adr/0047-commercial-documents-and-pricing.md)
+- **ADRs that name this module most (mentions; not complete):** [ADR-0037](../../adr/0037-subcontracting.md), [ADR-0047](../../adr/0047-commercial-documents-and-pricing.md), [ADR-0054](../../adr/0054-users-roles-and-authorizations.md), [ADR-0056](../../adr/0056-multiple-units-of-measure.md)
 
 ## `reporting` (layer 4)
 
@@ -134,7 +147,8 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Settings (0):** none in settings.csv
 - **Work item kinds (0):** none
 - **Authorization areas (1):** `print_template`
-- **ADRs:** [ADR-0049](../../adr/0049-statutory-reporting-and-printing.md)
+- **ADRs (declared):** [ADR-0049](../../adr/0049-statutory-reporting-and-printing.md)
+- **ADRs that name this module most (mentions; not complete):** [ADR-0049](../../adr/0049-statutory-reporting-and-printing.md)
 
 ## `sales` (layer 4)
 
@@ -145,7 +159,9 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Settings (0):** none in settings.csv
 - **Work item kinds (2):** `credit_hold`, `sales_return_due`
 - **Authorization areas (6):** `credit_note`, `debit_note`, `quotation`, `sales_invoice`, `sales_order`, `sales_return`
-- **ADRs:** [ADR-0009](../../adr/0009-document-lifecycle.md), [ADR-0047](../../adr/0047-commercial-documents-and-pricing.md), [ADR-0053](../../adr/0053-core-neutrality.md), [ADR-0055](../../adr/0055-approval-pools-and-stages.md)
+- **Tables in DS-22-09-42-commercial-inventory.sql with no stated owner:** `document_installment` (section names sales, purchasing), `document_line_custom_text` (section names sales, purchasing), `document_line_price_step` (section names sales, purchasing) ([data-map findings](data-map.md#findings-tables-without-an-owner-and-lab-stubs))
+- **ADRs (declared):** [ADR-0028](../../adr/0028-document-lifecycle-hardening.md), [ADR-0044](../../adr/0044-data-migration-and-export.md), [ADR-0045](../../adr/0045-master-data-and-price-lists.md), [ADR-0046](../../adr/0046-product-configuration.md), [ADR-0047](../../adr/0047-commercial-documents-and-pricing.md)
+- **ADRs that name this module most (mentions; not complete):** [ADR-0009](../../adr/0009-document-lifecycle.md), [ADR-0047](../../adr/0047-commercial-documents-and-pricing.md), [ADR-0053](../../adr/0053-core-neutrality.md), [ADR-0055](../../adr/0055-approval-pools-and-stages.md)
 
 ## `assets` (layer 3)
 
@@ -156,7 +172,8 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Settings (0):** none in settings.csv
 - **Work item kinds (0):** none
 - **Authorization areas (0):** none
-- **ADRs:** [ADR-0025](../../adr/0025-later-phase-seams.md)
+- **ADRs (declared):** none declared
+- **ADRs that name this module most (mentions; not complete):** [ADR-0025](../../adr/0025-later-phase-seams.md)
 
 ## `inventory` (layer 3)
 
@@ -167,7 +184,8 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Settings (3):** `movement_type.purchase_return.costing_role`, `movement_type.purchase_return.include_landed_cost`, `movement_type.purchase_return.value_source`
 - **Work item kinds (3):** `putaway_without_target`, `reservation_canceled`, `short_pick`
 - **Authorization areas (17):** `costing_adjustment`, `costing_run`, `delivery`, `goods_receipt`, `internal_consumption`, `landed_cost`, `opening_balance`, `other_issue`, `other_receipt`, `return_from_customer`, `return_to_supplier`, `scrap`, `stock_count`, `stock_reservation`, `stock_transfer`, `transfer_order`, `warehouse_task`
-- **ADRs:** [ADR-0009](../../adr/0009-document-lifecycle.md), [ADR-0012](../../adr/0012-posting-periods-and-closing.md), [ADR-0020](../../adr/0020-inventory-and-costing-model.md), [ADR-0021](../../adr/0021-landed-cost.md), [ADR-0023](../../adr/0023-warehouse-management.md), [ADR-0024](../../adr/0024-planning.md), [ADR-0025](../../adr/0025-later-phase-seams.md), [ADR-0027](../../adr/0027-cross-cutting-ownership.md), [ADR-0028](../../adr/0028-document-lifecycle-hardening.md), [ADR-0030](../../adr/0030-commercial-seams-and-imports.md), [ADR-0031](../../adr/0031-design-simplifications.md), [ADR-0034](../../adr/0034-production-orders-and-shop-floor.md), [ADR-0035](../../adr/0035-production-costing.md), [ADR-0037](../../adr/0037-subcontracting.md), [ADR-0047](../../adr/0047-commercial-documents-and-pricing.md), [ADR-0056](../../adr/0056-multiple-units-of-measure.md), [ADR-0060](../../adr/0060-agent-assisted-reporting-and-analysis.md), [ADR-0061](../../adr/0061-barcodes.md), [ADR-0064](../../adr/0064-production-agent.md)
+- **ADRs (declared):** [ADR-0020](../../adr/0020-inventory-and-costing-model.md), [ADR-0022](../../adr/0022-repository-and-engineering-conventions.md), [ADR-0023](../../adr/0023-warehouse-management.md), [ADR-0024](../../adr/0024-planning.md), [ADR-0027](../../adr/0027-cross-cutting-ownership.md), [ADR-0028](../../adr/0028-document-lifecycle-hardening.md), [ADR-0030](../../adr/0030-commercial-seams-and-imports.md), [ADR-0031](../../adr/0031-design-simplifications.md), [ADR-0035](../../adr/0035-production-costing.md), [ADR-0037](../../adr/0037-subcontracting.md), [ADR-0044](../../adr/0044-data-migration-and-export.md), [ADR-0047](../../adr/0047-commercial-documents-and-pricing.md), [ADR-0056](../../adr/0056-multiple-units-of-measure.md)
+- **ADRs that name this module most (mentions; not complete):** [ADR-0009](../../adr/0009-document-lifecycle.md), [ADR-0012](../../adr/0012-posting-periods-and-closing.md), [ADR-0020](../../adr/0020-inventory-and-costing-model.md), [ADR-0021](../../adr/0021-landed-cost.md), [ADR-0023](../../adr/0023-warehouse-management.md), [ADR-0024](../../adr/0024-planning.md), [ADR-0025](../../adr/0025-later-phase-seams.md), [ADR-0027](../../adr/0027-cross-cutting-ownership.md), [ADR-0028](../../adr/0028-document-lifecycle-hardening.md), [ADR-0030](../../adr/0030-commercial-seams-and-imports.md), [ADR-0031](../../adr/0031-design-simplifications.md), [ADR-0034](../../adr/0034-production-orders-and-shop-floor.md), [ADR-0035](../../adr/0035-production-costing.md), [ADR-0037](../../adr/0037-subcontracting.md), [ADR-0047](../../adr/0047-commercial-documents-and-pricing.md), [ADR-0056](../../adr/0056-multiple-units-of-measure.md), [ADR-0060](../../adr/0060-agent-assisted-reporting-and-analysis.md), [ADR-0061](../../adr/0061-barcodes.md), [ADR-0064](../../adr/0064-production-agent.md)
 
 ## `ledger` (layer 3)
 
@@ -178,7 +196,9 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Settings (0):** none in settings.csv
 - **Work item kinds (0):** none
 - **Authorization areas (7):** `balance_transfer`, `chart_of_accounts`, `closing_entry`, `exchange_rate`, `fx_revaluation`, `general_journal`, `open_item_matching`
-- **ADRs:** [ADR-0025](../../adr/0025-later-phase-seams.md), [ADR-0026](../../adr/0026-open-item-core.md), [ADR-0041](../../adr/0041-tax-engine.md), [ADR-0044](../../adr/0044-data-migration-and-export.md), [ADR-0048](../../adr/0048-cash-bank-receivables-payables.md), [ADR-0049](../../adr/0049-statutory-reporting-and-printing.md), [ADR-0060](../../adr/0060-agent-assisted-reporting-and-analysis.md)
+- **Tables in DS-06-universal-journal.sql with no stated owner:** `account_period_balance`, `journal_entry`, `journal_line`, `open_item`, `payment_term_line`, `subledger_activation` ([data-map findings](data-map.md#findings-tables-without-an-owner-and-lab-stubs))
+- **ADRs (declared):** [ADR-0026](../../adr/0026-open-item-core.md), [ADR-0044](../../adr/0044-data-migration-and-export.md), [ADR-0049](../../adr/0049-statutory-reporting-and-printing.md)
+- **ADRs that name this module most (mentions; not complete):** [ADR-0025](../../adr/0025-later-phase-seams.md), [ADR-0026](../../adr/0026-open-item-core.md), [ADR-0041](../../adr/0041-tax-engine.md), [ADR-0044](../../adr/0044-data-migration-and-export.md), [ADR-0048](../../adr/0048-cash-bank-receivables-payables.md), [ADR-0049](../../adr/0049-statutory-reporting-and-printing.md), [ADR-0060](../../adr/0060-agent-assisted-reporting-and-analysis.md)
 
 ## `master_data` (layer 3)
 
@@ -189,7 +209,8 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Settings (3):** `master_data.product_code.assignment`, `master_data.product_code.pad_width`, `master_data.product_code.prefix_source`
 - **Work item kinds (0):** none
 - **Authorization areas (10):** `master_data_group`, `organization`, `partner`, `partner_bank_account`, `price_list`, `print_profile`, `product`, `product_unit`, `uom_alias`, `warehouse`
-- **ADRs:** [ADR-0010](../../adr/0010-system-chart-of-accounts.md), [ADR-0015](../../adr/0015-account-determination.md), [ADR-0017](../../adr/0017-permission-envelope.md), [ADR-0018](../../adr/0018-product-and-item-model.md), [ADR-0019](../../adr/0019-partners-and-crm-foundation.md), [ADR-0020](../../adr/0020-inventory-and-costing-model.md), [ADR-0023](../../adr/0023-warehouse-management.md), [ADR-0024](../../adr/0024-planning.md), [ADR-0027](../../adr/0027-cross-cutting-ownership.md), [ADR-0033](../../adr/0033-production-master-data.md), [ADR-0045](../../adr/0045-master-data-and-price-lists.md), [ADR-0046](../../adr/0046-product-configuration.md), [ADR-0049](../../adr/0049-statutory-reporting-and-printing.md), [ADR-0051](../../adr/0051-agent-workflows.md), [ADR-0053](../../adr/0053-core-neutrality.md), [ADR-0054](../../adr/0054-users-roles-and-authorizations.md), [ADR-0056](../../adr/0056-multiple-units-of-measure.md), [ADR-0057](../../adr/0057-document-intake-and-extraction.md), [ADR-0058](../../adr/0058-configurable-workflows.md), [ADR-0060](../../adr/0060-agent-assisted-reporting-and-analysis.md), [ADR-0061](../../adr/0061-barcodes.md), [ADR-0062](../../adr/0062-product-engineering-workflow.md), [ADR-0063](../../adr/0063-configurable-policy-settings.md), [ADR-0064](../../adr/0064-production-agent.md)
+- **ADRs (declared):** [ADR-0006](../../adr/0006-id-and-numeric-model.md), [ADR-0011](../../adr/0011-multi-currency.md), [ADR-0018](../../adr/0018-product-and-item-model.md), [ADR-0019](../../adr/0019-partners-and-crm-foundation.md), [ADR-0020](../../adr/0020-inventory-and-costing-model.md), [ADR-0023](../../adr/0023-warehouse-management.md), [ADR-0024](../../adr/0024-planning.md), [ADR-0027](../../adr/0027-cross-cutting-ownership.md), [ADR-0029](../../adr/0029-proposals-and-agent-safety.md), [ADR-0031](../../adr/0031-design-simplifications.md), [ADR-0033](../../adr/0033-production-master-data.md), [ADR-0037](../../adr/0037-subcontracting.md), [ADR-0041](../../adr/0041-tax-engine.md), [ADR-0045](../../adr/0045-master-data-and-price-lists.md), [ADR-0046](../../adr/0046-product-configuration.md), [ADR-0049](../../adr/0049-statutory-reporting-and-printing.md), [ADR-0054](../../adr/0054-users-roles-and-authorizations.md), [ADR-0056](../../adr/0056-multiple-units-of-measure.md), [ADR-0057](../../adr/0057-document-intake-and-extraction.md), [ADR-0061](../../adr/0061-barcodes.md), [ADR-0062](../../adr/0062-product-engineering-workflow.md)
+- **ADRs that name this module most (mentions; not complete):** [ADR-0010](../../adr/0010-system-chart-of-accounts.md), [ADR-0015](../../adr/0015-account-determination.md), [ADR-0017](../../adr/0017-permission-envelope.md), [ADR-0018](../../adr/0018-product-and-item-model.md), [ADR-0019](../../adr/0019-partners-and-crm-foundation.md), [ADR-0020](../../adr/0020-inventory-and-costing-model.md), [ADR-0023](../../adr/0023-warehouse-management.md), [ADR-0024](../../adr/0024-planning.md), [ADR-0027](../../adr/0027-cross-cutting-ownership.md), [ADR-0033](../../adr/0033-production-master-data.md), [ADR-0045](../../adr/0045-master-data-and-price-lists.md), [ADR-0046](../../adr/0046-product-configuration.md), [ADR-0049](../../adr/0049-statutory-reporting-and-printing.md), [ADR-0051](../../adr/0051-agent-workflows.md), [ADR-0053](../../adr/0053-core-neutrality.md), [ADR-0054](../../adr/0054-users-roles-and-authorizations.md), [ADR-0056](../../adr/0056-multiple-units-of-measure.md), [ADR-0057](../../adr/0057-document-intake-and-extraction.md), [ADR-0058](../../adr/0058-configurable-workflows.md), [ADR-0060](../../adr/0060-agent-assisted-reporting-and-analysis.md), [ADR-0061](../../adr/0061-barcodes.md), [ADR-0062](../../adr/0062-product-engineering-workflow.md), [ADR-0063](../../adr/0063-configurable-policy-settings.md), [ADR-0064](../../adr/0064-production-agent.md)
 
 ## `production` (layer 3)
 
@@ -200,7 +221,9 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Settings (21):** `production.capture.enabled_sources`, `production.completion.propose_at_percent`, `production.confirmation.activity_tolerance_percent`, `production.confirmation.duplicate_window_minutes`, `production.confirmation.over_tolerance_action`, `production.confirmation.yield_tolerance_percent`, `production.feedback.enabled`, `production.feedback.min_orders`, `production.feedback.min_periods`, `production.mes_import.auto_post`, `production.mes_import.min_evidence_drafts`, `production.mes_import.min_evidence_months` …
 - **Work item kinds (10):** `configured_estimate_failed`, `product_item_proposal_ended`, `product_release_ready`, `production_completion_candidate`, `production_component_shortage`, `production_import_review`, `production_order_stalled`, `production_standard_review`, `shop_floor_report_extracted`, `subcontract_line_review`
 - **Authorization areas (7):** `configuration_model`, `operation_confirmation`, `production_cost_settlement`, `production_issue`, `production_order`, `production_receipt`, `production_structure`
-- **ADRs:** [ADR-0024](../../adr/0024-planning.md), [ADR-0025](../../adr/0025-later-phase-seams.md), [ADR-0032](../../adr/0032-phase-1-scope-with-production.md), [ADR-0033](../../adr/0033-production-master-data.md), [ADR-0034](../../adr/0034-production-orders-and-shop-floor.md), [ADR-0035](../../adr/0035-production-costing.md), [ADR-0036](../../adr/0036-multi-level-mrp.md), [ADR-0037](../../adr/0037-subcontracting.md), [ADR-0043](../../adr/0043-policy-and-approval.md), [ADR-0046](../../adr/0046-product-configuration.md), [ADR-0049](../../adr/0049-statutory-reporting-and-printing.md), [ADR-0062](../../adr/0062-product-engineering-workflow.md), [ADR-0064](../../adr/0064-production-agent.md)
+- **Tables in DS-43-54-planning-production.sql with no stated owner:** `planning_run` (section names planning, production), `planning_setting` (section names planning, production), `planning_state` (section names planning, production), `production_structure` (section names planning, production) ([data-map findings](data-map.md#findings-tables-without-an-owner-and-lab-stubs))
+- **ADRs (declared):** [ADR-0025](../../adr/0025-later-phase-seams.md), [ADR-0032](../../adr/0032-phase-1-scope-with-production.md), [ADR-0033](../../adr/0033-production-master-data.md), [ADR-0034](../../adr/0034-production-orders-and-shop-floor.md), [ADR-0035](../../adr/0035-production-costing.md), [ADR-0037](../../adr/0037-subcontracting.md), [ADR-0046](../../adr/0046-product-configuration.md), [ADR-0055](../../adr/0055-approval-pools-and-stages.md), [ADR-0062](../../adr/0062-product-engineering-workflow.md)
+- **ADRs that name this module most (mentions; not complete):** [ADR-0024](../../adr/0024-planning.md), [ADR-0025](../../adr/0025-later-phase-seams.md), [ADR-0032](../../adr/0032-phase-1-scope-with-production.md), [ADR-0033](../../adr/0033-production-master-data.md), [ADR-0034](../../adr/0034-production-orders-and-shop-floor.md), [ADR-0035](../../adr/0035-production-costing.md), [ADR-0036](../../adr/0036-multi-level-mrp.md), [ADR-0037](../../adr/0037-subcontracting.md), [ADR-0043](../../adr/0043-policy-and-approval.md), [ADR-0046](../../adr/0046-product-configuration.md), [ADR-0049](../../adr/0049-statutory-reporting-and-printing.md), [ADR-0062](../../adr/0062-product-engineering-workflow.md), [ADR-0064](../../adr/0064-production-agent.md)
 
 ## `tax` (layer 3)
 
@@ -211,7 +234,8 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Settings (0):** none in settings.csv
 - **Work item kinds (12):** `e_invoice_date_outside_window`, `e_invoice_key_conflict`, `e_invoice_outage`, `e_invoice_posting_held`, `e_invoice_quarantine_overflow`, `e_invoice_quarantine_review`, `e_invoice_record_superseded`, `e_invoice_rejected`, `supplier_invoice_received`, `tax_adjustment_redated`, `tax_condition_pending`, `tax_deductibility_changed`
 - **Authorization areas (2):** `tax_adjustment`, `tax_setup`
-- **ADRs:** [ADR-0041](../../adr/0041-tax-engine.md)
+- **ADRs (declared):** [ADR-0004](../../adr/0004-naming-conventions.md), [ADR-0028](../../adr/0028-document-lifecycle-hardening.md), [ADR-0041](../../adr/0041-tax-engine.md), [ADR-0053](../../adr/0053-core-neutrality.md)
+- **ADRs that name this module most (mentions; not complete):** [ADR-0041](../../adr/0041-tax-engine.md)
 
 ## `agent_runs` (layer 2)
 
@@ -222,7 +246,8 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Settings (0):** none in settings.csv
 - **Work item kinds (0):** none
 - **Authorization areas (1):** `agent_run_bodies`
-- **ADRs:** [ADR-0027](../../adr/0027-cross-cutting-ownership.md), [ADR-0042](../../adr/0042-work-queue.md), [ADR-0050](../../adr/0050-agent-runtime-and-query-layer.md), [ADR-0057](../../adr/0057-document-intake-and-extraction.md), [ADR-0063](../../adr/0063-configurable-policy-settings.md)
+- **ADRs (declared):** [ADR-0027](../../adr/0027-cross-cutting-ownership.md), [ADR-0050](../../adr/0050-agent-runtime-and-query-layer.md), [ADR-0057](../../adr/0057-document-intake-and-extraction.md)
+- **ADRs that name this module most (mentions; not complete):** [ADR-0027](../../adr/0027-cross-cutting-ownership.md), [ADR-0042](../../adr/0042-work-queue.md), [ADR-0050](../../adr/0050-agent-runtime-and-query-layer.md), [ADR-0057](../../adr/0057-document-intake-and-extraction.md), [ADR-0063](../../adr/0063-configurable-policy-settings.md)
 
 ## `attachments` (layer 2)
 
@@ -233,7 +258,8 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Settings (0):** none in settings.csv
 - **Work item kinds (2):** `attachment_rejected`, `document_extraction_review`
 - **Authorization areas (0):** none
-- **ADRs:** [ADR-0022](../../adr/0022-repository-and-engineering-conventions.md), [ADR-0027](../../adr/0027-cross-cutting-ownership.md), [ADR-0057](../../adr/0057-document-intake-and-extraction.md)
+- **ADRs (declared):** [ADR-0027](../../adr/0027-cross-cutting-ownership.md), [ADR-0038](../../adr/0038-audit-and-observability.md), [ADR-0049](../../adr/0049-statutory-reporting-and-printing.md), [ADR-0057](../../adr/0057-document-intake-and-extraction.md)
+- **ADRs that name this module most (mentions; not complete):** [ADR-0022](../../adr/0022-repository-and-engineering-conventions.md), [ADR-0027](../../adr/0027-cross-cutting-ownership.md), [ADR-0057](../../adr/0057-document-intake-and-extraction.md)
 
 ## `audit` (layer 2)
 
@@ -244,7 +270,8 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Settings (0):** none in settings.csv
 - **Work item kinds (0):** none
 - **Authorization areas (1):** `audit`
-- **ADRs:** [ADR-0006](../../adr/0006-id-and-numeric-model.md), [ADR-0019](../../adr/0019-partners-and-crm-foundation.md), [ADR-0038](../../adr/0038-audit-and-observability.md), [ADR-0052](../../adr/0052-minimal-crm.md), [ADR-0058](../../adr/0058-configurable-workflows.md)
+- **ADRs (declared):** [ADR-0019](../../adr/0019-partners-and-crm-foundation.md), [ADR-0038](../../adr/0038-audit-and-observability.md), [ADR-0052](../../adr/0052-minimal-crm.md), [ADR-0054](../../adr/0054-users-roles-and-authorizations.md)
+- **ADRs that name this module most (mentions; not complete):** [ADR-0006](../../adr/0006-id-and-numeric-model.md), [ADR-0019](../../adr/0019-partners-and-crm-foundation.md), [ADR-0038](../../adr/0038-audit-and-observability.md), [ADR-0052](../../adr/0052-minimal-crm.md), [ADR-0058](../../adr/0058-configurable-workflows.md)
 
 ## `configuration` (layer 2)
 
@@ -255,7 +282,8 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Settings (0):** none in settings.csv
 - **Work item kinds (0):** none
 - **Authorization areas (1):** `configuration`
-- **ADRs:** [ADR-0058](../../adr/0058-configurable-workflows.md), [ADR-0059](../../adr/0059-ai-tuning-and-development-of-deterministic-functions.md)
+- **ADRs (declared):** [ADR-0022](../../adr/0022-repository-and-engineering-conventions.md), [ADR-0027](../../adr/0027-cross-cutting-ownership.md), [ADR-0058](../../adr/0058-configurable-workflows.md), [ADR-0059](../../adr/0059-ai-tuning-and-development-of-deterministic-functions.md)
+- **ADRs that name this module most (mentions; not complete):** [ADR-0058](../../adr/0058-configurable-workflows.md), [ADR-0059](../../adr/0059-ai-tuning-and-development-of-deterministic-functions.md)
 
 ## `db` (layer 2)
 
@@ -266,7 +294,8 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Settings (0):** none in settings.csv
 - **Work item kinds (0):** none
 - **Authorization areas (0):** none
-- **ADRs:** see [adr-index.md](adr-index.md)
+- **ADRs (declared):** none declared
+- **ADRs that name this module most (mentions; not complete):** —
 
 ## `documents` (layer 2)
 
@@ -277,7 +306,9 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Settings (3):** `documents.e_invoice_unit_code_scheme`, `documents.unit_name_max_length`, `documents.unit_name_source`
 - **Work item kinds (2):** `approval_pending`, `change_proposal_failed`
 - **Authorization areas (1):** `change_proposal`
-- **ADRs:** [ADR-0009](../../adr/0009-document-lifecycle.md), [ADR-0020](../../adr/0020-inventory-and-costing-model.md), [ADR-0022](../../adr/0022-repository-and-engineering-conventions.md), [ADR-0028](../../adr/0028-document-lifecycle-hardening.md), [ADR-0029](../../adr/0029-proposals-and-agent-safety.md), [ADR-0038](../../adr/0038-audit-and-observability.md), [ADR-0043](../../adr/0043-policy-and-approval.md), [ADR-0052](../../adr/0052-minimal-crm.md), [ADR-0054](../../adr/0054-users-roles-and-authorizations.md), [ADR-0055](../../adr/0055-approval-pools-and-stages.md), [ADR-0061](../../adr/0061-barcodes.md), [ADR-0062](../../adr/0062-product-engineering-workflow.md)
+- **Tables in DS-05-platform.sql with no stated owner:** `auto_post_confirmation` (section names policy, documents), `period_unlock_request` (section names policy, documents), `policy_decision` (section names policy, documents) ([data-map findings](data-map.md#findings-tables-without-an-owner-and-lab-stubs))
+- **ADRs (declared):** [ADR-0004](../../adr/0004-naming-conventions.md), [ADR-0008](../../adr/0008-command-envelope-and-registry.md), [ADR-0009](../../adr/0009-document-lifecycle.md), [ADR-0028](../../adr/0028-document-lifecycle-hardening.md), [ADR-0029](../../adr/0029-proposals-and-agent-safety.md), [ADR-0030](../../adr/0030-commercial-seams-and-imports.md), [ADR-0043](../../adr/0043-policy-and-approval.md), [ADR-0052](../../adr/0052-minimal-crm.md), [ADR-0054](../../adr/0054-users-roles-and-authorizations.md), [ADR-0055](../../adr/0055-approval-pools-and-stages.md)
+- **ADRs that name this module most (mentions; not complete):** [ADR-0009](../../adr/0009-document-lifecycle.md), [ADR-0020](../../adr/0020-inventory-and-costing-model.md), [ADR-0022](../../adr/0022-repository-and-engineering-conventions.md), [ADR-0028](../../adr/0028-document-lifecycle-hardening.md), [ADR-0029](../../adr/0029-proposals-and-agent-safety.md), [ADR-0038](../../adr/0038-audit-and-observability.md), [ADR-0043](../../adr/0043-policy-and-approval.md), [ADR-0052](../../adr/0052-minimal-crm.md), [ADR-0054](../../adr/0054-users-roles-and-authorizations.md), [ADR-0055](../../adr/0055-approval-pools-and-stages.md), [ADR-0061](../../adr/0061-barcodes.md), [ADR-0062](../../adr/0062-product-engineering-workflow.md)
 
 ## `localization` (layer 2)
 
@@ -288,7 +319,8 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Settings (0):** none in settings.csv
 - **Work item kinds (0):** none
 - **Authorization areas (1):** `regime_option`
-- **ADRs:** see [adr-index.md](adr-index.md)
+- **ADRs (declared):** none declared
+- **ADRs that name this module most (mentions; not complete):** —
 
 ## `outbox` (layer 2)
 
@@ -299,7 +331,8 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Settings (0):** none in settings.csv
 - **Work item kinds (1):** `event_delivery_held`
 - **Authorization areas (1):** `event_delivery`
-- **ADRs:** [ADR-0013](../../adr/0013-outbox-and-events.md)
+- **ADRs (declared):** [ADR-0013](../../adr/0013-outbox-and-events.md)
+- **ADRs that name this module most (mentions; not complete):** [ADR-0013](../../adr/0013-outbox-and-events.md)
 
 ## `periods` (layer 2)
 
@@ -310,7 +343,8 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Settings (0):** none in settings.csv
 - **Work item kinds (0):** none
 - **Authorization areas (2):** `close_checklist`, `posting_period`
-- **ADRs:** see [adr-index.md](adr-index.md)
+- **ADRs (declared):** none declared
+- **ADRs that name this module most (mentions; not complete):** —
 
 ## `permissions` (layer 2)
 
@@ -321,7 +355,8 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Settings (0):** none in settings.csv
 - **Work item kinds (3):** `owner_suspended`, `role_permission_held`, `segregation_review_due`
 - **Authorization areas (4):** `delegation`, `role`, `segregation_rule`, `user_account`
-- **ADRs:** [ADR-0017](../../adr/0017-permission-envelope.md), [ADR-0042](../../adr/0042-work-queue.md), [ADR-0054](../../adr/0054-users-roles-and-authorizations.md), [ADR-0055](../../adr/0055-approval-pools-and-stages.md)
+- **ADRs (declared):** [ADR-0017](../../adr/0017-permission-envelope.md), [ADR-0040](../../adr/0040-ui-architecture.md), [ADR-0054](../../adr/0054-users-roles-and-authorizations.md)
+- **ADRs that name this module most (mentions; not complete):** [ADR-0017](../../adr/0017-permission-envelope.md), [ADR-0042](../../adr/0042-work-queue.md), [ADR-0054](../../adr/0054-users-roles-and-authorizations.md), [ADR-0055](../../adr/0055-approval-pools-and-stages.md)
 
 ## `policy` (layer 2)
 
@@ -332,7 +367,9 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Settings (0):** none in settings.csv
 - **Work item kinds (3):** `auto_post_suspended`, `auto_post_unconfirmed`, `consequence_posting_blocked`
 - **Authorization areas (2):** `period_unlock_request`, `policy`
-- **ADRs:** [ADR-0042](../../adr/0042-work-queue.md), [ADR-0043](../../adr/0043-policy-and-approval.md), [ADR-0055](../../adr/0055-approval-pools-and-stages.md), [ADR-0059](../../adr/0059-ai-tuning-and-development-of-deterministic-functions.md)
+- **Tables in DS-05-platform.sql with no stated owner:** `auto_post_confirmation` (section names policy, documents), `period_unlock_request` (section names policy, documents), `policy_decision` (section names policy, documents) ([data-map findings](data-map.md#findings-tables-without-an-owner-and-lab-stubs))
+- **ADRs (declared):** [ADR-0043](../../adr/0043-policy-and-approval.md), [ADR-0055](../../adr/0055-approval-pools-and-stages.md)
+- **ADRs that name this module most (mentions; not complete):** [ADR-0042](../../adr/0042-work-queue.md), [ADR-0043](../../adr/0043-policy-and-approval.md), [ADR-0055](../../adr/0055-approval-pools-and-stages.md), [ADR-0059](../../adr/0059-ai-tuning-and-development-of-deterministic-functions.md)
 
 ## `registry` (layer 2)
 
@@ -343,7 +380,8 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Settings (0):** none in settings.csv
 - **Work item kinds (1):** `setting_review_required`
 - **Authorization areas (2):** `company_setting`, `general_access`
-- **ADRs:** [ADR-0063](../../adr/0063-configurable-policy-settings.md)
+- **ADRs (declared):** [ADR-0063](../../adr/0063-configurable-policy-settings.md)
+- **ADRs that name this module most (mentions; not complete):** [ADR-0063](../../adr/0063-configurable-policy-settings.md)
 
 ## `work` (layer 2)
 
@@ -354,7 +392,8 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Settings (0):** none in settings.csv
 - **Work item kinds (0):** none
 - **Authorization areas (2):** `work_queue`, `work_queue_administration`
-- **ADRs:** [ADR-0022](../../adr/0022-repository-and-engineering-conventions.md), [ADR-0042](../../adr/0042-work-queue.md)
+- **ADRs (declared):** [ADR-0042](../../adr/0042-work-queue.md), [ADR-0054](../../adr/0054-users-roles-and-authorizations.md), [ADR-0055](../../adr/0055-approval-pools-and-stages.md)
+- **ADRs that name this module most (mentions; not complete):** [ADR-0022](../../adr/0022-repository-and-engineering-conventions.md), [ADR-0042](../../adr/0042-work-queue.md)
 
 ## `clock` (layer 1)
 
@@ -365,7 +404,8 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Settings (0):** none in settings.csv
 - **Work item kinds (0):** none
 - **Authorization areas (0):** none
-- **ADRs:** see [adr-index.md](adr-index.md)
+- **ADRs (declared):** [ADR-0007](../../adr/0007-time-model.md)
+- **ADRs that name this module most (mentions; not complete):** —
 
 ## `errors` (layer 1)
 
@@ -376,7 +416,8 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Settings (0):** none in settings.csv
 - **Work item kinds (0):** none
 - **Authorization areas (0):** none
-- **ADRs:** see [adr-index.md](adr-index.md)
+- **ADRs (declared):** none declared
+- **ADRs that name this module most (mentions; not complete):** —
 
 ## `i18n` (layer 1)
 
@@ -387,7 +428,8 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Settings (0):** none in settings.csv
 - **Work item kinds (0):** none
 - **Authorization areas (0):** none
-- **ADRs:** see [adr-index.md](adr-index.md)
+- **ADRs (declared):** none declared
+- **ADRs that name this module most (mentions; not complete):** —
 
 ## `ids` (layer 1)
 
@@ -398,7 +440,8 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Settings (0):** none in settings.csv
 - **Work item kinds (0):** none
 - **Authorization areas (0):** none
-- **ADRs:** see [adr-index.md](adr-index.md)
+- **ADRs (declared):** none declared
+- **ADRs that name this module most (mentions; not complete):** —
 
 ## `numeric` (layer 1)
 
@@ -409,5 +452,6 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Settings (0):** none in settings.csv
 - **Work item kinds (0):** none
 - **Authorization areas (0):** none
-- **ADRs:** see [adr-index.md](adr-index.md)
+- **ADRs (declared):** [ADR-0006](../../adr/0006-id-and-numeric-model.md)
+- **ADRs that name this module most (mentions; not complete):** —
 

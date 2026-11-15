@@ -19,7 +19,10 @@ Inputs (all under docs/):
 - spec/00-reading-guide.md: the command verb list with event forms.
 - catalogs/settings.csv, work-item-kinds.csv, authorization-areas.csv.
 
-Outputs: design/generated/{module-cards,data-map,event-matrix,adr-index}.md, sorted and stable.
+Outputs: design/generated/{module-cards,data-map,event-matrix,adr-index}.md, sorted and stable. Purpose in the data
+map is a table's own comment, never a line of another table's comment, and stays empty when none belongs to it.
+ADRs per module are "declared" (ADR-0022 rule 2 notes; ADR citations in the DDL of the module's owned tables) and,
+separately, "mentions" (a count of backticked names), labelled as such.
 
 Unowned and stub tables: the script fails (exit 2) on a table with no owner, or a stub table, unless it is listed in
 ACKNOWLEDGED below with the finding it belongs to. Acknowledged tables are listed as findings in data-map.md; no owner
@@ -111,6 +114,21 @@ def camel_words(pascal):
 
 # ----------------------------------------------------------------------------------------------- module map
 
+def module_adrs(docs):
+    """Module -> ADRs that ADR-0022 rule 2 names for it: ADR links in its note in the layer table, and the ADR of
+    the note paragraph that adds a module ('`module` (layer n')."""
+    text = read(os.path.join(docs, ADR0022))
+    out = defaultdict(set)
+    for name, (layer, note) in module_map(docs).items():
+        out[name].update(re.findall(r"ADR-(\d{4})", note))
+    for line in text.splitlines():
+        nm = re.search(r"Note \(\[ADR-(\d{4})\]", line)
+        if nm:
+            for name in re.findall(r"`(\w+)` \(layer \d", line):
+                out[name].add(nm.group(1))
+    return out
+
+
 def module_map(docs):
     """Module -> (layer, note) from ADR-0022 rule 2: the layer table and its '`module` (layer n' notes."""
     text = read(os.path.join(docs, ADR0022))
@@ -160,6 +178,7 @@ class Table:
         self.name, self.path, self.line = name, path, line
         self.owner, self.owner_source, self.purpose, self.section = None, "", "", ""
         self.columns, self.candidates = [], []
+        self.leading, self.adrs = "", set()
 
 
 def parse_owns(text, known_modules):
@@ -201,7 +220,7 @@ def parse_ddl(docs, modules):
         for group, mod in re.findall(r"\b((?:\w+, )*\w+ and \w+) are owned by (\w+)", flat_comments):
             for t in re.split(r",\s*|\s+and\s+", group):
                 named[t] = mod
-        sec_title, sec_owner, sec_multi, sec_owns = "", None, [], {}
+        sec_title, sec_owner, sec_multi, sec_owns, sec_raw = "", None, [], {}, ""
         current = None
         pending_section = None
         for idx, line in enumerate(lines, start=1):
@@ -217,6 +236,7 @@ def parse_ddl(docs, modules):
             sm = SECTION_RE.match(line)
             if sm:
                 sec_title = BRACKET_RE.sub("", sm.group(1)).split("(")[0].strip()
+                sec_raw = sm.group(1)
                 sec_owner, sec_multi, sec_owns = None, [], {}
                 bm = BRACKET_RE.search(sm.group(1))
                 if bm:
@@ -268,10 +288,9 @@ def parse_ddl(docs, modules):
                 if not owner and sec_multi:
                     t.candidates = sec_multi
                 t.owner, t.owner_source = owner, src
-                purpose = BRACKET_RE.sub("", trailing).strip(" -;")
-                if not purpose and above:
-                    purpose = above[-1]
-                t.purpose = (purpose or sec_title)[:150]
+                t.purpose = BRACKET_RE.sub("", trailing).strip(" -;")
+                t.leading = above_text
+                t.adrs = set(re.findall(r"ADR-(\d{4})", sec_raw + " " + trailing))
                 tables[name] = t
                 current = t
                 continue
@@ -292,7 +311,77 @@ def parse_ddl(docs, modules):
             am = ALTER_FK_RE.match(line)
             if am:
                 fks.append((am.group(1), am.group(2).replace(" ", ""), am.group(3), f"{rel(docs, path)}:{idx}"))
+    for t in tables.values():
+        if not t.purpose:
+            t.purpose = leading_purpose(t.name, t.leading, tables)
+        if t.leading:
+            lead, own = own_sentences(t.name, t.leading, tables)
+            t.adrs |= set(re.findall(r"ADR-(\d{4})", " ".join(lead + own)))
     return tables, fks, problems
+
+
+def shorten(text, limit=200):
+    if len(text) <= limit:
+        return text
+    cut = text[:limit].rsplit(" ", 1)[0]
+    return cut.rstrip(",;:") + " …"
+
+
+def split_sentences(block):
+    """Split a comment block at '. ' or '; ' outside parentheses."""
+    out, depth, start = [], 0, 0
+    for i, ch in enumerate(block):
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth = max(0, depth - 1)
+        elif ch in ".;" and depth == 0 and (i + 1 == len(block) or block[i + 1] == " "):
+            word = re.search(r"(\S+)$", block[start:i])
+            abbrev = word and word.group(1).lower() in ("e.g", "i.e", "etc", "vs", "cf", "no")
+            cites_next = block[i + 2:i + 6] == "ADR-"
+            if not abbrev and not (ch == ";" and cites_next):
+                out.append(block[start:i + 1].strip())
+                start = i + 1
+    if block[start:].strip():
+        out.append(block[start:].strip())
+    return [x for x in out if x]
+
+
+def names_table(text, table):
+    return re.search(rf"(?<![\w.-]){re.escape(table)}(?![\w-])", text) is not None
+
+
+def other_tables_named(name, block, tables):
+    """Other DDL tables the block names: names with an underscore, or any name in backticks (plain words such as
+    'company' or 'item' are ordinary English in comments)."""
+    return [t for t in tables if t != name and (("_" in t and names_table(block, t)) or f"`{t}`" in block)]
+
+
+def own_sentences(name, block, tables):
+    """The sentences of a table's leading block that belong to it: those that name it, with any leading sentence
+    that is only an ADR citation; all of them when the block names no other table; else none."""
+    sentences = split_sentences(block)
+    named = [x for x in sentences if names_table(x, name)]
+    if named:
+        lead = []
+        for x in sentences:
+            if re.fullmatch(r"ADR-\d{4}(?: rules? [\d, and-]+)?[.:;]?", x):
+                lead.append(x)
+            else:
+                break
+        return lead, named
+    if not other_tables_named(name, block, tables):
+        return [], sentences
+    return [], []
+
+
+def leading_purpose(name, block, tables):
+    """First own sentence of the table's leading comment block, or empty."""
+    if not block:
+        return ""
+    _, own = own_sentences(name, block, tables)
+    own = [x for x in own if not re.fullmatch(r"ADR-\d{4}(?: rules? [\d, and-]+)?[.:;]?", x)]
+    return shorten(own[0].rstrip(";")) if own else ""
 
 
 def lab_stubs(docs):
@@ -393,7 +482,9 @@ def owner_of(tables, name):
 def render_data_map(docs, modules, tables, fks, stubs, findings):
     out = [HEADER, "# Data map (generated)\n",
            "Tables per owner module, from the DDL drafts in `docs/design/*.sql` and the owners their SQL comments state "
-           "(ADR-0022 rule 7). Purpose is the table's own comment, else the comment above it, else its section title. "
+           "(ADR-0022 rule 7). Purpose is the table's own comment on its CREATE TABLE line, else the first sentence of its own "
+           "leading comment block that names it (or, when the block names no other table, its first sentence); it is "
+           "empty when no comment belongs to the table. The DDL drafts have no `COMMENT ON`. Section is the DDL section title. "
            "Part of [architecture-overview.md](../architecture-overview.md), Part C.\n"]
     by_mod = defaultdict(list)
     for t in tables.values():
@@ -407,11 +498,11 @@ def render_data_map(docs, modules, tables, fks, stubs, findings):
     for src, cols, tgt, loc in fks:
         fk_out[src].append((cols, tgt))
     for mod in sorted(by_mod, key=lambda m: (modules.get(m, (9,))[0], m)):
-        out.append(f"## `{mod}`\n\n| Table | Purpose | Key references | Source |\n| --- | --- | --- | --- |")
+        out.append(f"## `{mod}`\n\n| Table | Purpose | Section | Key references | Source |\n| --- | --- | --- | --- | --- |")
         for t in sorted(by_mod[mod], key=lambda x: x.name):
             refs = sorted({tgt for cols, tgt in fk_out.get(t.name, []) if tgt != "company"})
             refs_s = ", ".join(f"`{r}`" for r in refs[:8]) + (" …" if len(refs) > 8 else "")
-            out.append(f"| `{t.name}` | {md_escape(t.purpose)} | {refs_s} | {t.path}:{t.line} |")
+            out.append(f"| `{t.name}` | {md_escape(t.purpose)} | {md_escape(t.section)} | {refs_s} | {t.path}:{t.line} |")
         out.append("")
     out.append("## Cross-module foreign keys (report)\n")
     out.append("Foreign keys whose source and target tables have different stated owners. Foreign keys are not imports, "
@@ -503,27 +594,52 @@ def render_events(tables, events, consumers, event_lines, modules, stubs):
     return "\n".join(out) + "\n"
 
 
-def render_adr_index(modules, adrs):
+DECLARED_NOTE = ("**Declared** ADRs of a module are those ADR-0022 rule 2 names for it (links in its note in the layer "
+                 "table; the ADR of the note that adds the module) and those the DDL cites in the section header, the "
+                 "CREATE TABLE comment or the table's own leading comment of a table it owns. ADR status lines name design items, not modules, and the "
+                 "backlog maps design items to no module, so they cannot be read as a module declaration. Declared lists "
+                 "therefore miss ADRs whose tables have no DDL or no stated owner (for example ADR-0014 for the "
+                 "journal tables, whose DS-06 DDL states no owner). **Mentions** are a separate count: modules named "
+                 "at least 3 times in backticks in the ADR (tables counted for their stated owner), at most 4; a "
+                 "reading aid, not complete and not ownership.")
+
+
+def declared_by_module(modules, tables, adr_nums, docs):
+    declared = defaultdict(set)
+    for mod, nums in module_adrs(docs).items():
+        declared[mod].update(n for n in nums if n in adr_nums)
+    for t in tables.values():
+        if t.owner:
+            declared[t.owner].update(n for n in t.adrs if n in adr_nums)
+    return declared
+
+
+def render_adr_index(modules, adrs, declared):
+    by_adr = defaultdict(set)
+    for mod, nums in declared.items():
+        for n in nums:
+            by_adr[n].add(mod)
     out = [HEADER, "# ADR index by module and layer (generated)\n",
-           "Title, status and design item come from each ADR's first lines. Modules are those named most often in the "
-           "ADR (module names in backticks, plus tables in backticks counted for their stated owner; at least 3 "
-           "mentions, at most 4 modules). This is a reading aid, not ownership.\n",
-           "## By ADR\n", "| ADR | Title | Status | Design item | Modules | Layers |", "| --- | --- | --- | --- | --- | --- |"]
+           "Title, status and design item come from each ADR's first lines. " + DECLARED_NOTE + "\n",
+           "## By ADR\n", "| ADR | Title | Status | Design item | Modules (declared) | Layers (declared) | Modules (mentions) |",
+           "| --- | --- | --- | --- | --- | --- | --- |"]
     for a in adrs:
-        layers = sorted({modules[m][0] for m in a["modules"] if m in modules})
+        mods = sorted(by_adr.get(a["num"], set()), key=lambda m: (-modules.get(m, (0,))[0], m))
+        layers = sorted({modules[m][0] for m in mods if m in modules}, reverse=True)
         out.append(f"| [ADR-{a['num']}](../../adr/{a['file']}) | {md_escape(a['title'])} | {a['status']} | "
-                   f"{md_escape(a['design'])} | {', '.join('`' + m + '`' for m in a['modules'])} | "
-                   f"{', '.join(map(str, layers))} |")
-    out.append("\n## By module\n\n| Layer | Module | ADRs |\n| --- | --- | --- |")
+                   f"{md_escape(a['design'])} | {', '.join('`' + m + '`' for m in mods) or '—'} | "
+                   f"{', '.join(map(str, layers)) or '—'} | {', '.join('`' + m + '`' for m in a['modules']) or '—'} |")
+    out.append("\n## By module\n\n| Layer | Module | ADRs (declared) | ADRs (mentions) |\n| --- | --- | --- | --- |")
     for mod, (layer, _) in sorted(modules.items(), key=lambda kv: (-kv[1][0], kv[0])):
-        lst = [a["num"] for a in adrs if mod in a["modules"]]
-        out.append(f"| {layer} | `{mod}` | {', '.join('ADR-' + n for n in lst) or '—'} |")
-    out.append("\n## By layer\n\n| Layer | ADRs |\n| --- | --- |")
+        dec = sorted(declared.get(mod, set()))
+        men = [a["num"] for a in adrs if mod in a["modules"]]
+        out.append(f"| {layer} | `{mod}` | {', '.join('ADR-' + n for n in dec) or '—'} | {', '.join('ADR-' + n for n in men) or '—'} |")
+    out.append("\n## By layer (declared)\n\n| Layer | ADRs |\n| --- | --- |")
     for layer in sorted({l for l, _ in modules.values()}, reverse=True):
-        lst = sorted({a["num"] for a in adrs for m in a["modules"] if modules.get(m, (0,))[0] == layer})
+        lst = sorted({n for m, nums in declared.items() if modules.get(m, (0,))[0] == layer for n in nums})
         out.append(f"| {layer} | {', '.join('ADR-' + n for n in lst) or '—'} |")
-    out.append("\nADRs that name no module often enough (platform-wide or process ADRs): " +
-               ", ".join("ADR-" + a["num"] for a in adrs if not a["modules"]) + ".")
+    out.append("\nADRs declared for no module (platform-wide, process or not yet in the DDL): " +
+               ", ".join("ADR-" + a["num"] for a in adrs if not by_adr.get(a["num"])) + ".")
     return "\n".join(out) + "\n"
 
 
@@ -532,14 +648,29 @@ def load_csv(docs, name):
         return list(csv.DictReader(fh))
 
 
-def render_cards(docs, modules, tables, events, commands, adrs, event_tables):
+def render_cards(docs, modules, tables, events, commands, adrs, event_tables, declared):
     settings, kinds, areas = load_csv(docs, "settings.csv"), load_csv(docs, "work-item-kinds.csv"), load_csv(docs, "authorization-areas.csv")
     out = [HEADER, "# Module cards (generated)\n",
            "One card per module of ADR-0022 rule 2, with the module's note in that table. Tables are those "
            "whose DDL states this owner. Events are those whose noun names one of its tables (see "
            "[event-matrix.md](event-matrix.md)). Commands and queries are names in backticks in the ADRs whose noun "
            "names one of its tables: a reading aid until the registry exists. Settings, work item kinds and "
-           "authorization areas come from their catalogs' `area` or `module` columns.\n"]
+           "authorization areas come from their catalogs' `area` or `module` columns. " + DECLARED_NOTE + "\n"]
+    files = {adr["num"]: adr["file"] for adr in adrs}
+    unowned_note = defaultdict(list)  # module -> lines about unowned tables it should know of
+    by_file = defaultdict(lambda: defaultdict(int))
+    for t in tables.values():
+        if t.owner:
+            by_file[t.path][t.owner] += 1
+    for t in sorted(tables.values(), key=lambda x: x.name):
+        if t.owner:
+            continue
+        if t.candidates:
+            for c in t.candidates:
+                unowned_note[c].append((t.path, t.name, "section names " + ", ".join(t.candidates)))
+        elif by_file[t.path]:
+            top = sorted(by_file[t.path].items(), key=lambda kv: (-kv[1], kv[0]))[0][0]
+            unowned_note[top].append((t.path, t.name, ""))
     for mod, (layer, note) in sorted(modules.items(), key=lambda kv: (-kv[1][0], kv[0])):
         owned = sorted(t.name for t in tables.values() if t.owner == mod)
         evs = sorted(e for e, p in event_tables.items() if p == mod)
@@ -557,6 +688,7 @@ def render_cards(docs, modules, tables, events, commands, adrs, event_tables):
         wik = sorted(r["code"] for r in kinds if r.get("module") == mod)
         aa = sorted(r["code"] for r in areas if r.get("module") == mod)
         adr_list = [a["num"] for a in adrs if mod in a["modules"]]
+        dec_list = sorted(declared.get(mod, set()))
         out.append(f"## `{mod}` (layer {layer})\n")
         out.append(f"- **Note in ADR-0022 rule 2:** {adr_links_from_generated(md_escape(note)) if note else '—'}")
         out.append(f"- **Owned tables ({len(owned)}):** " + (", ".join(f"`{t}`" for t in owned) or "none stated"))
@@ -567,7 +699,15 @@ def render_cards(docs, modules, tables, events, commands, adrs, event_tables):
         out.append(f"- **Settings ({len(sets)}):** " + (", ".join(f"`{s}`" for s in sets[:12]) + (" …" if len(sets) > 12 else "") if sets else "none in settings.csv"))
         out.append(f"- **Work item kinds ({len(wik)}):** " + (", ".join(f"`{k}`" for k in wik) or "none"))
         out.append(f"- **Authorization areas ({len(aa)}):** " + (", ".join(f"`{k}`" for k in aa) or "none"))
-        out.append(f"- **ADRs:** " + (", ".join(f"[ADR-{n}](../../adr/{next(a['file'] for a in adrs if a['num'] == n)})" for n in adr_list) or "see [adr-index.md](adr-index.md)"))
+        if unowned_note.get(mod):
+            grouped = defaultdict(list)
+            for path, name, why in unowned_note[mod]:
+                grouped[path].append(f"`{name}`" + (f" ({why})" if why else ""))
+            for path in sorted(grouped):
+                out.append(f"- **Tables in {os.path.basename(path)} with no stated owner:** " + ", ".join(grouped[path]) +
+                           " ([data-map findings](data-map.md#findings-tables-without-an-owner-and-lab-stubs))")
+        out.append(f"- **ADRs (declared):** " + (", ".join(f"[ADR-{n}](../../adr/{files[n]})" for n in dec_list) or "none declared"))
+        out.append(f"- **ADRs that name this module most (mentions; not complete):** " + (", ".join(f"[ADR-{n}](../../adr/{files[n]})" for n in adr_list) or "—"))
         out.append("")
     return "\n".join(out) + "\n"
 
@@ -589,6 +729,7 @@ def build(docs):
             errors.append(f"table {t.name} names owner {t.owner}, which is not a module of ADR-0022 rule 2 ({t.path}:{t.line})")
     forms = verb_forms(docs)
     adrs, events, commands, consumers, event_lines = parse_adrs(docs, modules, tables, forms)
+    declared = declared_by_module(modules, tables, {a["num"] for a in adrs}, docs)
     event_tables = {}
     for ev in events:
         words = camel_words(ev)
@@ -600,8 +741,8 @@ def build(docs):
     files = {
         "data-map.md": render_data_map(docs, modules, tables, fks, stubs, findings & set(ACKNOWLEDGED)),
         "event-matrix.md": render_events(tables, events, consumers, event_lines, modules, set(stubs)),
-        "adr-index.md": render_adr_index(modules, adrs),
-        "module-cards.md": render_cards(docs, modules, tables, events, commands, adrs, event_tables),
+        "adr-index.md": render_adr_index(modules, adrs, declared),
+        "module-cards.md": render_cards(docs, modules, tables, events, commands, adrs, event_tables, declared),
     }
     summary = {
         "tables": len(tables), "modules": len(modules), "foreign_keys": len(fks), "events": len(events),

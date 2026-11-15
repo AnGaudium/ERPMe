@@ -4,7 +4,7 @@ For the author and design reviewers. Coding agents read the short [coder core](a
 
 **Rule of this document.** It summarizes and links. It creates no rule. Where an ADR, a DDL draft or a catalog disagrees with another, the point is listed under [Findings for the review](#findings-for-the-review) with `file:line`, and is not resolved here. ADRs win over this file.
 
-Status: written 2026-11-16 against `main`, from the outline approved after a systems review and a developer review. Facts that could not be confirmed are marked "(to verify)".
+Status: written 2026-11-16 against `main`, from the outline approved after a systems review and a developer review. Revised 2026-11-16 after independent review round 1. Facts that could not be confirmed would be marked "(to verify)"; none remain.
 
 ## Contents
 
@@ -12,7 +12,7 @@ B1 [Purpose and scope](#b1-purpose-and-scope) · B2 [System context](#b2-system-
 
 ## B1. Purpose and scope
 
-ERPMe is an open-source ERP designed for agentic workflows, for trading and manufacturing companies, with CRM from the start. Its accounting and inventory core follows SAP concepts (S/4HANA for the data model, Business One for SME scope) ([01-vision](../spec/01-vision.md):3; D5). Country rules live in localization packages ([ADR-0016](../adr/0016-localization-package-structure.md)).
+ERPMe is an open-source ERP designed for agentic workflows, for trading and assembly businesses (01-vision:3), with production in Phase 1 for manufacturers ([ADR-0032](../adr/0032-phase-1-scope-with-production.md) rule 1), and with CRM from the start. Its accounting and inventory core follows SAP concepts (S/4HANA for the data model, Business One for SME scope) ([01-vision](../spec/01-vision.md):3; D5). Country rules live in localization packages ([ADR-0016](../adr/0016-localization-package-structure.md)).
 
 **Phase 1** is defined by [spec 09](../spec/09-mvp-scope.md) as amended by [ADR-0032](../adr/0032-phase-1-scope-with-production.md): every capability a customer cannot operate without is in Phase 1 in full depth, and production, multi-level MRP, planning and subcontracting move into Phase 1 (ADR-0032:7–16). Spec 09 itself still shows production as later; that wording waits for the author ([open-questions](../open-questions.md):122).
 
@@ -21,7 +21,7 @@ ERPMe is an open-source ERP designed for agentic workflows, for trading and manu
 2. **Every write is a schema'd command, simulated before executed** (Principles 1, 2, 9). One envelope, two calls, one `plan_hash` ([ADR-0008](../adr/0008-command-envelope-and-registry.md)).
 3. **Append-only books and explainable numbers** (Principles 5, 6). Posted documents are immutable and corrected by correction documents ([ADR-0009](../adr/0009-document-lifecycle.md)).
 4. **State tables plus a transactional outbox; no event sourcing** (D4; [ADR-0013](../adr/0013-outbox-and-events.md)). The work queue is central (Principle 8).
-5. **Fully usable without an LLM** (Principle 12). Agents start only from work items, and every consumer works with the LLM off.
+5. **Fully usable without an LLM** (Principle 12). Every agent run is bound to a work item, and every consumer works with the LLM off.
 
 ## B2. System context
 
@@ -89,7 +89,7 @@ flowchart LR
 | `erpme worker --queue integrations` | External consumers: e-invoice, mail, malware scan | `erpme_worker` | Calls with no transaction open (ADR-0013 rule 10) |
 | `erpme worker --queue jobs` | System jobs, scheduled jobs, long-job consumers | `erpme_worker` | Procrastinate periodic tasks; stalled-job retry (ADR-0022 rule 12) |
 | `erpme worker --queue pdf` | Render worker | `erpme_worker` | Own process, sandboxed, 30-min lease, 3 attempts ([ADR-0049](../adr/0049-statutory-reporting-and-printing.md):199) |
-| `erpme worker --queue agents` | `agent_runner` | `erpme_worker` (to verify) | 5-min lease with a 60-s heartbeat (ADR-0013:53; ADR-0050:160) |
+| `erpme worker --queue agents` | `agent_runner` | `erpme_worker`, derived from ADR-0017 rule 18 ("`erpme_worker` runs delivery workers and system jobs") plus ADR-0050:160 (`agent_runner` is a consumer); a run's read-only queries use `erpme_readonly` (ADR-0050:369) | 5-min lease with a 60-s heartbeat (ADR-0013:53; ADR-0050:160) |
 | `erpme admin migrate` / `bootstrap` | Migrations, catalogs, package data; first operator and owner | `erpme_migration` | Only role with `BYPASSRLS` (ADR-0017 rule 18) |
 | Read-only query layer | Views in schema `query` | `erpme_readonly` | Statement timeout 10 s for agent runs, 30 s otherwise (ADR-0050:369) |
 
@@ -142,7 +142,7 @@ flowchart TB
 - Attachment bytes live in an object store, never in the database ([ADR-0027](../adr/0027-cross-cutting-ownership.md):38). The upload endpoint streams to it, then dispatches `CreateAttachment` ([ADR-0038](../adr/0038-audit-and-observability.md):134).
 - The scanner runs as a consumer of `AttachmentCreated` on `integrations` (ADR-0038:140). Scanner, collector and telemetry backend are chosen in DS-37 (ADR-0038:125).
 - The secret store holds the LLM key, mailbox credentials and `automation.value_hmac_key` (ADR-0050:61; ADR-0052:110; [ADR-0058](../adr/0058-configurable-workflows.md):212). Its product is DS-37.
-- The OCR engine is a self-hosted installation component ([ADR-0057](../adr/0057-document-intake-and-extraction.md):80). Which worker runs intake extraction is shown as `jobs` above (to verify).
+- The OCR engine is a self-hosted installation component ([ADR-0057](../adr/0057-document-intake-and-extraction.md):80). Intake extraction runs in the consumer `document_extraction_runner`, a long job on queue `jobs` (ADR-0057:57).
 - In `test` and `simulation`, every external lookup and gateway is a recording stub (ADR-0022 rule 9).
 - Deployment beyond the test server (Compose services, hosts, single-host assumption) waits for DS-37 ([backlog](backlog.md):49).
 
@@ -171,7 +171,7 @@ Generated counts from the DDL drafts: 318 tables, of which 302 have a stated own
 
 ### Spines
 
-Four small ERDs. Columns are omitted; every company reference is composite on (`company_id`, `id`) unless the DDL shows otherwise.
+Four small ERDs, drawn from the DDL drafts. Columns are omitted, and so is how each key is composed; the DDL shows that (composite company keys are required in `master_data` and `crm` by ADR-0045 rule 1 and ADR-0052 rule 3).
 
 **Master data** (DS-20-master-data.sql)
 
@@ -324,7 +324,7 @@ sequenceDiagram
 
 | Failure | Detection | Automatic behavior | Human action |
 | --- | --- | --- | --- |
-| Lock or transaction timeout, deadlock | `concurrent_update`, `timeout`; metrics (ADR-0038:103) | Rolled back; retry with the same key returns the first result (ADR-0008 rules 11, 16) | None |
+| Lock or transaction timeout, deadlock | `concurrent_update`, `timeout`; metrics (ADR-0038:103) | Rolled back, idempotency row included; a retry with the same key runs again (ADR-0008 rules 11, 16) | None |
 | Database down, failover | Not specified | Not specified | Not specified (DS-37) |
 | Worker crash | `locked_until` passes | Delivery returns to `pending`, attempt counts (ADR-0013 rule 7) | None |
 | Delivery keeps failing | `held` after `max_attempts`; operations dashboard; work item where it matters (ADR-0013 rule 8) | Blocks later events of the subject for that consumer | `RetryEventDelivery` or `SkipEventDelivery` |
@@ -337,6 +337,10 @@ sequenceDiagram
 | Malware scanner down | Consumer failures | Retries, then held; unscanned bytes are never served and `Post` is refused (ADR-0038:140–144) | Release the held delivery |
 | Object store unavailable | Not specified | Not specified | Not specified (DS-37) |
 | LLM switched off | `llm_provider` unset | Every agent mode is off (ADR-0050:63) | Work continues by hand (Principle 12) |
+
+**Delivery mechanics** (moved from Part A). After commit, `NOTIFY erpme_outbox` wakes the workers, which also poll every 5 s (ADR-0022 rule 12). A worker claims a `pending` delivery with `FOR UPDATE SKIP LOCKED` only when no earlier delivery of that consumer and subject is open, with a 5-minute lease (ADR-0013 rule 7). After `max_attempts` (default 10) the delivery is `held` and blocks its subject for that consumer until a human runs `RetryEventDelivery` or `SkipEventDelivery` (ADR-0013 rule 8). Outside calls are recorded as intents by a command and made by an `external` consumer on `integrations` with no transaction open (ADR-0013 rule 10).
+
+**Error codes.** New codes go into the registry's catalog with the same columns; envelope-level codes are defined only in DS-04 ([DS-04](DS-04-command-envelope.md), Error catalog).
 
 **Event delivery with an unknown external outcome** (ADR-0013 rule 10; e-invoice example, [ADR-0028](../adr/0028-document-lifecycle-hardening.md) rule 7)
 
@@ -533,7 +537,7 @@ flowchart LR
 
 **Threat model, by boundary**
 - **Injected instructions in outside content.** Content from mail, files and extractions taints runs; tainted runs draft only; the human acted for is bound from the trigger, never from a sender (ADR-0017 rule 12; ADR-0013 rule 11; [ADR-0029](../adr/0029-proposals-and-agent-safety.md) rules 8–14).
-- **Privilege misuse.** Permissions, record and owner scope, field classes, segregation of duties ([ADR-0054](../adr/0054-users-roles-and-authorizations.md) rules 17–20; ADR-0017 rule 16). Only humans approve (ADR-0017 rule 15).
+- **Privilege misuse.** Permissions, record and owner scope (documents record `owner_employee_id` and `created_by_user_id`, ADR-0054 rule 14), field classes (`cost`, `margin`; separate from the data labels that govern LLM routing, ADR-0017 rule 10), segregation of duties ([ADR-0054](../adr/0054-users-roles-and-authorizations.md) rules 17–20; ADR-0017 rule 16). Only humans approve (ADR-0017 rule 15).
 - **Cross-company leaks.** RLS with `FORCE ROW LEVEL SECURITY`, fail closed (ADR-0017 rules 18–19).
 - **Data egress to the LLM.** Data labels and the routing switch, default off; with it on, typed placeholders, a residual scan and shape masks; the processing log is committed before the send (ADR-0050:86–101). The data-processing policy fails closed; providers are permitted with four eyes (ADR-0057:206–218).
 - **Malicious files.** Type detected from bytes, SVG not allowed, 25 MiB limit, scanning before use (ADR-0038:133–144). Rendering runs in a Jinja2 sandbox with no network (ADR-0049:254–255).
@@ -626,6 +630,8 @@ The frontend size budgets (250 KB gzipped shell, 150 KB PWA route) are listed un
 
 The production core step proposed by ADR-0032 rule 7 has no number yet ([open-questions](../open-questions.md):212). Steps 0–4 are Phase 0; 5–11 are Phase 1 (spec 11:49). No document names a design-lab test or simulation flow as the acceptance test of a step; the lab ([README](../reviews/2026-11-14-design-validation/README.md):5) is design evidence.
 
+**Testing beyond the coder core** (moved from Part A). Hypothesis state machines run from `LedgerMachine` on ([DS-16](DS-16-invariants-and-harness.md) rule 17). `erpme_reference` recomputes expected results from the run directory with the standard library only, and equality is exact (DS-16 rules 3, 29–30). From `build_step` 1, 90% branch coverage is enforced per package on `ledger`, `inventory`, `registry`, `documents`, `tax` and `localization` (ADR-0022 rule 16). The design lab is design evidence, never imported, and not a build-step acceptance test.
+
 **Repository and developer loop** (ADR-0022 rules 1, 14, 16): one uv workspace; `backend/` (distribution `erpme`), `tools/` (test distributions), `l10n/`, `frontend/`, `tests/scenarios/`, `datasets/`, `deploy/`. Every check runs through `erpme-dev` (`check`, `generate --check`, `dco`, `test`, `hypothesis`, `parallel`, `dataset small`, `scenarios`, `guards`, `frontend`, `nightly`, `ci`), each with a `--json` summary and `skipped` where inputs do not exist yet. CI jobs `dco`, `check`, `test`, `dataset`, `scenarios`, `guards`, `frontend` run in parallel, 15 minutes each.
 
 **Open design items** ([backlog](backlog.md))
@@ -668,7 +674,7 @@ The production core step proposed by ADR-0032 rule 7 has no number yet ([open-qu
 
 **Spec wording awaiting the author** (examples): spec 09 outdated by ADR-0032 (:122, :64); e-invoice add-on placement (:30); spec 17 local-model wording (:41); import batch wording (:49); spec 07 approval engine (:120); customization levels in specs 10 and 16 (:249, :265); spec 03 rule 1 (:264).
 
-**Known limits of this overview.** The event matrix and ADR index are text extraction until the registry exists; module cards list commands found in ADR text, not a registry; failure rows for the database and object store wait for DS-37.
+**Known limits of this overview.** The event matrix is text extraction until the registry exists; module cards list commands found in ADR text, not a registry. ADR lists per module are "declared" (ADR-0022 rule 2 notes and the ADRs the DDL cites for the module's owned tables) plus a separate "mentions" count; declared lists miss ADRs whose tables have no DDL or no stated owner, for example ADR-0014 for `ledger` (journal tables unowned in DS-06) and ADR-0008 for `registry` (`idempotency_record` has no DDL). Failure rows for the database and object store wait for DS-37.
 
 ## Findings for the review
 
@@ -685,3 +691,8 @@ Disagreements between documents, recorded and not resolved.
 9. **CRM separability.** Spec 01 (:15), spec 18 (:16) and D3 (decisions.md:9) say one edition. ADR-0052 (:25, :192) limits only `crm`'s layer-4 imports. `customer_profile` and `supplier_profile` hold `NOT NULL` single-column foreign keys to `account` (DS-20:252, :270), which is a lab stub. Whether a CRM-only deployment is a goal is undecided (B17).
 10. **Frontend budgets.** The outline treated the size budgets as decided; ADR-0040 lists them as "Targets (open question)" in rule 17 (:209–212).
 11. **Spec 09 and spec 11 versus ADR-0032.** Spec 09 (:12, :15) still shows production and planning as later; spec 11 has no production core step (open-questions.md:64, :122, :212).
+12. **Same-layer contract imports.** ADR-0022 rule 2 (:47) says a module imports only from lower layers and names `tax` to `ledger` as the exception within layer 3. Rule 6 (:109) allows the `contract` between modules of layers 3 and 4, and rule 4 (:87) has `inventory` handlers call `ledger.contract.write_journal_entry`.
+13. **No folder for consumers or queries.** ADR-0022 rule 3 (:76–84) names `contract.py`, `handlers/`, `tables.py`, `services/`. Rule 5 (:94) has `app` register handlers, consumers and queries. No document says where consumer and query code lives.
+14. **Rules without a check.** ADR-0022 rule 13 (:194–210) is the list of custom checks. No check exists yet for these seven rules, candidates for the lint and check deliverable of the coding kit: client-side money arithmetic (ADR-0040 rule 2); permission or policy checks in handlers (ADR-0008 rule 5); references by `code` in commands (ADR-0006 rule 5); `status` as a column name (ADR-0004 rule 13); PostgreSQL `ENUM` types (ADR-0004 rule 14); country rules in the core (ADR-0053); imports of lab code ([lab README](../reviews/2026-11-14-design-validation/README.md):5). The change-tracked guard of ADR-0038 rule 3 is not in the rule 13 list either.
+15. **Notes still say proposed.** Notes in ADR-0022 (:68–74, :212), ADR-0008, ADR-0013, ADR-0027 and ADR-0050 cite ADR-0056 to ADR-0064 as "proposed 2026-11-15"; their status lines say accepted (2026-11-15).
+16. **Outline deviations, for the author to confirm.** The approved outline says all generation goes through `erpme-dev generate`, "never through a separate tool script"; Part C is written by the lab script `gen_overview.py` until `erpme-dev generate` exists (B6). The outline's "FK allowlist report" is delivered as a report of cross-module foreign keys without allowlist verdicts (B6).
