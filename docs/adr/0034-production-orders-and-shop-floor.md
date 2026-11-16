@@ -297,7 +297,7 @@ It adds only what production needs:
 
 ## Context
 
-ADR-0032 targets assembly-type manufacturing in Phase 1, with a general core that learns from SAP. This ADR keeps SAP's production order concepts on ERPMe's machinery:
+ADR-0032 targets assembly-type manufacturing in Phase 1, with a general core that learns from SAP. This ADR keeps SAP's production order concepts on NativeFlows's machinery:
 - statuses, issue and backflush, confirmations with milestones, goods receipt, technical completion;
 - document lifecycle and approval as release;
 - change orders for changes in flight;

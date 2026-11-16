@@ -6,7 +6,7 @@ Date: 2026-11-15. Reviewer: independent (read-only). Base: branch `ds-uom`, HEAD
 
 0 blocking, 8 should-fix, 9 nits. The three round-1 blockers are closed in substance; what remains are residues of B1, B2, S1 and S2 and two new contradictions.
 
-Lab, each on a fresh `erpme_lab_rv57` (dropped afterwards): t20 157/157, t21 85/85, t12 186/186, t16 99/99, all with `--load`. "Probe" means run against the loaded schema in a rolled-back transaction. t05 and t15 were not rerun.
+Lab, each on a fresh `nativeflows_lab_rv57` (dropped afterwards): t20 157/157, t21 85/85, t12 186/186, t16 99/99, all with `--load`. "Probe" means run against the loaded schema in a rolled-back transaction. t05 and t15 were not rerun.
 
 File references: `0057`, `0062`, `DS-36` are the drafts in `drafts/ds-intake/`.
 

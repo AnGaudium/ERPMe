@@ -9,7 +9,7 @@ from decimal import Decimal as D
 
 from .core import (EFF, W, J, jsonable, ins, upd, new_id, now, sha, TRACE)
 
-DOCS = os.path.expanduser(os.environ.get("ERPME_DOCS", "~/Projects/ERPMe/docs"))
+DOCS = os.path.expanduser(os.environ.get("NATIVEFLOWS_DOCS", "~/Projects/NativeFlows/docs"))
 CAT = os.path.join(DOCS, "catalogs")
 LEVELS = ["none", "read", "edit", "post", "full"]
 
@@ -140,7 +140,7 @@ def chain_for(actor, command):
         return CHAIN_OVERRIDE
     run = actor.origin_run or actor.run
     key = f"run:{run['id']}" if run else f"cmd:{actor.actor_id}:{command}:{now().isoformat()}"
-    return {"id": _u.uuid5(_u.NAMESPACE_URL, "erpme-sim-chain:" + key), "depth": 0, "rule": None}
+    return {"id": _u.uuid5(_u.NAMESPACE_URL, "nativeflows-sim-chain:" + key), "depth": 0, "rule": None}
 
 
 COMMAND_FLAGS = {}   # command -> (effect_class, is_human_only, is_proposal_bound, is_draft_only, is_internal_only)

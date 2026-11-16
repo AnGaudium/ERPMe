@@ -8,7 +8,7 @@ Date: 2026-11-15. Reviewer: independent (read-only). Tested on copies of `base-d
 
 ## Lab
 
-Fresh `erpme_lab_rv57` for every `--load`; no "out of shared memory" occurred.
+Fresh `nativeflows_lab_rv57` for every `--load`; no "out of shared memory" occurred.
 
 | Copy | Result |
 | --- | --- |

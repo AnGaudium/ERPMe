@@ -2,7 +2,7 @@
 -- ADR-0033, ADR-0037 and ADR-0045, with the columns ADR-0046 (product configuration) adds; its tables are in DS-56-product-configuration.sql.
 -- PostgreSQL 18. Loaded together with DS-06 and tested in the design lab (docs/reviews/2026-11-14-design-validation,
 -- t05_master_data.py). The ADRs win if this file disagrees.
--- Tables live in schema `erpme` (ADR-0022 rule 7); domains in schema `types` (ADR-0006 rule 8). Keys are shown inline;
+-- Tables live in schema `nativeflows` (ADR-0022 rule 7); domains in schema `types` (ADR-0006 rule 8). Keys are shown inline;
 -- in migrations they get names from the MetaData naming convention (ADR-0004 rule 15). btree_gist is installed (ADR-0022 rule 8).
 -- Every table carries company_id, FORCE ROW LEVEL SECURITY and the generated company policy (ADR-0022 rule 8), except
 -- the global catalogs currency, uom (core rows have a null company_id and are readable by all), uom_conversion, and

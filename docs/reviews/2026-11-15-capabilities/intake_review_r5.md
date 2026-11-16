@@ -8,7 +8,7 @@ Date: 2026-11-15. Reviewer: independent (read-only). Tested on `/tmp` copies of 
 
 ## Lab
 
-Fresh `erpme_lab_rv57` for every `--load`; no lock exhaustion occurred.
+Fresh `nativeflows_lab_rv57` for every `--load`; no lock exhaustion occurred.
 
 | Copy | Result |
 | --- | --- |

@@ -219,7 +219,7 @@ Spec 07 sees Business One as the model and lists multiple levels, minimum approv
 
 **SAP S/4HANA:** release strategies give classes of purchasing documents a sequence of release codes.
 
-**What ERPMe changes.** It keeps conditions in one place, the policy table (spec 07: "the approval engine never evaluates conditions itself"). The rank is the bridge: the policy says how serious a document is, and the pool says who approves at that level. Pools are by document group rather than by originator, because ERPMe's segregation rules already handle who originates.
+**What NativeFlows changes.** It keeps conditions in one place, the policy table (spec 07: "the approval engine never evaluates conditions itself"). The rank is the bridge: the policy says how serious a document is, and the pool says who approves at that level. Pools are by document group rather than by originator, because NativeFlows's segregation rules already handle who originates.
 
 **Why exclude writers.** ADR-0043 rule 13 let a person approve their own document until the author decides. With several stages and k of n, four eyes is the point of the design, so this ADR excludes writers by default. The small-company mode of ADR-0054 rule 20 is the explicit way back, flagged for the author.
 

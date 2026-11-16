@@ -5,7 +5,7 @@
 -- versions, and analysis examples (the verified question and plan pairs, versioned).
 -- Loaded after DS-05-platform.sql (agent_run) and DS-15 (user_account) by the design lab's load_all.py
 -- (docs/reviews/2026-11-14-design-validation, t18_analysis.py). The ADRs win if this file disagrees.
--- Conventions of DS-20 and DS-05-platform: tables in schema erpme, keys inline, references between company tables
+-- Conventions of DS-20 and DS-05-platform: tables in schema nativeflows, keys inline, references between company tables
 -- composite on (company_id, id), UUIDv7 IDs from context.new_id, no ID defaults, recorded_at on every row
 -- (ADR-0007 rule 9); every table carries company_id, FORCE ROW LEVEL SECURITY and the company policy of ADR-0017
 -- rule 19 (last section). Plans are JSON validated by the plan model of ADR-0060 rule 7 in the command; the database
@@ -289,8 +289,8 @@ BEGIN
     FOREACH v_table IN ARRAY ARRAY['analysis_question', 'saved_analysis', 'saved_analysis_version', 'analysis_example'] LOOP
         EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', v_table);
         EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', v_table);
-        EXECUTE format('CREATE POLICY company_policy ON %I USING (company_id::text = current_setting(''erpme.company_id'', true))', v_table);
-        EXECUTE format('CREATE POLICY company_ids_policy ON %I FOR SELECT USING (company_id::text = ANY (string_to_array(current_setting(''erpme.company_ids'', true), '','')))', v_table);
+        EXECUTE format('CREATE POLICY company_policy ON %I USING (company_id::text = current_setting(''nativeflows.company_id'', true))', v_table);
+        EXECUTE format('CREATE POLICY company_ids_policy ON %I FOR SELECT USING (company_id::text = ANY (string_to_array(current_setting(''nativeflows.company_ids'', true), '','')))', v_table);
     END LOOP;
 END
 $$;

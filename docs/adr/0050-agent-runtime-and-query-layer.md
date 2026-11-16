@@ -20,7 +20,7 @@ Status: accepted (2026-11-15) under ADR-0005, reviewed by Claude Fable 5.2 (buil
 
 **Runs replay.** Recorded runs can be replayed with their recorded LLM outputs, deterministically, or re-run against another model or prompt for comparison. Each workflow has a golden evaluation set from the synthetic dataset. Shadow-mode metrics feed the promotion rules of ADR-0051.
 
-**The query layer.** Agents and reports read through semantic views in schema `query`, served by the read-only role `erpme_readonly` with short timeouts, pagination and row limits. The views mask field classes, apply record scope, and omit `is_untrusted` columns unless asked. Management reporting reads views by system account. Views are exposed as registered queries and described as MCP resources. Audit data is never on an agent's tool list.
+**The query layer.** Agents and reports read through semantic views in schema `query`, served by the read-only role `nativeflows_readonly` with short timeouts, pagination and row limits. The views mask field classes, apply record scope, and omit `is_untrusted` columns unless asked. Management reporting reads views by system account. Views are exposed as registered queries and described as MCP resources. Audit data is never on an agent's tool list.
 
 ### Rules
 
@@ -55,10 +55,10 @@ Status: accepted (2026-11-15) under ADR-0005, reviewed by Claude Fable 5.2 (buil
    - **`stub`:** the recording stub of ADR-0022 rule 9 for `test` and `simulation` environments. It returns fixed outputs per template and records requests, and it is what the CI canary tests read (rule 11).
 
    Each adapter publishes capability flags per model: structured output, tool calls, image and PDF input, context length, reasoning control, prompt caching. A seat uses an advanced feature only when the flag is set, with a fallback otherwise (spec 17, "no lowest common denominator").
-4. Only `erpme.agents.gateway.adapters` may import a provider library (`anthropic`) or call a provider host. An import-linter `forbidden` contract enforces it (ADR-0022 rule 6), and handlers still import no LLM library (ADR-0008 rule 4).
+4. Only `nativeflows.agents.gateway.adapters` may import a provider library (`anthropic`) or call a provider host. An import-linter `forbidden` contract enforces it (ADR-0022 rule 6), and handlers still import no LLM library (ADR-0008 rule 4).
 5. Seats and providers:
-   - **`seatmap.yaml`** (spec 17) lives in `backend/erpme/agents/seatmap.yaml`. Each seat names: required capabilities, reasoning level, temperature where supported, output token limit, the model per provider, a fallback chain within the same provider, and the evaluation report that admitted each (seat, model) pair (rule 40). It changes by commit only, and CI refuses a change whose evaluation report is missing or failed.
-   - **One provider per installation in Phase 1.** The installation setting `llm_provider` (from `ERPME_LLM_PROVIDER`) selects the adapter for every seat. In Phase 1 it accepts only `anthropic`, the configured cloud provider; startup refuses any other value. The endpoint and API key come from the deployment's secret store, are read only by the gateway process, and never appear in a prompt, log or span. Fallback chains never cross providers in Phase 1.
+   - **`seatmap.yaml`** (spec 17) lives in `backend/nativeflows/agents/seatmap.yaml`. Each seat names: required capabilities, reasoning level, temperature where supported, output token limit, the model per provider, a fallback chain within the same provider, and the evaluation report that admitted each (seat, model) pair (rule 40). It changes by commit only, and CI refuses a change whose evaluation report is missing or failed.
+   - **One provider per installation in Phase 1.** The installation setting `llm_provider` (from `NATIVEFLOWS_LLM_PROVIDER`) selects the adapter for every seat. In Phase 1 it accepts only `anthropic`, the configured cloud provider; startup refuses any other value. The endpoint and API key come from the deployment's secret store, are read only by the gateway process, and never appear in a prompt, log or span. Fallback chains never cross providers in Phase 1.
    - **The local option.** Spec 17 says Phase 1 has no local models. The `local` adapter is designed but not enabled. Whether Phase 1 may use a local provider at all, and whether it may then receive personal values, is the author's (open question; scope). Until then, with the switch on, personal values are stripped from every request (rule 9).
    - **Off.** `llm_provider` unset means the LLM is off. Every agent mode is then `off`, and every operation still works by hand (Principle 12).
 
@@ -107,7 +107,7 @@ Status: accepted (2026-11-15) under ADR-0005, reviewed by Claude Fable 5.2 (buil
 **Agent types, prompts and modes**
 
 12. Agent types are code, versioned as one artifact:
-    - **Declaration.** Each workflow module `erpme.agents.workflows.<agent_type>` declares: `code`, `version` (semver), the ordered steps, the tool list (rule 29), the declared permissions (ADR-0017 rule 11), the work item kinds it may claim (ADR-0042 rule 10), `scope_kind` (`partner`, `import_batch`, `subject`) with its scope resolver (rule 15), the subject tables it accepts (rule 15), `may_read_untrusted`, the seat of each LLM step, its prompt templates and output schemas with their versions, its budget maximums (rule 22), and its evaluation suite with threshold (rule 39).
+    - **Declaration.** Each workflow module `nativeflows.agents.workflows.<agent_type>` declares: `code`, `version` (semver), the ordered steps, the tool list (rule 29), the declared permissions (ADR-0017 rule 11), the work item kinds it may claim (ADR-0042 rule 10), `scope_kind` (`partner`, `import_batch`, `subject`) with its scope resolver (rule 15), the subject tables it accepts (rule 15), `may_read_untrusted`, the seat of each LLM step, its prompt templates and output schemas with their versions, its budget maximums (rule 22), and its evaluation suite with threshold (rule 39).
     - **Rows.** At startup the registry writes `agent_type` (`code`, `name`, `is_active`) and one immutable `agent_type_version` row per version (all of the above as data, plus a `content_hash`), like the generated catalogs. Nobody edits them.
     - **New versions.** Changing any declared element, template or schema changes the content hash. CI fails when the hash changes and the version does not, and a new version needs a passing evaluation (rule 40).
     - **Names.** `agent_type` codes are `snake_case` nouns of the workflow (ADR-0004): `customer_onboarding`, `quotation`, `bank_matching`, `purchase_invoice`, `planning`, `data_migration` (ADR-0051).
@@ -122,7 +122,7 @@ Status: accepted (2026-11-15) under ADR-0005, reviewed by Claude Fable 5.2 (buil
 
     Note ([ADR-0064](0064-production-agent.md), proposed 2026-11-15): agent types `production` (scope `subject` on `production_order` or `production_version`, `may_read_untrusted: false`), `production_capture` (scope `subject` on one `production_order` resolved from a `document_extraction`, tainted at start) and `production_variance` (scope `subject` on `analysis_question` or `production_order`, field class `cost`), each with its leaf `agent_<agent_type>` (rule 1).
 13. Prompt templates:
-    - **Files.** `backend/erpme/agents/prompts/<agent_type>/<template_code>.md`, Markdown with front matter: `code`, `version` (semver), `seat`, `inputs` (field paths, with `required`), `output_schema` (pydantic model path and its version).
+    - **Files.** `backend/nativeflows/agents/prompts/<agent_type>/<template_code>.md`, Markdown with front matter: `code`, `version` (semver), `seat`, `inputs` (field paths, with `required`), `output_schema` (pydantic model path and its version).
     - **Overlays.** Provider-specific wording is a small overlay file `<template_code>.<provider>.md` (spec 17). The base and overlay are hashed together.
     - **Versions.** CI fails when a template's content hash changes without a version change. A run records, per step, the template code, version and content hash.
     - **Language.** Templates are English (reading guide rule 6). Outputs that people read are written in the language the step's input names (a contact's `preferred_language`, else the company's), as an IETF language tag. No template or output schema fixes a list of languages.
@@ -302,7 +302,7 @@ Status: accepted (2026-11-15) under ADR-0005, reviewed by Claude Fable 5.2 (buil
 
 29. Tool lists (spec 03 rule 2; ADR-0008 rule 6):
     - **What.** An agent type version's tool list names registered queries and commands. Nothing is inferred from a prompt.
-    - **Definitions.** Tool definitions are generated from the registry with the same names (`snake_case`, ADR-0004 rule 19) and JSON Schemas as the MCP tools. ERPMe's own runs call the dispatcher in process; outside MCP clients use the MCP transport with their own credentials.
+    - **Definitions.** Tool definitions are generated from the registry with the same names (`snake_case`, ADR-0004 rule 19) and JSON Schemas as the MCP tools. NativeFlows's own runs call the dispatcher in process; outside MCP clients use the MCP transport with their own credentials.
     - **Checked per call.** The dispatcher checks every call against the run token's tool list and rejects others with `tool_not_allowed`, with a denial record.
 
     Note: the tool list is step 2 of the dispatcher's check order, first after the credential and before `human_only`, `proposal_required` and permission ([DS-04](../design/DS-04-command-envelope.md#dispatcher-check-order)). Allowed-target commands of ADR-0029 rule 2 (effect class `master_data_change` or `is_proposal_bound`) are kept off tool lists too, a registry check that INV-214 covers: agents reach them only through `CreateChangeProposal`, so an agent run that calls one directly gets `tool_not_allowed`, and `proposal_required` is met by consumer commands carrying an origin run (EC-56).
@@ -380,16 +380,16 @@ Status: accepted (2026-11-15) under ADR-0005, reviewed by Claude Fable 5.2 (buil
 **Query layer**
 
 42. Placement and names:
-    - **Schema `query`** holds the semantic views (ADR-0004 rule 16's placement; ADR-0022 rule 7 keeps tables in `erpme`).
+    - **Schema `query`** holds the semantic views (ADR-0004 rule 16's placement; ADR-0022 rule 7 keeps tables in `nativeflows`).
     - **Names** are nouns, unique across the database and never equal to a table name (ADR-0004 rules 9, 16): row views end in `_overview`; aggregates use their own noun (`system_account_turnover`).
     - **Owner.** `query` declares each view in its `views.py` with its SQL; a CI check fails on a view without a declaration.
 43. Roles and connections:
-    - **Owner role.** Views are owned by `erpme_query_owner` (`NOLOGIN`, never `BYPASSRLS`), which has `SELECT` on the base tables it needs. Views use `security_barrier`. The generated company policy (ADR-0017 rule 19) applies to `erpme_query_owner`; a test runs every view as `erpme_readonly` without `erpme.company_id` and expects no rows.
-    - **Reader role.** `erpme_readonly` has `USAGE` on schema `query` and `SELECT` on its views, and no grant in `erpme`.
-    - **Connections.** A separate pool for `erpme_readonly`, with `default_transaction_read_only` on, `statement_timeout` 10 seconds for agent runs and 30 seconds otherwise (ADR-0022 rule 9 allows lowering), and `transaction_timeout` 30 seconds.
+    - **Owner role.** Views are owned by `nativeflows_query_owner` (`NOLOGIN`, never `BYPASSRLS`), which has `SELECT` on the base tables it needs. Views use `security_barrier`. The generated company policy (ADR-0017 rule 19) applies to `nativeflows_query_owner`; a test runs every view as `nativeflows_readonly` without `nativeflows.company_id` and expects no rows.
+    - **Reader role.** `nativeflows_readonly` has `USAGE` on schema `query` and `SELECT` on its views, and no grant in `nativeflows`.
+    - **Connections.** A separate pool for `nativeflows_readonly`, with `default_transaction_read_only` on, `statement_timeout` 10 seconds for agent runs and 30 seconds otherwise (ADR-0022 rule 9 allows lowering), and `transaction_timeout` 30 seconds.
 44. `SELECT` only (ADR-0040 rule 13):
     - **The builder** composes each statement from the view declaration and the request: one `SELECT` with bound parameters. No client sends SQL, and agents never write SQL (Principle 7). A CI test checks that every built statement is a single `SELECT`.
-    - **No side effects.** Views call no volatile function. `EXECUTE` on `pg_notify` is revoked from `PUBLIC` and granted to `erpme_app` and `erpme_worker`.
+    - **No side effects.** Views call no volatile function. `EXECUTE` on `pg_notify` is revoked from `PUBLIC` and granted to `nativeflows_app` and `nativeflows_worker`.
 
     Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), proposed 2026-11-15): the analysis compiler emits one statement whose top level is a `SELECT`, with read-only common table expressions, over declared views only and with every value bound; the same CI test covers it (rule 12).
 45. View declarations, beside the SQL:
@@ -400,25 +400,25 @@ Status: accepted (2026-11-15) under ADR-0005, reviewed by Claude Fable 5.2 (buil
     Note: document rows also declare the owner scope columns of their document, `owner_employee_id` and `created_by_user_id`; a row that follows a document (a line, an open item) declares the document it follows ([ADR-0054](0054-users-roles-and-authorizations.md) rules 14–15).
 46. Exposure:
     - **Queries.** Each view gives `List<View>` and, where keyed, `Get<View>`, registered by `query` (ADR-0004 rule 21). REST and MCP are generated (Principle 10). Their names are the view's noun in `PascalCase`: `ListPartnerOverview`, `ListSystemAccountTurnover`.
-    - **MCP resources** (Principle 7): `erpme://query/views` lists the views, and `erpme://query/views/<name>` returns a declaration (columns, meanings, labels, field classes, untrusted flags, filters). They hold metadata only; data comes through the queries.
+    - **MCP resources** (Principle 7): `nativeflows://query/views` lists the views, and `nativeflows://query/views/<name>` returns a declaration (columns, meanings, labels, field classes, untrusted flags, filters). They hold metadata only; data comes through the queries.
 
-    Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), proposed 2026-11-15): the analysis catalog adds the resources `erpme://query/measures`, `erpme://query/measures/<code>`, `erpme://query/dimensions` and `erpme://query/dimensions/<code>`, metadata only (rule 14).
+    Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), proposed 2026-11-15): the analysis catalog adds the resources `nativeflows://query/measures`, `nativeflows://query/measures/<code>`, `nativeflows://query/dimensions` and `nativeflows://query/dimensions/<code>`, metadata only (rule 14).
 47. Filters and pages:
     - **Operators:** equality; `in` (at most 100 values); ranges on dates, amounts and quantities; `contains` on declared text columns (case and diacritics folded). Sorting only on declared columns, with `id` as the tiebreak.
     - **Pages.** Cursor paging (ADR-0008 rule 22): `limit` default 100, maximum 1,000. For agent runs the maximum is 200, and `max_rows_read` caps a run's total (rule 22).
 48. Field classes and record scope, applied in the view and in the builder:
-    - **Session settings.** The builder sets, with `SET LOCAL`, `erpme.company_id`, `erpme.field_classes`, `erpme.scope_branch_ids`, `erpme.scope_warehouse_ids` and, for tainted runs, `erpme.taint_scope_partner_id` or `erpme.taint_scope_import_batch_id`, `erpme.taint_subject`, `erpme.taint_work_item_id` and `erpme.taint_document_ids` (the drafts of its work item and agent type), all from the actor's effective rights (rule 31).
+    - **Session settings.** The builder sets, with `SET LOCAL`, `nativeflows.company_id`, `nativeflows.field_classes`, `nativeflows.scope_branch_ids`, `nativeflows.scope_warehouse_ids` and, for tainted runs, `nativeflows.taint_scope_partner_id` or `nativeflows.taint_scope_import_batch_id`, `nativeflows.taint_subject`, `nativeflows.taint_work_item_id` and `nativeflows.taint_document_ids` (the drafts of its work item and agent type), all from the actor's effective rights (rule 31).
     - **Field classes.** Each class column is `CASE WHEN query.has_field_class('<class>') THEN … END`, so a missing class yields null even if the builder errs. The builder also leaves those columns out of the result (ADR-0017 rule 10: omitted, not null).
     - **Record scope.** Each view computes `is_in_scope` from the scope settings. The builder always filters on it, and computes `is_scope_filtered` with one `EXISTS` over the same filters and `NOT is_in_scope`, which returns one boolean and no row.
 
-    Note: the builder also sets `erpme.read_grants`: the actor's assignments in force that grant the query's permission, for an agent run those of its human, as a list of (branch IDs, warehouse IDs, owner scope, the employee IDs of the organization resolver's set, user ID). A view's `is_in_scope` is true for a document row when one grant passes both record scope and owner scope, and for other rows when one passes record scope ([ADR-0054](0054-users-roles-and-authorizations.md) rules 13–15).
+    Note: the builder also sets `nativeflows.read_grants`: the actor's assignments in force that grant the query's permission, for an agent run those of its human, as a list of (branch IDs, warehouse IDs, owner scope, the employee IDs of the organization resolver's set, user ID). A view's `is_in_scope` is true for a document row when one grant passes both record scope and owner scope, and for other rows when one passes record scope ([ADR-0054](0054-users-roles-and-authorizations.md) rules 13–15).
 
     Note ([ADR-0059](0059-ai-tuning-and-development-of-deterministic-functions.md), proposed 2026-11-15): for a run of a drafting agent type (one whose tool list holds an artifact draft command), the builder also excludes the held-out cases, by the hash rule, from every row query and aggregate: rows of the declared case tables and rows whose declared case-reference columns point at a held-out case. An aggregate it cannot filter is refused with `held_out_filter_unavailable`. Only queries registered held-out filtered may be on such a tool list, and reads of evidence, shadow outcomes, monitor snapshots, automation executions and `GetAutoPostShadowEvaluation` never are (rule 16).
 
-    Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), proposed 2026-11-15): for analysis plans, which read several fact views in one statement, `erpme.read_grants` is a map keyed by view name: each fact view's entry holds the assignments that grant that view's `List` permission, and each view's `is_in_scope` reads its own entry, so one fact's grant never widens another's. The builder also sets `erpme.business_date` for views that compare dates with it (rule 13).
+    Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), proposed 2026-11-15): for analysis plans, which read several fact views in one statement, `nativeflows.read_grants` is a map keyed by view name: each fact view's entry holds the assignments that grant that view's `List` permission, and each view's `is_in_scope` reads its own entry, so one fact's grant never widens another's. The builder also sets `nativeflows.business_date` for views that compare dates with it (rule 13).
 
-    Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), proposed 2026-11-15): this note replaces the list format of the first note above: `erpme.read_grants` is always a map keyed by view name, for every query of the read-only layer, so each view's `is_in_scope` reads one format; a `List<View>` query sets a one-entry map, and an analysis plan one entry per fact view it reads (ADR-0060 rule 13).
-49. Taint in the views: the builder applies rules 25–28. It omits untrusted columns unless asked and reads the effective `is_tainted` column of returned rows. Each view computes `is_in_taint_scope` as rule 27 defines the scope: its partner or import batch column equals the run's scope, or the row is the run's subject, its work item or one of `erpme.taint_document_ids`. Views of reference data are declared `is_reference` and always pass. For tainted runs the builder filters on `is_in_taint_scope`, and refuses a view that has none of these columns and is not `is_reference`.
+    Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), proposed 2026-11-15): this note replaces the list format of the first note above: `nativeflows.read_grants` is always a map keyed by view name, for every query of the read-only layer, so each view's `is_in_scope` reads one format; a `List<View>` query sets a one-entry map, and an analysis plan one entry per fact view it reads (ADR-0060 rule 13).
+49. Taint in the views: the builder applies rules 25–28. It omits untrusted columns unless asked and reads the effective `is_tainted` column of returned rows. Each view computes `is_in_taint_scope` as rule 27 defines the scope: its partner or import batch column equals the run's scope, or the row is the run's subject, its work item or one of `nativeflows.taint_document_ids`. Views of reference data are declared `is_reference` and always pass. For tainted runs the builder filters on `is_in_taint_scope`, and refuses a view that has none of these columns and is not `is_reference`.
 50. Never in an agent's reach:
     - **Audit.** No view over `audit_record`, `audit_change`, `audit_denial`, `policy_decision`, `agent_run_step` or `personal_data_processing_log` is registered for agents. Tainted runs never read audit data (ADR-0038 rule 7). People read these through their own queries.
     - **Secrets.** Never in a view (rule 45).
@@ -525,7 +525,7 @@ Constraints:
 - ADR-0002 fixes the Anthropic SDK behind a thin self-written gateway and rejects agent frameworks.
 - Handlers make no network call (ADR-0008 rule 4), so LLM calls run in an external consumer outside transactions (ADR-0013 rule 10).
 
-How others do it, concepts only. SAP's Joule and S/4HANA AI services keep business logic in the application and call models through a central hub with grounding and data masking; reads go through CDS views with authorization checks. ERPMe follows the same split: one gateway with masking by label, semantic views with scope and field filters, and the business core deciding everything.
+How others do it, concepts only. SAP's Joule and S/4HANA AI services keep business logic in the application and call models through a central hub with grounding and data masking; reads go through CDS views with authorization checks. NativeFlows follows the same split: one gateway with masking by label, semantic views with scope and field filters, and the business core deciding everything.
 
 The main risk is prompt injection from outside content. Instructions cannot be filtered reliably from text. So the design never trusts the model: taint is set where data is read, tainted runs cannot act or see beyond their scope, tools are fixed and read-only for the model, and every output is checked by code.
 
@@ -555,7 +555,7 @@ The main risk is prompt injection from outside content. Instructions cannot be f
   - ADR-0008 rule 6: tool lists and tool definitions; rule 25: agent budgets beside rate limits;
   - ADR-0013 rule 12: the wake-up consumer starts runs through `StartAgentRun`; rule 13: queue `agents`;
   - ADR-0014 rule 17: agents read views and module queries;
-  - ADR-0017 rule 3: the run token; rule 4: `start_agent:<agent_type>`; rule 11: the third limit of tool lists; rule 12: the tainted read scope; rule 18: `erpme_query_owner`; rule 19: scope and classes through session settings in views;
+  - ADR-0017 rule 3: the run token; rule 4: `start_agent:<agent_type>`; rule 11: the third limit of tool lists; rule 12: the tainted read scope; rule 18: `nativeflows_query_owner`; rule 19: scope and classes through session settings in views;
   - ADR-0019 rule 7: label evaluation per value; rule 10: erasure of run steps; rule 11: the gateway's log entries;
   - ADR-0022 rule 2: the three modules and their imports; rule 6: the provider import contract; rule 7: schema `query` and the owner role; rule 9: 10-second agent queries;
   - ADR-0023 rule 23: warehouse views later;

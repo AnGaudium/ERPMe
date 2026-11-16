@@ -207,7 +207,7 @@ The author's design draft "Deterministic Policy Engine (Maker-Checker Gateway)" 
 
 ## Context
 
-The author's draft of 2026-11-16 describes a maker-checker gateway: an agent makes a draft, deterministic code checks it, and a clean draft posts without a person. ERPMe already has most of the pieces, but only for one path:
+The author's draft of 2026-11-16 describes a maker-checker gateway: an agent makes a draft, deterministic code checks it, and a clean draft posts without a person. NativeFlows already has most of the pieces, but only for one path:
 
 - **The auto-post path** of ADR-0043 rule 14 evaluates unattended postings as `system`, under an enabled rule with an owner, a maximum, confirmation and shadow evidence, with evidence hooks registered by `cash` and `production`. ADR-0043 rule 5 says the bank cascade is the only unattended workflow posting.
 - **The evidence floor** `auto_post.max_error_rate` and the rule of three (ADR-0063 rule 10), the asymmetric change path and the hard locks (ADR-0063 rules 3, 6).
@@ -217,7 +217,7 @@ The author's draft of 2026-11-16 describes a maker-checker gateway: an agent mak
 
 What was missing is a generic checker per document type and an answer for tainted drafts. Spec 03 rule 1 forbids auto-posting what an LLM contributed to, and spec 03 says no setting relaxes it. The purchase invoice agent's drafts are always tainted, because the run reads a supplier's e-invoice record (ADR-0051 rule 20). So a gateway without the author's decision could never post a single agent-drafted invoice. The author decided to allow it under customer configuration.
 
-SAP's logistics invoice verification posts incoming electronic invoices in the background when they match the order and receipt within the company code's tolerance keys, and otherwise parks them or posts them blocked for payment. ERPMe keeps the SAP idea (tolerances against order and receipt decide) and adds what an AI-native system needs: the shadow evidence before enabling, value bases for model-read values, and fast demotion.
+SAP's logistics invoice verification posts incoming electronic invoices in the background when they match the order and receipt within the company code's tolerance keys, and otherwise parks them or posts them blocked for payment. NativeFlows keeps the SAP idea (tolerances against order and receipt decide) and adds what an AI-native system needs: the shadow evidence before enabling, value bases for model-read values, and fast demotion.
 
 ## Options considered
 

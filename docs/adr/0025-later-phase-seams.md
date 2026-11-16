@@ -105,7 +105,7 @@ Everything else for these phases is additive: new tables, movement types, transa
   - ADR-0010 rule 9: the chart is frozen to additions at the gate. ADR-0010 rule 12: a mapping is frozen at the first posting.
   - ADR-0014 rules 9, 10 and 17: subledgers are views over journal lines.
 - **SAP practice, concepts only.** CO orders as cost collectors that carry WIP and settle; material ledger multilevel actual costing; asset accounting with reconciliation accounts and a transfer of old balances at go-live.
-- **ERPMe's own answer.** The activation date with a reclassification document lets a chart that cannot change its control kinds after release still gain subledgers safely.
+- **NativeFlows's own answer.** The activation date with a reclassification document lets a chart that cannot change its control kinds after release still gain subledgers safely.
 
 ## Options considered
 

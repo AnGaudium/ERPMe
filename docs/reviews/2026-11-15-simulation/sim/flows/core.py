@@ -18,14 +18,14 @@ from fractions import Fraction
 import psycopg
 from psycopg.types.json import Jsonb, set_json_dumps
 
-DSN = os.environ.get("ERPME_SIM_DSN", "host=127.0.0.1 port=5561 dbname=erpme_sim user=lab password=lab")
-LLM_URL = os.environ.get("ERPME_SIM_LLM_URL", "http://127.0.0.1:18083/v1/chat/completions")
-LLM_MODEL = os.environ.get("ERPME_SIM_LLM_MODEL", "/models/gemma-4-31b-it-Q8_0/gemma-4-31B-it-Q8_0.gguf")
+DSN = os.environ.get("NATIVEFLOWS_SIM_DSN", "host=127.0.0.1 port=5561 dbname=nativeflows_sim user=lab password=lab")
+LLM_URL = os.environ.get("NATIVEFLOWS_SIM_LLM_URL", "http://127.0.0.1:18083/v1/chat/completions")
+LLM_MODEL = os.environ.get("NATIVEFLOWS_SIM_LLM_MODEL", "/models/gemma-4-31b-it-Q8_0/gemma-4-31B-it-Q8_0.gguf")
 LLM_MODE = os.environ.get("SIM_LLM", "live")          # live | off (labelled fallback fixtures, for dry runs)
 LLM_GAP = float(os.environ.get("SIM_LLM_GAP", "4"))   # seconds between calls: the machine is shared
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TZ = dt.timezone(dt.timedelta(hours=7))
-SEED = "erpme-sim-2026-11-15"
+SEED = "nativeflows-sim-2026-11-15"
 
 
 # ------------------------------------------------------------------ values
@@ -124,18 +124,18 @@ def reset_streams():
 # ------------------------------------------------------------------ database
 class DB:
     def __init__(self):
-        self.cx = psycopg.connect(DSN + " options=-csearch_path=erpme")
+        self.cx = psycopg.connect(DSN + " options=-csearch_path=nativeflows")
         self.cx.autocommit = True
         self.cols = {}
 
     def set_company(self, company_id):
         # FORCE ROW LEVEL SECURITY on the platform tables (ADR-0022 rule 8): the session names its company.
-        self.cx.execute("select set_config('erpme.company_id', %s, false)", (str(company_id),))
+        self.cx.execute("select set_config('nativeflows.company_id', %s, false)", (str(company_id),))
 
     def load_columns(self):
         self.cols = {}
         for t, c, nul, dflt, udt in self.cx.execute(
-                "select table_name, column_name, is_nullable, column_default, udt_name from information_schema.columns where table_schema='erpme'"):
+                "select table_name, column_name, is_nullable, column_default, udt_name from information_schema.columns where table_schema='nativeflows'"):
             self.cols.setdefault(t, {})[c] = (nul == "YES", dflt, udt)
 
     def x(self, sql, args=None):
@@ -184,10 +184,10 @@ def _adapt(v):
 
 
 def ins(db, table, **cols):
-    """Insert one row into erpme.<table>; fills company_id and recorded_at when the table has them."""
+    """Insert one row into nativeflows.<table>; fills company_id and recorded_at when the table has them."""
     meta = db.cols.get(table)
     if meta is None:
-        raise KeyError(f"no table erpme.{table}")
+        raise KeyError(f"no table nativeflows.{table}")
     if "company_id" in meta and "company_id" not in cols and getattr(W, "co", None):
         cols["company_id"] = W.co
     if "recorded_at" in meta and "recorded_at" not in cols:
@@ -197,7 +197,7 @@ def ins(db, table, **cols):
         cols = _u.fill_block(db, table, cols)
     for k in cols:
         if k not in meta:
-            raise KeyError(f"erpme.{table} has no column {k}")
+            raise KeyError(f"nativeflows.{table} has no column {k}")
     keys = list(cols)
     vals = [Jsonb(cols[k]) if meta[k][2] == "jsonb" and cols[k] is not None and not isinstance(cols[k], Jsonb) else _adapt(cols[k]) for k in keys]
     db.x("insert into %s (%s) values (%s)" % (table, ",".join('"%s"' % k for k in keys), ",".join(["%s"] * len(keys))), vals)
@@ -206,7 +206,7 @@ def ins(db, table, **cols):
 
 
 def upd(db, table, where, **cols):
-    """Update erpme.<table> rows matching where (dict of column -> value)."""
+    """Update nativeflows.<table> rows matching where (dict of column -> value)."""
     sets = ",".join('"%s"=%%s' % k for k in cols)
     conds = " and ".join('"%s"=%%s' % k for k in where)
     meta = db.cols.get(table, {})

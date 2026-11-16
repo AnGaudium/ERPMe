@@ -6,7 +6,7 @@ Status: accepted (2026-11-14) under ADR-0005, reviewed by Claude Fable 5.2 (buil
 
 The web UI is one more client of the command and query layer. It writes data only through registered commands and reads only through registered queries.
 
-**Screens.** Almost every screen is rendered from the registry: lists from `List<Noun>` queries, record views from `Get<Noun>`, and forms from command schemas. Their small UI metadata travels as named `x-erpme-*` annotations in the generated JSON Schemas. A form shows the server's plan and check results before anything executes, and the client never computes money or quantities itself. The six hand-built entry screens of step 9 reuse the same components with their own layout and the AG Grid line editor.
+**Screens.** Almost every screen is rendered from the registry: lists from `List<Noun>` queries, record views from `Get<Noun>`, and forms from command schemas. Their small UI metadata travels as named `x-nativeflows-*` annotations in the generated JSON Schemas. A form shows the server's plan and check results before anything executes, and the client never computes money or quantities itself. The six hand-built entry screens of step 9 reuse the same components with their own layout and the AG Grid line editor.
 
 **Transport.**
 - **Sessions:** cookie sessions with a CSRF token.
@@ -30,7 +30,7 @@ The web UI is one more client of the command and query layer. It writes data onl
    - **Screen needs.** A screen need the API cannot meet is solved in the API for every client, as a B2 change where it alters a command ([steps-5-9.md](../runbook/steps-5-9.md), step 9 fallback).
    - **The live stream** is a signal to refetch. It carries no data that a query would not give.
 2. The client does no business arithmetic. Totals, taxes, prices, conversions and stock effects come from simulation; the client only formats them.
-   - **Decimals.** They travel as canonical decimal strings (ADR-0006 rule 13) and are never parsed into floating-point numbers. A small self-written decimal-string module formats them by locale, at the scale of the field's currency or unit (`x-erpme-scale-from`, rule 4; ADR-0006 rule 14). It parses localized input back to the canonical form. Input with too many decimals is shown as the server's `too_many_decimal_places`, never rounded.
+   - **Decimals.** They travel as canonical decimal strings (ADR-0006 rule 13) and are never parsed into floating-point numbers. A small self-written decimal-string module formats them by locale, at the scale of the field's currency or unit (`x-nativeflows-scale-from`, rule 4; ADR-0006 rule 14). It parses localized input back to the canonical form. Input with too many decimals is shown as the server's `too_many_decimal_places`, never rounded.
 
    Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), proposed 2026-11-15): analysis charts and tables plot server cells only: totals, subtotals, other rows, shares, changes and contributions are cells of `EvaluateAnalysisPlan`; every figure of an answer is a key fact, and every sentence of its narrative, rendered by code with the formatter of this rule from fixed templates (rules 15, 23, 32).
 3. Times and dates:
@@ -42,17 +42,17 @@ The web UI is one more client of the command and query layer. It writes data onl
 
 4. The registry emits UI metadata in the generated JSON Schemas, as these annotations:
    - **Derived from the model:**
-     - `x-erpme-widget` (from the field's type: Amount, Quantity, UnitPrice, ExchangeRate, Percent, BusinessDate, enums, references);
-     - `x-erpme-field-class` (ADR-0017 rule 10, emitted by ADR-0022 rule 17);
-     - `x-erpme-untrusted` (ADR-0029);
-     - `x-erpme-ref` (the referenced table of a `Ref[<table>]`);
-     - `x-erpme-scale-from` (the sibling currency or unit field).
+     - `x-nativeflows-widget` (from the field's type: Amount, Quantity, UnitPrice, ExchangeRate, Percent, BusinessDate, enums, references);
+     - `x-nativeflows-field-class` (ADR-0017 rule 10, emitted by ADR-0022 rule 17);
+     - `x-nativeflows-untrusted` (ADR-0029);
+     - `x-nativeflows-ref` (the referenced table of a `Ref[<table>]`);
+     - `x-nativeflows-scale-from` (the sibling currency or unit field).
    - **Optional hints in `json_schema_extra`:**
-     - `x-erpme-group` and `x-erpme-order`;
-     - `x-erpme-line-columns` for line arrays;
-     - `x-erpme-hidden-when` and `x-erpme-read-only-when` (simple conditions on other fields of the same payload);
-     - `x-erpme-lookup` (the `List<Noun>` query with a `search` filter and the result fields to show);
-     - `x-erpme-list-defaults` on a `List<Noun>` result model (default columns, sort and filters).
+     - `x-nativeflows-group` and `x-nativeflows-order`;
+     - `x-nativeflows-line-columns` for line arrays;
+     - `x-nativeflows-hidden-when` and `x-nativeflows-read-only-when` (simple conditions on other fields of the same payload);
+     - `x-nativeflows-lookup` (the `List<Noun>` query with a `search` filter and the result fields to show);
+     - `x-nativeflows-list-defaults` on a `List<Noun>` result model (default columns, sort and filters).
    - **Labels and help** come from i18n keys (rule 14), not from the schema.
    - **Not per screen.** Nothing is maintained per screen in the frontend. User-defined fields (after Phase 1) appear through the same schemas, so the renderer never hard-codes field lists.
 5. CI checks the hints:
@@ -146,8 +146,8 @@ The web UI is one more client of the command and query layer. It writes data onl
 **Sessions, schemas, live updates**
 
 12. Transport:
-    - **Sessions** are server-side (ADR-0017 rule 2), in a cookie `__Host-erpme_session` (`Secure`, `HttpOnly`, `SameSite=Lax`).
-    - **CSRF.** Every state-changing request from a cookie session carries the header `X-ERPMe-CSRF` with the session's token, and its `Origin` must be the installation's. Integrations and agents use bearer tokens and need neither.
+    - **Sessions** are server-side (ADR-0017 rule 2), in a cookie `__Host-nativeflows_session` (`Secure`, `HttpOnly`, `SameSite=Lax`).
+    - **CSRF.** Every state-changing request from a cookie session carries the header `X-NativeFlows-CSRF` with the session's token, and its `Origin` must be the installation's. Integrations and agents use bearer tokens and need neither.
     - **Hand-written endpoints.** The transport endpoints, owned by `permissions` and `registry`, are the only hand-written ones besides the attachment upload: `POST /api/auth/sign-in`, `POST /api/auth/totp`, `POST /api/auth/sign-out`, `GET /api/auth/oidc/callback`, `GET /api/ui/stream`, and `POST /api/ui/stream/subscriptions`. ADR-0008 rule 6 and ADR-0038 rule 13 get a note.
     - **CSRF token.** The client gets it from the sign-in response and from `GetSessionContext`.
     - **Session bootstrap.** `GetSessionContext` is installation-scoped and needs only a valid credential, not a permission. This is an exception to ADR-0017 rule 8, which gets a note. It returns only the caller's own rights, and it is on no agent tool list. It returns, after sign-in:
@@ -161,12 +161,12 @@ The web UI is one more client of the command and query layer. It writes data onl
 
     Note: a hand-written endpoint `POST /api/auth/password` consumes a one-time reset token or changes a password; `GetSessionContext` also returns owner scopes, the delegations in force and the user's pending invitations ([ADR-0054](0054-users-roles-and-authorizations.md) rules 3, 4, 22).
 13. Live updates (ADR-0013 rule 12) work as follows:
-    - **The header.** When the dispatcher inserts an event (ADR-0013 rule 6), it also sends `pg_notify('erpme_ui', header)` in the same transaction. The notification goes out only on commit and never from a simulation.
+    - **The header.** When the dispatcher inserts an event (ADR-0013 rule 6), it also sends `pg_notify('nativeflows_ui', header)` in the same transaction. The notification goes out only on commit and never from a simulation.
     - **Header contents:** event ID, event type, company, the subject's root (`subject_table` and `subject_id`, with child subjects resolved to their document), `subject_sequence`, and the subject's record-scope dimensions as the dispatcher's scope resolver computes them (the same values `audit_record` stores, ADR-0038 rule 2). It carries no payload values. This replaces the consumer that ADR-0013 rule 12 foresaw, so there are no delivery rows, pausing or retention to manage.
     - **Listening.** Each web process holds one dedicated `LISTEN` connection outside the pool; it reads no table. Because any database role can listen on a channel, headers carry only IDs, and the read-only query layer (DS-33) accepts nothing but `SELECT`.
     - **The stream.** A signed-in tab opens `GET /api/ui/stream` (Server-Sent Events over HTTP/2 through Caddy, heartbeat every 25 seconds, no buffering). Its first message gives a random `stream_id`.
     - **Subscriptions.** The tab posts the whole set of subjects and nouns it has open to `/api/ui/stream/subscriptions` with that `stream_id`, at most 100 entries. A list screen subscribes to its noun, not to its rows, so 100 is ample. A set whose relayed payload would exceed 7,500 bytes is rejected with `request_too_large`, keeping it under PostgreSQL's `NOTIFY` limit. A post replaces the stream's set, so it is idempotent.
-      - **Routing.** The post may reach another web process, so the receiving process checks that the stream belongs to the session and relays `{stream_id, subscriptions}` with `pg_notify('erpme_ui_sub', …)` (IDs only). Every process listens there, and the one holding the stream applies it.
+      - **Routing.** The post may reach another web process, so the receiving process checks that the stream belongs to the session and relays `{stream_id, subscriptions}` with `pg_notify('nativeflows_ui_sub', …)` (IDs only). Every process listens there, and the one holding the stream applies it.
       - **Reconnects.** After a reconnect the tab gets a new `stream_id` and posts its set again.
     - **Forwarding.** The web process forwards a header only if all of these hold:
       - it matches a subscription;
@@ -178,7 +178,7 @@ The web UI is one more client of the command and query layer. It writes data onl
     - **The client** coalesces headers for 300 ms per query key, invalidates the subject's TanStack Query keys and refetches through queries, so permissions and field classes apply on the read.
     - **Delivery.** Best effort. After a reconnect, the client refetches what is open.
 
-    The query builder emits one `SELECT` per statement, and `EXECUTE` on `pg_notify` is revoked from `PUBLIC` and granted to `erpme_app` and `erpme_worker` ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 44).
+    The query builder emits one `SELECT` per statement, and `EXECUTE` on `pg_notify` is revoked from `PUBLIC` and granted to `nativeflows_app` and `nativeflows_worker` ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 44).
 
     Note: the header also carries the subject document's `owner_employee_id` and `created_by_user_id` (IDs), and a header is forwarded only when the session's read owner scope reaches the document, checked against the same cached assignments and organization data ([ADR-0054](0054-users-roles-and-authorizations.md) rule 15).
 14. Notifications to people beyond live screens (e-mail, push) are after Phase 1 (spec 07).
@@ -257,7 +257,7 @@ The stack is fixed by ADR-0002. These were defined nowhere and are decided here:
 - accessibility and browser targets;
 - where check results travel.
 
-Odoo and SAP Fiori both render most screens from metadata. Odoo's views are hand-written XML per model; ERPMe derives its metadata from the command schemas, so agents and people see one definition.
+Odoo and SAP Fiori both render most screens from metadata. Odoo's views are hand-written XML per model; NativeFlows derives its metadata from the command schemas, so agents and people see one definition.
 
 ## Options considered
 

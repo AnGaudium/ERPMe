@@ -8,14 +8,14 @@ window (rule 21). Part H checks invitations, linked and shared users and the cre
 of rule 9 and the organization guard of rule 6, on real rows. Part G checks the approval engine of ADR-0055 rules 3-20 as pure functions.
 Not covered: the dispatcher, RLS policies, the live-update stream, the upgrade job itself, work item visibility queries.
 
-Environment: ERPME_LAB_DSN (a throwaway database), PGPASSWORD, ERPME_DOCS (a docs directory with DS-15-access.sql
+Environment: NATIVEFLOWS_LAB_DSN (a throwaway database), PGPASSWORD, NATIVEFLOWS_DOCS (a docs directory with DS-15-access.sql
 and the catalogs in place). Loading needs the lab loader and stubs of that docs directory.
 """
 import csv, hashlib, io, os, random, re, subprocess, sys, tempfile
 from datetime import date, datetime, timedelta, timezone
 from lab import RESULTS, conn, expect, new
 
-DOCS = os.environ.get("ERPME_DOCS", os.path.expanduser("~/Projects/ERPMe/docs"))
+DOCS = os.environ.get("NATIVEFLOWS_DOCS", os.path.expanduser("~/Projects/NativeFlows/docs"))
 LAB = os.path.join(DOCS, "reviews/2026-11-14-design-validation/lab")
 CAT = os.path.join(DOCS, "catalogs")
 
@@ -77,10 +77,10 @@ X = c.execute
 tables15 = re.findall(r"CREATE TABLE (\w+)", ddl15)
 installation = {"user_account", "user_session", "credential_reset", "integration_client", "integration_token", "installation_role_assignment"}
 missing = [t for t in tables15 if t not in installation and not X(
-    "select 1 from information_schema.columns where table_schema='erpme' and table_name=%s and column_name='company_id'", (t,)).fetchone()]
+    "select 1 from information_schema.columns where table_schema='nativeflows' and table_name=%s and column_name='company_id'", (t,)).fetchone()]
 check(f"A2 all {len(tables15) - len(installation)} company tables of DS-15 carry company_id", missing == [], missing or "")
 inst_with = [t for t in installation if X(
-    "select 1 from information_schema.columns where table_schema='erpme' and table_name=%s and column_name='company_id'", (t,)).fetchone()]
+    "select 1 from information_schema.columns where table_schema='nativeflows' and table_name=%s and column_name='company_id'", (t,)).fetchone()]
 check("A3 the six installation tables carry no company_id", inst_with == [], inst_with or "")
 
 # ---------------------------------------------------------------- fixtures
@@ -125,7 +125,7 @@ expect("B1 assignment own read with company edit (edit wider than read)", lambda
 expect("B2 assignment team read with department edit", lambda cx: ra(cx, "team", "department"), True, "ck_role_assignment_owner_scope_pair")
 expect("B3 assignment department read with own edit", lambda cx: ra(cx, "department", "own"), False)
 expect("B4 an assignment to an agent type (agent types get no assignments, ADR-0054 rule 16)", lambda cx: ra(cx, None, None, kind="agent_type", user=None), True, "ck_role_assignment_principal_kind")
-check("B4b role_assignment has no agent_type column", not X("select 1 from information_schema.columns where table_schema='erpme' and table_name='role_assignment' and column_name='agent_type'").fetchone())
+check("B4b role_assignment has no agent_type column", not X("select 1 from information_schema.columns where table_schema='nativeflows' and table_name='role_assignment' and column_name='agent_type'").fetchone())
 expect("B5 user assignment without owner scope", lambda cx: ra(cx, None, None), True, "ck_role_assignment_owner_scope")
 expect("B6 assignment granted to oneself", lambda cx: ra(cx, granted="uA"), True, "ck_role_assignment_not_self")
 expect("B7 assignment ending before it starts", lambda cx: ra(cx, vfrom="2026-02-01", vto="2026-01-31"), True, "ck_role_assignment_dates")

@@ -1,9 +1,9 @@
 """Scenario: configurable workflows (ADR-0058), as pure functions and on the DDL drafts.
 
 Run: python t22_workflows.py [--load]
-  The pure checks (part W) always run. With --load, ERPME_LAB_DSN must name a throwaway database: load_all.py drops and
-  rebuilds schemas erpme and types there and loads every DDL file of design/, and the database checks (part D) run.
-  ERPME_DOCS points at the docs/ tree (default ~/Projects/ERPMe/docs); ERPME_LAB_DIR at lab.py and load_all.py
+  The pure checks (part W) always run. With --load, NATIVEFLOWS_LAB_DSN must name a throwaway database: load_all.py drops and
+  rebuilds schemas nativeflows and types there and loads every DDL file of design/, and the database checks (part D) run.
+  NATIVEFLOWS_DOCS points at the docs/ tree (default ~/Projects/NativeFlows/docs); NATIVEFLOWS_LAB_DIR at lab.py and load_all.py
   (default: this file's directory).
 
 W: the rules of ADR-0058 as lab functions over a small registry: condition evaluation by type and operator (rule 8);
@@ -27,11 +27,11 @@ Not covered: commands, the dispatcher itself, consumers, the upgrade job, UI.
 import hashlib, itertools, json, os, random, sys, time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-LAB = os.environ.get("ERPME_LAB_DIR", HERE)
+LAB = os.environ.get("NATIVEFLOWS_LAB_DIR", HERE)
 sys.path.insert(0, LAB)
 from lab import RESULTS, conn, expect, new  # noqa: E402
 
-DOCS = os.path.expanduser(os.environ.get("ERPME_DOCS", "~/Projects/ERPMe/docs"))
+DOCS = os.path.expanduser(os.environ.get("NATIVEFLOWS_DOCS", "~/Projects/NativeFlows/docs"))
 random.seed(58)
 INF = float("inf")
 
@@ -1030,7 +1030,7 @@ if "--load" in sys.argv:
     import psycopg  # noqa: E402,F401
     import uuid as _uuid
     from load_all import load_all  # noqa: E402
-    dsn = os.environ.get("ERPME_LAB_DSN", "host=127.0.0.1 port=5561 dbname=erpme_lab user=lab")
+    dsn = os.environ.get("NATIVEFLOWS_LAB_DSN", "host=127.0.0.1 port=5561 dbname=nativeflows_lab user=lab")
     n_tables = load_all(dsn, DOCS)
     check("D01 load_all.py loads every DDL file of design/ with the configuration file", n_tables > 200, n_tables)
     c = conn(); c.autocommit = True
@@ -1038,14 +1038,14 @@ if "--load" in sys.argv:
     NEW = {"automation_rule", "automation_rule_version", "automation_execution", "automation_scope_skip", "configuration_state", "decision_table", "decision_table_version",
            "decision_table_row", "parameter_set", "parameter_set_version", "parameter_set_value", "artifact_promotion_evidence", "artifact_transition",
            "artifact_shadow_outcome", "golden_case_label", "artifact_monitor_snapshot"}
-    nulls = X("select table_name from information_schema.columns where table_schema='erpme' and column_name='company_id' and is_nullable='NO' and table_name = any(%s)",
+    nulls = X("select table_name from information_schema.columns where table_schema='nativeflows' and column_name='company_id' and is_nullable='NO' and table_name = any(%s)",
               (sorted(NEW),)).fetchall()
-    forced = X("select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace where nspname='erpme' and relname = any(%s) and relrowsecurity and relforcerowsecurity",
+    forced = X("select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace where nspname='nativeflows' and relname = any(%s) and relrowsecurity and relforcerowsecurity",
                (sorted(NEW),)).fetchone()[0]
-    pol = X("select count(distinct tablename) from pg_policies where schemaname='erpme' and policyname='company_policy' and tablename = any(%s)", (sorted(NEW),)).fetchone()[0]
+    pol = X("select count(distinct tablename) from pg_policies where schemaname='nativeflows' and policyname='company_policy' and tablename = any(%s)", (sorted(NEW),)).fetchone()[0]
     check("D02 the sixteen configuration tables exist with company_id NOT NULL, forced row-level security and the company policy",
           len(nulls) == len(NEW) == forced == pol == 16, (len(nulls), forced, pol))
-    cc = {(t_, col): d for t_, col, d in X("select table_name, column_name, column_default from information_schema.columns where table_schema='erpme' and table_name in ('outbox_event','audit_record')").fetchall()}
+    cc = {(t_, col): d for t_, col, d in X("select table_name, column_name, column_default from information_schema.columns where table_schema='nativeflows' and table_name in ('outbox_event','audit_record')").fetchall()}
     check("D03 outbox_event and audit_record carry causation_chain_id, causation_depth (no default) and automation_rule_version_id",
           all((t_, col) in cc for t_ in ("outbox_event", "audit_record") for col in ("causation_chain_id", "causation_depth", "automation_rule_version_id"))
           and cc[("outbox_event", "causation_depth")] is None and cc[("audit_record", "causation_depth")] is None)
@@ -1056,7 +1056,7 @@ if "--load" in sys.argv:
         X("insert into user_account (id, login, display_name, language, password_hash, created_at) values (%s,%s,'Lab user','en','x',now())", (I[k], f"u22{k}{t}"))
     X("insert into company (id,code,legal_name,company_currency,time_zone,localization_package,accounting_regime,valuation_area_level,fiscal_calendar_owner_id,default_language)"
       " values (%s,%s,'Co','USD','UTC','l10n_test','test','warehouse',%s,'en')", (I["co"], "C22-" + t, I["u"]))
-    X("select set_config('erpme.company_id', %s, false)", (str(I["co"]),))
+    X("select set_config('nativeflows.company_id', %s, false)", (str(I["co"]),))
     H = hashlib.sha256(b"x").hexdigest()
     ACT = json.dumps([{"kind": "raise_work_item", "owner": "role:warehouse_keeper", "due_days": 1}])
     for k, code in (("rule", "large_order_warehouse_alert"), ("rule2", "other_rule")):
@@ -1070,13 +1070,13 @@ if "--load" in sys.argv:
 
     def D_bad(name, match, fn):
         def run(cx):
-            cx.execute("select set_config('erpme.company_id', %s, true)", (str(I["co"]),))
+            cx.execute("select set_config('nativeflows.company_id', %s, true)", (str(I["co"]),))
             fn(cx)
         expect(name, run, True, match)
 
     def D_good(name, fn):
         def run(cx):
-            cx.execute("select set_config('erpme.company_id', %s, true)", (str(I["co"]),))
+            cx.execute("select set_config('nativeflows.company_id', %s, true)", (str(I["co"]),))
             fn(cx)
         expect(name, run, False)
     D_bad("D04 a version is inserted only as a draft (not active, not shadow)", "inserted only as drafts", lambda cx: version(cx, new(), n=9, state="active"))

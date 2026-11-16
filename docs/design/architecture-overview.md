@@ -1,4 +1,4 @@
-# ERPMe architecture overview
+# NativeFlows architecture overview
 
 For the author and design reviewers. Coding agents read the short [coder core](architecture-core.md) instead (Part A). Generated appendices are in [generated/](generated/) (Part C).
 
@@ -12,7 +12,7 @@ B1 [Purpose and scope](#b1-purpose-and-scope) · B2 [System context](#b2-system-
 
 ## B1. Purpose and scope
 
-ERPMe is an open-source ERP designed for agentic workflows, for trading and assembly businesses (01-vision:3), with production in Phase 1 for manufacturers ([ADR-0032](../adr/0032-phase-1-scope-with-production.md) rule 1), and with CRM from the start. Its accounting and inventory core follows SAP concepts (S/4HANA for the data model, Business One for SME scope) ([01-vision](../spec/01-vision.md):3; D5). Country rules live in localization packages ([ADR-0016](../adr/0016-localization-package-structure.md)).
+NativeFlows is an open-source ERP designed for agentic workflows, for trading and assembly businesses (01-vision:3), with production in Phase 1 for manufacturers ([ADR-0032](../adr/0032-phase-1-scope-with-production.md) rule 1), and with CRM from the start. Its accounting and inventory core follows SAP concepts (S/4HANA for the data model, Business One for SME scope) ([01-vision](../spec/01-vision.md):3; D5). Country rules live in localization packages ([ADR-0016](../adr/0016-localization-package-structure.md)).
 
 **Phase 1** is defined by [spec 09](../spec/09-mvp-scope.md) as amended by [ADR-0032](../adr/0032-phase-1-scope-with-production.md): every capability a customer cannot operate without is in Phase 1 in full depth, and production, multi-level MRP, planning and subcontracting move into Phase 1 (ADR-0032:7–16). Spec 09 itself still shows production as later; that wording waits for the author ([open-questions](../open-questions.md):122).
 
@@ -36,7 +36,7 @@ flowchart LR
     I["Integration clients: REST"]
     M["MCP clients"]
   end
-  E["ERPMe installation"]
+  E["NativeFlows installation"]
   LLM["LLM provider: one cloud provider per installation"]
   MB["Mailboxes: IMAP and SMTP"]
   IDP["Identity provider: OIDC"]
@@ -58,7 +58,7 @@ flowchart LR
 
 - **LLM provider.** One provider per installation in Phase 1; `llm_provider` accepts only `anthropic`; the `local` adapter is designed but not enabled. If unset, the LLM is off and everything works by hand ([ADR-0050](../adr/0050-agent-runtime-and-query-layer.md):52–63).
 - **Mailboxes.** `crm.contract.MailboxConnector`, IMAP over TLS and SMTP submission ([ADR-0052](../adr/0052-minimal-crm.md):112).
-- **Bank files.** `ImportBankStatement` runs the package's `BankStatementReader`; no money moves from ERPMe in Phase 1 ([ADR-0048](../adr/0048-cash-bank-receivables-payables.md):97, :114).
+- **Bank files.** `ImportBankStatement` runs the package's `BankStatementReader`; no money moves from NativeFlows in Phase 1 ([ADR-0048](../adr/0048-cash-bank-receivables-payables.md):97, :114).
 - **E-invoices.** The provider connection is an add-on designed after the core; a deterministic stub stands in ([backlog](backlog.md):77; [ADR-0028](../adr/0028-document-lifecycle-hardening.md):107).
 - **Identity.** Password (argon2) with TOTP, or OIDC through Authlib; no separate identity server ([ADR-0017](../adr/0017-permission-envelope.md):14; [ADR-0002](../adr/0002-core-technology-tools.md):29).
 - **Warehouse app.** The same React app as a PWA, with wedge, camera and manual scans ([ADR-0061](../adr/0061-barcodes.md):123; D14).
@@ -84,14 +84,14 @@ flowchart LR
 
 | Process | Role | Database role | Notes |
 | --- | --- | --- | --- |
-| `erpme serve` | REST and MCP API, SSE stream for live screens | `erpme_app` | Rate limits per actor 20/5/50 rps for human/agent/integration (ADR-0022 rule 9); SSE per [ADR-0040](../adr/0040-ui-architecture.md) rule 13 |
-| `erpme worker --queue events` | Transactional consumers | `erpme_worker` | Claims through the definer function owned by `erpme_claim` (ADR-0017 rule 19) |
-| `erpme worker --queue integrations` | External consumers: e-invoice, mail, malware scan | `erpme_worker` | Calls with no transaction open (ADR-0013 rule 10) |
-| `erpme worker --queue jobs` | System jobs, scheduled jobs, long-job consumers | `erpme_worker` | Procrastinate periodic tasks; stalled-job retry (ADR-0022 rule 12) |
-| `erpme worker --queue pdf` | Render worker | `erpme_worker` | Own process, sandboxed, 30-min lease, 3 attempts ([ADR-0049](../adr/0049-statutory-reporting-and-printing.md):199) |
-| `erpme worker --queue agents` | `agent_runner` | `erpme_worker`, derived from ADR-0017 rule 18 ("`erpme_worker` runs delivery workers and system jobs") plus ADR-0050:164 (`agent_runner` is a consumer); a run's read-only queries use `erpme_readonly` (ADR-0050:387) | 5-min lease with a 60-s heartbeat (ADR-0013:62; ADR-0050:164) |
-| `erpme admin migrate` / `bootstrap` | Migrations, catalogs, package data; first operator and owner | `erpme_migration` | Only role with `BYPASSRLS` (ADR-0017 rule 18) |
-| Read-only query layer | Views in schema `query` | `erpme_readonly` | Statement timeout 10 s for agent runs, 30 s otherwise (ADR-0050:387) |
+| `nativeflows serve` | REST and MCP API, SSE stream for live screens | `nativeflows_app` | Rate limits per actor 20/5/50 rps for human/agent/integration (ADR-0022 rule 9); SSE per [ADR-0040](../adr/0040-ui-architecture.md) rule 13 |
+| `nativeflows worker --queue events` | Transactional consumers | `nativeflows_worker` | Claims through the definer function owned by `nativeflows_claim` (ADR-0017 rule 19) |
+| `nativeflows worker --queue integrations` | External consumers: e-invoice, mail, malware scan | `nativeflows_worker` | Calls with no transaction open (ADR-0013 rule 10) |
+| `nativeflows worker --queue jobs` | System jobs, scheduled jobs, long-job consumers | `nativeflows_worker` | Procrastinate periodic tasks; stalled-job retry (ADR-0022 rule 12) |
+| `nativeflows worker --queue pdf` | Render worker | `nativeflows_worker` | Own process, sandboxed, 30-min lease, 3 attempts ([ADR-0049](../adr/0049-statutory-reporting-and-printing.md):199) |
+| `nativeflows worker --queue agents` | `agent_runner` | `nativeflows_worker`, derived from ADR-0017 rule 18 ("`nativeflows_worker` runs delivery workers and system jobs") plus ADR-0050:164 (`agent_runner` is a consumer); a run's read-only queries use `nativeflows_readonly` (ADR-0050:387) | 5-min lease with a 60-s heartbeat (ADR-0013:62; ADR-0050:164) |
+| `nativeflows admin migrate` / `bootstrap` | Migrations, catalogs, package data; first operator and owner | `nativeflows_migration` | Only role with `BYPASSRLS` (ADR-0017 rule 18) |
+| Read-only query layer | Views in schema `query` | `nativeflows_readonly` | Statement timeout 10 s for agent runs, 30 s otherwise (ADR-0050:387) |
 
 ADR-0022 rule 12 lists four worker queues; ADR-0013 rule 13 adds `agents`. Five queues are shown here; the difference is a [finding](#findings-for-the-review).
 
@@ -100,8 +100,8 @@ ADR-0022 rule 12 lists four worker queues; ADR-0013 rule 13 adds `agents`. Five 
 ```mermaid
 flowchart TB
   C["Caddy: TLS, HTTP/2"]
-  subgraph App["ERPMe processes"]
-    API["erpme serve: REST, MCP, SSE"]
+  subgraph App["NativeFlows processes"]
+    API["nativeflows serve: REST, MCP, SSE"]
     WE["worker events"]
     WI["worker integrations"]
     WJ["worker jobs"]
@@ -109,7 +109,7 @@ flowchart TB
     WA["worker agents: agent_runner and LLM gateway"]
   end
   subgraph PG["PostgreSQL 18"]
-    S1["schema erpme: all tables"]
+    S1["schema nativeflows: all tables"]
     S2["schema types: domains"]
     S3["schema procrastinate: job queue"]
     S4["schema query: views"]
@@ -138,7 +138,7 @@ flowchart TB
   WJ --> OCR
 ```
 
-- Schemas `erpme`, `types`, `procrastinate`, `query` ([ADR-0022](../adr/0022-repository-and-engineering-conventions.md) rule 7).
+- Schemas `nativeflows`, `types`, `procrastinate`, `query` ([ADR-0022](../adr/0022-repository-and-engineering-conventions.md) rule 7).
 - Attachment bytes live in an object store, never in the database ([ADR-0027](../adr/0027-cross-cutting-ownership.md):38). The upload endpoint streams to it, then dispatches `CreateAttachment` ([ADR-0038](../adr/0038-audit-and-observability.md):134).
 - The scanner runs as a consumer of `AttachmentCreated` on `integrations` (ADR-0038:142). Scanner, collector and telemetry backend are chosen in DS-37 (ADR-0038:125).
 - The secret store holds the LLM key, mailbox credentials and `automation.value_hmac_key` (ADR-0050:61; ADR-0052:110; [ADR-0058](../adr/0058-configurable-workflows.md):212). Its product is DS-37.
@@ -149,7 +149,7 @@ flowchart TB
 ## B4. Tenancy and isolation
 
 - **One installation, many companies.** One user account works in several companies ([ADR-0054](../adr/0054-users-roles-and-authorizations.md):21, :47). Group currency is an installation setting ([ADR-0011](../adr/0011-multi-currency.md):22).
-- **Company context first, RLS second.** The dispatcher checks company, record scope and owner scope (step 5). PostgreSQL RLS pins each transaction to `erpme.company_id` and fails closed; null-company rows need the value `installation`; registered cross-company queries use `erpme.company_ids` under a second, read-only policy ([ADR-0017](../adr/0017-permission-envelope.md) rule 19). RLS guards companies only; record scope and field classes stay in the dispatcher and views.
+- **Company context first, RLS second.** The dispatcher checks company, record scope and owner scope (step 5). PostgreSQL RLS pins each transaction to `nativeflows.company_id` and fails closed; null-company rows need the value `installation`; registered cross-company queries use `nativeflows.company_ids` under a second, read-only policy ([ADR-0017](../adr/0017-permission-envelope.md) rule 19). RLS guards companies only; record scope and field classes stay in the dispatcher and views.
 - **Installation tables** have no `company_id`: e.g. `event_subject`, `event_consumer`, `agent_type`, `agent_type_version` (DS-05-platform.sql:19).
 - **Settings.** Scopes are installation, regime, company and narrower. An installation value is a maximum that narrower scopes may only tighten ([ADR-0063](../adr/0063-configurable-policy-settings.md):23–25).
 - **Assumption, not decided:** whether unrelated customers always get separate installations is not stated in any ADR. The systems review proposed recording it as an assumption by ADR.
@@ -263,7 +263,7 @@ erDiagram
 
 ### Cross-module references
 
-- **Foreign keys are not imports.** All tables share schema `erpme` and keys cross modules by design (ADR-0022 rule 7), often pointing up the layers (e.g. `document.partner_id`, layer 2 → layer 3). The [data map](generated/data-map.md#cross-module-foreign-keys-report) reports 422 cross-module foreign keys with their direction. It gives no allowlist verdicts; an allowlist with a reason per edge is a later step.
+- **Foreign keys are not imports.** All tables share schema `nativeflows` and keys cross modules by design (ADR-0022 rule 7), often pointing up the layers (e.g. `document.partner_id`, layer 2 → layer 3). The [data map](generated/data-map.md#cross-module-foreign-keys-report) reports 422 cross-module foreign keys with their direction. It gives no allowlist verdicts; an allowlist with a reason per edge is a later step.
 - **Polymorphic references** (`subject_table`/`subject_id`, `target_table`/`target_id`, `case_table`/`case_id`) are listed separately: 19 pairs, in `outbox_event`, `event_delivery`, `event_subject`, `audit_record`, `audit_denial`, `work_item`, `work_item_link`, `attachment_link`, `change_proposal_item` and others. Invariants check them, e.g. INV-83 for `attachment_link` (ADR-0027 rule 2).
 - **Event coupling.** The [event matrix](generated/event-matrix.md) lists 80 event types named in the ADRs, their producing module and the consumers named with them. Generic document events (`<Type>Posted` for every type, ADR-0009 rule 22) are not enumerated there.
 
@@ -276,7 +276,7 @@ Each table has exactly one owning module (ADR-0022 rule 7). Ownership exists tod
 
 The generator fails on any new unowned or stub table; the known ones are listed as findings, with no owner invented.
 
-**Generation.** Part C is written now by the lab script `docs/reviews/2026-11-14-design-validation/lab/gen_overview.py` (with `--check`), because `erpme-dev generate` does not exist yet. `erpme-dev generate` takes this over at build step 0 (ADR-0022 rules 14, 17), reading the registry and `tables.py` instead of the DDL drafts.
+**Generation.** Part C is written now by the lab script `docs/reviews/2026-11-14-design-validation/lab/gen_overview.py` (with `--check`), because `nativeflows-dev generate` does not exist yet. `nativeflows-dev generate` takes this over at build step 0 (ADR-0022 rules 14, 17), reading the registry and `tables.py` instead of the DDL drafts.
 
 ## B7. Transactions, concurrency and failure
 
@@ -316,7 +316,7 @@ sequenceDiagram
   H->>DB: locks in order, journal, stock, number, state
   D->>D: compare plan_hash
   D->>DB: audit_record, outbox_event, event_delivery, stored response
-  D->>DB: NOTIFY erpme_outbox, erpme_ui
+  D->>DB: NOTIFY nativeflows_outbox, nativeflows_ui
   end
   DB-->>W: NOTIFY after commit
   D-->>C: result, plan_hash, audit_record_id
@@ -340,7 +340,7 @@ sequenceDiagram
 | Object store unavailable | Not specified | Not specified | Not specified (DS-37) |
 | LLM switched off | `llm_provider` unset | Every agent mode is off (ADR-0050:63) | Work continues by hand (Principle 12) |
 
-**Delivery mechanics** (moved from Part A). After commit, `NOTIFY erpme_outbox` wakes the workers, which also poll every 5 s (ADR-0022 rule 12). A worker claims a `pending` delivery with `FOR UPDATE SKIP LOCKED` only when no earlier delivery of that consumer and subject is open, with a 5-minute lease (ADR-0013 rule 7). After `max_attempts` (default 10) the delivery is `held` and blocks its subject for that consumer until a human runs `RetryEventDelivery` or `SkipEventDelivery` (ADR-0013 rule 8). Outside calls are recorded as intents by a command and made by an `external` consumer on `integrations` with no transaction open (ADR-0013 rule 10).
+**Delivery mechanics** (moved from Part A). After commit, `NOTIFY nativeflows_outbox` wakes the workers, which also poll every 5 s (ADR-0022 rule 12). A worker claims a `pending` delivery with `FOR UPDATE SKIP LOCKED` only when no earlier delivery of that consumer and subject is open, with a 5-minute lease (ADR-0013 rule 7). After `max_attempts` (default 10) the delivery is `held` and blocks its subject for that consumer until a human runs `RetryEventDelivery` or `SkipEventDelivery` (ADR-0013 rule 8). Outside calls are recorded as intents by a command and made by an `external` consumer on `integrations` with no transaction open (ADR-0013 rule 10).
 
 **Error codes.** New codes go into the registry's catalog with the same columns; envelope-level codes are defined only in DS-04 ([DS-04](DS-04-command-envelope.md), Error catalog).
 
@@ -482,7 +482,7 @@ sequenceDiagram
 
 **Evaluation and promotion.** One golden set per workflow from the synthetic dataset, with at least 90% equal answers; a replay suite on every commit; live evaluation capped at USD 10 and never on fork pull requests (ADR-0050:362–372). Promotion from `shadow` to `assisted` needs `agent_promotion_evidence` and an approved change proposal, with at least 10 business days of shadow (ADR-0050:134; ADR-0051:39). Decision artifacts follow ADR-0059's lifecycle draft → backtested → shadow → assisted → active → retired; AI drafts L1 parameters and L2 rules as data, never L3 code ([ADR-0059](../adr/0059-ai-tuning-and-development-of-deterministic-functions.md):9–11, :117–125).
 
-**Intake and analysis.** Intake is a system job, not an agent; the reader ladder stops at the first valid record, and vision values that do not align with OCR words fill nothing ([ADR-0057](../adr/0057-document-intake-and-extraction.md):11, :57–71, :130–134). Analysis compiles a validated plan into one read-only `SELECT` under `erpme_readonly`; every cell equals the sum of its drill rows ([ADR-0060](../adr/0060-agent-assisted-reporting-and-analysis.md):11–13, :173–186).
+**Intake and analysis.** Intake is a system job, not an agent; the reader ladder stops at the first valid record, and vision values that do not align with OCR words fill nothing ([ADR-0057](../adr/0057-document-intake-and-extraction.md):11, :57–71, :130–134). Analysis compiles a validated plan into one read-only `SELECT` under `nativeflows_readonly`; every cell equals the sum of its drill rows ([ADR-0060](../adr/0060-agent-assisted-reporting-and-analysis.md):11–13, :173–186).
 
 ## B10. Configurability
 
@@ -491,13 +491,13 @@ sequenceDiagram
 - **Hard locks** cannot be configured away, e.g. numbers only from code (ADR-0063:56–69).
 - **Workflows and automation** ([ADR-0058](../adr/0058-configurable-workflows.md)): three tiers (parameters, typed decision tables, event-condition-action rules), no scripting or expression language (:9, :30–35). Rules never approve, submit, post, send or change master data or settings (:11, :40). They may run only `is_automation_allowed` draft commands (:53); chains stop at depth 3 (:113); a circuit breaker disables failing rules (:126–129).
 - **Auto-post gateway settings.** `auto_post.<document_type>.mode` (`off`, `shadow`, `live`), its maximum in company currency (default 0), allowed currencies, tainted drafts (off) and verified values (on), the purchase invoice's supplier history, price and quantity tolerances and full receipt, and the confirmation cadence; decision tables at the decision point `auto_post.<document_type>`; an `auto_post_advisor` agent drafts thresholds and tables through ADR-0059's lifecycle and never enables anything ([ADR-0065](../adr/0065-deterministic-auto-post-gateway.md) rules 8, 9, 17–18; proposed).
-- **Work case settings.** `work_case.<kind>.mode` (`off`, `manual`, `by_rule`, `auto`; default `off`), `work_case.<kind>.due_days` and `work.landing_page` (role template to `work_queue` or `case_list`), all `neutral`; automation rules gain the action `open_work_case` ([ADR-0066](../adr/0066-work-cases.md) rules 4, 7; proposed).
+- **Work case settings.** `work_case.<kind>.mode` (`off`, `manual`, `by_rule`, `auto`; default `off`), `work_case.<kind>.due_days` and `work.landing_page.<role_template>` (role template to `work_queue` or `case_list`), all `neutral`; automation rules gain the action `open_work_case` ([ADR-0066](../adr/0066-work-cases.md) rules 4, 7; proposed).
 - **Implementation-time setup.** The setup flow shows the registry by area with defaults, bounds and direction; a company starts on the core defaults; a first value that loosens needs a proposal; upgrades never change behavior silently (`RunSettingUpgradeCheck`) (ADR-0063:8, :49–50).
 
 ## B11. Localization and regimes
 
 - **Core neutrality.** The test: would the rule read the same for a company in a country the core has never seen? ([ADR-0053](../adr/0053-core-neutrality.md):26).
-- **Packages.** `l10n/<code>/` with a manifest, regimes, templates, reports, settings, i18n, and code that implements only published interfaces; `l10n_*` imports only `erpme.sdk` ([ADR-0016](../adr/0016-localization-package-structure.md):13, :73; [DS-14](DS-14-localization-package.md)). A company uses one package and one regime (ADR-0016:14).
+- **Packages.** `l10n/<code>/` with a manifest, regimes, templates, reports, settings, i18n, and code that implements only published interfaces; `l10n_*` imports only `nativeflows.sdk` ([ADR-0016](../adr/0016-localization-package-structure.md):13, :73; [DS-14](DS-14-localization-package.md)). A company uses one package and one regime (ADR-0016:14).
 - **Basis and flags.** Every template entry carries `legal_source`, `author_decision` or `status: unverified`; in `production` an unverified setting fails with `regime_setting_unverified` (ADR-0016:41, :58).
 - **`l10n_xx`.** A fictional test package with one regime `test` and dummy values; the loader refuses it in production (ADR-0053:155–164).
 - **Vietnam.** The `l10n_vn` package is deferred work outside the core ([ADR-0039](../adr/0039-vietnam-package-tt99.md); ADR-0053:7). This overview does not summarize it.
@@ -514,7 +514,7 @@ flowchart LR
     MAILIN["Inbound mail and attachments"]
     FILES["Uploaded files, bank files, scans"]
   end
-  subgraph Core["ERPMe trust zone"]
+  subgraph Core["NativeFlows trust zone"]
     DISP["Dispatcher: credential, run gates, permission, visibility"]
     RLS["PostgreSQL RLS: company, fail closed"]
     GW["LLM gateway: data labels, routing switch, processing log"]
@@ -551,9 +551,9 @@ flowchart LR
 - **Data egress to the LLM.** Data labels and the routing switch, default off; with it on, typed placeholders, a residual scan and shape masks; the processing log is committed before the send (ADR-0050:86–101). The data-processing policy fails closed; providers are permitted with four eyes (ADR-0057:208–220).
 - **Malicious files.** Type detected from bytes, SVG not allowed, 25 MiB limit, scanning before use (ADR-0038:133–146). Rendering runs in a Jinja2 sandbox with no network (ADR-0049:254–255).
 - **Supply chain and CI.** GitHub-hosted runners only, actions pinned by SHA, `contents: read`, the labeling workflow never checks out the head, Dependabot off until approved; the nightly run starts from a timer on the test server, with a token limited to issues (ADR-0022 rules 13, 15, 16, 18). LLM evaluation never runs on fork pull requests (ADR-0050:370–371).
-- **Operator.** `erpme_migration` is the only `BYPASSRLS` role; definer functions (`erpme_claim`, `erpme_invitation`, `erpme_setting_reader`) give narrow cross-row access (ADR-0017 rules 18–19).
+- **Operator.** `nativeflows_migration` is the only `BYPASSRLS` role; definer functions (`nativeflows_claim`, `nativeflows_invitation`, `nativeflows_setting_reader`) give narrow cross-row access (ADR-0017 rules 18–19).
 
-**Authentication and sessions.** Argon2 with TOTP or OIDC; TOTP required by role flag; sessions server-side, idle 2 h, absolute 12 h, lockout 15 min after 10 failures; API tokens hashed, at most one year; run tokens bound to one run (ADR-0017:14–19; ADR-0054:69–74). Cookie `__Host-erpme_session` with CSRF header and Origin check (ADR-0040:147–148).
+**Authentication and sessions.** Argon2 with TOTP or OIDC; TOTP required by role flag; sessions server-side, idle 2 h, absolute 12 h, lockout 15 min after 10 failures; API tokens hashed, at most one year; run tokens bound to one run (ADR-0017:14–19; ADR-0054:69–74). Cookie `__Host-nativeflows_session` with CSRF header and Origin check (ADR-0040:147–148).
 
 **Secrets.** Fields marked `is_secret` never reach a view, an agent result or a prompt (ADR-0050:104). Secret values live in the deployment's secret store (DS-37).
 
@@ -579,9 +579,9 @@ A daily job creates partitions 3 months ahead (ADR-0022 rule 12). ADR-0002's sen
 
 **Backup and restore.** pgBackRest is the tool (ADR-0002:52); a restore is tested, not only written, before go-live ([runbook/go-live](../runbook/go-live.md):19, :81); restores run with triggers disabled ([ADR-0014](../adr/0014-universal-journal.md):51). The database and the attachment store share one restore point: objects are write-once under SHA-256 keys, in a store with versioning or object lock where available; no object is deleted while a database restore point could still name it, because physical deletion waits `attachments.delete_grace_days`, at least the point-in-time-recovery window. Restoring the database to a time T finds every object referenced at T, and objects written later are swept as orphans after the grace period (ADR-0038 rules 13–15 notes). RPO and RTO are not stated anywhere.
 
-**Upgrades and migrations.** One linear Alembic history; `erpme admin migrate` runs migrations, catalogs and package data (ADR-0022 rule 8). Event payloads get upcasters (ADR-0013 rule 17). Command schemas serve the current and previous major until the next LTS (ADR-0008 rule 23). Packages load at deploy, no downgrades (ADR-0016:15). Upgrade tests from N-2 and LTS ([07-shared-foundation](../spec/07-shared-foundation.md):83).
+**Upgrades and migrations.** One linear Alembic history; `nativeflows admin migrate` runs migrations, catalogs and package data (ADR-0022 rule 8). Event payloads get upcasters (ADR-0013 rule 17). Command schemas serve the current and previous major until the next LTS (ADR-0008 rule 23). Packages load at deploy, no downgrades (ADR-0016:15). Upgrade tests from N-2 and LTS ([07-shared-foundation](../spec/07-shared-foundation.md):83).
 
-**Environments.** `environment` is `production`, `test` or `simulation`, set from `ERPME_ENVIRONMENT`, never changing away from `production`; non-production uses recording stubs (ADR-0022 rule 9). The test server holds synthetic data only (ADR-0022 rule 18) and rebuilds its database from empty every night (ADR-0022 rule 8). Staging comes from step 10; real data only in a rehearsal, deleted within 7 days ([ADR-0003](../adr/0003-build-operating-rules.md):12, :22).
+**Environments.** `environment` is `production`, `test` or `simulation`, set from `NATIVEFLOWS_ENVIRONMENT`, never changing away from `production`; non-production uses recording stubs (ADR-0022 rule 9). The test server holds synthetic data only (ADR-0022 rule 18) and rebuilds its database from empty every night (ADR-0022 rule 8). Staging comes from step 10; real data only in a rehearsal, deleted within 7 days ([ADR-0003](../adr/0003-build-operating-rules.md):12, :22).
 
 **Observability** ([ADR-0038](../adr/0038-audit-and-observability.md) rules 10–12): spans, metrics and structlog JSON logs; value-free attribute allow-lists with a CI canary; no SQL capture; consumer spans link to the event's `trace_id`; the Phase 1 dashboard is the telemetry backend's; held deliveries are read through a query (ADR-0038:98–126).
 
@@ -611,17 +611,17 @@ The frontend size budgets (250 KB gzipped shell, 150 KB PWA route) are listed un
 
 ## B15. Frontend overview
 
-- **Schema-driven renderer.** Lists from `List<Noun>`, records from `Get<Noun>`, forms from command schemas, with `x-erpme-*` annotations in the generated JSON Schemas ([ADR-0040](../adr/0040-ui-architecture.md):9, rule 4). Screen kinds: list, record view, command form, query result view (rule 6); proposed: the case view (timeline left, artifact right) and the case list, with the home screen set per role ([ADR-0066](../adr/0066-work-cases.md) rule 21).
+- **Schema-driven renderer.** Lists from `List<Noun>`, records from `Get<Noun>`, forms from command schemas, with `x-nativeflows-*` annotations in the generated JSON Schemas ([ADR-0040](../adr/0040-ui-architecture.md):9, rule 4). Screen kinds: list, record view, command form, query result view (rule 6); proposed: the case view (timeline left, artifact right) and the case list, with the home screen set per role ([ADR-0066](../adr/0066-work-cases.md) rule 21).
 - **No business arithmetic in the client.** Totals, taxes, prices and stock effects come from simulation (rule 2). Forms submit in two steps with one envelope (rule 9).
 - **Generated types** in `frontend/src/generated/`, never edited (ADR-0022 rules 17, 24). `snake_case` end to end (ADR-0004 rule 3).
 - **Six hand-built screens**: sales invoice, goods receipt, goods issue, cash receipt, cash payment, journal entry (rule 20); proposed notes add the extraction verification screen and an analysis view (ADR-0040:84–86).
 - **PWA** for warehouse and shop floor, Chrome on Android 10+ (ADR-0040:211); offline queue after Phase 1 (ADR-0061:19).
-- **Live updates.** The dispatcher sends a header on `erpme_ui`; web processes forward it over SSE with permission checks; best effort (rule 13).
+- **Live updates.** The dispatcher sends a header on `nativeflows_ui`; web processes forward it over SSE with permission checks; best effort (rule 13).
 - **Fiori patterns.** No ADR-0040 note on Fiori layouts exists, proposed or accepted. ADR-0040 mentions Fiori only as context (:258).
 
 ## B16. Build and delivery
 
-**Coding-rules gate** ([ADR-0022](../adr/0022-repository-and-engineering-conventions.md) rule 13, note of 2026-11-16). No product code is merged until `erpme-dev check` passes on the empty module skeleton with every import contract (rule 6) and every rule 13 check, or reports `skipped` with a reason where its inputs do not exist yet (rule 14). CI runs the same command and `main` is protected; pre-commit hooks are a convenience. The note keeps pyright strict and the decided tools, and adds: complexity 10 with the `PL` limits and 400-line files; named suppressions only, counted per module; `typing.Any` banned in `erpme` outside adapters and `generated/`; a run-time lock-order assertion in the `db` lock helper; stricter float checks; and two check speeds, `check --fast` for pre-commit and agents, the full `check` for pre-push and CI.
+**Coding-rules gate** ([ADR-0022](../adr/0022-repository-and-engineering-conventions.md) rule 13, note of 2026-11-16). No product code is merged until `nativeflows-dev check` passes on the empty module skeleton with every import contract (rule 6) and every rule 13 check, or reports `skipped` with a reason where its inputs do not exist yet (rule 14). CI runs the same command and `main` is protected; pre-commit hooks are a convenience. The note keeps pyright strict and the decided tools, and adds: complexity 10 with the `PL` limits and 400-line files; named suppressions only, counted per module; `typing.Any` banned in `nativeflows` outside adapters and `generated/`; a run-time lock-order assertion in the `db` lock helper; stricter float checks; and two check speeds, `check --fast` for pre-commit and agents, the full `check` for pre-push and CI.
 
 **Build steps** ([spec 11](../spec/11-build-order.md):36–47; runbook [README](../runbook/README.md))
 
@@ -642,9 +642,9 @@ The frontend size budgets (250 KB gzipped shell, 150 KB PWA route) are listed un
 
 The production core step proposed by ADR-0032 rule 7 has no number yet ([open-questions](../open-questions.md):212). Steps 0–4 are Phase 0; 5–11 are Phase 1 (spec 11:49). No document names a design-lab test or simulation flow as the acceptance test of a step; the lab ([README](../reviews/2026-11-14-design-validation/README.md):5) is design evidence.
 
-**Testing beyond the coder core** (moved from Part A). Hypothesis state machines run from `LedgerMachine` on ([DS-16](DS-16-invariants-and-harness.md) rule 17). `erpme_reference` recomputes expected results from the run directory with the standard library only, and equality is exact (DS-16 rules 3, 29–30). From `build_step` 1, 90% branch coverage is enforced per package on `ledger`, `inventory`, `registry`, `documents`, `tax` and `localization` (ADR-0022 rule 16). The design lab is design evidence, never imported, and not a build-step acceptance test.
+**Testing beyond the coder core** (moved from Part A). Hypothesis state machines run from `LedgerMachine` on ([DS-16](DS-16-invariants-and-harness.md) rule 17). `nativeflows_reference` recomputes expected results from the run directory with the standard library only, and equality is exact (DS-16 rules 3, 29–30). From `build_step` 1, 90% branch coverage is enforced per package on `ledger`, `inventory`, `registry`, `documents`, `tax` and `localization` (ADR-0022 rule 16). The design lab is design evidence, never imported, and not a build-step acceptance test.
 
-**Repository and developer loop** (ADR-0022 rules 1, 14, 16): one uv workspace; `backend/` (distribution `erpme`), `tools/` (test distributions), `l10n/`, `frontend/`, `tests/scenarios/`, `datasets/`, `deploy/`. Every check runs through `erpme-dev` (`check`, `generate --check`, `dco`, `test`, `hypothesis`, `parallel`, `dataset small`, `scenarios`, `guards`, `frontend`, `nightly`, `ci`), each with a `--json` summary and `skipped` where inputs do not exist yet. CI jobs `dco`, `check`, `test`, `dataset`, `scenarios`, `guards`, `frontend` run in parallel, 15 minutes each.
+**Repository and developer loop** (ADR-0022 rules 1, 14, 16): one uv workspace; `backend/` (distribution `nativeflows`), `tools/` (test distributions), `l10n/`, `frontend/`, `tests/scenarios/`, `datasets/`, `deploy/`. Every check runs through `nativeflows-dev` (`check`, `generate --check`, `dco`, `test`, `hypothesis`, `parallel`, `dataset small`, `scenarios`, `guards`, `frontend`, `nightly`, `ci`), each with a `--json` summary and `skipped` where inputs do not exist yet. CI jobs `dco`, `check`, `test`, `dataset`, `scenarios`, `guards`, `frontend` run in parallel, 15 minutes each.
 
 **Open design items** ([backlog](backlog.md))
 
@@ -707,4 +707,4 @@ Disagreements between documents, recorded and not resolved.
 13. **No folder for consumers or queries.** ADR-0022 rule 3 (:76–84) names `contract.py`, `handlers/`, `tables.py`, `services/`. Rule 5 (:94) has `app` register handlers, consumers and queries. No document says where consumer and query code lives.
 14. **Rules without a check.** ADR-0022 rule 13 (:194–210) is the list of custom checks. The coding-rules gate (rule 13 note, 2026-11-16) makes these checks part of what must exist before product code, so this list is the gate's backlog for the rules below. No check exists yet for these seven rules, candidates for the lint and check deliverable of the coding kit: client-side money arithmetic (ADR-0040 rule 2); permission or policy checks in handlers (ADR-0008 rule 5); references by `code` in commands (ADR-0006 rule 5); `status` as a column name (ADR-0004 rule 13); PostgreSQL `ENUM` types (ADR-0004 rule 14); country rules in the core (ADR-0053); imports of lab code ([lab README](../reviews/2026-11-14-design-validation/README.md):5). The change-tracked guard of ADR-0038 rule 3 is not in the rule 13 list either.
 15. **Notes still say proposed.** Notes in ADR-0022 (:68–74, :212), ADR-0008, ADR-0013, ADR-0027 and ADR-0050 cite ADR-0056 to ADR-0064 as "proposed 2026-11-15"; their status lines say accepted (2026-11-15).
-16. **Outline deviations, for the author to confirm.** The approved outline says all generation goes through `erpme-dev generate`, "never through a separate tool script"; Part C is written by the lab script `gen_overview.py` until `erpme-dev generate` exists (B6). The outline's "FK allowlist report" is delivered as a report of cross-module foreign keys without allowlist verdicts (B6).
+16. **Outline deviations, for the author to confirm.** The approved outline says all generation goes through `nativeflows-dev generate`, "never through a separate tool script"; Part C is written by the lab script `gen_overview.py` until `nativeflows-dev generate` exists (B6). The outline's "FK allowlist report" is delivered as a report of cross-module foreign keys without allowlist verdicts (B6).

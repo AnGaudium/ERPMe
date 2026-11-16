@@ -25,7 +25,7 @@ This fix runs LAST, after fix_production, fix_commercial, fix_platform, fix_flow
 - 8.4 note in backlog DS-28 row that pools and stages are ADR-0055.
 - 8.5 step-log entries (2026-11-15): author decision DS-24 e-invoice provider connection is an add-on outside the core; DS-57 production agent added; and one entry for the holistic review itself (written by the coordinator at commit time, skip here).
 - 8.6 fix the 14 broken relative links.
-- 8.7 sort the lab README file table; 8.8 L-09 wording; 8.9 make each lab script print its total at the end if it does not, and state counts for L-12/L-14; 8.10 t05/t06 read ERPME_DOCS like t11/t12.
+- 8.7 sort the lab README file table; 8.8 L-09 wording; 8.9 make each lab script print its total at the end if it does not, and state counts for L-12/L-14; 8.10 t05/t06 read NATIVEFLOWS_DOCS like t11/t12.
 - 9.1-9.3 clean open-questions.md: fix "(proposed)" for ADR-0055 (also ADR-0032:90 via note); merge duplicates (keep one entry with cross-references); tick or split entries answered by accepted ADRs or author decisions; update stale decree references to the current ones only where the repo already states the replacement (Decree 254/2026, Circular 91/2026); do not delete author-raised questions, tick them with a pointer.
 - 10.1 add verb Evaluate (level read) to the glossary verb list and authorization-verb-levels.csv; note on ADR-0004 that Evaluate<Noun> is a query form (EvaluateConfiguration) — do not rename.
 - 10.2 split Match/Unmatch and Pack/Unpack glossary rows; add Get/List to the verb table or adjust catalogs/README sentence.
@@ -36,7 +36,7 @@ This fix runs LAST, after fix_production, fix_commercial, fix_platform, fix_flow
 - 11.3 bank short names in t08 -> BANK-A, BANK-B, BANK-C; rerun t08.
 - 11.4 author name: leave (author's own public repo); report to the author.
 - 11.5 leave (author-approved generic goal).
-- 12 write `reviews/2026-11-14-design-validation/lab/load_all.py`: the combined loader recipe (stubs minus user_account and minus any stub that a DDL draft now defines; pg_trgm; document columns; all DDL files in design/ concatenated and ordered by load_ds06 logic; search_path), with a guard for trailing comments after ';'. Lab test: load everything into erpme_lab and report the table count. This loader is what the final simulation uses.
+- 12 write `reviews/2026-11-14-design-validation/lab/load_all.py`: the combined loader recipe (stubs minus user_account and minus any stub that a DDL draft now defines; pg_trgm; document columns; all DDL files in design/ concatenated and ordered by load_ds06 logic; search_path), with a guard for trailing comments after ';'. Lab test: load everything into nativeflows_lab and report the table count. This loader is what the final simulation uses.
 
 ## DDL reconciliation (apply in this final step, after all apply_ddl*.py ran)
 Planning/production DDL (DS-43-54, lab t16 96/96) reported ambiguities; decisions:
@@ -61,7 +61,7 @@ Planning/production DDL (DS-43-54, lab t16 96/96) reported ambiguities; decision
 - Null-safe CHECKs: scan all DDL drafts (DS-05-platform, DS-43-54, DS-22-09-42, DS-15, DS-20, DS-35, DS-56) for CHECKs that pass on NULL unintentionally (length(btrim(x)) > 0 on nullable columns, nullable comparisons) and make them null-safe where the column is meant NOT NULL or the rule must hold.
 - credit_hold.work_item_id and other work_item references: add keys to work_item (company_id, id) if DS-05-platform defines work_item.
 - demand_supply_line keys to sales/purchase/request lines are added by DS-22-09-42 only (DS-43-54 must not duplicate).
-- Labs share erpme_lab: final runs go sequentially (no parallel agents).
+- Labs share nativeflows_lab: final runs go sequentially (no parallel agents).
 
 ## From the platform DDL (DS-05-platform, lab t15 145/145); decisions for the final step
 - 00_stubs.sql: drop the `document` stub (DS-05 defines it), the `user_account` stub (DS-15), and `material_document`/`material_document_line` (DS-22-09-42 defines them); keep system_account, account, fiscal_year, posting_period, posting_period_area_state, applied_rate, close_task, tax_code, transaction_key. Old labs that need bare stubs (t01-t08 insert bare user_account rows, t11/t14 extra stubs) keep working: give the old standard load a `00_stubs_legacy.sql` (the current file renamed) and point t01-t08/t11/t14 at it, OR keep 00_stubs.sql as is and make load_all.py strip the redefined stubs. Prefer the second (fewer lab edits).

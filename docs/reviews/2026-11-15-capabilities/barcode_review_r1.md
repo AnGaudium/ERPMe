@@ -43,7 +43,7 @@ Fix: validate the whole format when the numbering configuration is created or ch
 - The DDL comment reads as if `ReleaseBarcode` deletes only rows without `retired_type`; rule 7 and the constraints section say a person releases retired codes; t19 D16 deletes a retired row.
 - Rule 7 says "SSCCs are never reused, as GS1 requires", yet `ReleaseBarcode` may delete a retired SSCC. As far as I know GS1 requires no reallocation within one year (the survey says the same, line 334), so a supplier's SSCC may legitimately come back and would then be `barcode_retired`.
 
-Fix: add `UpdateItemBarcode` (item, unit) for corrections; store `retired_owner_id` and let the trigger revive a row retired from the same type and owner; state that `ReleaseBarcode` deletes reserved and retired rows but never a company-issued SSCC; reword the GS1 sentence as ERPMe policy for its own SSCCs.
+Fix: add `UpdateItemBarcode` (item, unit) for corrections; store `retired_owner_id` and let the trigger revive a row retired from the same type and owner; state that `ReleaseBarcode` deletes reserved and retired rows but never a company-issued SSCC; reword the GS1 sentence as NativeFlows policy for its own SSCCs.
 
 **S6. Rule 18 rounds a scanned measure, which ADR-0006 rule 14 and ADR-0056 rule 8 forbid.**
 `adr/0061-barcodes.md:157`; `lab/t19_barcode.py:529`.
@@ -113,4 +113,4 @@ Fix: a list of prefixes with one active for generation. A generated GTIN keeps i
 - Vietnam stays behind `TraceabilityCodeProvider`, flagged unverified; the examples name no real company.
 - All 19 notes sit on the rules that rule 28 names; INV-620 to INV-623 and EC-119 to EC-128 do not collide; t12 C23b gives each of the 9 new names a leaf and a level; `ReleaseBarcode` resolves to `full`.
 
-Cleanup done: database `erpme_lab_rv61` dropped, `/tmp/rv61` deleted; the repository and the drafts were not changed.
+Cleanup done: database `nativeflows_lab_rv61` dropped, `/tmp/rv61` deleted; the repository and the drafts were not changed.

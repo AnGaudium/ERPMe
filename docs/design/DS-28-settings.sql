@@ -4,7 +4,7 @@
 -- artifacts of DS-28-34-configuration-artifacts.sql.
 -- PostgreSQL 18. Loaded with every other design/*.sql file by load_all.py (docs/reviews/2026-11-14-design-validation,
 -- t24_settings.py with --load). The ADRs win if this file disagrees.
--- Conventions of DS-20, DS-15 and DS-05: tables in schema erpme, domains in types; IDs are UUIDv7 from context.new_id,
+-- Conventions of DS-20, DS-15 and DS-05: tables in schema nativeflows, domains in types; IDs are UUIDv7 from context.new_id,
 -- no ID defaults; references between company tables are composite on (company_id, id); recorded_at on every row.
 -- setting_definition and extension_point are installation data written by the registry at startup (like agent_type),
 -- without company_id and without row-level security; application roles get SELECT only on them, so no command or trigger
@@ -165,18 +165,18 @@ CREATE FUNCTION setting_is_looser(p_direction text, p_order text[], a jsonb, b j
         ELSE false END
 $$;
 -- The installation value in force for a key and placeholder values on a date (rule 1), for get_setting and the trigger
--- below. Installation rows stay visible only under erpme.company_id = 'installation' (ADR-0017 rule 19); this function
+-- below. Installation rows stay visible only under nativeflows.company_id = 'installation' (ADR-0017 rule 19); this function
 -- returns only the key, the value and its effective date, never the operators' accounts or reasons. In the pattern of
--- erpme_claim (ADR-0017 rules 18-19): it is owned by a no-login role erpme_setting_reader whose only policy on
+-- nativeflows_claim (ADR-0017 rules 18-19): it is owned by a no-login role nativeflows_setting_reader whose only policy on
 -- setting_value sees rows with company_id null, and no role gains BYPASSRLS; the role, its policy and the ownership are
 -- created with the database roles, not here. The roles step also revokes EXECUTE on it from PUBLIC and grants it to the
 -- application roles. Like the trigger function below, it names its tables with the schema and pins
--- search_path = erpme, pg_temp, so a temporary table cannot stand in for setting_value or setting_definition; application
+-- search_path = nativeflows, pg_temp, so a temporary table cannot stand in for setting_value or setting_definition; application
 -- roles get no TEMPORARY privilege on the database either (ADR-0017 rule 18 note).
 CREATE FUNCTION setting_installation_value(p_key text, p_placeholder_values jsonb, p_date date)
     RETURNS TABLE (setting_key text, value jsonb, effective_from date)
-    LANGUAGE sql STABLE SECURITY DEFINER SET search_path = erpme, pg_temp AS $$
-    SELECT v.setting_key, v.value, v.effective_from FROM erpme.setting_value v
+    LANGUAGE sql STABLE SECURITY DEFINER SET search_path = nativeflows, pg_temp AS $$
+    SELECT v.setting_key, v.value, v.effective_from FROM nativeflows.setting_value v
      WHERE v.company_id IS NULL AND v.setting_key = p_key AND v.placeholder_values = p_placeholder_values AND v.effective_from <= p_date
      ORDER BY v.effective_from DESC, v.recorded_at DESC LIMIT 1
 $$;
@@ -192,16 +192,16 @@ $$;
 -- (company, key) before it reads the definition and the value in force, so two concurrent changes of one key cannot both
 -- compare with the same replaced value. It needs no privilege on setting_definition beyond SELECT (a row lock would need
 -- UPDATE), and transaction-level advisory locks are allowed on trigger paths (ADR-0022 rule 13 note).
-CREATE FUNCTION setting_value_check_insert() RETURNS trigger LANGUAGE plpgsql SET search_path = erpme, pg_temp AS $$
+CREATE FUNCTION setting_value_check_insert() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 DECLARE
-    d        erpme.setting_definition%ROWTYPE;
+    d        nativeflows.setting_definition%ROWTYPE;
     v_max    jsonb;
     v_kind   text;
     v_in     jsonb;
     v_found  boolean := false;
 BEGIN
     PERFORM pg_advisory_xact_lock(hashtextextended('setting_value:' || coalesce(NEW.company_id::text, 'installation') || ':' || NEW.setting_key, 0));
-    SELECT * INTO d FROM erpme.setting_definition WHERE setting_key = NEW.setting_key;
+    SELECT * INTO d FROM nativeflows.setting_definition WHERE setting_key = NEW.setting_key;
     IF NOT FOUND THEN
         RAISE EXCEPTION 'setting_scope_invalid: key % is not registered', NEW.setting_key USING ERRCODE = 'check_violation';
     END IF;
@@ -223,17 +223,17 @@ BEGIN
         RAISE EXCEPTION 'setting_out_of_bounds: the copied type, bounds or direction of % differ from its definition', NEW.setting_key USING ERRCODE = 'check_violation';
     END IF;
     IF NEW.scope_kind <> 'installation' AND 'installation' = ANY (d.scopes) THEN
-        SELECT i.value INTO v_max FROM erpme.setting_installation_value(NEW.setting_key, NEW.placeholder_values, NEW.effective_from) AS i;
-        IF v_max IS NOT NULL AND erpme.setting_is_looser(d.direction, d.direction_order, NEW.value, v_max) THEN
+        SELECT i.value INTO v_max FROM nativeflows.setting_installation_value(NEW.setting_key, NEW.placeholder_values, NEW.effective_from) AS i;
+        IF v_max IS NOT NULL AND nativeflows.setting_is_looser(d.direction, d.direction_order, NEW.value, v_max) THEN
             RAISE EXCEPTION 'setting_out_of_bounds: % is looser than the installation value % of %', NEW.value, v_max, NEW.setting_key USING ERRCODE = 'check_violation';
         END IF;
     END IF;
-    SELECT v.value, true INTO v_in, v_found FROM erpme.setting_value v
+    SELECT v.value, true INTO v_in, v_found FROM nativeflows.setting_value v
      WHERE v.company_id IS NOT DISTINCT FROM NEW.company_id AND v.setting_key = NEW.setting_key AND v.scope_kind = NEW.scope_kind
        AND v.scope_ref = NEW.scope_ref AND v.placeholder_values = NEW.placeholder_values AND v.effective_from <= NEW.effective_from
      ORDER BY v.effective_from DESC, v.recorded_at DESC LIMIT 1;
     IF NOT coalesce(v_found, false) AND NEW.scope_kind NOT IN ('company', 'installation') THEN
-        SELECT v.value, true INTO v_in, v_found FROM erpme.setting_value v
+        SELECT v.value, true INTO v_in, v_found FROM nativeflows.setting_value v
          WHERE v.company_id = NEW.company_id AND v.setting_key = NEW.setting_key AND v.scope_kind = 'company'
            AND v.placeholder_values = NEW.placeholder_values AND v.effective_from <= NEW.effective_from
          ORDER BY v.effective_from DESC, v.recorded_at DESC LIMIT 1;
@@ -248,8 +248,8 @@ BEGIN
     END IF;
     v_kind := CASE
         WHEN NEW.replaced_value IS NULL OR d.direction = 'neutral' OR NEW.value = NEW.replaced_value THEN 'neutral'
-        WHEN erpme.setting_is_looser(d.direction, d.direction_order, NEW.value, NEW.replaced_value) THEN 'loosen'
-        WHEN erpme.setting_is_looser(d.direction, d.direction_order, NEW.replaced_value, NEW.value) THEN 'tighten'
+        WHEN nativeflows.setting_is_looser(d.direction, d.direction_order, NEW.value, NEW.replaced_value) THEN 'loosen'
+        WHEN nativeflows.setting_is_looser(d.direction, d.direction_order, NEW.replaced_value, NEW.value) THEN 'tighten'
         ELSE 'neutral' END;
     IF NEW.change_kind IS NOT NULL AND NEW.change_kind <> v_kind THEN
         RAISE EXCEPTION 'setting_value change_kind % differs from the derived %', NEW.change_kind, v_kind USING ERRCODE = 'check_violation';
@@ -267,6 +267,6 @@ CREATE TRIGGER trg_setting_value_check_insert BEFORE INSERT ON setting_value
 -- installation maxima only through setting_installation_value (ADR-0063 rule 1).
 ALTER TABLE setting_value ENABLE ROW LEVEL SECURITY;
 ALTER TABLE setting_value FORCE ROW LEVEL SECURITY;
-CREATE POLICY company_policy ON setting_value USING (company_id::text = current_setting('erpme.company_id', true)
-    OR (company_id IS NULL AND current_setting('erpme.company_id', true) = 'installation'));
-CREATE POLICY company_ids_policy ON setting_value FOR SELECT USING (company_id::text = ANY (string_to_array(current_setting('erpme.company_ids', true), ',')));
+CREATE POLICY company_policy ON setting_value USING (company_id::text = current_setting('nativeflows.company_id', true)
+    OR (company_id IS NULL AND current_setting('nativeflows.company_id', true) = 'installation'));
+CREATE POLICY company_ids_policy ON setting_value FOR SELECT USING (company_id::text = ANY (string_to_array(current_setting('nativeflows.company_ids', true), ',')));

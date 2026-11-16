@@ -4,7 +4,7 @@ Date: 2026-11-15. Scope: six open questions (product numbering, unit names, purc
 
 How to read it: each section gives what vendors do, then a recommendation table (setting, scope, safe default, bounds, who changes it, what stays fixed). Vendor facts come from vendor documentation where it could be reached and from community sources otherwise. Those are marked "(community)". Nothing here decides a legal matter.
 
-**Scope levels** used below: *installation* (one deployment), *regime package* (a country localization package seeds or forces a value), *company*, *product category*. **Change authority** is written as a role idea, not an ERPMe role name. Every setting change should be a human-only command with a reason, recorded in the audit log, and should take effect from a stated date, never retroactively.
+**Scope levels** used below: *installation* (one deployment), *regime package* (a country localization package seeds or forces a value), *company*, *product category*. **Change authority** is written as a role idea, not an NativeFlows role name. Every setting change should be a human-only command with a reason, recorded in the audit log, and should take effect from a stated date, never retroactively.
 
 ---
 
@@ -40,7 +40,7 @@ How to read it: each section gives what vendors do, then a recommendation table 
 
 | | Recommendation |
 |---|---|
-| Settings | (a) `documents.unit_name_max_length` (regime, empty = no limit); (b) `documents.unit_name_source`: `statutory_then_translation` (regime); (c) `documents.e_invoice_unit_code_scheme`: `none` / `unece_rec20_21` (regime), with a package mapping file from ERPMe unit to scheme code, so an `x-carton` company unit can map to `XCT` |
+| Settings | (a) `documents.unit_name_max_length` (regime, empty = no limit); (b) `documents.unit_name_source`: `statutory_then_translation` (regime); (c) `documents.e_invoice_unit_code_scheme`: `none` / `unece_rec20_21` (regime), with a package mapping file from NativeFlows unit to scheme code, so an `x-carton` company unit can map to `XCT` |
 | Scope | (a)–(c) regime package. Company units' own names stay company data (`data_translation`) |
 | Safe default | Core: no limit, translation as source, no unit-code scheme. A country package sets real values only after its own verification; until then (a) stays empty |
 | Bounds | Max length 1–255. Unit codes validated against the shipped Rec 20/21 list |
@@ -88,7 +88,7 @@ Landed cost follows the document: SAP reverses planned delivery costs proportion
 - **Number guarantees?** The products that guarantee numbers do it structurally: code selects the facts and code renders the values (Tableau's deterministic insights plus its number checks, ThoughtSpot's compiled SQL, Arria and Quill templates).
 - **Toggles?** Toggles are admin-level, off by default for GenAI (Tableau, Power BI tenant), scoped to groups, with a disclaimer shown to users.
 
-ERPMe's Phase 1 claim plan is stricter than every vendor, and that suits an ERP where a wrong number is costly. Keep it.
+NativeFlows's Phase 1 claim plan is stricter than every vendor, and that suits an ERP where a wrong number is costly. Keep it.
 
 | | Recommendation |
 |---|---|
@@ -112,7 +112,7 @@ ERPMe's Phase 1 claim plan is stricter than every vendor, and that suits an ERP 
 
   It expects scanners to be configured to send AIM identifiers and a printable GS ([GS1 bar codes](https://learn.microsoft.com/en-us/dynamics365/supply-chain/warehousing/gs1-barcodes)).
 - **Odoo.** The GS1 nomenclature rules are editable regexes, and the FNC1 separator is a configurable alternation, default `Alt029|#|\x1D` ([GS1 nomenclature](https://www.odoo.com/documentation/16.0/applications/inventory_and_mrp/barcode/operations/gs1_nomenclature.html)). Lots keep expiration, best-before (`use_date`), removal and alert dates as separate fields.
-- **Day 00.** The GS1 General Specifications say day 00 "SHALL be interpreted as the last day of the noted month" for the expiry-type dates ([GS1 Sweden notice](https://gs1.se/en/news/change-of-date-format-for-regulated-healthcare-products/)). For regulated healthcare, GS1 has forbidden day 00 since 1 January 2025 ([GSCN 21-040](https://www.gs1.org/docs/barcodes/GSCN_21-040_HealthcareExpDate.pdf); [GS1 UK](https://www.gs1uk.org/insights/news/change-of-date-format-for-regulated-healthcare-products)). I could not verify GS1's text for (11) and (13), so ERPMe's first-day reading for those is a design choice.
+- **Day 00.** The GS1 General Specifications say day 00 "SHALL be interpreted as the last day of the noted month" for the expiry-type dates ([GS1 Sweden notice](https://gs1.se/en/news/change-of-date-format-for-regulated-healthcare-products/)). For regulated healthcare, GS1 has forbidden day 00 since 1 January 2025 ([GSCN 21-040](https://www.gs1.org/docs/barcodes/GSCN_21-040_HealthcareExpDate.pdf); [GS1 UK](https://www.gs1uk.org/insights/news/change-of-date-format-for-regulated-healthcare-products)). I could not verify GS1's text for (11) and (13), so NativeFlows's first-day reading for those is a design choice.
 - **Best before vs expiry.** These are different facts: quality versus safety. Odoo and most WMS store them apart. Filling expiry from (15) is not a GS1 rule.
 
 | Setting | Scope | Safe default | Bounds | Who changes |
@@ -150,7 +150,7 @@ ERPMe's Phase 1 claim plan is stricter than every vendor, and that suits an ERP 
 - The outcome is a hold or warning that a person resolves, never deletion.
 - The number is normalized: case, punctuation and leading zeros.
 
-ERPMe's interim (gross within one minor unit and dates within 7 days, or equal number digits) sits well inside this range.
+NativeFlows's interim (gross within one minor unit and dates within 7 days, or equal number digits) sits well inside this range.
 
 | | Recommendation |
 |---|---|

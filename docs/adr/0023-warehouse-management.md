@@ -116,7 +116,7 @@ A small shop and a managed distribution warehouse run on the same model.
 
    Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): handling unit types stay physical containers, unrelated to product units in Phase 1; a quantity per handling unit type and packaging dimensions come after Phase 1 (rule 15).
 
-   Note ([ADR-0061](0061-barcodes.md), proposed 2026-11-15): a handling unit's barcode is an SSCC (18 digits, valid check digit) or an internal code (default prefix `HU-`), registered in the barcode registry. A receipt scan of a supplier's (00) gives a new handling unit that SSCC in a handling-unit-managed warehouse. A supplier's retired SSCC is deleted by the daily job `RunRetiredSsccCleanup` once `barcode.sscc_reuse_months` have passed (a company setting, default 12, unverified), so the pallet may come back; an SSCC under the company's own prefixes, active or not, needs a person, ERPMe never reissues one, and SSCC assignment comes after Phase 1 (rules 7, 17, 25).
+   Note ([ADR-0061](0061-barcodes.md), proposed 2026-11-15): a handling unit's barcode is an SSCC (18 digits, valid check digit) or an internal code (default prefix `HU-`), registered in the barcode registry. A receipt scan of a supplier's (00) gives a new handling unit that SSCC in a handling-unit-managed warehouse. A supplier's retired SSCC is deleted by the daily job `RunRetiredSsccCleanup` once `barcode.sscc_reuse_months` have passed (a company setting, default 12, unverified), so the pallet may come back; an SSCC under the company's own prefixes, active or not, needs a person, NativeFlows never reissues one, and SSCC assignment comes after Phase 1 (rules 7, 17, 25).
 
 **Movements**
 
@@ -298,7 +298,7 @@ A small shop and a managed distribution warehouse run on the same model.
 - **Earlier scope.** "After Phase 1: bins" and "not doing: wave picking, slotting optimization" ([09](../spec/09-mvp-scope.md)). The author's decision of 2026-11-14 moves warehouse management into Phase 1.
 - **ADR-0020.** It reserved `bin_id` and set one lock order and the dated negative-stock rule; ADR-0009 fixes what an approved document may change.
 - **Practice studied, concepts only.** SAP EWM (warehouse tasks, bins, handling units, stock types, strategies), Business One (bins per warehouse, pick lists from orders), D365 (location directives, license plates, waves) and Odoo (putaway rules, packages, batch transfers).
-- **ERPMe's own choices:**
+- **NativeFlows's own choices:**
   - one stock table with a dated book check and current physical checks;
   - picks from demand lines, so approved deliveries never change;
   - strategies as rule tables that agents can read and propose;

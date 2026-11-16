@@ -22,7 +22,7 @@ Caveat on sources: vendor admin guides are often behind a login. Every claim bel
   - Partner sources describe the Dynamics 365 Finance reconciliation agent as flagging exceptions for approval rather than resolving them. https://www.confiz.com/blog/the-invisible-accountant-how-ai-is-transforming-account-reconciliation-in-d365-finance/
   - Xero's JAX auto-reconciles only "high confidence" lines and is switched on or off per bank account. https://www.xero.com/us/campaign/auto-bank-reconciliation/
 
-**Finding.** Vendors let classic ML auto-post above a customer-set threshold once there is enough history. LLM agents in finance ship as draft producers with a human finalizer. ERPMe's floor (no auto-post where an LLM contributed) matches how the market treats generative AI. It is stricter than how the market treats classic ML.
+**Finding.** Vendors let classic ML auto-post above a customer-set threshold once there is enough history. LLM agents in finance ship as draft producers with a human finalizer. NativeFlows's floor (no auto-post where an LLM contributed) matches how the market treats generative AI. It is stricter than how the market treats classic ML.
 
 ### 1.2 Deterministic rules auto-post recurring items, including bank fees
 

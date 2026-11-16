@@ -10,9 +10,9 @@ The simulator runs fictional companies day by day. It writes what happened in bu
 
 | Package | Holds | May import |
 | --- | --- | --- |
-| `erpme_events` | Business-event log schema (pydantic models, JSON Schema export), canonical writer and reader | standard library, pydantic |
-| `erpme_simulator` | Profiles, generators, random helpers, edge-case injectors, input file writers, log coverage | `erpme_events` |
-| `erpme_adapters` | One adapter module per build step (`step_1`, `step_3` …): business event → commands | `erpme_events`, `erpme_client` (DS-16 section 1) |
+| `nativeflows_events` | Business-event log schema (pydantic models, JSON Schema export), canonical writer and reader | standard library, pydantic |
+| `nativeflows_simulator` | Profiles, generators, random helpers, edge-case injectors, input file writers, log coverage | `nativeflows_events` |
+| `nativeflows_adapters` | One adapter module per build step (`step_1`, `step_3` …): business event → commands | `nativeflows_events`, `nativeflows_client` (DS-16 section 1) |
 
 1. The simulator imports no core code and never touches the database (a contract DS-18 enforces). It cannot see what the core computed. The replay runner, not the simulator, sets `business_date_override` per company for each `sim_date` (ADR-0007 rule 15; DS-16 rule 19).
 2. One schema serves the simulator, the adapters, DS-16's state machines and scenario files, and the test-scenario model's proposals (rule 21 below). It is published as `docs/catalogs/business-events.schema.json` (generated, CI diff). A small example log `docs/catalogs/business-events.example.jsonl` (generated from the small profile's first week, CI diff) gives the recomputation writer a fixture inside `docs/` (DS-16 rule 3).
@@ -142,11 +142,11 @@ The simulator runs fictional companies day by day. It writes what happened in bu
 15. Randomness:
     - Each stream's generator is `random.Random(int.from_bytes(sha256(f"{seed}|{company}|{stream}".encode("utf-8")).digest()[:8], "big"))`, with streams such as `sales.orders` and `edge.EC-07`; company and stream codes never contain `|`.
     - Draws use only `getrandbits` through the simulator's own helpers (integer ranges by rejection sampling, Fisher-Yates shuffle, weighted choice with integer weights). The library's `choice`, `shuffle`, `sample`, `randrange`, `gauss` and floats are not used, because their results are not guaranteed across Python versions or platforms.
-    - Rates, seasonal factors and prices are `Fraction` or `Decimal`, rounded by `erpme.numeric`'s published rules, re-implemented in `erpme_events`.
+    - Rates, seasonal factors and prices are `Fraction` or `Decimal`, rounded by `nativeflows.numeric`'s published rules, re-implemented in `nativeflows_events`.
 
     Adding a stream leaves other streams' draws unchanged. Injectors that change shared state can still change what later generators see.
 16. Output canonical form:
-    - JSON with keys in schema field order, separators `,` and `:`, `ensure_ascii=False`, text in Unicode NFC, LF line endings, written by `erpme_events`' own writer, not by pydantic's dump.
+    - JSON with keys in schema field order, separators `,` and `:`, `ensure_ascii=False`, text in Unicode NFC, LF line endings, written by `nativeflows_events`' own writer, not by pydantic's dump.
     - `.eml` files with fixed MIME boundaries, `Message-ID` and `Date` derived from the event.
     - XML in canonical form (C14N 2.0).
 
@@ -155,7 +155,7 @@ The simulator runs fictional companies day by day. It writes what happened in bu
 
 ## 5. Profiles and sizes
 
-18. A profile is a versioned YAML file in `erpme_simulator/profiles/`. It holds:
+18. A profile is a versioned YAML file in `nativeflows_simulator/profiles/`. It holds:
     - the calendar (start, end, pinned year);
     - the companies with package, regime, costing policy, and test accounts and test offset account (rule 11);
     - master data counts;
@@ -196,7 +196,7 @@ The simulator runs fictional companies day by day. It writes what happened in bu
 19. All generated data is fictional:
     - Names, addresses, e-mails, phone numbers, bank account numbers, invoice and customs numbers, and third parties (banks, carriers, customs offices) are generated from word lists the project writes itself and licenses CC0. E-mail domains use `example.com`-style reserved domains.
     - Tax IDs use the official format with a valid check digit and a fixed prefix intended to be unassigned. A CI test checks that every generated ID carries the prefix. Whether the prefix is truly unassigned, and which phone ranges are safe, is a real-data fact the author confirms (open question).
-    - Odoo demo data is used only as a checklist of record kinds (`erpme_simulator/checklist.md`), with nothing copied.
+    - Odoo demo data is used only as a checklist of record kinds (`nativeflows_simulator/checklist.md`), with nothing copied.
 
 ## 6. Input files
 
@@ -227,14 +227,14 @@ The simulator runs fictional companies day by day. It writes what happened in bu
     | `added_in` | |
     | `description` | |
 
-    Version 0.1.0 has 211 edge cases. EC-01 to EC-31 are the first set:
+    Version 0.1.0 has 217 edge cases. EC-01 to EC-31 are the first set:
     - 23 from [12-testing.md](../spec/12-testing.md#synthetic-dataset), counting landed cost after partial sale and after period lock separately;
     - eight that ADRs require: foreign-currency journal, reversal of an internal document, transfer through transit, preliminary price missing, degenerate costing, one cost source over several receipts, cost before receipt, import VAT on customs.
 
     Later groups: EC-32 to EC-40 warehouse management (ADR-0023); EC-41 to EC-45 planning (ADR-0024); EC-46 to EC-52 open items (ADR-0026); EC-53 to EC-55, EC-59 and EC-60 the document lifecycle (ADR-0028); EC-56 to EC-58 agent safety (ADR-0029); EC-61 to EC-64 commercial seams (ADR-0030); EC-65 and EC-66 tax (ADR-0041); EC-67 and EC-68 imports (ADR-0030, ADR-0044); EC-69 to EC-71 commercial documents (ADR-0047); EC-72 to EC-78 cash and bank (ADR-0048); EC-79 to EC-83 agent workflows (ADR-0050, ADR-0051); EC-84 to EC-91, EC-99 and EC-100 CRM (ADR-0052); EC-92 to EC-98 reporting (ADR-0049); EC-110 to EC-118 users, roles and approval stages (ADR-0054, ADR-0055); EC-150 to EC-155 and EC-170 agent-assisted analysis, EC-171 to EC-179 reserved for it ([ADR-0060](../adr/0060-agent-assisted-reporting-and-analysis.md) rule 36); EC-156 to EC-168 configurable workflows and decision artifacts (ADR-0058, ADR-0059), in their block EC-156 to EC-169; EC-180 to EC-193 configurable policy settings (ADR-0063), in their block EC-180 to EC-199. EC-101 to EC-109 are multiple units of measure ([ADR-0056](../adr/0056-multiple-units-of-measure.md) rule 25), and EC-119 to EC-129 are barcodes ([ADR-0061](../adr/0061-barcodes.md) rule 27), which fills the block of ADR-0054; EC-130 and EC-131 are multiple units of measure too. EC-132 to EC-149 are document intake and product engineering ([ADR-0057](../adr/0057-document-intake-and-extraction.md), [ADR-0062](../adr/0062-product-engineering-workflow.md)), of which EC-132 to EC-148 are taken; the product engineering rows have no first step until the production core step is numbered. EC-200 to EC-219 are the production agent ([ADR-0064](../adr/0064-production-agent.md)), with no first step until the production core step is numbered. EC-220 to EC-239 are the deterministic auto-post gateway ([ADR-0065](../adr/0065-deterministic-auto-post-gateway.md), proposed 2026-11-16), of which EC-220 to EC-228 are taken, first step 6. EC-240 to EC-249 are work cases ([ADR-0066](../adr/0066-work-cases.md), proposed 2026-11-16), of which EC-240 to EC-245 are taken, first step 5. Rows written before the ADRs listed their own codes (most of EC-01 to EC-31) name a source ADR that does not cite the code; the catalog is authoritative.
 
     Outcomes of EC-20, EC-21, EC-22 and EC-63 are business behavior the spec does not state (ADR-0005 item 11). ADR-0047 gives them interim, flagged outcomes (rules 18, 20, 22); the author confirms them before their first executable step.
-23. Each edge case has one injector in `erpme_simulator/edge_cases/`, registered by code. A CI test compares catalog and registry (as DS-16 rule 5 does for invariants) and validates `business_event_types` against the schema. Injectors add or modify events only through the generators, and never write anything a real business could not produce.
+23. Each edge case has one injector in `nativeflows_simulator/edge_cases/`, registered by code. A CI test compares catalog and registry (as DS-16 rule 5 does for invariants) and validates `business_event_types` against the schema. Injectors add or modify events only through the generators, and never write anything a real business could not produce.
 24. EC-26 changes a fictional, date-effective test tax code in a test setting. It is not a claim about any law; DS-23 provides such test codes.
 
 ## 8. Coverage report

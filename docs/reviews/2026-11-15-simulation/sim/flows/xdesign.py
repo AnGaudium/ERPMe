@@ -9,7 +9,7 @@ from types import SimpleNamespace
 from .core import W, ins, new_id, now, sha, jsonable
 from . import platform as P
 
-DOCS = os.path.expanduser(os.environ.get("ERPME_DOCS", "~/Projects/ERPMe/docs"))
+DOCS = os.path.expanduser(os.environ.get("NATIVEFLOWS_DOCS", "~/Projects/NativeFlows/docs"))
 LABDIR = os.path.join(DOCS, "reviews/2026-11-14-design-validation/lab")
 _LIBS = {}
 # up to this marker every top-level statement but a check runs (tables built by loops and calls); after it, definitions only

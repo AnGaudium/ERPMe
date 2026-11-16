@@ -3,7 +3,7 @@
 -- this file disagrees.
 -- Loading: DS-20 references user_account, which this file defines, so the lab loader orders DS-20, DS-06 and this file
 -- together, after 00_stubs.sql without its one-column user_account stub (the older scenarios keep the stub).
--- Conventions of DS-20: tables in schema `erpme`, domains in `types`; keys inline, named by the MetaData convention in
+-- Conventions of DS-20: tables in schema `nativeflows`, domains in `types`; keys inline, named by the MetaData convention in
 -- migrations (ADR-0004 rule 15); IDs are UUIDv7 from context.new_id (ADR-0006 rule 3), no defaults; references between
 -- company tables are composite on (company_id, id); every table with company_id gets FORCE ROW LEVEL SECURITY and the
 -- generated company policy (ADR-0017 rule 19; ADR-0022 rule 8).
@@ -192,10 +192,10 @@ CREATE UNIQUE INDEX ux_role_permission_hold_in_force ON role_permission_hold (ro
 -- pending until its own user runs ConfirmUserInvitation. Display name and e-mail are what the company typed; the
 -- company's queries show these, never the account's own data, while pending. ConfirmUserInvitation and the user's
 -- CancelUserInvitation are company-scoped commands whose permission check is that the caller is user_account_id.
--- The invited user's pending list is a registered cross-company query; its erpme.company_ids come from a
--- security-definer function owned by a no-login role erpme_invitation, whose only policy here sees pending rows:
+-- The invited user's pending list is a registered cross-company query; its nativeflows.company_ids come from a
+-- security-definer function owned by a no-login role nativeflows_invitation, whose only policy here sees pending rows:
 --   pending_invitation_companies(user_account_id uuid) RETURNS SETOF uuid  -- company IDs only; no role has BYPASSRLS
--- (the pattern of erpme_claim, ADR-0017 rule 19; role and function are created with the database roles, not here).
+-- (the pattern of nativeflows_claim, ADR-0017 rule 19; role and function are created with the database roles, not here).
 -- Pending invitations expire after the installation setting invitation_expiry_days (default 30).
 CREATE TABLE user_invitation (
     id                  uuid PRIMARY KEY,

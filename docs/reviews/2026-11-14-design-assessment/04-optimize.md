@@ -1,4 +1,4 @@
-# ERPMe design review, part 4: optimizer lens
+# NativeFlows design review, part 4: optimizer lens
 
 Snapshot: `the read-only snapshot of commit 9ac727f` (AGENTS.md, README.md, docs/ without archive/ and prompts/). The reconstruction (`01-reconstruction.md`) was used as a map only. Every claim below was checked against the snapshot file it cites. DS-41 (seams for production costing and asset subledgers) is still being drafted, so its absence is not reported.
 
@@ -203,12 +203,12 @@ The one-document direct transfer of ADR-0020 r6 survives only as an internal ad-
 **Evidence**
 - ADR-0013 r6–r8: `event_delivery` has its own claim (`FOR UPDATE SKIP LOCKED`), lease (`locked_until`), backoff, `max_attempts`, `held` state and crash reclaim.
 - ADR-0013 r13 and ADR-0022 r12: Procrastinate also runs, with its own retry, heartbeat (30 s) and stalled-job detection (5 min). It runs the delivery workers, system jobs, scheduled jobs and the PDF queue.
-- ADR-0017 r18: an `erpme_claim` role exists for the delivery claim. ADR-0022 r8: Procrastinate's schema is pinned by an Alembic migration.
+- ADR-0017 r18: an `nativeflows_claim` role exists for the delivery claim. ADR-0022 r8: Procrastinate's schema is pinned by an Alembic migration.
 
 **Consequence.** Two implementations of "claim, lease, retry, give up" with different semantics, two dashboards of stuck work, two sets of PAR tests (PAR-04 covers only deliveries), and a third-party schema to keep in step with migrations. An agent debugging a stuck job has to know which machine it is in.
 
 **Simplification (choose one)**
-- **(A)** Drop Procrastinate. Model system jobs and scheduled runs as rows in one `job_run` table (or as events to a registered `system` consumer), claimed by the same worker loop with the same lease, backoff and `held` semantics. Scheduling is a small periodic loop in `erpme worker`.
+- **(A)** Drop Procrastinate. Model system jobs and scheduled runs as rows in one `job_run` table (or as events to a registered `system` consumer), claimed by the same worker loop with the same lease, backoff and `held` semantics. Scheduling is a small periodic loop in `nativeflows worker`.
 - **(B)** Keep Procrastinate only for scheduling and the PDF worker. Delivery workers become a plain loop over `event_delivery`, not Procrastinate tasks.
 
 **What it removes:** (A) one dependency, one schema and one retry semantics. (B) the nesting of one queue inside the other.
@@ -313,7 +313,7 @@ The one-document direct transfer of ADR-0020 r6 survives only as an internal ad-
 
 **Consequence.** `company_id::text = current_setting(...)` cannot match the leading `company_id` column of indexes such as `(company_id, account_id, posting_period_id)` (ADR-0014 r16). Any query that relies on RLS for the company filter scans more than it should.
 
-**Simplification.** Use a STABLE function `erpme.current_company_id()` that returns uuid or NULL, and `erpme.is_installation_scope()` that returns boolean. The policy becomes `company_id = erpme.current_company_id()`, or `company_id IS NULL AND erpme.is_installation_scope()`. Fail-closed behavior is unchanged.
+**Simplification.** Use a STABLE function `nativeflows.current_company_id()` that returns uuid or NULL, and `nativeflows.is_installation_scope()` that returns boolean. The policy becomes `company_id = nativeflows.current_company_id()`, or `company_id IS NULL AND nativeflows.is_installation_scope()`. Fail-closed behavior is unchanged.
 
 ### OPT-16 (low, Information flow): delivery retention exists only for replay deduplication
 
@@ -363,11 +363,11 @@ The one-document direct transfer of ADR-0020 r6 survives only as an internal ad-
 ### OPT-20 (low, architecture): test tooling granularity
 
 **Evidence**
-- ADR-0022 r1 and r6, DS-16 §1: seven distributions (`erpme_dev`, `erpme_events`, `erpme_client`, `erpme_adapters`, `erpme_simulator`, `erpme_testkit`, `erpme_reference`), each with its own `pyproject.toml`.
+- ADR-0022 r1 and r6, DS-16 §1: seven distributions (`nativeflows_dev`, `nativeflows_events`, `nativeflows_client`, `nativeflows_adapters`, `nativeflows_simulator`, `nativeflows_testkit`, `nativeflows_reference`), each with its own `pyproject.toml`.
 - DS-17 r7: "Adapters of earlier steps are kept, so any log can be replayed at any step."
 
 **Simplification.**
-- Keep `erpme_reference` separate, because stdlib-only independence matters. Merge the rest into one `erpme_harness` distribution with import-linter contracts between its subpackages.
+- Keep `nativeflows_reference` separate, because stdlib-only independence matters. Merge the rest into one `nativeflows_harness` distribution with import-linter contracts between its subpackages.
 - Keep only the current step's adapter, which already maps every event type with `first_step ≤ N`. Earlier adapters live in git history.
 - ADR-0008 r23 serves only the current and previous command majors, so old adapters will break anyway.
 

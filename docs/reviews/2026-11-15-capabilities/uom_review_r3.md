@@ -2,7 +2,7 @@
 
 0 blocking, 2 should-fix, 7 nits. All six round-2 items and the six nits are resolved. Both should-fix items are new and come from the round-3 backstop and share rules; each has a small, tested fix. File:line refer to the round-3 review copy ("0056" = `adr/0056-multiple-units-of-measure.md`).
 
-What I ran, on my own database `erpme_lab_ru`:
+What I ran, on my own database `nativeflows_lab_ru`:
 - `t17_uom.py --load`: 106/106. `t14`: 83/83. `t16 --load`: 99/99.
 - `t01` 16/16, `t02` 6/6, `t03` 4/4, `t04` 5/5, `t05` 62/62, `t06` 60/60, `t07` 38/38, `t08` 46/46.
 - `check_package.py` on tt99: PASS; self-test 28 of 28 caught.

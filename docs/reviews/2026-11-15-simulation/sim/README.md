@@ -1,6 +1,6 @@
-# ERPMe flow simulation (design validation; flows 1-11 on design branch ds-production HEAD bd459d4, ADR-0056 to ADR-0064)
+# NativeFlows flow simulation (design validation; flows 1-11 on design branch ds-production HEAD bd459d4, ADR-0056 to ADR-0064)
 
-ERPMe is in the design phase and has no product code. This folder builds a test database from **all** design DDL,
+NativeFlows is in the design phase and has no product code. This folder builds a test database from **all** design DDL,
 seeds one fictional company of the DS-17 `vn_manufacturing` profile, and runs six business flows step by step as the
 flows report (holistic review, Part B) and the architect decisions after it describe. Every step writes the real
 design tables, runs the deterministic rule as a pure Python function, records events, audit rows and work items, and
@@ -17,13 +17,13 @@ On gb10:
 ```bash
 cd docs/reviews/2026-11-15-simulation/sim
 python run_all.py                # live LLM (17 calls)
-./simrun.sh final_a                                             # fresh database erpme_sim_final_a, SIM_LLM=off (recorded fixtures)
+./simrun.sh final_a                                             # fresh database nativeflows_sim_final_a, SIM_LLM=off (recorded fixtures)
 SIM_LLM=off python run_all.py    # dry run: each LLM step uses its labelled fallback fixture
 python3 compare_traces.py build/runs/runA.json build/runs/runB.json   # equal apart from the LLM text?
 ```
 
-- Database `erpme_sim` in container `erpme_lab_pg` (127.0.0.1:5561, user `lab`); override with `ERPME_SIM_DSN`. Each run
-  drops and rebuilds schemas `erpme` and `types`, so it is rerunnable. The session sets `erpme.company_id` because the
+- Database `nativeflows_sim` in container `nativeflows_lab_pg` (127.0.0.1:5561, user `lab`); override with `NATIVEFLOWS_SIM_DSN`. Each run
+  drops and rebuilds schemas `nativeflows` and `types`, so it is rerunnable. The session sets `nativeflows.company_id` because the
   DS-05 tables have FORCE ROW LEVEL SECURITY.
 - IDs come from seeded random streams per (flow, table) and timestamps from a business clock, so a rerun writes the same
   rows; only the LLM's text can differ (and a different LLM choice changes the branch it leads to).
@@ -35,9 +35,9 @@ python3 compare_traces.py build/runs/runA.json build/runs/runB.json   # equal ap
 
 ## Current state: integrated design (branch ds-production, HEAD bd459d4), flows 1-11
 
-The docs copy is `../base-integrated/` (`git archive ds-production`); point `ERPME_DOCS` at `base-integrated/docs`. The loader
+The docs copy is `../base-integrated/` (`git archive ds-production`); point `NATIVEFLOWS_DOCS` at `base-integrated/docs`. The loader
 now builds 339 tables, including DS-28-settings, DS-28-34-configuration-artifacts, DS-33-analysis and DS-36-document-intake.
-`simrun.sh NAME` creates a fresh database `erpme_sim_NAME` (use a lowercase name), runs with `SIM_LLM=off`, and copies the log and
+`simrun.sh NAME` creates a fresh database `nativeflows_sim_NAME` (use a lowercase name), runs with `SIM_LLM=off`, and copies the log and
 trace to `build/runs/NAME.*`.
 
 **Fixes for the design changes since ec0c126:**
@@ -91,7 +91,7 @@ databases: all 11 flows pass, 83/83 checks, 27/27 invariants, 17 LLM calls (reco
 
 `build_schema.py` calls the repo's combined loader `docs/reviews/2026-11-14-design-validation/lab/load_all.py`
 (HEAD 46ece8b): all `docs/design/*.sql` (DS-05-platform, DS-06, DS-15, DS-20, DS-22-09-42, DS-35, DS-43-54, DS-56) in one
-dependency order, 291 tables, extensions in schema `erpme`. Without that file it falls back to the earlier recipe
+dependency order, 291 tables, extensions in schema `nativeflows`. Without that file it falls back to the earlier recipe
 (`00_stubs.sql` minus the stub tables a DDL defines, `pg_trgm`, `load_ds06.py` order).
 
 Still stubs:

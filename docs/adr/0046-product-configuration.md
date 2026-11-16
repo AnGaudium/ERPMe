@@ -248,7 +248,7 @@ The reference systems solve this differently:
 - **D365 product configuration:** models with attributes, expression constraints solved by a constraint solver, table constraints, calculations, conditional bill of materials lines and route operations, and a new variant created for each configuration.
 - **Odoo configurator:** attributes that create variants always, dynamically or never; exclusions; custom values; price extras. No conditional sizing of bills of materials beyond lines that apply to some variants.
 
-ERPMe takes SAP's super structure with selection conditions and D365's configured variant per configuration, and keeps the rule language as small as Odoo's spirit. That way an agent can read, explain and propose every rule. The first review of this ADR found that sequential rule application made results depend on rule order, that first-time configurations had no cost at the checks, and that numbers created value rows from quotations. Rounds, the configuration estimate and numbers stored as numbers fix them.
+NativeFlows takes SAP's super structure with selection conditions and D365's configured variant per configuration, and keeps the rule language as small as Odoo's spirit. That way an agent can read, explain and propose every rule. The first review of this ADR found that sequential rule application made results depend on rule order, that first-time configurations had no cost at the checks, and that numbers created value rows from quotations. Rounds, the configuration estimate and numbers stored as numbers fix them.
 
 ## Options considered
 

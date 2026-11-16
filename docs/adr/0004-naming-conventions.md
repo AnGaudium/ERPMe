@@ -21,7 +21,7 @@ Every code identifier is an English word or phrase from the glossary in [00-read
 
 **Modules and packages**
 
-7. The Python distribution and top-level package is `erpme`; each module is `erpme.<module>`. A module name is one or two lowercase English words in `snake_case` (e.g. `ledger`, `master_data`). DS-18 decides the module list and whether modules map to PostgreSQL schemas; if a module has its own schema, the schema has the module's name. Decided in [ADR-0022](0022-repository-and-engineering-conventions.md) rules 2, 7: one schema `erpme`; test tooling lives in separate top-level packages `erpme_<tool>` that the product never imports.
+7. The Python distribution and top-level package is `nativeflows`; each module is `nativeflows.<module>`. A module name is one or two lowercase English words in `snake_case` (e.g. `ledger`, `master_data`). DS-18 decides the module list and whether modules map to PostgreSQL schemas; if a module has its own schema, the schema has the module's name. Decided in [ADR-0022](0022-repository-and-engineering-conventions.md) rules 2, 7: one schema `nativeflows`; test tooling lives in separate top-level packages `nativeflows_<tool>` that the product never imports.
 8. Localization packages are named `l10n_<country>`, with the ISO 3166-1 alpha-2 code in lowercase (`l10n_vn`, `l10n_us`). An accounting regime inside a package is identified by its official code in lowercase (`tt99`, `tt133`). How a package is packaged and loaded is DS-14.
 
 **Database objects**
@@ -45,7 +45,7 @@ Every code identifier is an English word or phrase from the glossary in [00-read
 
 14. Enumerated values are lowercase `snake_case` English words (`pending_approval`, `soft_locked`). They are stored as `text` with a `CHECK` constraint or as a reference table, never as a PostgreSQL `ENUM` type, so a value can be added or retired in an ordinary migration. Their UI labels go through i18n.
 15. Constraint and index names come from one SQLAlchemy `MetaData` naming convention: `pk_<table>`, `fk_<table>_<column>`, `uq_<table>_<columns>`, `ix_<table>_<columns>`, `ck_<table>_<name>`, where every `CHECK` constraint is given an explicit `<name>`. Triggers, which the convention does not cover, are named by hand `trg_<table>_<purpose>`.
-16. Other database objects: views are named like tables, as nouns, with no prefix, and share the database-wide uniqueness of rule 9 (placement is DS-33); sequences keep PostgreSQL's default `<table>_<column>_seq`; partitions are `<table>_<yyyy>` or `<table>_<yyyy>_<mm>`; database roles are `erpme_<purpose>` (the roles themselves are DS-15).
+16. Other database objects: views are named like tables, as nouns, with no prefix, and share the database-wide uniqueness of rule 9 (placement is DS-33); sequences keep PostgreSQL's default `<table>_<column>_seq`; partitions are `<table>_<yyyy>` or `<table>_<yyyy>_<mm>`; database roles are `nativeflows_<purpose>` (the roles themselves are DS-15).
 
     Placement: views are in schema `query`, named as nouns that never equal a table name ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 42).
 

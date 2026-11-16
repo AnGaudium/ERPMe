@@ -1,7 +1,7 @@
 # Simulation observations: integrated design (ds-production, HEAD bd459d4), flows 1-11
 
 Date: 2026-11-15. Simulator: `sim/` (flows 1-6 with the UoM scenario, and the new flows 7-11). Two runs on fresh databases
-(`erpme_sim_final_a`, `erpme_sim_final_b`): 11 flows pass, 83/83 flow checks, 27/27 invariants, 17 LLM calls per run
+(`nativeflows_sim_final_a`, `nativeflows_sim_final_b`): 11 flows pass, 83/83 flow checks, 27/27 invariants, 17 LLM calls per run
 (recorded fallback fixtures, `SIM_LLM=off`), and `compare_traces.py` finds 0 differences. The design repo was not edited.
 
 ## Design gaps found

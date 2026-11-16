@@ -1,6 +1,6 @@
 -- Simulation stubs: tables the six flows write that have no design DDL yet. NOT design DDL.
 -- Each stub carries only the columns the simulation reads; the README lists them as stubs.
-SET search_path = erpme;
+SET search_path = nativeflows;
 
 -- lab stub tax_code (00_stubs.sql has only id): the DS-19 tax_codes.csv columns the simulation reads (DS-23 pending)
 ALTER TABLE tax_code ADD COLUMN code text UNIQUE, ADD COLUMN tax_kind text, ADD COLUMN direction text,

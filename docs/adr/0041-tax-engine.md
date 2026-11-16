@@ -231,7 +231,7 @@ DS-23 is needed by step 2 (data model) and step 7 (logic and returns). The Vietn
 
 The research behind this ADR read only some primary texts; unconfirmed points are open questions. The first review found that a mutable subledger, recomputation at posting, and live returns would let filed periods change silently. This version freezes taxes in the document, keeps the subledger append-only, and snapshots filed returns.
 
-SAP stores tax items per document and declares through its advance return; Odoo maps taxes through fiscal positions and tax grids. ERPMe combines a dated matrix with document tax rows, an append-only subledger and filed snapshots.
+SAP stores tax items per document and declares through its advance return; Odoo maps taxes through fiscal positions and tax grids. NativeFlows combines a dated matrix with document tax rows, an append-only subledger and filed snapshots.
 
 ## Options considered
 

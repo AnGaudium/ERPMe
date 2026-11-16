@@ -1,13 +1,13 @@
-"""Build the erpme_sim schema from the eight design DDL files (simulation helper, not product code).
+"""Build the nativeflows_sim schema from the eight design DDL files (simulation helper, not product code).
 
 Recipe (until docs/reviews/2026-11-14-design-validation/lab/load_all.py exists; it is used when present):
   lab/00_stubs.sql without the stub tables a DDL file defines (user_account, document, material_document,
-  material_document_line); CREATE EXTENSION pg_trgm after SET search_path = erpme; the eight files concatenated
-  and ordered by lab/load_ds06.py; SET search_path = erpme. Then sim_stubs.sql (tables with no DDL yet).
+  material_document_line); CREATE EXTENSION pg_trgm after SET search_path = nativeflows; the eight files concatenated
+  and ordered by lab/load_ds06.py; SET search_path = nativeflows. Then sim_stubs.sql (tables with no DDL yet).
 """
 import os, re, subprocess, sys, tempfile
 
-DOCS = os.path.expanduser(os.environ.get("ERPME_DOCS", "~/Projects/ERPMe/docs"))
+DOCS = os.path.expanduser(os.environ.get("NATIVEFLOWS_DOCS", "~/Projects/NativeFlows/docs"))
 DESIGN = os.path.join(DOCS, "design")
 LAB = os.path.join(DOCS, "reviews/2026-11-14-design-validation/lab")
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -25,7 +25,7 @@ def build_sql():
         stubs, n = pat.subn("", stubs)
         if n:
             removed.append(t)
-    stubs = stubs.replace("SET search_path = erpme;\n", "SET search_path = erpme;\nCREATE EXTENSION IF NOT EXISTS pg_trgm;\n", 1)
+    stubs = stubs.replace("SET search_path = nativeflows;\n", "SET search_path = nativeflows;\nCREATE EXTENSION IF NOT EXISTS pg_trgm;\n", 1)
     src = "".join(open(os.path.join(DESIGN, f), encoding="utf-8").read() + "\n" for f in FILES)
     with tempfile.NamedTemporaryFile("w", suffix=".sql", delete=False, encoding="utf-8") as tf:
         tf.write(src)
@@ -40,7 +40,7 @@ def build_sql():
             "design_files": ["docs/design/" + f for f in FILES], "lab_stub_tables": remaining,
             "external_refs": [e.strip() for e in external.split(",") if e.strip()],
             "sim_stub_tables": sorted(set(re.findall(r"CREATE TABLE (?:IF NOT EXISTS )?(\w+)", sim_stubs)))}
-    return [stubs, "SET search_path = erpme;\n" + p.stdout, sim_stubs], info
+    return [stubs, "SET search_path = nativeflows;\n" + p.stdout, sim_stubs], info
 
 
 def load(cx, dsn=None):
@@ -49,10 +49,10 @@ def load(cx, dsn=None):
     if os.path.isfile(os.path.join(LAB, "load_all.py")):
         sys.path.insert(0, LAB)
         from load_all import load_all
-        n = load_all(dsn or os.environ.get("ERPME_SIM_DSN", "host=127.0.0.1 port=5561 dbname=erpme_sim user=lab password=lab"), DOCS)
+        n = load_all(dsn or os.environ.get("NATIVEFLOWS_SIM_DSN", "host=127.0.0.1 port=5561 dbname=nativeflows_sim user=lab password=lab"), DOCS)
         cx.execute(sim_stubs)
         stubs = open(os.path.join(LAB, "00_stubs.sql"), encoding="utf-8").read()
-        defined = {r[0] for r in cx.execute("select table_name from information_schema.tables where table_schema='erpme'")}
+        defined = {r[0] for r in cx.execute("select table_name from information_schema.tables where table_schema='nativeflows'")}
         stub_tables = sorted(t for t in set(re.findall(r"CREATE TABLE (\w+)", stubs)) if t in defined and t not in DEFINED_STUBS)
         return {"recipe": "docs/reviews/2026-11-14-design-validation/lab/load_all.py (all design/*.sql in one dependency order, %d tables) + sim_stubs.sql" % n,
                 "design_files": ["docs/design/" + os.path.basename(f) for f in sorted(__import__("glob").glob(os.path.join(DESIGN, "*.sql")))],
@@ -69,8 +69,8 @@ def load(cx, dsn=None):
 
 if __name__ == "__main__":
     import psycopg
-    dsn = os.environ.get("ERPME_SIM_DSN", "host=127.0.0.1 port=5561 dbname=erpme_sim user=lab password=lab")
+    dsn = os.environ.get("NATIVEFLOWS_SIM_DSN", "host=127.0.0.1 port=5561 dbname=nativeflows_sim user=lab password=lab")
     cx = psycopg.connect(dsn); cx.autocommit = True
     info = load(cx)
-    n = cx.execute("select count(*) from information_schema.tables where table_schema='erpme'").fetchone()[0]
-    print(info); print("tables in erpme:", n)
+    n = cx.execute("select count(*) from information_schema.tables where table_schema='nativeflows'").fetchone()[0]
+    print(info); print("tables in nativeflows:", n)

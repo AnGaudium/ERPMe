@@ -3,7 +3,7 @@
 -- Loaded with DS-20, DS-56, DS-06, DS-15 and DS-43-54 in the design lab (docs/reviews/2026-11-14-design-validation,
 -- t14_commercial_inventory_ddl.py).
 -- The ADRs win if this file disagrees.
--- Conventions as DS-20: tables in schema erpme, keys inline (migrations name them by the MetaData naming convention,
+-- Conventions as DS-20: tables in schema nativeflows, keys inline (migrations name them by the MetaData naming convention,
 -- ADR-0004 rule 15), UUIDv7 IDs from context.new_id or the client, no ID defaults, recorded_at on every row (ADR-0007 rule 9).
 -- Every table carries company_id, FORCE ROW LEVEL SECURITY and the generated company policy (ADR-0017 rule 19,
 -- ADR-0022 rule 8), except the global catalog movement_type. The lab checks this list.

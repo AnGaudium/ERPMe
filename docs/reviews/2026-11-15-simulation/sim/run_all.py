@@ -1,4 +1,4 @@
-"""Run the six ERPMe flows end to end on erpme_sim, from scratch, and write trace/trace.json and trace/trace.md.
+"""Run the six NativeFlows flows end to end on nativeflows_sim, from scratch, and write trace/trace.json and trace/trace.md.
 
 Simulation for design validation, not product code. Usage: see README.md.
 """
@@ -33,13 +33,13 @@ def main():
     db = core.DB()
     print("load schema ...")
     db.x("set client_min_messages = warning")
-    db.x("DROP SCHEMA IF EXISTS erpme CASCADE; DROP SCHEMA IF EXISTS types CASCADE")
+    db.x("DROP SCHEMA IF EXISTS nativeflows CASCADE; DROP SCHEMA IF EXISTS types CASCADE")
     schema_info = build_schema.load(db.cx, core.DSN)
     db.load_columns()
     from flows import uom
     uom.BLOCK_TABLES.clear()
     uom.BLOCK_TABLES.update(t for t, c in db.cols.items() if "uom_factor_source" in c)
-    n_tables = db.val("select count(*) from information_schema.tables where table_schema='erpme' and table_type='BASE TABLE'")
+    n_tables = db.val("select count(*) from information_schema.tables where table_schema='nativeflows' and table_type='BASE TABLE'")
     print(f"  {n_tables} tables")
     TRACE.flow = 0
     setup = seed.seed(db)
@@ -70,7 +70,7 @@ def main():
         f["status"] = "pass" if results.get(f["flow"]) and all(c["ok"] for c in f["checks"]) else "fail"
         f["steps"] = sum(1 for s in TRACE.steps if s["flow"] == f["flow"])
         f["llm_calls"] = sum(1 for s in TRACE.steps if s["flow"] == f["flow"] and s.get("llm"))
-    trace = {"meta": {"run_at": dt.datetime.now(core.TZ).isoformat(timespec="seconds"), "database": "erpme_sim", "format_version": "2.0",
+    trace = {"meta": {"run_at": dt.datetime.now(core.TZ).isoformat(timespec="seconds"), "database": "nativeflows_sim", "format_version": "2.0",
                       "schema": schema_info, "tables": n_tables,
                       "simulation_stubs": "sim_stubs.sql (not design DDL)",
                       "llm": {"model": core.LLM_MODEL, "mode": core.LLM_MODE, "live": LLM_STATS["live"], "fallback": LLM_STATS["fallback"],

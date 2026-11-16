@@ -346,7 +346,7 @@ ADR-0045 left pricing as a whole to DS-22, and some twenty accepted ADRs hand DS
 - **D365:** trade agreements, discounts and charges; three-way matching policies with tolerances; credit holds.
 - **Odoo:** pricelists with rules, promotions as programs, invoices from deliveries or orders.
 
-ERPMe keeps the shapes people expect: an order, then stock, then money. It keeps one pure pricing function with its steps on the line, and enforces the subtle parts (GR/IR, corrections, credit) by invariants the lab checks. The first review of this ADR found that GR/IR was exact only without rounding and without reversals. It also found that return documents had been redefined against ADR-0009 and ADR-0027, and that a mismatched invoice could pass by submitting first. The rounded cumulative postings, the latest-only reversals, the accepted definitions of returns and the seed on both actions fix these.
+NativeFlows keeps the shapes people expect: an order, then stock, then money. It keeps one pure pricing function with its steps on the line, and enforces the subtle parts (GR/IR, corrections, credit) by invariants the lab checks. The first review of this ADR found that GR/IR was exact only without rounding and without reversals. It also found that return documents had been redefined against ADR-0009 and ADR-0027, and that a mismatched invoice could pass by submitting first. The rounded cumulative postings, the latest-only reversals, the accepted definitions of returns and the seed on both actions fix these.
 
 ## Options considered
 

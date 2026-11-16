@@ -1,4 +1,4 @@
-# Simulation findings (sim rebuild at HEAD 46ece8b; details in ~/Projects/ERPMe-lab/sim/README.md) + architect decisions
+# Simulation findings (sim rebuild at HEAD 46ece8b; details in ~/Projects/NativeFlows-lab/sim/README.md) + architect decisions
 "note" = note at rule end of the accepted ADR. Apply with fix_sim.py.
 
 1. DS-05 ck_bank_statement_line_match_state lacks `proposed` (ADR-0048 r9 note F1): add `proposed` to the check and require proposed_document_id when proposed (DDL direct edit; t15 still passes; add a t15 case).

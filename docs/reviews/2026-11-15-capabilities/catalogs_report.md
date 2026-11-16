@@ -1,8 +1,8 @@
-# Cross-reference and catalog integrity review — ERPMe @ 5536f9c (ds-15-access)
+# Cross-reference and catalog integrity review — NativeFlows @ 5536f9c (ds-15-access)
 
 Method: scripted checks over `docs/` (excluding `archive/` and `reviews/2026-11-14-design-assessment/`), plus manual reading of flagged spots. Read-only; `/tmp/rv4` on gb10 is deleted and `git status` is clean. Nothing was loaded into PostgreSQL and no lab script was run, so check 12 and the lab counts are static analysis only.
 
-Paths are relative to `~/Projects/ERPMe/docs/` on gb10 unless they start with `/`.
+Paths are relative to `~/Projects/NativeFlows/docs/` on gb10 unless they start with `/`.
 
 **Blocking for the simulation:** 2.1, 2.2, 3.1, 12.1–12.4. Everything else is Should-fix or Nit.
 
@@ -206,7 +206,7 @@ The backlog intro itself is correct: `design/backlog.md:3` says "Fifty-seven" an
 
 Fix: have each script's last line print its total and quote that; state counts for L-12 and L-14.
 
-8.10 **Nit** — `lab/t05_master_data.py:159` and `lab/t06_configuration.py:509` default to the hard-coded path `~/Projects/ERPMe/docs/design/…`; t11 and t12 use `ERPME_DOCS`. Unify.
+8.10 **Nit** — `lab/t05_master_data.py:159` and `lab/t06_configuration.py:509` default to the hard-coded path `~/Projects/NativeFlows/docs/design/…`; t11 and t12 use `NATIVEFLOWS_DOCS`. Unify.
 
 8.11 `adr/README.md` index: all 55 ADRs are listed, and titles and status dates match each ADR's Status line. No defect.
 
@@ -290,7 +290,7 @@ For the access scenarios, `document` also needs `owner_employee_id uuid`, `creat
 
 12.4 **Blocking for the sim** — `design/DS-35-crm.sql:466` uses `gin_trgm_ops`. The stubs create only `btree_gist`. The loader must run `CREATE EXTENSION IF NOT EXISTS pg_trgm;`, which needs the extension available and sufficient rights in the test database.
 
-12.5 **Should-fix** — none of the five DDL files sets a schema or search path. The loader must run the stubs first (they drop and create schemas `erpme` and `types`, the five `types.*` domains and `btree_gist`) and then `SET search_path = erpme` in the session that runs the ordered DDL.
+12.5 **Should-fix** — none of the five DDL files sets a schema or search path. The loader must run the stubs first (they drop and create schemas `nativeflows` and `types`, the five `types.*` domains and `btree_gist`) and then `SET search_path = nativeflows` in the session that runs the ordered DDL.
 
 12.6 **Nit** — `lab/load_ds06.py` splits statements on lines ending in `;`. A trailing comment after `;` silently merges two statements (L-13 found this once). None exists now in the five DS files; `lab/00_stubs.sql:5` has one, harmless because the stubs are executed whole. Add a guard to the loader.
 
@@ -306,4 +306,4 @@ Combined loader recipe:
 2. `CREATE EXTENSION IF NOT EXISTS pg_trgm`.
 3. `ALTER TABLE document …` as in 12.3, plus the DS-15 columns and the `document_version` stub if needed.
 4. Concatenate DS-20, DS-06, DS-15, DS-35 and DS-56 and pass them through `load_ds06.py`.
-5. `SET search_path = erpme`, then execute the ordered output.
+5. `SET search_path = nativeflows`, then execute the ordered output.

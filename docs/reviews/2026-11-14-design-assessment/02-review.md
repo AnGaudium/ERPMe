@@ -1,4 +1,4 @@
-# ERPMe design review, part 2: reviewer lens (completeness and consistency)
+# NativeFlows design review, part 2: reviewer lens (completeness and consistency)
 
 Snapshot: `the read-only snapshot of commit 9ac727f` (AGENTS.md, README.md, docs/ without archive/ and prompts/). The reconstruction (`01-reconstruction.md`) was used as a map only. Every claim below was checked against the snapshot text; citations are `file: rule n` (ADR rule numbers) or the catalog row. DS-41 (seams for production costing and asset subledgers) is being drafted and is not treated as missing.
 

@@ -1,8 +1,8 @@
 """Scenario: DS-35 minimal CRM (ADR-0052) on the DS-20, DS-35 and DS-06 DDL loaded together.
 
 Run: python t11_crm.py [--load]
-  ERPME_LAB_DSN must name a throwaway database; --load drops and rebuilds schemas erpme and types there.
-  ERPME_DOCS points at the docs/ tree to load (default ~/Projects/ERPMe/docs); ERPME_LAB_DIR at lab.py and
+  NATIVEFLOWS_LAB_DSN must name a throwaway database; --load drops and rebuilds schemas nativeflows and types there.
+  NATIVEFLOWS_DOCS points at the docs/ tree to load (default ~/Projects/NativeFlows/docs); NATIVEFLOWS_LAB_DIR at lab.py and
   load_ds06.py (default: this file's directory).
 
 D: the natural key of inbound messages (ADR-0052 rule 13): provider key per mailbox, one canonical row per
@@ -27,16 +27,16 @@ Not covered: commands, consumers, the connector and its probe, the timeline quer
 import hashlib, os, random, re, subprocess, sys, tempfile, unicodedata
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-LAB = os.environ.get("ERPME_LAB_DIR", HERE)
+LAB = os.environ.get("NATIVEFLOWS_LAB_DIR", HERE)
 sys.path.insert(0, LAB)
 from lab import conn, new, RESULTS  # noqa: E402
 
-DOCS = os.path.expanduser(os.environ.get("ERPME_DOCS", "~/Projects/ERPMe/docs"))
+DOCS = os.path.expanduser(os.environ.get("NATIVEFLOWS_DOCS", "~/Projects/NativeFlows/docs"))
 DESIGN = os.path.join(DOCS, "design")
 STUBS = os.path.join(DOCS, "reviews/2026-11-14-design-validation/lab/00_stubs.sql")
 # Lab-only stub additions: the shared document row's columns of ADR-0052 rule 18, pg_trgm (ADR-0022 rule 8), and
 # document_version (ADR-0009 rule 9), which the documents module owns.
-EXTRA_STUBS = """SET search_path = erpme;
+EXTRA_STUBS = """SET search_path = nativeflows;
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 ALTER TABLE document ADD COLUMN partner_id uuid, ADD COLUMN document_date date, ADD CONSTRAINT uq_document_company_id_id UNIQUE (company_id, id);
 CREATE TABLE document_version (id uuid PRIMARY KEY, company_id uuid NOT NULL, document_id uuid NOT NULL REFERENCES document (id),
@@ -46,7 +46,7 @@ CREATE TABLE document_version (id uuid PRIMARY KEY, company_id uuid NOT NULL, do
 # a final state, or in a frozen non-final state (issuing, ADR-0028 rule 6; sending, ADR-0052 rule 27), never change;
 # a document row in a final state never changes except posted -> reversed; versions are never updated or deleted.
 # Content tables only refuse new rows once frozen; their erasure is the append-only trigger's business (rule 7).
-FINAL_STATE_MODEL = """SET search_path = erpme;
+FINAL_STATE_MODEL = """SET search_path = nativeflows;
 CREATE FUNCTION lab_document_frozen() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE v_ids uuid[]; v_state text;
 BEGIN
@@ -449,7 +449,7 @@ def load():
         cx = conn(); cx.autocommit = True
         cx.execute(open(STUBS, encoding="utf-8").read())
         cx.execute(EXTRA_STUBS)
-        cx.execute("SET search_path = erpme;\n" + ordered.stdout)
+        cx.execute("SET search_path = nativeflows;\n" + ordered.stdout)
         cx.execute(FINAL_STATE_MODEL)
         cx.close()
 
@@ -517,7 +517,7 @@ def trial(name, fn, should_fail, match_text=None):
     RESULTS.append((ok, name, detail)); print(("PASS " if ok else "FAIL ") + name + " -- " + detail)
 
 def erasing(cx):
-    cx.execute("select set_config('erpme.erasure_command_id', 'lab', true)")
+    cx.execute("select set_config('nativeflows.erasure_command_id', 'lab', true)")
 
 # ---- D: inbound messages and the natural key
 trial("D01 a second fetch of one provider key in one mailbox is refused", lambda cx: inbound(cx, provider_message_key="1:100", content_hash=H("c")), True, "duplicate key")
@@ -745,7 +745,7 @@ trial("F12 a header refers to its request content by hash", lambda cx: cx.execut
 
 # ---- Y: content rows: draft deletes and the salt (rules 7, 24, 27)
 def deleting(cx, doc):
-    cx.execute("select set_config('erpme.document_delete_id', %s, true)", (str(doc),))
+    cx.execute("select set_config('nativeflows.document_delete_id', %s, true)", (str(doc),))
 def draft_delete(cx, state="draft", setting="own"):
     oid = outbound(cx, mid="y" + state + setting, state=state)
     if setting == "own":
@@ -818,7 +818,7 @@ ddl = open(os.path.join(DESIGN, "DS-35-crm.sql"), encoding="utf-8").read()
 tables = re.findall(r"CREATE TABLE (\w+) \((.*?)\n\);", ddl, re.S)
 missing = [n for n, body in tables if n != "public_mail_domain" and not re.search(r"^\s+company_id\s+uuid NOT NULL", body, re.M)]
 check(f"M01 all {len(tables) - 1} company tables of DS-35 carry company_id (missing: {missing or 'none'})", missing, [])
-live = {r[0] for r in X("select tablename from pg_tables where schemaname='erpme'").fetchall()}
+live = {r[0] for r in X("select tablename from pg_tables where schemaname='nativeflows'").fetchall()}
 check("M02 every DS-35 table exists in the loaded schema", sorted(n for n, _ in tables if n not in live), [])
 names = [n for n, _ in tables]
 late = [(n, r) for i, (n, body) in enumerate(tables) for r in re.findall(r"REFERENCES (\w+)", body) if r in names and names.index(r) > i]
@@ -826,7 +826,7 @@ check("M03 DS-35 loads top to bottom: no table references a later one", late, []
 no_rec = [n for n, body in tables if not re.search(r"^\s+recorded_at\s+timestamptz NOT NULL", body, re.M)]
 check("M04 every DS-35 table carries recorded_at", no_rec, [])
 TEXT = {"subject", "body_text", "requester_name", "requester_email", "requester_phone", "outcome_note", "email_address"}
-header_text = sorted(r[0] + "." + r[1] for r in X("select table_name, column_name from information_schema.columns where table_schema='erpme' and table_name in "
+header_text = sorted(r[0] + "." + r[1] for r in X("select table_name, column_name from information_schema.columns where table_schema='nativeflows' and table_name in "
                                                   "('outbound_message', 'outbound_message_recipient', 'data_subject_request')").fetchall() if r[1] in TEXT)
 check("M05 the two document headers and their lines hold no personal text", header_text, [])
 

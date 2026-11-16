@@ -1,6 +1,6 @@
-# Capability check: six capabilities against the ERPMe design
+# Capability check: six capabilities against the NativeFlows design
 
-Repo `~/Projects/ERPMe`, branch `holistic-review`, HEAD `32e7b1c`, read on 2026-11-15. Read-only check of `docs/` plus the unapplied draft `ERPMe-lab/drafts/ds-uom/0056-multiple-units-of-measure.md`.
+Repo `~/Projects/NativeFlows`, branch `holistic-review`, HEAD `32e7b1c`, read on 2026-11-15. Read-only check of `docs/` plus the unapplied draft `NativeFlows-lab/drafts/ds-uom/0056-multiple-units-of-measure.md`.
 
 Citations are `file:line` under `docs/` where the line was read with numbers, otherwise `file rule N`. Quotes are short and exact. "Not found" means a grep over `adr/`, `spec/`, `design/`, `catalogs/` and `open-questions.md` returned nothing; it is not proof of absence in `research/`, `reviews/` or `runbook/`, which were not searched.
 
@@ -81,7 +81,7 @@ Verdicts in short: 1 partly, 2 partly, 3 partly (mostly not), 4 partly, 5 partly
 
 **Constraints**
 
-- `spec/03-agent-safety.md:15`: "No hidden memory: anything an agent 'learns' ... must be deterministically computed data stored in the system, viewable and editable." So no fine-tuned model weights or opaque learned scorers as the store of what was learned; `adr/0051:285`: "ERPMe stores what was learned as visible rules and mappings instead of a hidden model".
+- `spec/03-agent-safety.md:15`: "No hidden memory: anything an agent 'learns' ... must be deterministically computed data stored in the system, viewable and editable." So no fine-tuned model weights or opaque learned scorers as the store of what was learned; `adr/0051:285`: "NativeFlows stores what was learned as visible rules and mappings instead of a hidden model".
 - Principle 13 and `adr/0051:30`: the LLM never computes "a price, discount, tax, quantity to post, account, match or score". AI may author a rule; the rule, not the model, computes.
 - `spec/03-agent-safety.md:7`: "a match an LLM contributed to is never auto-posted". A rule derived from untrusted text is tainted until a human approves it (`adr/0051:161`); after approval the master data is trusted (ADR-0029 rule 10, "the human approval is the trust boundary").
 - `spec/14-agent-workflows.md:39`: "An agent gains permissions only with evidence, never by impression."
@@ -178,7 +178,7 @@ Verdicts in short: 1 partly, 2 partly, 3 partly (mostly not), 4 partly, 5 partly
 
 **What exists**
 
-- Query layer. `adr/0050:23`: "Agents and reports read through semantic views in schema `query`, served by the read-only role `erpme_readonly` with short timeouts, pagination and row limits." Rule 44: "No client sends SQL, and agents never write SQL". Rule 46: MCP resources `erpme://query/views`. Rule 51: 17 initial views.
+- Query layer. `adr/0050:23`: "Agents and reports read through semantic views in schema `query`, served by the read-only role `nativeflows_readonly` with short timeouts, pagination and row limits." Rule 44: "No client sends SQL, and agents never write SQL". Rule 46: MCP resources `nativeflows://query/views`. Rule 51: 17 initial views.
 - Management reporting. Rule 53: `system_account_turnover` "so figures agree with the books"; "Management reports are views and exports, never documents."
 - Statutory engine. `adr/0049:11`: "Every figure is an exact sum of journal lines ... Every figure can be drilled down to the journal lines behind it." Company-defined statements and books: `adr/0049:120`. The reporting queries (`GetStatutoryReport`, `ListBookRow`, `ListReportLineContribution`) may be on agent tool lists (ADR-0050 rule 52 note).
 - List export. Rule 54: `CreateListExport` writes `.xlsx` as the requester; "Agents never export".

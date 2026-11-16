@@ -1,6 +1,6 @@
 # ADR-0061 Barcodes: independent review, round 4 (2026-11-15)
 
-Reviewed: copies of `base-ds-uom` and `base-uom-sim` in `/tmp`, each with `drafts/ds-barcode/apply_barcode.py` applied (55 writes over 33 files on both). No git command was run in `~/Projects/ERPMe` and the bases were not changed.
+Reviewed: copies of `base-ds-uom` and `base-uom-sim` in `/tmp`, each with `drafts/ds-barcode/apply_barcode.py` applied (55 writes over 33 files on both). No git command was run in `~/Projects/NativeFlows` and the bases were not changed.
 
 ## Verdict: ACCEPT
 
@@ -39,4 +39,4 @@ Correct. ADR-0022 rule 8 says the first migration creates the extensions `btree_
 - BarcodeDetector behaviour on devices is an open question for DS-31.
 - Row-level security is by the generated-policy convention and is not enabled by the lab load.
 
-Cleanup done: database `erpme_lab_rv61` dropped; `/tmp/rv61`, `/tmp/rv61sim` and `/tmp/rv61r2` deleted; the bases, the repository and the drafts were not changed.
+Cleanup done: database `nativeflows_lab_rv61` dropped; `/tmp/rv61`, `/tmp/rv61sim` and `/tmp/rv61r2` deleted; the bases, the repository and the drafts were not changed.

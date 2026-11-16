@@ -145,7 +145,7 @@ Applies to every step below:
 
 1. The 6 hand-built entry screens: sales invoice, goods receipt, goods issue, cash receipt, cash payment, journal entry, keyboard-first (DS-30).
 2. Warehouse PWA: receipt, issue, transfer and count; barcode per packaging unit (DS-31).
-3. Measurement session with an outside accountant who uses MISA daily: one simulated day of at least 50 documents over the 6 screen types, entered in ERPMe first, then in MISA; pass when ERPMe's elapsed time is no longer ([ADR-0003](../adr/0003-build-operating-rules.md) R9).
+3. Measurement session with an outside accountant who uses MISA daily: one simulated day of at least 50 documents over the 6 screen types, entered in NativeFlows first, then in MISA; pass when NativeFlows's elapsed time is no longer ([ADR-0003](../adr/0003-build-operating-rules.md) R9).
 
 **How agents are used:** builders implement screens against the UX spec; the reviewer checks that screens call only existing commands.
 

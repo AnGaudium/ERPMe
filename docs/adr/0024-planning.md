@@ -59,7 +59,7 @@ Planning answers, per item and warehouse: what to buy or move, how much, and by 
 
      It may refer to the partner's own item code in `partner_item` (ADR-0019 rule 6). It is the only home of supplier minimums, multiples and preference.
    - `supplier_purchasing_term` (one row per supplier partner) holds `minimum_order_amount` with its currency, an optional `container_volume` and `container_weight`, and an optional `order_cycle_days`.
-   - `supplier_item_lead_time` stores measured lead times per (supplier, item), refreshed by the forecast job: mean and standard deviation (square root through `erpme.numeric`) of the days from the supply line's `ordered_date` to receipt, read from `demand_supply_line` (rule 8). They are visible data (spec 03 rule 9) and are never applied without approval.
+   - `supplier_item_lead_time` stores measured lead times per (supplier, item), refreshed by the forecast job: mean and standard deviation (square root through `nativeflows.numeric`) of the days from the supply line's `ordered_date` to receipt, read from `demand_supply_line` (rule 8). They are visible data (spec 03 rule 9) and are never applied without approval.
 
    Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): `supplier_item` gains `order_uom_id` (NOT NULL; the inventory unit or an active product unit; proposed from the product's purchase unit), and its minimum and multiple are in that unit. A supplier with another pack size gets its own product unit, never a supplier factor. `supplier_purchasing_term.volume_uom_id` and `weight_uom_id` stay interim; item dimensions and weights convert to them through `uom_conversion` only (rules 14, 23).
 3. `transfer_route` holds:
@@ -114,7 +114,7 @@ Planning answers, per item and warehouse: what to buy or move, how much, and by 
     - **Seasonal index** of ISO week w: the mean, over the years of history, of (demand in week w ÷ that year's mean weekly demand), computed without event weeks and normalized so the 52 indices average 1. Week 53 uses week 52's index.
     - **Event index** of an event: the mean, over its past occurrences, of (demand in the event window ÷ the moving-average baseline of the 8 weeks before it). It replaces the seasonal index in event weeks.
     - **Daily spread.** The weekday profile is each weekday's share of demand over the last 26 weeks, uniform with less than 8 weeks of history.
-    - **Rounding.** Each day carries the remainder forward, so no quantity is lost to the unit's decimal places (ADR-0006). All arithmetic uses `erpme.numeric`.
+    - **Rounding.** Each day carries the remainder forward, so no quantity is lost to the unit's decimal places (ADR-0006). All arithmetic uses `nativeflows.numeric`.
 11. `RunForecast` (first slice):
     - **Method.** A moving average over the last 8 weeks without event weeks, multiplied by the seasonal or event index where at least 52 weeks of history exist. With less history, the check result is `forecast_history_insufficient`.
     - **Datasets.** History older than the simulated calendar is imported as `sales_history_recorded` events (DS-21 format), so the medium dataset covers indices. Whether the small dataset seeds a prior year is left with the open question on simulator coverage.
@@ -302,7 +302,7 @@ Planning answers, per item and warehouse: what to buy or move, how much, and by 
   - ADR-0007's explicit business dates.
   - Spec 03's accountable human and tainted runs.
 - Practice studied, concepts only: SAP (MRP Live, lot sizing, planned orders, exception messages), Business One (MRP recommendations converted to documents), D365 (coverage and action messages) and Odoo (reorder rules).
-- ERPMe's own choices:
+- NativeFlows's own choices:
   - a stable business key per proposal, so work items and explanations survive reruns;
   - exceptions per buyer as work items;
   - lead time split for imports, with transit in calendar days across Tết;
@@ -334,7 +334,7 @@ Planning answers, per item and warehouse: what to buy or move, how much, and by 
   - Errors: `planning_network_cycle`, `planning_run_in_progress`, `planned_order_not_convertible`.
   - Check results: `planning_parameter_missing`, `forecast_history_insufficient`.
   - `invalid_state_transition` for planned orders.
-- **DS-16:** INV-60 (pegging sums exactly), INV-61 (two simulated runs at a check point give equal `output_hash`, and a stored run with the same `input_hash` has that `output_hash`; `not_evaluated` from `erpme-check`), INV-62 (`origin_planned_order_id` kept).
+- **DS-16:** INV-60 (pegging sums exactly), INV-61 (two simulated runs at a check point give equal `output_hash`, and a stored run with the same `input_hash` has that `output_hash`; `not_evaluated` from `nativeflows-check`), INV-62 (`origin_planned_order_id` kept).
 - **DS-17:** business event types `replenishment_planned` (a planner runs planning and converts) and `forecast_adjusted`, from step 5, and `sales_history_recorded` (imported history).
 - **ADR-0008 rule 12, DS-04 plan section:** planning results listed, not hashed. **ADR-0022 rule 9:** `RunPlanning` and `RunForecast` registered as long jobs.
 - **DS-17:** edge cases EC-41 to EC-45 (import across Tết, intermittent item, supplier minimum excess, transfer network, promotion adjustment).

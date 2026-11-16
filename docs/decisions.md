@@ -20,4 +20,4 @@ These decisions are not reopened without a new ADR. If another file says otherwi
 | D14 | Core tools; React, TypeScript and Vite UI; warehouse app as a PWA | [ADR-0002](adr/0002-core-technology-tools.md) |
 | D15 | Timeframe 12–18 months; gates are conditions, months are estimates | [Roadmap](spec/10-roadmap.md) |
 | D16 | Test data is our own synthetic dataset: fictional companies simulated day by day through the public commands, large enough and covering the edge-case catalog. No third-party data is copied; Odoo's demo data is only a checklist. A reader for MISA or another system is built only to migrate a pilot that uses it | [Synthetic dataset](spec/12-testing.md#synthetic-dataset); [Build order](spec/11-build-order.md) |
-| D17 | Project name ERPMe. This repository is the source of truth for the specification; the shared Claude doc is a discussion copy | [docs/README.md](README.md) |
+| D17 | Project name NativeFlows. This repository is the source of truth for the specification; the shared Claude doc is a discussion copy | [docs/README.md](README.md) |

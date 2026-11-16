@@ -24,19 +24,19 @@ def get_price(db, pl, on, qty, uom_code, item=None, product=None, values=None):
     """find_price (ADR-0045 rule 4; ADR-0046 rule 15 for configurable products)."""
     uom = W.uom[uom_code]
     if product is None:
-        product = db.one("select product_id from erpme.item where id=%s", (item,))[0]
+        product = db.one("select product_id from nativeflows.item where id=%s", (item,))[0]
     f, inv = factor_of(db, product, uom, item=item)
 
     def rows(col, target, u):
-        return db.all(f"select id, minimum_quantity, unit_price from erpme.price_list_entry where price_list_id=%s and {col}=%s and uom_id=%s"
+        return db.all(f"select id, minimum_quantity, unit_price from nativeflows.price_list_entry where price_list_id=%s and {col}=%s and uom_id=%s"
                       " and start_date<=%s and (end_date is null or end_date>=%s)", (pl, target, u, on, on))
 
     def extras(vid):
-        return db.all("select id, product_id, unit_price_extra from erpme.price_list_option_extra where price_list_id=%s and variant_attribute_value_id=%s"
+        return db.all("select id, product_id, unit_price_extra from nativeflows.price_list_option_extra where price_list_id=%s and variant_attribute_value_id=%s"
                       " and (product_id=%s or product_id is null) and start_date<=%s and (end_date is null or end_date>=%s)", (pl, vid, product, on, on))
 
     def rates(attr):
-        return db.one("select id, rate_per_value from erpme.price_list_characteristic_rate where price_list_id=%s and product_id=%s and variant_attribute_id=%s"
+        return db.one("select id, rate_per_value from nativeflows.price_list_characteristic_rate where price_list_id=%s and product_id=%s and variant_attribute_id=%s"
                       " and start_date<=%s and (end_date is null or end_date>=%s)", (pl, product, attr, on, on))
     vl, vn = [], []
     for code, v in (values or {}).items():
@@ -61,7 +61,7 @@ def canon(values):
 def save_configuration(db, values):
     """Content-addressed find-or-create (ADR-0046 rule 9): only complete configurations; numbers stored as numbers."""
     h = hashlib.sha256(canon(values).encode()).hexdigest()
-    row = db.one("select id from erpme.product_configuration where company_id=%s and product_id=%s and content_hash=%s", (W.co, W.unit, h))
+    row = db.one("select id from nativeflows.product_configuration where company_id=%s and product_id=%s and content_hash=%s", (W.co, W.unit, h))
     if row:
         return row[0], False, h
     cid = new_id("md")
@@ -76,15 +76,15 @@ def save_configuration(db, values):
 
 def configured_item(db, cfg_id):
     """ADR-0046 rule 11: the item whose variant_key equals the item-defining values; number value rows appear only now."""
-    rows = db.all("""select pcv.variant_attribute_id, pcv.variant_attribute_value_id, pcv.numeric_value from erpme.product_configuration_value pcv
-                     join erpme.variant_attribute a on a.id = pcv.variant_attribute_id join erpme.product_variant_attribute pva
+    rows = db.all("""select pcv.variant_attribute_id, pcv.variant_attribute_value_id, pcv.numeric_value from nativeflows.product_configuration_value pcv
+                     join nativeflows.variant_attribute a on a.id = pcv.variant_attribute_id join nativeflows.product_variant_attribute pva
                        on pva.product_id = pcv.product_id and pva.variant_attribute_id = a.id
                      where pcv.product_configuration_id=%s and a.variant_mode='variant' order by pva.position""", (cfg_id,))
     pairs, names = [], []
     for a, vid, nv in rows:
         if vid is None:
             code = norm(D(nv))
-            r = db.one("select id from erpme.variant_attribute_value where variant_attribute_id=%s and numeric_value=%s", (a, nv))
+            r = db.one("select id from nativeflows.variant_attribute_value where variant_attribute_id=%s and numeric_value=%s", (a, nv))
             if r:
                 vid = r[0]
             else:
@@ -93,13 +93,13 @@ def configured_item(db, cfg_id):
                     code=code, name=code, numeric_value=nv)
             names.append(code)
         else:
-            names.append(db.one("select code from erpme.variant_attribute_value where id=%s", (vid,))[0])
+            names.append(db.one("select code from nativeflows.variant_attribute_value where id=%s", (vid,))[0])
         pairs.append((a, vid))
     key = sorted(p[1] for p in pairs)
-    r = db.one("select id, code from erpme.item where product_id=%s and variant_key=%s::uuid[]", (W.unit, key))
+    r = db.one("select id, code from nativeflows.item where product_id=%s and variant_key=%s::uuid[]", (W.unit, key))
     if r:
         return r[0], False, r[1], None
-    n = db.one("update erpme.product set last_item_number = last_item_number + 1 where id=%s returning code, last_item_number", (W.unit,))
+    n = db.one("update nativeflows.product set last_item_number = last_item_number + 1 where id=%s returning code, last_item_number", (W.unit,))
     iid = new_id("md")
     code = f"{n[0]}-{n[1]:04d}"
     # name: product name and item-defining values in position order (width x height / material / size / mounting)

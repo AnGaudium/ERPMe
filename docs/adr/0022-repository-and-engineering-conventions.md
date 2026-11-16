@@ -4,8 +4,8 @@ Status: accepted (2026-11-14) under ADR-0005, reviewed by Claude Fable 5.2 (buil
 
 ## Decision
 
-ERPMe is one repository and one uv workspace:
-- the product is the distribution `erpme`, made of modules in fixed layers;
+NativeFlows is one repository and one uv workspace:
+- the product is the distribution `nativeflows`, made of modules in fixed layers;
 - test tooling lives in separate distributions that the product never imports;
 - localization packages live under `l10n/`.
 
@@ -13,10 +13,10 @@ Modules talk to each other only through their contracts:
 - commands and events, as spec 07 requires;
 - in-process posting interfaces, which run inside the calling command's transaction and plan. One `Post<Type>` can then write the journal, stock, number and state together, as ADR-0009 and ADR-0020 need.
 
-All tables are in one PostgreSQL schema `erpme`, plus `types` for domains and `procrastinate` for the job queue. Each table has one owning module, and lock helpers register in one global lock order.
+All tables are in one PostgreSQL schema `nativeflows`, plus `types` for domains and `procrastinate` for the job queue. Each table has one owning module, and lock helpers register in one global lock order.
 
 Checks:
-- One developer CLI, `erpme-dev`, runs every check. CI jobs call only its subcommands, so an agent reproduces any failure with one command.
+- One developer CLI, `nativeflows-dev`, runs every check. CI jobs call only its subcommands, so an agent reproduces any failure with one command.
 - CI runs on GitHub-hosted runners, in parallel jobs of 15 minutes or less.
 - The nightly run is started by a timer on the test server, not by GitHub, so nothing from the public repository can start code there.
 - Generated interfaces are committed and checked.
@@ -29,10 +29,10 @@ Checks:
 
    | Path | Holds |
    | --- | --- |
-   | `pyproject.toml` | uv workspace root, with members as globs (`backend`, `tools/*`, `l10n/*/code`) so a sparse checkout still resolves. Holds shared ruff, pyright, import-linter, pytest and coverage settings, and `[tool.erpme] build_step`, raised by the author's commit at each gate (DS-16 rule 5) |
+   | `pyproject.toml` | uv workspace root, with members as globs (`backend`, `tools/*`, `l10n/*/code`) so a sparse checkout still resolves. Holds shared ruff, pyright, import-linter, pytest and coverage settings, and `[tool.nativeflows] build_step`, raised by the author's commit at each gate (DS-16 rule 5) |
    | `uv.lock` | The one lock file |
-   | `backend/` | Distribution `erpme`: `src/erpme/<module>/`, `migrations/` (Alembic), `provision/` (rule 7), `tests/`, `generated/` (rule 17) |
-   | `tools/<package>/` | Distributions `erpme_dev`, `erpme_events`, `erpme_client`, `erpme_simulator`, `erpme_adapters`, `erpme_testkit`, `erpme_reference`. Each has its own `pyproject.toml` and `tests/`. `erpme_reference` and its tests need only the standard library (DS-16 rule 3) |
+   | `backend/` | Distribution `nativeflows`: `src/nativeflows/<module>/`, `migrations/` (Alembic), `provision/` (rule 7), `tests/`, `generated/` (rule 17) |
+   | `tools/<package>/` | Distributions `nativeflows_dev`, `nativeflows_events`, `nativeflows_client`, `nativeflows_simulator`, `nativeflows_adapters`, `nativeflows_testkit`, `nativeflows_reference`. Each has its own `pyproject.toml` and `tests/`. `nativeflows_reference` and its tests need only the standard library (DS-16 rule 3) |
    | `l10n/l10n_<country>/` | Localization packages (ADR-0016 rule 1; layout DS-14). Each package's code in `code/` is its own distribution |
    | `frontend/` | The React app (from step 1, DS-30) |
    | `tests/scenarios/` | Regression, package-neutral golden and kept proposed scenarios (DS-16 rule 22). Regime-dependent goldens live in `l10n/<package>/tests/golden/` |
@@ -44,7 +44,7 @@ Checks:
 
 **Modules, contracts and layers**
 
-2. Modules of `erpme` (ADR-0004 rule 7) by layer. A module imports only from lower layers. A module is created by the first work package that needs it (B7). New modules beyond this list are added by ADR. Exception within layer 3: `tax` may import the `ledger` contract to post tax adjustments, and `ledger` never imports `tax`; settlements reach `tax` through the `OpenItemSettled` event ([ADR-0041](0041-tax-engine.md) rule 15). Within layer 2, `work` and `policy` are imported downward: `registry` imports both, `documents`, `outbox`, `permissions`, `attachments` and `agent_runs` import `work`, `policy` imports `work`, and neither imports the others ([ADR-0042](0042-work-queue.md); [ADR-0043](0043-policy-and-approval.md) rule 1).
+2. Modules of `nativeflows` (ADR-0004 rule 7) by layer. A module imports only from lower layers. A module is created by the first work package that needs it (B7). New modules beyond this list are added by ADR. Exception within layer 3: `tax` may import the `ledger` contract to post tax adjustments, and `ledger` never imports `tax`; settlements reach `tax` through the `OpenItemSettled` event ([ADR-0041](0041-tax-engine.md) rule 15). Within layer 2, `work` and `policy` are imported downward: `registry` imports both, `documents`, `outbox`, `permissions`, `attachments` and `agent_runs` import `work`, `policy` imports `work`, and neither imports the others ([ADR-0042](0042-work-queue.md); [ADR-0043](0043-policy-and-approval.md) rule 1).
 
    | Layer | Modules |
    | --- | --- |
@@ -52,7 +52,7 @@ Checks:
    | 5 · Interfaces | `api` (REST and MCP generated from the registry), `query` (read-only layer, DS-33), `agents` (after step 4), `sdk` (rule 4), `imports` (staged data imports, [ADR-0030](0030-commercial-seams-and-imports.md) rule 9) |
    | 4 · Commercial | `sales`, `purchasing`, `cash` (from steps 5–6), `reporting` (from step 5, interim until the author decides the build order, [ADR-0049](0049-statutory-reporting-and-printing.md) rule 30), `crm`, `planning` ([ADR-0024](0024-planning.md); it reads `production.contract`'s planning function and structures ([ADR-0036](0036-multi-level-mrp.md) rule 3) and `inventory.contract`'s `demand_supply_line` and hands over through `inventory.contract.request_replenishment`) |
    | 3 · Core business | `ledger` (journal, accounts, account determination, multi-currency), `inventory` (material documents, stock, costing, landed cost, and the warehouse management tables of [ADR-0023](0023-warehouse-management.md)), `master_data` (partners, products, warehouses, units, currencies, working calendars per [ADR-0033](0033-production-master-data.md) rule 11), `tax`; `production` (Phase 1 per [ADR-0032](0032-phase-1-scope-with-production.md); master data per [ADR-0033](0033-production-master-data.md)) and `assets` (Phase 3) per [ADR-0025](0025-later-phase-seams.md) |
-   | 2 · Platform | `registry` (command registry, dispatcher, envelope, idempotency; its public entry point `erpme.registry.dispatch`), `documents` (lifecycle, versions, numbering), `periods`, `permissions`, `outbox`, `audit`, `localization` (loader), `db` (engine, session settings, RLS context, the generic lock helper and the lock-order registry, the `MetaData` naming convention), `agent_runs`, `work`, `attachments`, `work`, `policy` ([ADR-0027](0027-cross-cutting-ownership.md) rule 1; `documents` and `permissions` may import the `agent_runs` contract; `documents` may import the `attachments` contract, [ADR-0038](0038-audit-and-observability.md) rule 14) |
+   | 2 · Platform | `registry` (command registry, dispatcher, envelope, idempotency; its public entry point `nativeflows.registry.dispatch`), `documents` (lifecycle, versions, numbering), `periods`, `permissions`, `outbox`, `audit`, `localization` (loader), `db` (engine, session settings, RLS context, the generic lock helper and the lock-order registry, the `MetaData` naming convention), `agent_runs`, `work`, `attachments`, `work`, `policy` ([ADR-0027](0027-cross-cutting-ownership.md) rule 1; `documents` and `permissions` may import the `agent_runs` contract; `documents` may import the `attachments` contract, [ADR-0038](0038-audit-and-observability.md) rule 14) |
    | 1 · Foundation | `numeric` (ADR-0006), `clock` (ADR-0007), `ids`, `i18n`, `errors` |
 
    `agent_runs` (layer 2), `agents` and `query` (layer 5) and their imports: [ADR-0050](0050-agent-runtime-and-query-layer.md) rule 1.
@@ -92,47 +92,47 @@ Checks:
    Posting interfaces run in the calling command's transaction and become part of its plan. They have no permission, idempotency or policy step of their own: the outer command is the one the actor called and was authorized for. They read and write only through `context` (ADR-0008 rule 4). They are never exposed on REST or MCP.
 
    This is how "modules call each other only through commands and events" (spec 07) is read for synchronous posting. The accounting interface in SAP works the same way. Asynchronous work still goes through events and consumers (ADR-0013). `sdk` re-exports the package-facing interfaces from the owning contracts and defines none itself.
-5. The composition root `erpme.app`:
+5. The composition root `nativeflows.app`:
    - imports every module's `handlers/` to register them. Import-linter exempts it from the layer contract, and nothing imports it;
-   - is loaded by `erpme.registry.dispatch` on first use through a declared entry point (`importlib.metadata` group `erpme.app`), never by a static import, so the in-process transport of `erpme_client` sees a full registry and the layer contract holds; `dispatch` is the registry module's named exception to rule 3;
+   - is loaded by `nativeflows.registry.dispatch` on first use through a declared entry point (`importlib.metadata` group `nativeflows.app`), never by a static import, so the in-process transport of `nativeflows_client` sees a full registry and the layer contract holds; `dispatch` is the registry module's named exception to rule 3;
    - runs the startup checks: the `environment` setting is present (rule 9); package data and code versions match (ADR-0016 rule 3); the catalog versions are the ones loaded.
 
    Entry points:
 
    | Entry point | Runs |
    | --- | --- |
-   | `erpme serve` | API server |
-   | `erpme worker --queue <name>` | Delivery workers and Procrastinate job workers (rule 12) |
-   | `erpme admin migrate` | Rule 8 |
-   | `erpme admin bootstrap` | ADR-0017 rule 7 |
+   | `nativeflows serve` | API server |
+   | `nativeflows worker --queue <name>` | Delivery workers and Procrastinate job workers (rule 12) |
+   | `nativeflows admin migrate` | Rule 8 |
+   | `nativeflows admin bootstrap` | ADR-0017 rule 7 |
 
 6. Import-linter contracts:
    - The layers of rule 2.
    - Independence between modules of layers 3 and 4, except their `contract`.
-   - `erpme` imports no tool package and no `l10n_*`.
-   - `l10n_*` imports only `erpme.sdk` (ADR-0016 rule 17).
+   - `nativeflows` imports no tool package and no `l10n_*`.
+   - `l10n_*` imports only `nativeflows.sdk` (ADR-0016 rule 17).
    - Handlers import no network, file, LLM or job library. This is a `forbidden` contract, so it catches transitive imports (ADR-0008 rule 4).
    - The tool packages follow DS-16 section 1 exactly:
 
      | Package | May import |
      | --- | --- |
-     | `erpme_events` | standard library, pydantic |
-     | `erpme_client` | `erpme.registry.dispatch`, `erpme.numeric`, HTTP and MCP client libraries |
-     | `erpme_adapters` | `erpme_events`, `erpme_client` |
-     | `erpme_simulator` | `erpme_events` |
-     | `erpme_testkit` | `erpme_events`, `erpme_adapters`, `erpme_client`, `erpme.numeric` |
-     | `erpme_reference` | standard library only |
+     | `nativeflows_events` | standard library, pydantic |
+     | `nativeflows_client` | `nativeflows.registry.dispatch`, `nativeflows.numeric`, HTTP and MCP client libraries |
+     | `nativeflows_adapters` | `nativeflows_events`, `nativeflows_client` |
+     | `nativeflows_simulator` | `nativeflows_events` |
+     | `nativeflows_testkit` | `nativeflows_events`, `nativeflows_adapters`, `nativeflows_client`, `nativeflows.numeric` |
+     | `nativeflows_reference` | standard library only |
 
-   A `forbidden` contract lets only `erpme.agents.gateway.adapters` import a provider library ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 4).
+   A `forbidden` contract lets only `nativeflows.agents.gateway.adapters` import a provider library ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 4).
 
 **Database**
 
 7. Schemas, ownership and roles:
-   - **Schemas.** One database. All tables are in schema `erpme`, domains are in `types` (ADR-0006), and Procrastinate's tables are in schema `procrastinate`. There is no schema per module: foreign keys cross modules and are declared by table name; one schema keeps RLS generation simple.
-   - **Ownership.** Every `erpme` table is declared in exactly one module's `tables.py`. A CI check fails on a table owned twice or not at all; it exempts `alembic_version`, partitions and schema `procrastinate`.
-   - **Roles.** Roles are cluster-level, so `backend/provision/roles.sql`, run as a superuser before any migration, creates the roles of ADR-0017 rule 18 and `erpme_check` (DS-16 rule 2: SELECT only, subject to RLS, never `BYPASSRLS`). The test fixture and the test server use the same file. Migrations only grant.
+   - **Schemas.** One database. All tables are in schema `nativeflows`, domains are in `types` (ADR-0006), and Procrastinate's tables are in schema `procrastinate`. There is no schema per module: foreign keys cross modules and are declared by table name; one schema keeps RLS generation simple.
+   - **Ownership.** Every `nativeflows` table is declared in exactly one module's `tables.py`. A CI check fails on a table owned twice or not at all; it exempts `alembic_version`, partitions and schema `procrastinate`.
+   - **Roles.** Roles are cluster-level, so `backend/provision/roles.sql`, run as a superuser before any migration, creates the roles of ADR-0017 rule 18 and `nativeflows_check` (DS-16 rule 2: SELECT only, subject to RLS, never `BYPASSRLS`). The test fixture and the test server use the same file. Migrations only grant.
 
-   Views are in schema `query`, owned by the role `erpme_query_owner`, which `provision/roles.sql` creates ([ADR-0050](0050-agent-runtime-and-query-layer.md) rules 42–43).
+   Views are in schema `query`, owned by the role `nativeflows_query_owner`, which `provision/roles.sql` creates ([ADR-0050](0050-agent-runtime-and-query-layer.md) rules 42–43).
 8. Migrations:
    - Alembic keeps one linear history in `backend/migrations/`. CI fails on more than one head and on any migration that does not upgrade an empty database to head.
    - The first migration creates the extensions `btree_gist` (ADR-0007) and `pg_trgm` (ADR-0002), the schemas, and the domains in `types`.
@@ -145,17 +145,17 @@ Checks:
      - per-role grants.
 
      A test compares live `pg_policies` with the expected definitions.
-   - The claim function of ADR-0017 is a hand-written `SECURITY DEFINER` function owned by `erpme_claim`, with its own test.
+   - The claim function of ADR-0017 is a hand-written `SECURITY DEFINER` function owned by `nativeflows_claim`, with its own test.
    - Before go-live (B8), merged migrations may be squashed only in the author's commit that raises `build_step` at a gate. The test server rebuilds its database from empty every night.
    - Procrastinate's schema SQL is applied by an Alembic migration that pins its version.
-   - `erpme admin migrate` runs Alembic, then loads the core catalogs, then the localization package data. Deployment and tests use this one command.
+   - `nativeflows admin migrate` runs Alembic, then loads the core catalogs, then the localization package data. Deployment and tests use this one command.
 9. Session and runtime settings:
    - **How settings are applied.** Per role with `ALTER ROLE … SET` in `provision/roles.sql`, and with `SET LOCAL` inside a transaction when a registered job needs longer:
      - every session runs in UTC;
      - `lock_timeout` is 5 s;
      - `transaction_timeout` is 30 s for commands and queries, 4 min for consumer transactions (inside ADR-0013's 5-minute lease), and 15 min for registered long jobs (period-end costing, planning and forecast runs per [ADR-0024](0024-planning.md) rule 17, close tasks, import chunks per [ADR-0030](0030-commercial-seams-and-imports.md) rule 9);
      - `idle_in_transaction_session_timeout` is 60 s;
-     - `statement_timeout` is 30 s for `erpme_readonly` (DS-33 may lower it).
+     - `statement_timeout` is 30 s for `nativeflows_readonly` (DS-33 may lower it).
    - **Timeouts and limits.** Exceeding a timeout returns `concurrent_update` or `timeout` (ADR-0008 rule 11). Request bodies are limited to 10 MiB (`request_too_large`), and batches to 1,000 items (`batch_too_large`); larger imports are staged ([ADR-0030](0030-commercial-seams-and-imports.md) rule 9). A batch that cannot finish within its timeout should be split by the caller. Attachments use their own upload endpoint and limit ([ADR-0038](0038-audit-and-observability.md) rule 13).
    - **Rate limits.** Token buckets per actor (not per actor kind), held in memory per API process (no Redis, ADR-0002), with these defaults:
 
@@ -166,9 +166,9 @@ Checks:
      | Integration | 50 | 100 |
 
      `system` actors are exempt. Exceeding the limit returns `rate_limited`.
-   - **`environment`.** The installation setting `environment` (`production`, `test`, `simulation`; ADR-0007 rule 15) is required at startup from `ERPME_ENVIRONMENT`. It is stored on first start and can never change away from `production`. In `test` and `simulation`, every external lookup and gateway (tax ID lookup, e-invoice, bank, exchange-rate fetchers, e-mail) is replaced by a recording stub (DS-17 rule 19; DS-24, DS-25).
+   - **`environment`.** The installation setting `environment` (`production`, `test`, `simulation`; ADR-0007 rule 15) is required at startup from `NATIVEFLOWS_ENVIRONMENT`. It is stored on first start and can never change away from `production`. In `test` and `simulation`, every external lookup and gateway (tax ID lookup, e-invoice, bank, exchange-rate fetchers, e-mail) is replaced by a recording stub (DS-17 rule 19; DS-24, DS-25).
 
-   `statement_timeout` is 10 s for queries of agent runs on `erpme_readonly`; 30 s stays for other callers ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 43).
+   `statement_timeout` is 10 s for queries of agent runs on `nativeflows_readonly`; 30 s stays for other callers ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 43).
 10. Locks. The lock-order registry in `db` holds the one global order, asserted per command (each batch item and each consumer command separately) (superseded by the complete order of [ADR-0027](0027-cross-cutting-ownership.md) rule 10):
     1. period area state rows, share lock (ADR-0012 rule 9);
     2. `stock_value` rows ascending by item and warehouse ID, then lot and serial quantity rows (ADR-0020 rule 9);
@@ -184,18 +184,18 @@ Checks:
 11. Tools and versions:
     - Python 3.14 and PostgreSQL 18 (ADR-0006). The test image is pinned by digest. `tzdata` is pinned.
     - uv; ruff with rule sets `E`, `F`, `W`, `I`, `N`, `UP`, `B`, `DTZ`, `TID`, `S`, `PL`.
-    - `TID251` bans these qualified names: `datetime.datetime.now`, `datetime.datetime.utcnow`, `datetime.date.today`, `time.time` (ADR-0007; `erpme.clock` is exempt), and `random` inside `erpme`.
+    - `TID251` bans these qualified names: `datetime.datetime.now`, `datetime.datetime.utcnow`, `datetime.date.today`, `time.time` (ADR-0007; `nativeflows.clock` is exempt), and `random` inside `nativeflows`.
     - `ruff format`; pyright strict on every distribution; pytest with pytest-xdist, testcontainers, Hypothesis and pytest-cov (branch).
 12. Outbox workers (ADR-0013):
-    - `erpme worker --queue events|integrations|jobs|pdf`.
-    - Workers wake on `NOTIFY erpme_outbox`, sent by the emitting transaction, and poll every 5 s as a fallback.
+    - `nativeflows worker --queue events|integrations|jobs|pdf`.
+    - Workers wake on `NOTIFY nativeflows_outbox`, sent by the emitting transaction, and poll every 5 s as a fallback.
     - Retry delay after attempt n is min(2ⁿ s, 1 h), up to the consumer's `max_attempts`, after which the delivery is held (ADR-0013 rule 8).
     - A daily job creates `outbox_event` partitions 3 months ahead and drops expired ones under ADR-0013 rule 15. The same job creates audit partitions 3 months ahead and drops none ([ADR-0038](0038-audit-and-observability.md) rule 6).
     - Procrastinate's stalled-job retry runs from the `jobs` worker, with a heartbeat of 30 s and stalled after 5 min.
     - Step 1 work package 6 implements this rule.
-13. `erpme_dev.checks` holds the checks no tool provides, each named after the rule it enforces. Each failure reports `file:line`, the rule ID and a one-line fix:
-    - **Floats.** No floating-point types in migrations, and none for amounts, quantities, prices, rates or percentages in `erpme` (ADR-0006 rule 12). Other floats, such as timeouts, need a `# float-ok: <reason>` comment.
-    - **Rounding and conversion.** Neither happens outside `erpme.numeric` (ADR-0006 rules 10, 15).
+13. `nativeflows_dev.checks` holds the checks no tool provides, each named after the rule it enforces. Each failure reports `file:line`, the rule ID and a one-line fix:
+    - **Floats.** No floating-point types in migrations, and none for amounts, quantities, prices, rates or percentages in `nativeflows` (ADR-0006 rule 12). Other floats, such as timeouts, need a `# float-ok: <reason>` comment.
+    - **Rounding and conversion.** Neither happens outside `nativeflows.numeric` (ADR-0006 rules 10, 15).
     - **Database time functions.** None of the banned ones appear in SQL (ADR-0007 rule 16).
     - **Identifiers.** No identifier is longer than 63 bytes or on a reserved list (ADR-0004 rules 4, 6).
     - **Serialized tables.** These are referenced only by their registered helpers and by migrations (ADR-0008 rule 10).
@@ -214,19 +214,19 @@ Checks:
     Note ([ADR-0063](0063-configurable-policy-settings.md), proposed 2026-11-15): transaction-level advisory locks (`pg_advisory_xact_lock`) are allowed on handler and trigger paths, because they end with the transaction; session-level advisory locks stay banned. The first user is the settings trigger, which serializes changes per company and key ([ADR-0063](0063-configurable-policy-settings.md) rule 2).
 
     Note (coding-rules gate, 2026-11-16; chief architect under ADR-0005, the author asked that the way code is written and checked be fixed before the first line of product code):
-    - **Gate 0.** No product code (anything under `erpme` beyond the empty module skeleton) is merged until `erpme-dev check` exists and passes on that skeleton with every contract of rule 6 and every check of rule 13 implemented, or reporting `skipped` with its reason where its inputs do not exist yet (rule 14). CI runs the same command, and `main` is protected: the CI checks are required and no direct push. Pre-commit hooks are a convenience, not the gate.
-    - **Tools stay as decided.** pyright strict (no second type checker), ruff with the rule sets above, import-linter configured in `pyproject.toml`, checks in `erpme_dev.checks`.
+    - **Gate 0.** No product code (anything under `nativeflows` beyond the empty module skeleton) is merged until `nativeflows-dev check` exists and passes on that skeleton with every contract of rule 6 and every check of rule 13 implemented, or reporting `skipped` with its reason where its inputs do not exist yet (rule 14). CI runs the same command, and `main` is protected: the CI checks are required and no direct push. Pre-commit hooks are a convenience, not the gate.
+    - **Tools stay as decided.** pyright strict (no second type checker), ruff with the rule sets above, import-linter configured in `pyproject.toml`, checks in `nativeflows_dev.checks`.
     - **Size and complexity,** chosen for review by people and small coding models: ruff `C901` with `max-complexity = 10`; the `PL` limits at 6 arguments, 12 branches, 6 returns and 50 statements per function; at most 400 lines per Python file outside `generated/` and migrations (a rule 13 check). Raising a limit for one function needs `# noqa: <code>  # reason`, counted in the check summary.
-    - **Suppressions.** No bare `# noqa` or `# type: ignore`: each names its code and a reason after it; `typing.Any` is banned in `erpme` by `TID251` except in adapters and `generated/`. A rule 13 check counts suppressions per module, and an increase is shown in the pull request summary.
+    - **Suppressions.** No bare `# noqa` or `# type: ignore`: each names its code and a reason after it; `typing.Any` is banned in `nativeflows` by `TID251` except in adapters and `generated/`. A rule 13 check counts suppressions per module, and an increase is shown in the pull request summary.
     - **Lock order is checked at run time,** not by parsing: the lock helper of `db` raises `lock_order_violation` in test and development when a lock is taken out of the registered order (ADR-0027 rule 10). The static check only forbids `FOR UPDATE`, `pg_advisory_xact_lock` and raw lock SQL outside the helper.
     - **Database access through `context` only** is enforced by the `forbidden` import contract of rule 6 (handlers import no database library) and by a rule 13 check that forbids `.execute(` on any object not reached from the handler's `context` argument.
     - **Floats:** the rule 13 check also flags `Decimal(<float>)`, `json.loads` without `parse_float=Decimal`, and `float`, `real` or `double precision` columns in migrations.
-    - **Two speeds.** `erpme-dev check --fast` (ruff, format, import-linter and the rule 13 checks on changed files) for pre-commit and agents' inner loop; the full `check` (adds pyright and generated-file drift through `generate --check`) on pre-push and CI.
+    - **Two speeds.** `nativeflows-dev check --fast` (ruff, format, import-linter and the rule 13 checks on changed files) for pre-commit and agents' inner loop; the full `check` (adds pyright and generated-file drift through `generate --check`) on pre-push and CI.
     - **Agents read the rules in one place:** the root `AGENTS.md` points to this note and to `docs/design/architecture-core.md` section A5; every failure prints `file:line`, the rule ID and a one-line fix (rule 13).
 
 **One command for agents and CI**
 
-14. `erpme-dev` subcommands. Each prints a JSON summary as its last line with `--json`; at `build_step` 0 a subcommand whose inputs do not exist yet reports `skipped` with the reason:
+14. `nativeflows-dev` subcommands. Each prints a JSON summary as its last line with `--json`; at `build_step` 0 a subcommand whose inputs do not exist yet reports `skipped` with the reason:
 
     | Subcommand | Runs | CI job |
     | --- | --- | --- |
@@ -253,16 +253,16 @@ Checks:
 16. `ci.yml`:
     - **Triggers and runners.** Runs on `pull_request` and on `push` to `main`, on GitHub-hosted `ubuntu-24.04` runners, with top-level `permissions: contents: read` and actions pinned by commit SHA.
     - **Jobs.** `dco`, `check`, `test`, `dataset`, `scenarios`, `guards` and `frontend` run in parallel, each with `timeout-minutes: 15` (ADR-0003 R6). DS-16 rule 21's part budgets apply in the job that runs each part.
-    - **Coverage.** Coverage comes from the `test` job only. 90% branch coverage is enforced per package by `erpme-dev test --cov` from `build_step` 1 on `ledger`, `inventory`, `registry`, `documents` (where posting and numbering live), `tax` and `localization`. This maps ADR-0003 R4's list; R4 itself is the author's.
+    - **Coverage.** Coverage comes from the `test` job only. 90% branch coverage is enforced per package by `nativeflows-dev test --cov` from `build_step` 1 on `ledger`, `inventory`, `registry`, `documents` (where posting and numbering live), `tax` and `localization`. This maps ADR-0003 R4's list; R4 itself is the author's.
     - **Labels.** A separate `pull_request_target` workflow, whose only permission is `pull-requests: write`, reads only the changed-file list, never checks out the head, and applies the labels `reserved-review` and `author-review`. `author-review` marks paths of money, stock posting, idempotency, outbox, triggers and RLS (runbook stage 5).
     - **Branch protection.** The author sets branch protection and the required jobs, and the setting "require approval for all external contributors".
 17. Generated files:
-    - `erpme-dev generate` writes into `backend/generated/`:
+    - `nativeflows-dev generate` writes into `backend/generated/`:
       - the JSON Schemas of commands, queries and events, with each field's field class (ADR-0017 rule 10; DS-16 rule 16);
       - `openapi.json`;
       - the MCP tool list;
       - the `SystemAccount`, `TransactionKey` and `MovementType` types (ADR-0010, ADR-0015).
-    - It writes the TypeScript types, the annotated JSON Schemas (`x-erpme-*`, [ADR-0040](0040-ui-architecture.md) rule 4) and the i18n catalogs into `frontend/src/generated/`, and the business-event schema and example log into `docs/catalogs/` (DS-17 rule 2).
+    - It writes the TypeScript types, the annotated JSON Schemas (`x-nativeflows-*`, [ADR-0040](0040-ui-architecture.md) rule 4) and the i18n catalogs into `frontend/src/generated/`, and the business-event schema and example log into `docs/catalogs/` (DS-17 rule 2).
     - Output is sorted and stable. A merge conflict in it is resolved by rerunning the command.
     - The files are committed, and CI fails on any difference, so every public API change shows in review (ADR-0008).
 
@@ -270,9 +270,9 @@ Checks:
 
 18. The test server:
     - **Host.** A Linux host with Docker, configured from `deploy/test-server/`. It holds synthetic data only. It shares no files, database or user with any other project on the machine; on a shared host it uses rootless Docker or a dedicated VM, since Docker access is root. Which machine hosts it is the author's decision (open question).
-    - **Nightly run.** A systemd timer at 19:00 UTC (02:00 in Vietnam) pulls `main` and runs `erpme-dev nightly`: the run in [testing-operations.md](../runbook/testing-operations.md#the-nightly-run), including regeneration of the small and medium datasets against their locks (DS-17 rule 17).
+    - **Nightly run.** A systemd timer at 19:00 UTC (02:00 in Vietnam) pulls `main` and runs `nativeflows-dev nightly`: the run in [testing-operations.md](../runbook/testing-operations.md#the-nightly-run), including regeneration of the small and medium datasets against their locks (DS-17 rule 17).
     - **Credentials.** The run reports through a fine-grained token limited to this repository's issues, opening or updating `defect` issues titled with the dedupe key (ADR-0003 R7). The test-scenario model's key stays on the server. No GitHub event can start code there.
-    - **Reports.** `erpme-dev nightly` writes the full report to a dated directory in the server's report storage (`/srv/erpme-test/reports/<date>/`, configured in `deploy/test-server/`), and posts its summary (run ID, invariants, reference differences, coverage, timings, spend, new defects) as a comment on one pinned `nightly` issue through the same token.
+    - **Reports.** `nativeflows-dev nightly` writes the full report to a dated directory in the server's report storage (`/srv/nativeflows-test/reports/<date>/`, configured in `deploy/test-server/`), and posts its summary (run ID, invariants, reference differences, coverage, timings, spend, new defects) as a comment on one pinned `nightly` issue through the same token.
     - **Cache.** Dataset runs are cached by triple and never edited in place.
 19. Dependencies and releases:
     - **Vulnerability audit.** The nightly run audits `uv.lock` and the npm lock.
@@ -294,14 +294,14 @@ Checks:
     - `Co-Authored-By:` for the agent.
 
     No force-push to `main`; only the author merges.
-22. The pull request template is the runbook's five-line description (IDs, what changed, documents updated, reference results, open questions), plus the `erpme-dev ci --json` summary.
+22. The pull request template is the runbook's five-line description (IDs, what changed, documents updated, reference results, open questions), plus the `nativeflows-dev ci --json` summary.
 
 **Agent instructions**
 
 23. Agent instructions:
     - **Root.** `AGENTS.md` at the root is the one instruction file; `CLAUDE.md` holds `@AGENTS.md`.
     - **Per directory.** `AGENTS.md` files in `backend/`, each module, `tools/`, `l10n/` and `frontend/` hold at most 40 lines of local rules. Each sits next to a one-line `CLAUDE.md` importing it, because Claude Code loads nested `CLAUDE.md` files but not nested `AGENTS.md`.
-    - **Skills.** Recurring tasks have skills in `.claude/skills/`: `new-command`, `new-migration`, `new-invariant`, `new-edge-case`, `new-adr`, `posting-change-review`, and DS-38's localization skill later. Each points at the governing ADR and ends with the `erpme-dev` command that proves the task done. Reviewers on other providers read the same files as Markdown.
+    - **Skills.** Recurring tasks have skills in `.claude/skills/`: `new-command`, `new-migration`, `new-invariant`, `new-edge-case`, `new-adr`, `posting-change-review`, and DS-38's localization skill later. Each points at the governing ADR and ends with the `nativeflows-dev` command that proves the task done. Reviewers on other providers read the same files as Markdown.
     - **ADR template.** [docs/adr/template.md](template.md) stays the template.
 
 **Frontend**
@@ -315,8 +315,8 @@ Checks:
 **Licences**
 
 25. Licences follow [18-license-governance.md](../spec/18-license-governance.md), which puts "SDK, command schemas, client libraries" under Apache-2.0 for external integrations:
-    - `backend/generated/` (command schemas) and `tools/erpme_client` carry Apache-2.0, declared per path in `pyproject.toml` and a `LICENSE` file;
-    - the licence of `erpme.sdk`, which re-exports interfaces of AGPL modules for in-process packages, is the author's (open question); interim AGPL-3.0;
+    - `backend/generated/` (command schemas) and `tools/nativeflows_client` carry Apache-2.0, declared per path in `pyproject.toml` and a `LICENSE` file;
+    - the licence of `nativeflows.sdk`, which re-exports interfaces of AGPL modules for in-process packages, is the author's (open question); interim AGPL-3.0;
     - the rest is AGPL-3.0; the dataset is CC0.
 
 ## Context
@@ -347,7 +347,7 @@ Tools are fixed by ADR-0002. The goal set by ADR-0005 is a repository that agent
 | Nested dispatch of internal commands | One mechanism | Re-checks permissions and idempotency per step; needs plan merging and a hidden exposure class |
 | Nightly from a timer on the test server (chosen) | Nothing from GitHub can run code on the server; no runner to secure | Reports need a token on the server |
 | Self-hosted GitHub runner | Nightly visible in Actions | On a public user repository, labels do not restrict workflows; a fork could reach the Docker socket |
-| One `erpme` distribution with layered modules (chosen) | One install; import-linter sees all | A large package |
+| One `nativeflows` distribution with layered modules (chosen) | One install; import-linter sees all | A large package |
 | Schema per module | Visible ownership | Harder cross-module keys and RLS; ownership is checked by CI instead |
 | CI calls tools directly | Familiar | Local and CI drift |
 | GitHub DCO app | No code | A third-party app; it cannot recognize agent co-authors |
@@ -368,13 +368,13 @@ Tools are fixed by ADR-0002. The goal set by ADR-0005 is a repository that agent
 
 - [docs/adr/0004-naming-conventions.md](0004-naming-conventions.md) rule 7, [docs/adr/0008-command-envelope-and-registry.md](0008-command-envelope-and-registry.md) rule 4, [docs/adr/0013-outbox-and-events.md](0013-outbox-and-events.md), [docs/adr/0017-permission-envelope.md](0017-permission-envelope.md) rule 18: notes.
 - [docs/spec/00-reading-guide.md](../spec/00-reading-guide.md):
-  - glossary rows for module (updated), posting interface, composition root, `build_step`, `erpme-dev`, `erpme_check`;
+  - glossary rows for module (updated), posting interface, composition root, `build_step`, `nativeflows-dev`, `nativeflows_check`;
   - `sdk`, `db` and `crm` in the allowed abbreviations.
 - [docs/design/DS-06-universal-journal.sql](../design/DS-06-universal-journal.sql): header note on schema placement.
-- [AGENTS.md](../../AGENTS.md): current phase and `erpme-dev`.
+- [AGENTS.md](../../AGENTS.md): current phase and `nativeflows-dev`.
 - [docs/design/backlog.md](../design/backlog.md): DS-18 row links here.
 - [docs/adr/README.md](README.md): index row.
-- [docs/open-questions.md](../open-questions.md): test server host; sign-off practice and bot identities; licence of `erpme.sdk`.
+- [docs/open-questions.md](../open-questions.md): test server host; sign-off practice and bot identities; licence of `nativeflows.sdk`.
 - [docs/design/DS-17-synthetic-dataset.md](../design/DS-17-synthetic-dataset.md) rule 27: the dataset has its own CI job.
 - [docs/runbook/testing-operations.md](../runbook/testing-operations.md): environments point here.
 - [docs/runbook/step-log.md](../runbook/step-log.md): entry at acceptance.
