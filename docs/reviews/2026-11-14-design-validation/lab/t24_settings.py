@@ -368,6 +368,8 @@ def other_value(r):
     if t == "enum":
         return next(v for v in b["values"] if v != dv)
     if t in NUMERIC:
+        if not isinstance(dv, (int, Dec)):  # unset default (ADR-0066 work_case.<kind>.due_days): any in-bounds value differs
+            return b["min"]
         return dv + 1 if b["max"] is None or dv + 1 <= b["max"] else dv - 1
     return ["C9"]
 
@@ -557,8 +559,8 @@ MT = {"basis": "company_rule", "origin": "llm_proposed", "whole_reference_token"
       "approver": "u2", "proposer": "u1", "run_human": "u3", "evidence_counts_basis": True, "auto_post_evidence": True}
 variants = [dict(MT, whole_reference_token=False), dict(MT, live_drafts=9), dict(MT, live_unchanged_share=Dec("0.98")), dict(MT, approver="u1"),
             dict(MT, approver="u3"), dict(MT, evidence_counts_basis=False)]
-check("A18 LLM-originated rules: off by default and bounded false until spec 03 is reworded (human_post); if enabled later, they auto-post only when all five conditions hold; any one failing gives human_post (EC-183)",
-      default_of(S["cash.auto_post.accept_llm_originated_rules"]) is False and not in_bounds(S["cash.auto_post.accept_llm_originated_rules"], True)
+check("A18 LLM-originated rules: off by default; the bound is lifted by the author decision of ADR-0065 rule 12, so enabling is a loosening by proposal; when enabled they auto-post only when all five conditions hold; any one failing gives human_post (EC-183)",
+      default_of(S["cash.auto_post.accept_llm_originated_rules"]) is False and in_bounds(S["cash.auto_post.accept_llm_originated_rules"], True)
       and llm_rule_post(MT, False) == "human_post" and llm_rule_post(MT, True) == "auto_post"
       and all(llm_rule_post(v, True) == "human_post" for v in variants))
 check("A19 an llm_suggestion draft never auto-posts, whatever the setting, and a rule a person wrote is unaffected by it (hard lock)",

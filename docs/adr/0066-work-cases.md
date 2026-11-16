@@ -77,7 +77,7 @@ A case never widens an agent's read scope.
 
      A routine flow that the company handles without people, such as signed e-invoice XML posted through the auto-post gateway (ADR-0065), stays `off` or `by_rule`, with conditions on gate fields.
    - **`work_case.<kind>.due_days`** (company, integer, default `unset`, bounds 1 to 90): `unset` means the kind's registered due rule applies.
-   - **`work.landing_page`** (company, object, default `{}`): maps role template codes to `work_queue` or `case_list`. A user whose role assignments in force include a template mapped to `case_list` lands on the case list; everyone else lands on the work queue, which is today's behavior. Both surfaces stay reachable for everyone with the rights.
+   - **`work.landing_page.<role_template>`** (company, enum, default `work_queue`, bounds `work_queue|case_list`): the home screen for users holding that role template. A user whose role assignments in force include a template mapped to `case_list` lands on the case list; everyone else lands on the work queue, which is today's behavior. Both surfaces stay reachable for everyone with the rights.
 
    The three settings are neither tighter nor looser (direction `neutral`): a case grants no right and relaxes no check. A change is immediate and needs the leaf `work_queue_administration`.
 
@@ -175,7 +175,7 @@ A case never widens an agent's read scope.
     - **The case view.** The left pane holds the timeline of rule 17, with untrusted text in the "external content" style (ADR-0040 rule 17). The right pane holds the selected artifact's record view, or its command form with the plan panel. Editing a draft there is an ordinary update command: Review simulates, and the client computes nothing (ADR-0040 rule 2). The pending commands of rule 16 sit above the panes.
     - **The case list.** A list over `ListWorkCase`, beside the work queue list.
 
-    `work.landing_page` chooses a role's home (rule 4). Lists, record views, command forms, the keyboard model and the six hand-built screens are unchanged.
+    `work.landing_page.<role_template>` chooses a role's home (rule 4). Lists, record views, command forms, the keyboard model and the six hand-built screens are unchanged.
 
 **Checks**
 
@@ -251,7 +251,7 @@ A case never widens an agent's read scope.
 - **Not changed:** `docs/spec/`, including the glossary. The glossary rows for work case, case kind, case view and case list come with acceptance.
 - **Catalog rows:**
   - **Errors** (DS-04): `work_case_kind_not_enabled` and `work_case_items_open` (precondition), `work_case_origin_not_allowed` (validation), `work_case_closed` (precondition).
-  - **Settings:** `work_case.<kind>.mode`, `work_case.<kind>.due_days` and `work.landing_page`; the catalog holds 107 definitions.
+  - **Settings:** `work_case.<kind>.mode`, `work_case.<kind>.due_days` and `work.landing_page.<role_template>`; the catalog holds 107 definitions.
   - **Invariants** INV-790 to INV-793 of the block INV-790 to INV-799, and **edge cases** EC-240 to EC-245 of the block EC-240 to EC-249.
 
 ## Edge cases and invariants
