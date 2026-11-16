@@ -158,6 +158,8 @@ Allocation is always explicit. A deterministic query proposes it, and a person o
 
    Note ([ADR-0063](0063-configurable-policy-settings.md), proposed 2026-11-15): a new account-rule class `bank_charge` passes the counterparty check on a debit line whose bank transaction code the money account's `cash.bank_charge.codes` lists and that names no counterparty account; it may auto-post per rule under `cash.bank_charge.auto_post_ceiling` with its own evidence, never when open items also match, two rules match or the LLM classified the purpose. A rule proposed by an LLM feeds auto-post only while `cash.auto_post.accept_llm_originated_rules` is true (default false) and the conditions of rule 8 hold (rules 8, 9).
 
+   Note ([ADR-0065](0065-deterministic-auto-post-gateway.md), 2026-11-16 (proposed)): the cascade's auto-post becomes an instance of the auto-post gateway: `cash` registers checkers for `bank_receipt`, `bank_payment`, `cash_receipt` and `cash_payment` whose rules are today's eligibility conditions and the `bank_charge` gates, with the cascade as their trigger and unchanged behavior; their decisions are written in the gateway's columns of `policy_decision` ([ADR-0065](0065-deterministic-auto-post-gateway.md) rule 20).
+
 **Netting and write-offs**
 
 10. `partner_netting`:

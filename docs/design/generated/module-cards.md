@@ -14,7 +14,7 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Work item kinds (0):** none
 - **Authorization areas (0):** none
 - **ADRs (declared):** none declared
-- **ADRs that name this module most (mentions; not complete):** —
+- **ADRs that name this module most (mentions; not complete):** [ADR-0043](../../adr/0043-policy-and-approval.md)
 
 ## `agents` (layer 5)
 
@@ -24,7 +24,7 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Commands and queries named in ADRs (0):** none found
 - **Settings (17):** `agents.<agent_type>.daily_max_cost`, `agents.<agent_type>.daily_max_runs`, `agents.<agent_type>.drift_action`, `agents.<agent_type>.run_max_cost`, `agents.<agent_type>.run_max_input_tokens`, `agents.<agent_type>.run_max_llm_calls`, `agents.<agent_type>.run_max_output_tokens`, `agents.<agent_type>.run_max_rows_read`, `agents.<agent_type>.run_max_seconds`, `agents.<agent_type>.run_max_tool_calls`, `agents.<agent_type>.wake_up_mode.<kind>`, `agents.company_daily_max_cost` …
 - **Work item kinds (7):** `agent_budget_exhausted`, `agent_denials_repeated`, `agent_mode_degraded`, `agent_quality_below_threshold`, `agent_run_stopped`, `agent_task`, `data_processing_permission_suspended`
-- **Authorization areas (14):** `agent`, `agent_analysis`, `agent_bank_matching`, `agent_customer_onboarding`, `agent_data_migration`, `agent_document_reader`, `agent_planning`, `agent_product_engineering`, `agent_production`, `agent_production_capture`, `agent_production_variance`, `agent_purchase_invoice`, `agent_quotation`, `data_processing`
+- **Authorization areas (15):** `agent`, `agent_analysis`, `agent_auto_post_advisor`, `agent_bank_matching`, `agent_customer_onboarding`, `agent_data_migration`, `agent_document_reader`, `agent_planning`, `agent_product_engineering`, `agent_production`, `agent_production_capture`, `agent_production_variance`, `agent_purchase_invoice`, `agent_quotation`, `data_processing`
 - **ADRs (declared):** none declared
 - **ADRs that name this module most (mentions; not complete):** [ADR-0050](../../adr/0050-agent-runtime-and-query-layer.md), [ADR-0063](../../adr/0063-configurable-policy-settings.md)
 
@@ -50,7 +50,7 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Work item kinds (9):** `artifact_demoted`, `artifact_function_changed`, `artifact_invalidated`, `artifact_reference_deprecated`, `automation_notice`, `automation_owner_scope_narrowed`, `automation_rule_disabled`, `automation_rule_rate_limited`, `automation_task`
 - **Authorization areas (1):** `automation`
 - **ADRs (declared):** [ADR-0022](../../adr/0022-repository-and-engineering-conventions.md), [ADR-0058](../../adr/0058-configurable-workflows.md)
-- **ADRs that name this module most (mentions; not complete):** [ADR-0058](../../adr/0058-configurable-workflows.md), [ADR-0059](../../adr/0059-ai-tuning-and-development-of-deterministic-functions.md)
+- **ADRs that name this module most (mentions; not complete):** [ADR-0058](../../adr/0058-configurable-workflows.md), [ADR-0059](../../adr/0059-ai-tuning-and-development-of-deterministic-functions.md), [ADR-0065](../../adr/0065-deterministic-auto-post-gateway.md)
 
 ## `imports` (layer 5)
 
@@ -130,13 +130,13 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Note in ADR-0022 rule 2:** —
 - **Owned tables (16):** `gr_ir_write_off`, `gr_ir_write_off_line`, `purchase_credit_note`, `purchase_credit_note_line`, `purchase_debit_note`, `purchase_debit_note_line`, `purchase_invoice`, `purchase_invoice_line`, `purchase_order`, `purchase_order_line`, `purchase_request`, `purchase_request_line`, `purchase_return`, `purchase_return_line`, `service_receipt`, `service_receipt_line`
 - **Events produced (2):** `PurchaseOrderCreated`, `PurchaseRequestCreated`
-- **Commands and queries named in ADRs (2):** `CreatePurchaseInvoice`, `CreatePurchaseOrder`
+- **Commands and queries named in ADRs (3):** `CreatePurchaseInvoice`, `CreatePurchaseOrder`, `GetPurchaseInvoiceAutoPostShadowEvaluation`
 - **Settings (0):** none in settings.csv
 - **Work item kinds (3):** `duplicate_document_review`, `supplier_credit_due`, `supplier_invoice_extracted`
 - **Authorization areas (10):** `customs_declaration`, `gr_ir_rounding_clearing`, `gr_ir_write_off`, `purchase_credit_note`, `purchase_debit_note`, `purchase_invoice`, `purchase_order`, `purchase_request`, `purchase_return`, `service_receipt`
 - **Tables in DS-22-09-42-commercial-inventory.sql with no stated owner:** `document_installment` (section names sales, purchasing), `document_line_custom_text` (section names sales, purchasing), `document_line_price_step` (section names sales, purchasing) ([data-map findings](data-map.md#findings-tables-without-an-owner-and-lab-stubs))
 - **ADRs (declared):** [ADR-0028](../../adr/0028-document-lifecycle-hardening.md), [ADR-0037](../../adr/0037-subcontracting.md), [ADR-0047](../../adr/0047-commercial-documents-and-pricing.md)
-- **ADRs that name this module most (mentions; not complete):** [ADR-0037](../../adr/0037-subcontracting.md), [ADR-0047](../../adr/0047-commercial-documents-and-pricing.md), [ADR-0054](../../adr/0054-users-roles-and-authorizations.md), [ADR-0056](../../adr/0056-multiple-units-of-measure.md)
+- **ADRs that name this module most (mentions; not complete):** [ADR-0037](../../adr/0037-subcontracting.md), [ADR-0047](../../adr/0047-commercial-documents-and-pricing.md), [ADR-0054](../../adr/0054-users-roles-and-authorizations.md), [ADR-0056](../../adr/0056-multiple-units-of-measure.md), [ADR-0065](../../adr/0065-deterministic-auto-post-gateway.md)
 
 ## `reporting` (layer 4)
 
@@ -247,7 +247,7 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Work item kinds (0):** none
 - **Authorization areas (1):** `agent_run_bodies`
 - **ADRs (declared):** [ADR-0027](../../adr/0027-cross-cutting-ownership.md), [ADR-0050](../../adr/0050-agent-runtime-and-query-layer.md), [ADR-0057](../../adr/0057-document-intake-and-extraction.md)
-- **ADRs that name this module most (mentions; not complete):** [ADR-0027](../../adr/0027-cross-cutting-ownership.md), [ADR-0042](../../adr/0042-work-queue.md), [ADR-0050](../../adr/0050-agent-runtime-and-query-layer.md), [ADR-0057](../../adr/0057-document-intake-and-extraction.md), [ADR-0063](../../adr/0063-configurable-policy-settings.md)
+- **ADRs that name this module most (mentions; not complete):** [ADR-0027](../../adr/0027-cross-cutting-ownership.md), [ADR-0042](../../adr/0042-work-queue.md), [ADR-0050](../../adr/0050-agent-runtime-and-query-layer.md), [ADR-0057](../../adr/0057-document-intake-and-extraction.md), [ADR-0063](../../adr/0063-configurable-policy-settings.md), [ADR-0065](../../adr/0065-deterministic-auto-post-gateway.md)
 
 ## `attachments` (layer 2)
 
@@ -365,11 +365,11 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Events produced (0):** none found
 - **Commands and queries named in ADRs (11):** `CreateApprovalPool`, `CreateApprovalProcedure`, `CreatePolicyRule`, `DisablePolicyRule`, `EnablePolicyRule`, `ListApprovalPool`, `ListApprovalProcedure`, `ListPolicyRule`, `UpdateApprovalPool`, `UpdateApprovalProcedure`, `UpdatePolicyRule`
 - **Settings (0):** none in settings.csv
-- **Work item kinds (3):** `auto_post_suspended`, `auto_post_unconfirmed`, `consequence_posting_blocked`
+- **Work item kinds (4):** `auto_post_review`, `auto_post_suspended`, `auto_post_unconfirmed`, `consequence_posting_blocked`
 - **Authorization areas (2):** `period_unlock_request`, `policy`
 - **Tables in DS-05-platform.sql with no stated owner:** `auto_post_confirmation` (section names policy, documents), `period_unlock_request` (section names policy, documents), `policy_decision` (section names policy, documents) ([data-map findings](data-map.md#findings-tables-without-an-owner-and-lab-stubs))
 - **ADRs (declared):** [ADR-0043](../../adr/0043-policy-and-approval.md), [ADR-0055](../../adr/0055-approval-pools-and-stages.md)
-- **ADRs that name this module most (mentions; not complete):** [ADR-0042](../../adr/0042-work-queue.md), [ADR-0043](../../adr/0043-policy-and-approval.md), [ADR-0055](../../adr/0055-approval-pools-and-stages.md), [ADR-0059](../../adr/0059-ai-tuning-and-development-of-deterministic-functions.md)
+- **ADRs that name this module most (mentions; not complete):** [ADR-0042](../../adr/0042-work-queue.md), [ADR-0043](../../adr/0043-policy-and-approval.md), [ADR-0055](../../adr/0055-approval-pools-and-stages.md), [ADR-0059](../../adr/0059-ai-tuning-and-development-of-deterministic-functions.md), [ADR-0065](../../adr/0065-deterministic-auto-post-gateway.md)
 
 ## `registry` (layer 2)
 

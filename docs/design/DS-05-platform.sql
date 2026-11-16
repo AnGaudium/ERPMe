@@ -134,17 +134,21 @@ CREATE TABLE agent_type_setting (                          -- company data, chan
     id                    uuid PRIMARY KEY,
     company_id            uuid NOT NULL REFERENCES company (id),
     agent_type_code       text NOT NULL REFERENCES agent_type (code),
-    mode                  text NOT NULL DEFAULT 'off' CONSTRAINT ck_agent_type_setting_mode CHECK (mode IN ('off', 'shadow', 'assisted')),
+    mode                  text NOT NULL DEFAULT 'off' CONSTRAINT ck_agent_type_setting_mode CHECK (mode IN ('off', 'shadow', 'assisted', 'active')),   -- active: ADR-0065 rule 11
     workflow_owner_id     uuid REFERENCES user_account (id),
     -- budget values are setting_value rows of scope agent_type (rule 14 and 22 notes); no lowered_budget column
     promoted_version      text,
     promoted_seat_models  jsonb,                           -- (seat, model) pairs the evidence covered
+    active_document_types text[],                          -- ADR-0065 rule 11: the document types whose drafts may pass the auto-post gateway as tainted drafts
     recorded_at           timestamptz NOT NULL,
     UNIQUE (company_id, agent_type_code),
     FOREIGN KEY (agent_type_code, promoted_version) REFERENCES agent_type_version (agent_type_code, version),
     CONSTRAINT ck_agent_type_setting_owner CHECK (mode = 'off' OR workflow_owner_id IS NOT NULL),
     CONSTRAINT ck_agent_type_setting_promoted CHECK ((promoted_version IS NULL) = (promoted_seat_models IS NULL)
-        AND (mode <> 'assisted' OR promoted_version IS NOT NULL))
+        AND (mode NOT IN ('assisted', 'active') OR promoted_version IS NOT NULL)),
+    -- ADR-0065 rule 11: active names at least one document type; no other mode names any.
+    CONSTRAINT ck_agent_type_setting_active CHECK ((mode = 'active') = (active_document_types IS NOT NULL)
+        AND (active_document_types IS NULL OR cardinality(active_document_types) >= 1))
 );
 CREATE TABLE agent_run (                                   -- company data, not partitioned (rule 18)
     id                     uuid PRIMARY KEY,
@@ -517,6 +521,16 @@ CREATE TABLE policy_decision (                             -- never updated or d
     approval_pool_id              uuid,                    -- ADR-0055 rule 6
     approval_plan                 jsonb,                   -- required stages as in force on clock.today: id, sequence, code, min_rank, k, scope_binding, escalation_role_id, due_days
     continues_policy_decision_id  uuid,                    -- a resubmission that continues the round (ADR-0055 rule 11)
+    -- ADR-0065 rule 6: the auto-post gateway's decision and the checker's evidence; all null for other decisions.
+    auto_post_decision            text CONSTRAINT ck_policy_decision_auto_post_decision CHECK (auto_post_decision IN ('auto_post', 'require_human', 'reject')),
+    auto_post_mode                text CONSTRAINT ck_policy_decision_auto_post_mode CHECK (auto_post_mode IN ('shadow', 'live')),
+    auto_post_reason_code         text,                    -- the first failed rule in the gateway's order; null for auto_post
+    auto_post_checker_code        text,                    -- the registry declaration of the checker (ADR-0065 rule 2)
+    auto_post_checker_version     text,
+    auto_post_plan_hash           text CONSTRAINT ck_policy_decision_auto_post_plan_hash CHECK (auto_post_plan_hash ~ '^[0-9a-f]{64}$'),   -- the simulated plan; the posting must reproduce it
+    auto_post_as_of_date          date,                    -- the simulated business date the execution is pinned to
+    auto_post_evidence            jsonb,                   -- settings read (key, value, source), decision table and parameter set versions with hashes, every rule's code,
+                                                           -- outcome and values, value bases, taint, drafting run, agent type, behavior hash, effective mode, rule version
     decided_at                    timestamptz NOT NULL,
     recorded_at                   timestamptz NOT NULL,
     UNIQUE (company_id, id),
@@ -539,7 +553,22 @@ CREATE TABLE policy_decision (                             -- never updated or d
         THEN approval_pool_id IS NULL AND approval_plan IS NULL AND continues_policy_decision_id IS NULL
         ELSE approval_pool_id IS NOT NULL
              AND CASE WHEN jsonb_typeof(approval_plan) = 'array' THEN jsonb_array_length(approval_plan) > 0 ELSE false END END),
-    CONSTRAINT ck_policy_decision_continues CHECK (continues_policy_decision_id IS DISTINCT FROM id)
+    CONSTRAINT ck_policy_decision_continues CHECK (continues_policy_decision_id IS DISTINCT FROM id),
+    -- ADR-0065 rules 4 and 6: the gateway's columns come together, only for a post or issue by system or integration; a live auto_post is
+    -- allowed with confirmation, a live require_human human_only, a live reject denied, and a shadow decision human_only.
+    CONSTRAINT ck_policy_decision_auto_post CHECK (
+        (auto_post_decision IS NULL) = (auto_post_mode IS NULL)
+        AND (auto_post_decision IS NULL) = (auto_post_checker_code IS NULL)
+        AND (auto_post_decision IS NULL) = (auto_post_checker_version IS NULL)
+        AND (auto_post_decision IS NULL) = (auto_post_evidence IS NULL)
+        AND (auto_post_decision IS NULL OR (action IN ('post', 'issue') AND actor_kind IN ('system', 'integration')))
+        AND (auto_post_decision IS NULL OR (auto_post_decision = 'auto_post') = (auto_post_reason_code IS NULL))
+        AND (auto_post_decision IS DISTINCT FROM 'auto_post' OR (auto_post_plan_hash IS NOT NULL AND auto_post_as_of_date IS NOT NULL))
+        AND (auto_post_mode IS DISTINCT FROM 'shadow' OR outcome = 'human_only')
+        AND (auto_post_mode IS DISTINCT FROM 'live' OR CASE auto_post_decision
+                WHEN 'auto_post' THEN outcome = 'allowed' AND is_confirmation_required
+                WHEN 'require_human' THEN outcome = 'human_only'
+                ELSE outcome = 'denied' END))
 );
 CREATE INDEX ix_policy_decision_document_version_id ON policy_decision (document_version_id);
 CREATE TABLE approval (                                    -- owned by documents; one immutable row per decision at a stage (ADR-0055 rule 1)
@@ -957,12 +986,15 @@ CREATE TABLE agent_promotion_evidence (                    -- immutable; compute
     figures             jsonb NOT NULL,
     thresholds          jsonb NOT NULL,
     is_sufficient       boolean NOT NULL,
+    target_mode         text NOT NULL DEFAULT 'assisted' CONSTRAINT ck_agent_promotion_evidence_target_mode CHECK (target_mode IN ('assisted', 'active')),   -- ADR-0065 rule 11
+    document_type       text,                              -- ADR-0065 rule 11: the document type an active promotion covers (GetAgentDraftAcceptance)
     attachment_id       uuid,                              -- the data migration rehearsal report (ADR-0051 rule 28)
     created_by_user_id  uuid NOT NULL REFERENCES user_account (id),   -- interim: not stated in ADR-0050 (a person's command)
     recorded_at         timestamptz NOT NULL,
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, attachment_id) REFERENCES attachment (company_id, id),
-    CONSTRAINT ck_agent_promotion_evidence_dates CHECK (start_date <= end_date)
+    CONSTRAINT ck_agent_promotion_evidence_dates CHECK (start_date <= end_date),
+    CONSTRAINT ck_agent_promotion_evidence_document_type CHECK ((target_mode = 'active') = (document_type IS NOT NULL))
 );
 
 -- ===== Money accounts, statements and payments [cash] (ADR-0048 rules 2-3, 8-9, 16; ADR-0030 rule 10) =====

@@ -39,6 +39,8 @@ A capability check (2026-11-15) found that only approvals are configurable: the 
    - **Document lifecycles** (ADR-0009) and **agent workflow steps** (ADR-0051) stay code, changed only by a new release or agent type version.
    - **What a rule can never do:** submit, approve, reject, post, issue, reverse or send; change master data, settings, roles, policy or another artifact; widen an agent's tool list; relax a hard floor of spec 03.
 
+   Note ([ADR-0065](0065-deterministic-auto-post-gateway.md), 2026-11-16 (proposed)): unchanged by the auto-post gateway. The gateway is a policy decision at the policy point of `Post<Type>`, evaluated by core code with settings and a decision table at a module decision point; it is not an automation rule, so this rule needs no exception, and no automation rule posts ([ADR-0065](0065-deterministic-auto-post-gateway.md) rule 13).
+
 **Registry vocabulary**
 
 4. Trigger event types (ADR-0008 rule 1 note; ADR-0013 rule 1 note). An event type is usable as a trigger only when its registration declares:

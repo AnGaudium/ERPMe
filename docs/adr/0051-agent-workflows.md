@@ -193,6 +193,8 @@ Six agent types are designed now, each as a code-orchestrated workflow on the ru
     Note ([ADR-0059](0059-ai-tuning-and-development-of-deterministic-functions.md), proposed 2026-11-15): the evidence counts only proposals made under one `parameters_hash` and names it with the parameter set's latest transition; a later parameter set version, demotion, rollback or invalidation marks the stored evidence outdated in its own transaction, and re-arming needs a new rule version with new evidence (rule 6).
 
     Note ([ADR-0063](0063-configurable-policy-settings.md), proposed 2026-11-15): the 300 proposals at 99% are the default of the setting `auto_post.max_error_rate` (rule 10); evidence counts proposals of approved LLM-originated rules only while `cash.auto_post.accept_llm_originated_rules` is true (rule 8).
+
+    Note ([ADR-0065](0065-deterministic-auto-post-gateway.md), 2026-11-16 (proposed)): "Only the deterministic bank cascade may ever auto-post" (Decision) is generalized: every unattended posting goes through the auto-post gateway, whose instances are this cascade (unchanged), the production import and the purchase invoice. The `llm_suggestion` drafts of this rule still never auto-post, and `cash.auto_post.accept_llm_originated_rules` is no longer bounded false (default false) under the author's decision of 2026-11-16 ([ADR-0065](0065-deterministic-auto-post-gateway.md) rules 12, 20).
 19. Rules, gates and the rest:
     - **Rule proposals.** When a person posts a document matched to a line that carried a `stable_payer_token`, or matches such a line by hand, a `cash` consumer creates a `bank_matching_rule` change proposal as a draft (token → that partner; it never submits it) if the token appears in at least two of that partner's lines in the last 90 days and in no other partner's lines. The proposal copies an untrusted token, so its version is written tainted, as a version derived from untrusted content (ADR-0029 rules 8, 10), a person submits it (ADR-0029 rule 3), and a person approves it (ADR-0029 rule 5).
     - **Human gates.** A person posts the drafted document or matches the line, which resolves the item; a person approves rule proposals.
@@ -232,6 +234,8 @@ Six agent types are designed now, each as a code-orchestrated workflow on the ru
     - **Policy thresholds:** the company's purchase invoice rules (amount, `is_match_exceeded`, direct expense).
     - **Shadow comparator.** Against the purchase invoice posted with the same supplier invoice key: per line, item, order line, quantity and unit; equal when all drafted lines are equal and the header matches.
     - **Failures.** No supplier, or more than one: no run. An unreadable record: `not_applicable`. Unresolved lines are normal.
+
+    Note ([ADR-0065](0065-deterministic-auto-post-gateway.md), 2026-11-16 (proposed)): "a tainted draft needs a person to post" holds unless the company enables the auto-post gateway for purchase invoices with tainted drafts and this agent type is `active`; then a draft that passes the checker of [ADR-0065](0065-deterministic-auto-post-gateway.md) rule 19 posts as `system`, and the rule's owner confirms it. The next version of this agent type declares `auto_post_document_types` with `purchase_invoice` ([ADR-0065](0065-deterministic-auto-post-gateway.md) rules 10, 11, 19).
 
 **Planning** (ADR-0024 rule 23; ADR-0036 rules 11–12)
 

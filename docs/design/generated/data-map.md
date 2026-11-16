@@ -36,10 +36,10 @@ Tables per owner module, from the DDL drafts in `docs/design/*.sql` and the owne
 
 | Table | Purpose | Section | Key references | Source |
 | --- | --- | --- | --- | --- |
-| `agent_budget_usage` | Rule 23: one row per (company, agent type, business date), (company, business date), (company, outside-content pool, business date; rule 23 note) and (installation, day). | Agent settings, runs and budgets | `agent_type` | docs/design/DS-05-platform.sql:277 |
-| `agent_promotion_evidence` | immutable; computed once by CreateAgentPromotionEvidence | Agent promotion evidence | `agent_type`, `attachment`, `user_account` | docs/design/DS-05-platform.sql:949 |
-| `agent_run` | company data, not partitioned (rule 18) | Agent settings, runs and budgets | `agent_run`, `agent_type_version`, `partner`, `user_account`, `work_item` | docs/design/DS-05-platform.sql:149 |
-| `agent_run_step` | Rule 19: append-only, partitioned by month on id (partitions in the last section). | Agent settings, runs and budgets | `agent_run` | docs/design/DS-05-platform.sql:224 |
+| `agent_budget_usage` | Rule 23: one row per (company, agent type, business date), (company, business date), (company, outside-content pool, business date; rule 23 note) and (installation, day). | Agent settings, runs and budgets | `agent_type` | docs/design/DS-05-platform.sql:281 |
+| `agent_promotion_evidence` | immutable; computed once by CreateAgentPromotionEvidence | Agent promotion evidence | `agent_type`, `attachment`, `user_account` | docs/design/DS-05-platform.sql:978 |
+| `agent_run` | company data, not partitioned (rule 18) | Agent settings, runs and budgets | `agent_run`, `agent_type_version`, `partner`, `user_account`, `work_item` | docs/design/DS-05-platform.sql:153 |
+| `agent_run_step` | Rule 19: append-only, partitioned by month on id (partitions in the last section). | Agent settings, runs and budgets | `agent_run` | docs/design/DS-05-platform.sql:228 |
 | `agent_type` | installation data | Agent types |  | docs/design/DS-05-platform.sql:36 |
 | `agent_type_setting` | company data, change-tracked (rule 14) | Agent settings, runs and budgets | `agent_type`, `agent_type_version`, `user_account` | docs/design/DS-05-platform.sql:133 |
 | `agent_type_version` | installation data; immutable (trigger below) | Agent types | `agent_type` | docs/design/DS-05-platform.sql:43 |
@@ -49,8 +49,8 @@ Tables per owner module, from the DDL drafts in `docs/design/*.sql` and the owne
 
 | Table | Purpose | Section | Key references | Source |
 | --- | --- | --- | --- | --- |
-| `attachment` |  | Attachments | `document` | docs/design/DS-05-platform.sql:837 |
-| `attachment_link` | polymorphic target, checked by INV-83 | Attachments | `attachment` | docs/design/DS-05-platform.sql:865 |
+| `attachment` |  | Attachments | `document` | docs/design/DS-05-platform.sql:866 |
+| `attachment_link` | polymorphic target, checked by INV-83 | Attachments | `attachment` | docs/design/DS-05-platform.sql:894 |
 | `document_extraction` | one per attachment and purpose (rule 3) | Extractions | `attachment`, `document_reader`, `inbound_message`, `partner`, `user_account` | docs/design/DS-36-document-intake.sql:36 |
 | `document_reader` | installation data; immutable (trigger below) | Readers |  | docs/design/DS-36-document-intake.sql:21 |
 | `extraction_confirmation` | A person's confirmation of a field row (rule 23) | Extractions | `extraction_field`, `user_account` | docs/design/DS-36-document-intake.sql:158 |
@@ -63,9 +63,9 @@ Tables per owner module, from the DDL drafts in `docs/design/*.sql` and the owne
 
 | Table | Purpose | Section | Key references | Source |
 | --- | --- | --- | --- | --- |
-| `audit_change` | field changes of change-tracked tables; partitioned by month on id (rules 3, 6) | Audit | `audit_record` | docs/design/DS-05-platform.sql:787 |
-| `audit_denial` | Rule 5: coalesced, written outside the refused transaction | Audit |  | docs/design/DS-05-platform.sql:804 |
-| `audit_record` | one per executed command or batch item; partitioned by month on id (rule 6) | Audit | `policy_decision` | docs/design/DS-05-platform.sql:740 |
+| `audit_change` | field changes of change-tracked tables; partitioned by month on id (rules 3, 6) | Audit | `audit_record` | docs/design/DS-05-platform.sql:816 |
+| `audit_denial` | Rule 5: coalesced, written outside the refused transaction | Audit |  | docs/design/DS-05-platform.sql:833 |
+| `audit_record` | one per executed command or batch item; partitioned by month on id (rule 6) | Audit | `policy_decision` | docs/design/DS-05-platform.sql:769 |
 | `personal_data_processing_log` | IDs and field names only, never values; append-only (trigger below) | Processing log |  | docs/design/DS-35-crm.sql:472 |
 
 ## `configuration`
@@ -93,26 +93,26 @@ Tables per owner module, from the DDL drafts in `docs/design/*.sql` and the owne
 
 | Table | Purpose | Section | Key references | Source |
 | --- | --- | --- | --- | --- |
-| `approval` | owned by documents; one immutable row per decision at a stage (ADR-0055 rule 1) | Policy decisions and approvals | `approval_stage`, `document_version`, `policy_decision`, `user_account` | docs/design/DS-05-platform.sql:545 |
-| `change_proposal` | typed header of a non-posting document type (rule 1) | Change proposals | `document` | docs/design/DS-05-platform.sql:620 |
-| `change_proposal_execution` | immutable; written by the executing consumer (rule 3, Success) | Change proposals | `change_proposal`, `document_version` | docs/design/DS-05-platform.sql:652 |
-| `change_proposal_execution_item` | The audit row of each executed item (rule 3, Success). | Change proposals | `audit_record`, `change_proposal_execution` | docs/design/DS-05-platform.sql:665 |
-| `change_proposal_item` | The items of rule 1, an ADR-0008 rule 20 batch: one row per item, in batch order. | Change proposals | `change_proposal` | docs/design/DS-05-platform.sql:635 |
-| `document` |  | Documents | `branch`, `document`, `partner`, `user_account`, `work_item` | docs/design/DS-05-platform.sql:407 |
-| `document_version` | Rule 9: one row per version, never updated | Documents | `agent_run`, `document`, `document_version`, `user_account` | docs/design/DS-05-platform.sql:459 |
-| `numbering_configuration` | per document type: prefix, per-branch series, format (ADR-0009 rule 15) | Documents |  | docs/design/DS-05-platform.sql:384 |
-| `numbering_series` | created on first use; the counter moves only through the numbering lock helper (rule 15) | Documents | `branch`, `fiscal_year` | docs/design/DS-05-platform.sql:394 |
-| `posting_intent` | One per Issue attempt, never reused | Posting intents | `document_version`, `policy_decision` | docs/design/DS-05-platform.sql:596 |
-| `taint_clearance` | immutable; one per version (ADR-0029 rule 8) | Documents | `document_version`, `user_account` | docs/design/DS-05-platform.sql:484 |
+| `approval` | owned by documents; one immutable row per decision at a stage (ADR-0055 rule 1) | Policy decisions and approvals | `approval_stage`, `document_version`, `policy_decision`, `user_account` | docs/design/DS-05-platform.sql:574 |
+| `change_proposal` | typed header of a non-posting document type (rule 1) | Change proposals | `document` | docs/design/DS-05-platform.sql:649 |
+| `change_proposal_execution` | immutable; written by the executing consumer (rule 3, Success) | Change proposals | `change_proposal`, `document_version` | docs/design/DS-05-platform.sql:681 |
+| `change_proposal_execution_item` | The audit row of each executed item (rule 3, Success). | Change proposals | `audit_record`, `change_proposal_execution` | docs/design/DS-05-platform.sql:694 |
+| `change_proposal_item` | The items of rule 1, an ADR-0008 rule 20 batch: one row per item, in batch order. | Change proposals | `change_proposal` | docs/design/DS-05-platform.sql:664 |
+| `document` |  | Documents | `branch`, `document`, `partner`, `user_account`, `work_item` | docs/design/DS-05-platform.sql:411 |
+| `document_version` | Rule 9: one row per version, never updated | Documents | `agent_run`, `document`, `document_version`, `user_account` | docs/design/DS-05-platform.sql:463 |
+| `numbering_configuration` | per document type: prefix, per-branch series, format (ADR-0009 rule 15) | Documents |  | docs/design/DS-05-platform.sql:388 |
+| `numbering_series` | created on first use; the counter moves only through the numbering lock helper (rule 15) | Documents | `branch`, `fiscal_year` | docs/design/DS-05-platform.sql:398 |
+| `posting_intent` | One per Issue attempt, never reused | Posting intents | `document_version`, `policy_decision` | docs/design/DS-05-platform.sql:625 |
+| `taint_clearance` | immutable; one per version (ADR-0029 rule 8) | Documents | `document_version`, `user_account` | docs/design/DS-05-platform.sql:488 |
 
 ## `outbox`
 
 | Table | Purpose | Section | Key references | Source |
 | --- | --- | --- | --- | --- |
-| `event_consumer` | installation data | Outbox and delivery |  | docs/design/DS-05-platform.sql:685 |
-| `event_delivery` | one per subscribed consumer, unpartitioned (rule 6) | Outbox and delivery | `event_consumer`, `outbox_event` | docs/design/DS-05-platform.sql:718 |
-| `event_subject` | installation data, unpartitioned; the only ordering of events (rule 3) | Outbox and delivery |  | docs/design/DS-05-platform.sql:676 |
-| `outbox_event` | partitioned by month on id (rule 2); no unique index but its key | Outbox and delivery |  | docs/design/DS-05-platform.sql:694 |
+| `event_consumer` | installation data | Outbox and delivery |  | docs/design/DS-05-platform.sql:714 |
+| `event_delivery` | one per subscribed consumer, unpartitioned (rule 6) | Outbox and delivery | `event_consumer`, `outbox_event` | docs/design/DS-05-platform.sql:747 |
+| `event_subject` | installation data, unpartitioned; the only ordering of events (rule 3) | Outbox and delivery |  | docs/design/DS-05-platform.sql:705 |
+| `outbox_event` | partitioned by month on id (rule 2); no unique index but its key | Outbox and delivery |  | docs/design/DS-05-platform.sql:723 |
 
 ## `permissions`
 
@@ -143,11 +143,11 @@ Tables per owner module, from the DDL drafts in `docs/design/*.sql` and the owne
 | --- | --- | --- | --- | --- |
 | `approval_pool` |  | Approval pools and stages |  | docs/design/DS-15-access.sql:331 |
 | `approval_pool_document_type` | Selector: position 0 is the one default row per document type | Approval pools and stages | `approval_pool` | docs/design/DS-15-access.sql:343 |
-| `approval_procedure` | named ranks; approver role and scope binding moved to stages (ADR-0055 rule 5) | Policy rules and procedures |  | docs/design/DS-05-platform.sql:300 |
+| `approval_procedure` | named ranks; approver role and scope binding moved to stages (ADR-0055 rule 5) | Policy rules and procedures |  | docs/design/DS-05-platform.sql:304 |
 | `approval_stage` |  | Approval pools and stages | `approval_pool`, `role` | docs/design/DS-15-access.sql:353 |
 | `approval_stage_member` |  | Approval pools and stages | `approval_stage`, `role`, `user_account` | docs/design/DS-15-access.sql:372 |
-| `policy_rule` | the identity of a versioned rule; ties go to the lowest ID (rule 7) | Policy rules and procedures |  | docs/design/DS-05-platform.sql:313 |
-| `policy_rule_version` | Rule 3: a change writes a new version with effective_from | Policy rules and procedures | `approval_procedure`, `policy_rule`, `user_account` | docs/design/DS-05-platform.sql:323 |
+| `policy_rule` | the identity of a versioned rule; ties go to the lowest ID (rule 7) | Policy rules and procedures |  | docs/design/DS-05-platform.sql:317 |
+| `policy_rule_version` | Rule 3: a change writes a new version with effective_from | Policy rules and procedures | `approval_procedure`, `policy_rule`, `user_account` | docs/design/DS-05-platform.sql:327 |
 
 ## `registry`
 
@@ -324,20 +324,20 @@ Tables per owner module, from the DDL drafts in `docs/design/*.sql` and the owne
 
 | Table | Purpose | Section | Key references | Source |
 | --- | --- | --- | --- | --- |
-| `document_line_tax` | Part of the document's content: replaced by Create and Update while the document can change, frozen with it. | Taxes | `derivation_trace`, `document`, `tax_code` | docs/design/DS-05-platform.sql:882 |
-| `tax_line` | the immutable tax subledger, written at posting (rule 11) | Taxes | `branch`, `currency`, `document`, `journal_entry`, `tax_code` | docs/design/DS-05-platform.sql:899 |
-| `tax_line_adjustment` | append-only (rule 13 as amended by ADR-0053 rule 3) | Taxes | `journal_entry`, `tax_line`, `tax_line_adjustment` | docs/design/DS-05-platform.sql:930 |
+| `document_line_tax` | Part of the document's content: replaced by Create and Update while the document can change, frozen with it. | Taxes | `derivation_trace`, `document`, `tax_code` | docs/design/DS-05-platform.sql:911 |
+| `tax_line` | the immutable tax subledger, written at posting (rule 11) | Taxes | `branch`, `currency`, `document`, `journal_entry`, `tax_code` | docs/design/DS-05-platform.sql:928 |
+| `tax_line_adjustment` | append-only (rule 13 as amended by ADR-0053 rule 3) | Taxes | `journal_entry`, `tax_line`, `tax_line_adjustment` | docs/design/DS-05-platform.sql:959 |
 
 ## `cash`
 
 | Table | Purpose | Section | Key references | Source |
 | --- | --- | --- | --- | --- |
-| `bank_statement` |  | Money accounts, statements and payments | `attachment`, `money_account`, `user_account` | docs/design/DS-05-platform.sql:992 |
-| `bank_statement_line` | Append-only except the match, proposal and suggestion columns (trigger below). | Money accounts, statements and payments | `agent_run`, `bank_statement`, `document` | docs/design/DS-05-platform.sql:1015 |
-| `money_account` | company data, master_data_change, change-tracked (rule 2) | Money accounts, statements and payments | `account`, `currency` | docs/design/DS-05-platform.sql:969 |
-| `open_item_collection` | change-tracked (ADR-0038), so INV-98 reads the block at a posting | Money accounts, statements and payments | `open_item` | docs/design/DS-05-platform.sql:1161 |
-| `payment` | The typed header of the four payment types (rule 3). | Money accounts, statements and payments | `bank_statement_line`, `document`, `money_account`, `partner`, `partner_bank_account` | docs/design/DS-05-platform.sql:1082 |
-| `payment_line` |  | Money accounts, statements and payments | `account`, `cost_center`, `open_item`, `partner`, `payment`, `project` | docs/design/DS-05-platform.sql:1115 |
+| `bank_statement` |  | Money accounts, statements and payments | `attachment`, `money_account`, `user_account` | docs/design/DS-05-platform.sql:1024 |
+| `bank_statement_line` | Append-only except the match, proposal and suggestion columns (trigger below). | Money accounts, statements and payments | `agent_run`, `bank_statement`, `document` | docs/design/DS-05-platform.sql:1047 |
+| `money_account` | company data, master_data_change, change-tracked (rule 2) | Money accounts, statements and payments | `account`, `currency` | docs/design/DS-05-platform.sql:1001 |
+| `open_item_collection` | change-tracked (ADR-0038), so INV-98 reads the block at a posting | Money accounts, statements and payments | `open_item` | docs/design/DS-05-platform.sql:1193 |
+| `payment` | The typed header of the four payment types (rule 3). | Money accounts, statements and payments | `bank_statement_line`, `document`, `money_account`, `partner`, `partner_bank_account` | docs/design/DS-05-platform.sql:1114 |
+| `payment_line` |  | Money accounts, statements and payments | `account`, `cost_center`, `open_item`, `partner`, `payment`, `project` | docs/design/DS-05-platform.sql:1147 |
 
 ## `crm`
 
@@ -444,7 +444,7 @@ Tables per owner module, from the DDL drafts in `docs/design/*.sql` and the owne
 | Table | Purpose | Section | Key references | Source |
 | --- | --- | --- | --- | --- |
 | `account_period_balance` | Rule 18: period balance cache, written when a period's general area is locked. |  | `account`, `currency`, `posting_period` | docs/design/DS-06-universal-journal.sql:414 |
-| `auto_post_confirmation` | immutable (ADR-0029 rule 13; ADR-0043 rule 14) | Policy decisions and approvals | `policy_decision`, `user_account` | docs/design/DS-05-platform.sql:574 |
+| `auto_post_confirmation` | immutable (ADR-0029 rule 13; ADR-0043 rule 14) | Policy decisions and approvals | `policy_decision`, `user_account` | docs/design/DS-05-platform.sql:603 |
 | `document_installment` | The installment schedule of an invoice, part of its content (ADR-0047 rule 6; ADR-0026 rule 5) | Line content shared by every document type | `document` | docs/design/DS-22-09-42-commercial-inventory.sql:1192 |
 | `document_line_custom_text` | Free text for is_custom values (ADR-0046 rule 9; ADR-0045 rule 15): personal and untrusted. | Line content shared by every document type | `document`, `variant_attribute` | docs/design/DS-22-09-42-commercial-inventory.sql:1179 |
 | `document_line_price_step` | The pricing trace (ADR-0047 rule 16): one row per step, in the line's content, reproducing the stored net unit price and line amount (INV-93). | Line content shared by every document type | `document` | docs/design/DS-22-09-42-commercial-inventory.sql:1159 |
@@ -452,11 +452,11 @@ Tables per owner module, from the DDL drafts in `docs/design/*.sql` and the owne
 | `journal_line` |  |  | `account`, `applied_rate`, `branch`, `cost_center`, `cost_object`, `currency`, `derivation_trace`, `fixed_asset` … | docs/design/DS-06-universal-journal.sql:153 |
 | `open_item` |  |  | `account`, `currency`, `document`, `open_item`, `partner`, `payment_term` | docs/design/DS-06-universal-journal.sql:109 |
 | `payment_term_line` |  |  | `payment_term` | docs/design/DS-06-universal-journal.sql:97 |
-| `period_unlock_request` | typed header of a non-posting document type (ADR-0043 rule 16) | Policy decisions and approvals | `document`, `posting_period` | docs/design/DS-05-platform.sql:584 |
+| `period_unlock_request` | typed header of a non-posting document type (ADR-0043 rule 16) | Policy decisions and approvals | `document`, `posting_period` | docs/design/DS-05-platform.sql:613 |
 | `planning_run` | RunPlanning, a long job (ADR-0024 rule 17) | Company rows that serialize changes | `forecast_run`, `user_account` | docs/design/DS-43-54-planning-production.sql:42 |
 | `planning_setting` | one per company (ADR-0024 rule 7; ADR-0036 rules 4, 11) | Company rows that serialize changes | `user_account` | docs/design/DS-43-54-planning-production.sql:31 |
 | `planning_state` | the company's planning state row; RunPlanning locks it, so a second run gets planning_run_in_progress (ADR-0024 rule 17) | Company rows that serialize changes | `planning_run` | docs/design/DS-43-54-planning-production.sql:61 |
-| `policy_decision` | never updated or deleted (ADR-0009 rule 14) | Policy decisions and approvals | `approval_pool`, `approval_procedure`, `document_version`, `policy_decision`, `policy_rule`, `policy_rule_version`, `user_account` | docs/design/DS-05-platform.sql:498 |
+| `policy_decision` | never updated or deleted (ADR-0009 rule 14) | Policy decisions and approvals | `approval_pool`, `approval_procedure`, `document_version`, `policy_decision`, `policy_rule`, `policy_rule_version`, `user_account` | docs/design/DS-05-platform.sql:502 |
 | `production_structure` | created with the company; releases, version and setting saves lock it at class 3 (ADR-0033 rule 8; ADR-0027 rule 10) | Company rows that serialize changes |  | docs/design/DS-43-54-planning-production.sql:67 |
 | `subledger_activation` | ADR-0025 rule 4: activation of a gated control kind, read by journal_line_check_insert (lab finding L-03). |  | `document` | docs/design/DS-06-universal-journal.sql:55 |
 
@@ -466,15 +466,15 @@ Foreign keys whose source and target tables have different stated owners. Foreig
 
 | From (module, layer) | Column(s) | To (module, layer) | Direction | Source |
 | --- | --- | --- | --- | --- |
-| `agent_promotion_evidence` (agent_runs, 2) | `company_id,attachment_id` | `attachment` (attachments, 2) | same layer | docs/design/DS-05-platform.sql:964 |
-| `agent_promotion_evidence` (agent_runs, 2) | `created_by_user_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-05-platform.sql:961 |
-| `agent_run` (agent_runs, 2) | `company_id,scope_partner_id` | `partner` (master_data, 3) | up | docs/design/DS-05-platform.sql:195 |
-| `agent_run` (agent_runs, 2) | `company_id,work_item_id` | `work_item` (work, 2) | same layer | docs/design/DS-05-platform.sql:194 |
-| `agent_run` (agent_runs, 2) | `on_behalf_of_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-05-platform.sql:163 |
+| `agent_promotion_evidence` (agent_runs, 2) | `company_id,attachment_id` | `attachment` (attachments, 2) | same layer | docs/design/DS-05-platform.sql:995 |
+| `agent_promotion_evidence` (agent_runs, 2) | `created_by_user_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-05-platform.sql:992 |
+| `agent_run` (agent_runs, 2) | `company_id,scope_partner_id` | `partner` (master_data, 3) | up | docs/design/DS-05-platform.sql:199 |
+| `agent_run` (agent_runs, 2) | `company_id,work_item_id` | `work_item` (work, 2) | same layer | docs/design/DS-05-platform.sql:198 |
+| `agent_run` (agent_runs, 2) | `on_behalf_of_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-05-platform.sql:167 |
 | `agent_type_setting` (agent_runs, 2) | `workflow_owner_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-05-platform.sql:138 |
 | `data_processing_permission` (agent_runs, 2) | `approved_by_user_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-36-document-intake.sql:238 |
 | `data_processing_permission` (agent_runs, 2) | `company_id,assessment_attachment_id` | `attachment` (attachments, 2) | same layer | docs/design/DS-36-document-intake.sql:252 |
-| `attachment` (attachments, 2) | `company_id,generated_subject_document_id` | `document` (documents, 2) | same layer | docs/design/DS-05-platform.sql:858 |
+| `attachment` (attachments, 2) | `company_id,generated_subject_document_id` | `document` (documents, 2) | same layer | docs/design/DS-05-platform.sql:887 |
 | `document_extraction` (attachments, 2) | `company_id,inbound_message_id` | `inbound_message` (crm, 4) | up | docs/design/DS-36-document-intake.sql:69 |
 | `document_extraction` (attachments, 2) | `company_id,partner_id` | `partner` (master_data, 3) | up | docs/design/DS-36-document-intake.sql:68 |
 | `document_extraction` (attachments, 2) | `requested_by_user_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-36-document-intake.sql:56 |
@@ -482,18 +482,18 @@ Foreign keys whose source and target tables have different stated owners. Foreig
 | `extraction_confirmation` (attachments, 2) | `confirmed_by_user_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-36-document-intake.sql:162 |
 | `extraction_field` (attachments, 2) | `company_id,agent_run_id` | `agent_run` (agent_runs, 2) | same layer | docs/design/DS-36-document-intake.sql:124 |
 | `extraction_field` (attachments, 2) | `entered_by_user_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-36-document-intake.sql:114 |
-| `bank_statement` (cash, 4) | `company_id,source_attachment_id` | `attachment` (attachments, 2) | down | docs/design/DS-05-platform.sql:1010 |
-| `bank_statement` (cash, 4) | `imported_by_user_id` | `user_account` (permissions, 2) | down | docs/design/DS-05-platform.sql:1004 |
-| `bank_statement_line` (cash, 4) | `company_id,matched_document_id` | `document` (documents, 2) | down | docs/design/DS-05-platform.sql:1057 |
-| `bank_statement_line` (cash, 4) | `company_id,proposed_document_id` | `document` (documents, 2) | down | docs/design/DS-05-platform.sql:1058 |
-| `bank_statement_line` (cash, 4) | `company_id,suggestion_agent_run_id` | `agent_run` (agent_runs, 2) | down | docs/design/DS-05-platform.sql:1059 |
-| `money_account` (cash, 4) | `currency` | `currency` (master_data, 3) | down | docs/design/DS-05-platform.sql:975 |
-| `payment` (cash, 4) | `company_id,id,document_type` | `document` (documents, 2) | down | docs/design/DS-05-platform.sql:1104 |
-| `payment` (cash, 4) | `company_id,partner_id` | `partner` (master_data, 3) | down | docs/design/DS-05-platform.sql:1107 |
-| `payment` (cash, 4) | `company_id,partner_id,partner_bank_account_id` | `partner_bank_account` (master_data, 3) | down | docs/design/DS-05-platform.sql:1203 |
-| `payment_line` (cash, 4) | `company_id,cost_center_id` | `cost_center` (master_data, 3) | down | docs/design/DS-05-platform.sql:1140 |
-| `payment_line` (cash, 4) | `company_id,supplier_partner_id` | `partner` (master_data, 3) | down | docs/design/DS-05-platform.sql:1141 |
-| `payment_line` (cash, 4) | `project_id` | `project` (master_data, 3) | down | docs/design/DS-05-platform.sql:1130 |
+| `bank_statement` (cash, 4) | `company_id,source_attachment_id` | `attachment` (attachments, 2) | down | docs/design/DS-05-platform.sql:1042 |
+| `bank_statement` (cash, 4) | `imported_by_user_id` | `user_account` (permissions, 2) | down | docs/design/DS-05-platform.sql:1036 |
+| `bank_statement_line` (cash, 4) | `company_id,matched_document_id` | `document` (documents, 2) | down | docs/design/DS-05-platform.sql:1089 |
+| `bank_statement_line` (cash, 4) | `company_id,proposed_document_id` | `document` (documents, 2) | down | docs/design/DS-05-platform.sql:1090 |
+| `bank_statement_line` (cash, 4) | `company_id,suggestion_agent_run_id` | `agent_run` (agent_runs, 2) | down | docs/design/DS-05-platform.sql:1091 |
+| `money_account` (cash, 4) | `currency` | `currency` (master_data, 3) | down | docs/design/DS-05-platform.sql:1007 |
+| `payment` (cash, 4) | `company_id,id,document_type` | `document` (documents, 2) | down | docs/design/DS-05-platform.sql:1136 |
+| `payment` (cash, 4) | `company_id,partner_id` | `partner` (master_data, 3) | down | docs/design/DS-05-platform.sql:1139 |
+| `payment` (cash, 4) | `company_id,partner_id,partner_bank_account_id` | `partner_bank_account` (master_data, 3) | down | docs/design/DS-05-platform.sql:1235 |
+| `payment_line` (cash, 4) | `company_id,cost_center_id` | `cost_center` (master_data, 3) | down | docs/design/DS-05-platform.sql:1172 |
+| `payment_line` (cash, 4) | `company_id,supplier_partner_id` | `partner` (master_data, 3) | down | docs/design/DS-05-platform.sql:1173 |
+| `payment_line` (cash, 4) | `project_id` | `project` (master_data, 3) | down | docs/design/DS-05-platform.sql:1162 |
 | `artifact_promotion_evidence` (configuration, 2) | `created_by_user_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-28-34-configuration-artifacts.sql:327 |
 | `artifact_transition` (configuration, 2) | `company_id,change_proposal_id` | `change_proposal` (documents, 2) | same layer | docs/design/DS-28-34-configuration-artifacts.sql:369 |
 | `artifact_transition` (configuration, 2) | `on_behalf_of_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-28-34-configuration-artifacts.sql:365 |
@@ -520,7 +520,7 @@ Foreign keys whose source and target tables have different stated owners. Foreig
 | `data_subject_request` (crm, 4) | `company_id,id` | `document` (documents, 2) | down | docs/design/DS-35-crm.sql:314 |
 | `data_subject_request` (crm, 4) | `company_id,partner_id` | `partner` (master_data, 3) | down | docs/design/DS-35-crm.sql:318 |
 | `data_subject_request_content` (crm, 4) | `company_id,data_subject_request_id` | `document` (documents, 2) | down | docs/design/DS-35-crm.sql:302 |
-| `inbound_message` (crm, 4) | `company_id,raw_attachment_id` | `attachment` (attachments, 2) | down | docs/design/DS-05-platform.sql:1208 |
+| `inbound_message` (crm, 4) | `company_id,raw_attachment_id` | `attachment` (attachments, 2) | down | docs/design/DS-05-platform.sql:1240 |
 | `interaction` (crm, 4) | `assignee_user_id` | `user_account` (permissions, 2) | down | docs/design/DS-35-crm.sql:93 |
 | `interaction` (crm, 4) | `company_id,partner_id` | `partner` (master_data, 3) | down | docs/design/DS-35-crm.sql:99 |
 | `interaction` (crm, 4) | `company_id,partner_id,contact_id` | `contact` (master_data, 3) | down | docs/design/DS-35-crm.sql:100 |
@@ -528,7 +528,7 @@ Foreign keys whose source and target tables have different stated owners. Foreig
 | `interaction_match_candidate` (crm, 4) | `company_id,partner_id` | `partner` (master_data, 3) | down | docs/design/DS-35-crm.sql:192 |
 | `interaction_participant` (crm, 4) | `company_id,contact_id` | `contact` (master_data, 3) | down | docs/design/DS-35-crm.sql:132 |
 | `interaction_participant` (crm, 4) | `user_account_id` | `user_account` (permissions, 2) | down | docs/design/DS-35-crm.sql:128 |
-| `interaction_summary` (crm, 4) | `company_id,agent_run_id` | `agent_run` (agent_runs, 2) | down | docs/design/DS-05-platform.sql:1209 |
+| `interaction_summary` (crm, 4) | `company_id,agent_run_id` | `agent_run` (agent_runs, 2) | down | docs/design/DS-05-platform.sql:1241 |
 | `interaction_summary` (crm, 4) | `company_id,partner_id` | `partner` (master_data, 3) | down | docs/design/DS-35-crm.sql:430 |
 | `interaction_summary` (crm, 4) | `edited_by_user_id` | `user_account` (permissions, 2) | down | docs/design/DS-35-crm.sql:427 |
 | `mailbox` (crm, 4) | `owner_user_id` | `user_account` (permissions, 2) | down | docs/design/DS-35-crm.sql:60 |
@@ -543,21 +543,21 @@ Foreign keys whose source and target tables have different stated owners. Foreig
 | `partner_tax_lookup` (crm, 4) | `company_id,partner_id` | `partner` (master_data, 3) | down | docs/design/DS-35-crm.sql:457 |
 | `processing_basis` (crm, 4) | `company_id,contact_id` | `contact` (master_data, 3) | down | docs/design/DS-35-crm.sql:277 |
 | `processing_basis` (crm, 4) | `company_id,partner_id` | `partner` (master_data, 3) | down | docs/design/DS-35-crm.sql:278 |
-| `approval` (documents, 2) | `actor_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-05-platform.sql:554 |
-| `approval` (documents, 2) | `company_id,approval_pool_id,approval_stage_id` | `approval_stage` (policy, 2) | same layer | docs/design/DS-05-platform.sql:1197 |
-| `approval` (documents, 2) | `delegated_from_user_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-05-platform.sql:558 |
-| `approval` (documents, 2) | `on_behalf_of_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-05-platform.sql:555 |
-| `change_proposal_execution_item` (documents, 2) | `audit_record_id` | `audit_record` (audit, 2) | same layer | docs/design/DS-05-platform.sql:1193 |
-| `document` (documents, 2) | `company_id,branch_id` | `branch` (master_data, 3) | up | docs/design/DS-05-platform.sql:435 |
-| `document` (documents, 2) | `company_id,origin_work_item_id` | `work_item` (work, 2) | same layer | docs/design/DS-05-platform.sql:1192 |
-| `document` (documents, 2) | `company_id,owner_employee_id` | `partner` (master_data, 3) | up | docs/design/DS-05-platform.sql:437 |
-| `document` (documents, 2) | `company_id,partner_id` | `partner` (master_data, 3) | up | docs/design/DS-05-platform.sql:436 |
-| `document` (documents, 2) | `created_by_user_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-05-platform.sql:422 |
-| `document_version` (documents, 2) | `company_id,agent_run_id` | `agent_run` (agent_runs, 2) | same layer | docs/design/DS-05-platform.sql:478 |
-| `document_version` (documents, 2) | `company_id,origin_agent_run_id` | `agent_run` (agent_runs, 2) | same layer | docs/design/DS-05-platform.sql:479 |
-| `document_version` (documents, 2) | `on_behalf_of_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-05-platform.sql:468 |
-| `numbering_series` (documents, 2) | `company_id,branch_id` | `branch` (master_data, 3) | up | docs/design/DS-05-platform.sql:405 |
-| `taint_clearance` (documents, 2) | `cleared_by_user_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-05-platform.sql:488 |
+| `approval` (documents, 2) | `actor_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-05-platform.sql:583 |
+| `approval` (documents, 2) | `company_id,approval_pool_id,approval_stage_id` | `approval_stage` (policy, 2) | same layer | docs/design/DS-05-platform.sql:1229 |
+| `approval` (documents, 2) | `delegated_from_user_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-05-platform.sql:587 |
+| `approval` (documents, 2) | `on_behalf_of_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-05-platform.sql:584 |
+| `change_proposal_execution_item` (documents, 2) | `audit_record_id` | `audit_record` (audit, 2) | same layer | docs/design/DS-05-platform.sql:1225 |
+| `document` (documents, 2) | `company_id,branch_id` | `branch` (master_data, 3) | up | docs/design/DS-05-platform.sql:439 |
+| `document` (documents, 2) | `company_id,origin_work_item_id` | `work_item` (work, 2) | same layer | docs/design/DS-05-platform.sql:1224 |
+| `document` (documents, 2) | `company_id,owner_employee_id` | `partner` (master_data, 3) | up | docs/design/DS-05-platform.sql:441 |
+| `document` (documents, 2) | `company_id,partner_id` | `partner` (master_data, 3) | up | docs/design/DS-05-platform.sql:440 |
+| `document` (documents, 2) | `created_by_user_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-05-platform.sql:426 |
+| `document_version` (documents, 2) | `company_id,agent_run_id` | `agent_run` (agent_runs, 2) | same layer | docs/design/DS-05-platform.sql:482 |
+| `document_version` (documents, 2) | `company_id,origin_agent_run_id` | `agent_run` (agent_runs, 2) | same layer | docs/design/DS-05-platform.sql:483 |
+| `document_version` (documents, 2) | `on_behalf_of_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-05-platform.sql:472 |
+| `numbering_series` (documents, 2) | `company_id,branch_id` | `branch` (master_data, 3) | up | docs/design/DS-05-platform.sql:409 |
+| `taint_clearance` (documents, 2) | `cleared_by_user_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-05-platform.sql:492 |
 | `bin` (inventory, 3) | `company_id,warehouse_id` | `warehouse` (master_data, 3) | same layer | docs/design/DS-20-master-data.sql:709 |
 | `delivery` (inventory, 3) | `company_id,id` | `document` (documents, 2) | down | docs/design/DS-22-09-42-commercial-inventory.sql:572 |
 | `delivery` (inventory, 3) | `company_id,partner_id` | `partner` (master_data, 3) | same layer | docs/design/DS-22-09-42-commercial-inventory.sql:573 |
@@ -643,8 +643,8 @@ Foreign keys whose source and target tables have different stated owners. Foreig
 | `warehouse` (master_data, 3) | `default_shipping_bin_id,id` | `bin` (inventory, 3) | same layer | docs/design/DS-20-master-data.sql:714 |
 | `role_assignment_scope` (permissions, 2) | `company_id,branch_id` | `branch` (master_data, 3) | up | docs/design/DS-15-access.sql:265 |
 | `role_assignment_scope` (permissions, 2) | `company_id,warehouse_id` | `warehouse` (master_data, 3) | up | docs/design/DS-15-access.sql:266 |
-| `segregation_exception` (permissions, 2) | `audit_record_id` | `audit_record` (audit, 2) | same layer | docs/design/DS-05-platform.sql:1200 |
-| `segregation_exception` (permissions, 2) | `company_id,document_id` | `document` (documents, 2) | same layer | docs/design/DS-05-platform.sql:1199 |
+| `segregation_exception` (permissions, 2) | `audit_record_id` | `audit_record` (audit, 2) | same layer | docs/design/DS-05-platform.sql:1232 |
+| `segregation_exception` (permissions, 2) | `company_id,document_id` | `document` (documents, 2) | same layer | docs/design/DS-05-platform.sql:1231 |
 | `forecast_adjustment` (planning, 4) | `company_id,item_id` | `item` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:263 |
 | `forecast_adjustment` (planning, 4) | `company_id,warehouse_id` | `warehouse` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:264 |
 | `forecast_adjustment` (planning, 4) | `created_by_user_id` | `user_account` (permissions, 2) | down | docs/design/DS-43-54-planning-production.sql:257 |
@@ -687,7 +687,7 @@ Foreign keys whose source and target tables have different stated owners. Foreig
 | `approval_stage` (policy, 2) | `company_id,escalation_role_id` | `role` (permissions, 2) | same layer | docs/design/DS-15-access.sql:370 |
 | `approval_stage_member` (policy, 2) | `company_id,role_id` | `role` (permissions, 2) | same layer | docs/design/DS-15-access.sql:379 |
 | `approval_stage_member` (policy, 2) | `user_account_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-15-access.sql:376 |
-| `policy_rule_version` (policy, 2) | `owner_user_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-05-platform.sql:349 |
+| `policy_rule_version` (policy, 2) | `owner_user_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-05-platform.sql:353 |
 | `activity_type` (production, 3) | `time_uom_id` | `uom` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:341 |
 | `bill_of_materials` (production, 3) | `company_id,item_id` | `item` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:397 |
 | `bill_of_materials` (production, 3) | `company_id,product_id` | `product` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:398 |
@@ -874,13 +874,13 @@ Foreign keys whose source and target tables have different stated owners. Foreig
 | `sales_return_line` (sales, 4) | `company_id,return_from_customer_line_id` | `return_from_customer_line` (inventory, 3) | down | docs/design/DS-22-09-42-commercial-inventory.sql:829 |
 | `sales_return_line` (sales, 4) | `item_id,product_id` | `item` (master_data, 3) | down | docs/design/DS-22-09-42-commercial-inventory.sql:830 |
 | `sales_return_line` (sales, 4) | `uom_id` | `uom` (master_data, 3) | down | docs/design/DS-22-09-42-commercial-inventory.sql:816 |
-| `document_line_tax` (tax, 3) | `company_id,document_id` | `document` (documents, 2) | down | docs/design/DS-05-platform.sql:897 |
-| `document_line_tax` (tax, 3) | `derivation_trace_id` | `derivation_trace` (ledger, 3) | same layer | docs/design/DS-05-platform.sql:890 |
-| `tax_line` (tax, 3) | `company_id,declaring_branch_id` | `branch` (master_data, 3) | same layer | docs/design/DS-05-platform.sql:924 |
-| `tax_line` (tax, 3) | `company_id,document_id` | `document` (documents, 2) | down | docs/design/DS-05-platform.sql:923 |
-| `tax_line` (tax, 3) | `transaction_currency` | `currency` (master_data, 3) | same layer | docs/design/DS-05-platform.sql:912 |
+| `document_line_tax` (tax, 3) | `company_id,document_id` | `document` (documents, 2) | down | docs/design/DS-05-platform.sql:926 |
+| `document_line_tax` (tax, 3) | `derivation_trace_id` | `derivation_trace` (ledger, 3) | same layer | docs/design/DS-05-platform.sql:919 |
+| `tax_line` (tax, 3) | `company_id,declaring_branch_id` | `branch` (master_data, 3) | same layer | docs/design/DS-05-platform.sql:953 |
+| `tax_line` (tax, 3) | `company_id,document_id` | `document` (documents, 2) | down | docs/design/DS-05-platform.sql:952 |
+| `tax_line` (tax, 3) | `transaction_currency` | `currency` (master_data, 3) | same layer | docs/design/DS-05-platform.sql:941 |
 | `work_item` (work, 2) | `company_id,branch_id` | `branch` (master_data, 3) | up | docs/design/DS-05-platform.sql:85 |
-| `work_item` (work, 2) | `company_id,origin_agent_run_id` | `agent_run` (agent_runs, 2) | same layer | docs/design/DS-05-platform.sql:1191 |
+| `work_item` (work, 2) | `company_id,origin_agent_run_id` | `agent_run` (agent_runs, 2) | same layer | docs/design/DS-05-platform.sql:1223 |
 | `work_item` (work, 2) | `company_id,owner_approval_stage_id` | `approval_stage` (policy, 2) | same layer | docs/design/DS-05-platform.sql:87 |
 | `work_item` (work, 2) | `company_id,warehouse_id` | `warehouse` (master_data, 3) | up | docs/design/DS-05-platform.sql:86 |
 | `work_item` (work, 2) | `owner_user_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-05-platform.sql:65 |
@@ -894,12 +894,12 @@ Foreign keys whose source and target tables have different stated owners. Foreig
 | `account_period_balance` | `account_id` | `account` | lab stub | docs/design/DS-06-universal-journal.sql:417 |
 | `account_period_balance` | `posting_period_id` | `posting_period` | lab stub | docs/design/DS-06-universal-journal.sql:418 |
 | `activity_rate` | `posting_period_id` | `posting_period` | lab stub | docs/design/DS-43-54-planning-production.sql:1288 |
-| `approval` | `company_id,policy_decision_id,approval_pool_id` | `policy_decision` | no owner stated | docs/design/DS-05-platform.sql:565 |
-| `approval` | `company_id,policy_decision_id,document_version_id` | `policy_decision` | no owner stated | docs/design/DS-05-platform.sql:564 |
-| `audit_record` | `company_id,policy_decision_id` | `policy_decision` | no owner stated | docs/design/DS-05-platform.sql:1194 |
-| `auto_post_confirmation` | `company_id,policy_decision_id` | `policy_decision` | no owner stated | docs/design/DS-05-platform.sql:582 |
+| `approval` | `company_id,policy_decision_id,approval_pool_id` | `policy_decision` | no owner stated | docs/design/DS-05-platform.sql:594 |
+| `approval` | `company_id,policy_decision_id,document_version_id` | `policy_decision` | no owner stated | docs/design/DS-05-platform.sql:593 |
+| `audit_record` | `company_id,policy_decision_id` | `policy_decision` | no owner stated | docs/design/DS-05-platform.sql:1226 |
+| `auto_post_confirmation` | `company_id,policy_decision_id` | `policy_decision` | no owner stated | docs/design/DS-05-platform.sql:611 |
 | `customer_profile` | `receivable_account_id` | `account` | lab stub | docs/design/DS-20-master-data.sql:252 |
-| `document_line_tax` | `tax_code_id` | `tax_code` | lab stub | docs/design/DS-05-platform.sql:887 |
+| `document_line_tax` | `tax_code_id` | `tax_code` | lab stub | docs/design/DS-05-platform.sql:916 |
 | `employee_profile` | `receivable_account_id` | `account` | lab stub | docs/design/DS-20-master-data.sql:287 |
 | `journal_entry` | `close_task_id` | `close_task` | lab stub | docs/design/DS-06-universal-journal.sql:75 |
 | `journal_entry` | `fiscal_year_id` | `fiscal_year` | lab stub | docs/design/DS-06-universal-journal.sql:73 |
@@ -913,33 +913,33 @@ Foreign keys whose source and target tables have different stated owners. Foreig
 | `journal_line` | `system_account_id` | `system_account` | lab stub | docs/design/DS-06-universal-journal.sql:160 |
 | `journal_line` | `tax_code_id` | `tax_code` | lab stub | docs/design/DS-06-universal-journal.sql:181 |
 | `journal_line` | `transaction_key_id` | `transaction_key` | lab stub | docs/design/DS-06-universal-journal.sql:161 |
-| `money_account` | `account_id` | `account` | lab stub | docs/design/DS-05-platform.sql:976 |
+| `money_account` | `account_id` | `account` | lab stub | docs/design/DS-05-platform.sql:1008 |
 | `normal_capacity` | `posting_period_id` | `posting_period` | lab stub | docs/design/DS-43-54-planning-production.sql:1321 |
-| `numbering_series` | `fiscal_year_id` | `fiscal_year` | lab stub | docs/design/DS-05-platform.sql:398 |
+| `numbering_series` | `fiscal_year_id` | `fiscal_year` | lab stub | docs/design/DS-05-platform.sql:402 |
 | `open_item` | `account_id` | `account` | lab stub | docs/design/DS-06-universal-journal.sql:113 |
 | `open_item` | `predecessor_open_item_id` | `open_item` | no owner stated | docs/design/DS-06-universal-journal.sql:140 |
-| `open_item_collection` | `company_id,open_item_id` | `open_item` | no owner stated | docs/design/DS-05-platform.sql:1206 |
+| `open_item_collection` | `company_id,open_item_id` | `open_item` | no owner stated | docs/design/DS-05-platform.sql:1238 |
 | `opening_turnover` | `account_id` | `account` | lab stub | docs/design/DS-06-universal-journal.sql:443 |
 | `overhead_surcharge` | `posting_period_id` | `posting_period` | lab stub | docs/design/DS-43-54-planning-production.sql:1298 |
-| `payment_line` | `account_id` | `account` | lab stub | docs/design/DS-05-platform.sql:1128 |
-| `payment_line` | `open_item_id` | `open_item` | no owner stated | docs/design/DS-05-platform.sql:1122 |
+| `payment_line` | `account_id` | `account` | lab stub | docs/design/DS-05-platform.sql:1160 |
+| `payment_line` | `open_item_id` | `open_item` | no owner stated | docs/design/DS-05-platform.sql:1154 |
 | `pending_receipt_adjustment` | `clearing_journal_line_id` | `journal_line` | no owner stated | docs/design/DS-22-09-42-commercial-inventory.sql:1510 |
-| `period_unlock_request` | `posting_period_id` | `posting_period` | lab stub | docs/design/DS-05-platform.sql:587 |
+| `period_unlock_request` | `posting_period_id` | `posting_period` | lab stub | docs/design/DS-05-platform.sql:616 |
 | `planned_order` | `company_id,planning_run_id` | `planning_run` | no owner stated | docs/design/DS-43-54-planning-production.sql:664 |
 | `planning_action_message` | `company_id,planning_run_id` | `planning_run` | no owner stated | docs/design/DS-43-54-planning-production.sql:752 |
 | `planning_exception` | `company_id,planning_run_id` | `planning_run` | no owner stated | docs/design/DS-43-54-planning-production.sql:788 |
 | `planning_state` | `company_id,last_planning_run_id` | `planning_run` | no owner stated | docs/design/DS-43-54-planning-production.sql:65 |
-| `policy_decision` | `company_id,continues_policy_decision_id` | `policy_decision` | no owner stated | docs/design/DS-05-platform.sql:530 |
-| `posting_intent` | `company_id,policy_decision_id` | `policy_decision` | no owner stated | docs/design/DS-05-platform.sql:614 |
+| `policy_decision` | `company_id,continues_policy_decision_id` | `policy_decision` | no owner stated | docs/design/DS-05-platform.sql:544 |
+| `posting_intent` | `company_id,policy_decision_id` | `policy_decision` | no owner stated | docs/design/DS-05-platform.sql:643 |
 | `preliminary_price` | `posting_period_id` | `posting_period` | lab stub | docs/design/DS-22-09-42-commercial-inventory.sql:1305 |
 | `production_cost_settlement` | `posting_period_id` | `posting_period` | lab stub | docs/design/DS-43-54-planning-production.sql:1332 |
 | `production_order_period_cost` | `posting_period_id` | `posting_period` | lab stub | docs/design/DS-43-54-planning-production.sql:1352 |
 | `purchase_invoice_line` | `account_id` | `account` | lab stub | docs/design/DS-22-09-42-commercial-inventory.sql:959 |
 | `segregation_review` | `posting_period_id` | `posting_period` | lab stub | docs/design/DS-15-access.sql:321 |
 | `supplier_profile` | `payable_account_id` | `account` | lab stub | docs/design/DS-20-master-data.sql:270 |
-| `tax_line` | `journal_entry_id` | `journal_entry` | no owner stated | docs/design/DS-05-platform.sql:905 |
-| `tax_line` | `tax_code_id` | `tax_code` | lab stub | docs/design/DS-05-platform.sql:907 |
-| `tax_line_adjustment` | `journal_entry_id` | `journal_entry` | no owner stated | docs/design/DS-05-platform.sql:939 |
+| `tax_line` | `journal_entry_id` | `journal_entry` | no owner stated | docs/design/DS-05-platform.sql:934 |
+| `tax_line` | `tax_code_id` | `tax_code` | lab stub | docs/design/DS-05-platform.sql:936 |
+| `tax_line_adjustment` | `journal_entry_id` | `journal_entry` | no owner stated | docs/design/DS-05-platform.sql:968 |
 
 ## Polymorphic references
 
@@ -947,20 +947,20 @@ Column pairs `<x>_table` + `<x>_id` that point at any table. An FK scan cannot s
 
 | Table | Owner | Columns | Source |
 | --- | --- | --- | --- |
-| `agent_run` | agent_runs | `subject_table`, `subject_id` | docs/design/DS-05-platform.sql:149 |
-| `agent_run` | agent_runs | `taint_source_table`, `taint_source_id` | docs/design/DS-05-platform.sql:149 |
+| `agent_run` | agent_runs | `subject_table`, `subject_id` | docs/design/DS-05-platform.sql:153 |
+| `agent_run` | agent_runs | `taint_source_table`, `taint_source_id` | docs/design/DS-05-platform.sql:153 |
 | `artifact_shadow_outcome` | configuration | `case_table`, `case_id` | docs/design/DS-28-34-configuration-artifacts.sql:380 |
-| `attachment_link` | attachments | `target_table`, `target_id` | docs/design/DS-05-platform.sql:865 |
-| `audit_denial` | audit | `subject_table`, `subject_id` | docs/design/DS-05-platform.sql:804 |
-| `audit_record` | audit | `subject_table`, `subject_id` | docs/design/DS-05-platform.sql:740 |
+| `attachment_link` | attachments | `target_table`, `target_id` | docs/design/DS-05-platform.sql:894 |
+| `audit_denial` | audit | `subject_table`, `subject_id` | docs/design/DS-05-platform.sql:833 |
+| `audit_record` | audit | `subject_table`, `subject_id` | docs/design/DS-05-platform.sql:769 |
 | `automation_execution` | configuration | `subject_table`, `subject_id` | docs/design/DS-28-34-configuration-artifacts.sql:96 |
-| `change_proposal_item` | documents | `target_table`, `target_id` | docs/design/DS-05-platform.sql:635 |
+| `change_proposal_item` | documents | `target_table`, `target_id` | docs/design/DS-05-platform.sql:664 |
 | `document_line_price_step` | — | `source_table`, `source_id` | docs/design/DS-22-09-42-commercial-inventory.sql:1159 |
-| `event_delivery` | outbox | `subject_table`, `subject_id` | docs/design/DS-05-platform.sql:718 |
-| `event_subject` | outbox | `subject_table`, `subject_id` | docs/design/DS-05-platform.sql:676 |
+| `event_delivery` | outbox | `subject_table`, `subject_id` | docs/design/DS-05-platform.sql:747 |
+| `event_subject` | outbox | `subject_table`, `subject_id` | docs/design/DS-05-platform.sql:705 |
 | `extraction_result_link` | attachments | `target_table`, `target_id` | docs/design/DS-36-document-intake.sql:168 |
 | `golden_case_label` | configuration | `case_table`, `case_id` | docs/design/DS-28-34-configuration-artifacts.sql:397 |
-| `outbox_event` | outbox | `subject_table`, `subject_id` | docs/design/DS-05-platform.sql:694 |
+| `outbox_event` | outbox | `subject_table`, `subject_id` | docs/design/DS-05-platform.sql:723 |
 | `personal_data_processing_log` | audit | `subject_table`, `subject_id` | docs/design/DS-35-crm.sql:472 |
 | `work_item` | work | `subject_table`, `subject_id` | docs/design/DS-05-platform.sql:56 |
 | `work_item_link` | work | `target_table`, `target_id` | docs/design/DS-05-platform.sql:107 |
@@ -974,7 +974,7 @@ Listed for the review; no owner is invented. Each needs an owner stated in its D
 | `account` | lab stub only: no design DDL defines it yet (DS-05-platform.sql header; lab 00_stubs.sql). | docs/reviews/2026-11-14-design-validation/lab/00_stubs.sql |
 | `account_period_balance` | DS-06 states no owner module for this table in its comments (ADR-0022 rule 7 needs exactly one). | docs/design/DS-06-universal-journal.sql:414 |
 | `applied_rate` | lab stub only: no design DDL defines it yet (DS-05-platform.sql header; lab 00_stubs.sql). | docs/reviews/2026-11-14-design-validation/lab/00_stubs.sql |
-| `auto_post_confirmation` | its DDL section names two owner modules and the table names none (ADR-0022 rule 7 needs exactly one). Section owners: policy, documents. | docs/design/DS-05-platform.sql:574 |
+| `auto_post_confirmation` | its DDL section names two owner modules and the table names none (ADR-0022 rule 7 needs exactly one). Section owners: policy, documents. | docs/design/DS-05-platform.sql:603 |
 | `close_task` | lab stub only: no design DDL defines it yet (DS-05-platform.sql header; lab 00_stubs.sql). | docs/reviews/2026-11-14-design-validation/lab/00_stubs.sql |
 | `document_installment` | its DDL section names two owner modules and the table names none (ADR-0022 rule 7 needs exactly one). Section owners: sales, purchasing. | docs/design/DS-22-09-42-commercial-inventory.sql:1192 |
 | `document_line_custom_text` | its DDL section names two owner modules and the table names none (ADR-0022 rule 7 needs exactly one). Section owners: sales, purchasing. | docs/design/DS-22-09-42-commercial-inventory.sql:1179 |
@@ -984,11 +984,11 @@ Listed for the review; no owner is invented. Each needs an owner stated in its D
 | `journal_line` | DS-06 states no owner module for this table in its comments (ADR-0022 rule 7 needs exactly one). | docs/design/DS-06-universal-journal.sql:153 |
 | `open_item` | DS-06 states no owner module for this table in its comments (ADR-0022 rule 7 needs exactly one). | docs/design/DS-06-universal-journal.sql:109 |
 | `payment_term_line` | DS-06 states no owner module for this table in its comments (ADR-0022 rule 7 needs exactly one). | docs/design/DS-06-universal-journal.sql:97 |
-| `period_unlock_request` | its DDL section names two owner modules and the table names none (ADR-0022 rule 7 needs exactly one). Section owners: policy, documents. | docs/design/DS-05-platform.sql:584 |
+| `period_unlock_request` | its DDL section names two owner modules and the table names none (ADR-0022 rule 7 needs exactly one). Section owners: policy, documents. | docs/design/DS-05-platform.sql:613 |
 | `planning_run` | its DDL section names two owner modules and the table names none (ADR-0022 rule 7 needs exactly one). Section owners: planning, production. | docs/design/DS-43-54-planning-production.sql:42 |
 | `planning_setting` | its DDL section names two owner modules and the table names none (ADR-0022 rule 7 needs exactly one). Section owners: planning, production. | docs/design/DS-43-54-planning-production.sql:31 |
 | `planning_state` | its DDL section names two owner modules and the table names none (ADR-0022 rule 7 needs exactly one). Section owners: planning, production. | docs/design/DS-43-54-planning-production.sql:61 |
-| `policy_decision` | its DDL section names two owner modules and the table names none (ADR-0022 rule 7 needs exactly one). Section owners: policy, documents. | docs/design/DS-05-platform.sql:498 |
+| `policy_decision` | its DDL section names two owner modules and the table names none (ADR-0022 rule 7 needs exactly one). Section owners: policy, documents. | docs/design/DS-05-platform.sql:502 |
 | `posting_period` | lab stub only: no design DDL defines it yet (DS-05-platform.sql header; lab 00_stubs.sql). | docs/reviews/2026-11-14-design-validation/lab/00_stubs.sql |
 | `posting_period_area_state` | lab stub only: no design DDL defines it yet (DS-05-platform.sql header; lab 00_stubs.sql). | docs/reviews/2026-11-14-design-validation/lab/00_stubs.sql |
 | `production_structure` | its DDL section names two owner modules and the table names none (ADR-0022 rule 7 needs exactly one). Section owners: planning, production. | docs/design/DS-43-54-planning-production.sql:67 |

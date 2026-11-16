@@ -155,6 +155,8 @@ The hard floor on what a tainted run may read stays the literal spec 03 rule 1 u
 
     Note: the sentence on this rule's first line after "Definition and confirmation:" ("Confirmation is by the owner ...") is a later note spliced into the heading; it details the bullet **Confirmation.**. The accepted text stays where it is.
 
+    Note ([ADR-0065](0065-deterministic-auto-post-gateway.md), 2026-11-16 (proposed)): the definition holds for the auto-post gateway's postings, which are auto-posts that the rule's owner confirms. "Tainted runs never post" still holds: the run only drafts, and the gateway's `system` job posts a checked draft in a causation chain of its own ([ADR-0065](0065-deterministic-auto-post-gateway.md) rules 3, 7).
+
 **Tainted read scope**
 
 14. The only behavior is the literal spec 03 rule 1: a tainted run reads only records scoped to its related partner. No setting widens it, because spec 03 lets no policy, threshold or setting relax a hard floor.
@@ -168,6 +170,8 @@ The hard floor on what a tainted run may read stays the literal spec 03 rule 1 u
     Note: for a generated file the outbound check reads the attachment's `generated_kind`, `generated_audience` and `generated_subject_document_id`: only an external print of a document of the message's partner passes ([ADR-0049](0049-statutory-reporting-and-printing.md) rule 29).
 
     Note ([ADR-0063](0063-configurable-policy-settings.md), proposed 2026-11-15): declared projections of closed shapes (the first is `ListItemCandidate`) join the reference data of the literal scope as a reading of spec 03 rule 1 under the author's direction of 2026-11-15; the company setting `agents.tainted_reference_reads` only narrows it back to the literal scope, so no setting widens the floor (rule 16).
+
+    Note ([ADR-0065](0065-deterministic-auto-post-gateway.md), 2026-11-16 (proposed)): "spec 03 lets no policy, threshold or setting relax a hard floor" now has one exception, the author's decision of 2026-11-16: a tainted draft may be auto-posted when the company enables it for the document type and the deterministic checker passes (default off; [ADR-0065](0065-deterministic-auto-post-gateway.md) rule 10). The read scope of this rule is unchanged: the decision lets a checked draft post and widens no run's reads. The author rewords spec 03 rule 1 (open question) ([ADR-0065](0065-deterministic-auto-post-gateway.md) rules 10, 12).
 
 **Audit and checks**
 
@@ -183,6 +187,8 @@ The hard floor on what a tainted run may read stays the literal spec 03 rule 1 u
     - **EC-56:** an e-mail asks to change a bank account. The agent's direct attempt is rejected with `proposal_required`. A proposal approved by a second human succeeds.
     - **EC-57:** an injected instruction copied into a draft and edited by a human stays tainted. A run given that draft becomes tainted.
     - **EC-58:** auto-posts block the period lock until confirmed.
+
+    Note ([ADR-0065](0065-deterministic-auto-post-gateway.md), 2026-11-16 (proposed)): INV-84 is restated: no policy decision with outcome `allowed` for a non-human actor concerns an effectively tainted version, except a live gateway decision `auto_post` under [ADR-0065](0065-deterministic-auto-post-gateway.md) rule 10, which INV-761 checks. INV-85 is unchanged, because the gateway's job carries no origin agent run ([ADR-0065](0065-deterministic-auto-post-gateway.md) rules 3, 12).
 
 ## Context
 
