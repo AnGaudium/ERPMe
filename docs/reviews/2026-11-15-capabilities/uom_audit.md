@@ -1,6 +1,6 @@
 # Multi-UoM audit (holistic review)
 
-Repo `~/Projects/ERPMe`, branch `holistic-review`, HEAD 32e7b1c. Read-only audit, 2026-11-15.
+Repo `~/Projects/NativeFlows`, branch `holistic-review`, HEAD 32e7b1c. Read-only audit, 2026-11-15.
 Paths are under `docs/`. `0018:33` means `adr/0018-…md` line 33; `DS-20:403` means `design/DS-20-master-data.sql` line 403;
 `DS-22` = `DS-22-09-42-commercial-inventory.sql`; `DS-43` = `DS-43-54-planning-production.sql`; `DS-56` = `DS-56-product-configuration.sql`.
 

@@ -173,7 +173,7 @@ ADR-0051 rule 29 left the production agents to their own ADR. The production rul
 **Capture agent**
 
 19. C6 shop-floor capture (decision 7), `production_capture`:
-    - **Trigger:** `shop_floor_report_extracted`, raised when an extraction of purpose `shop_floor_report` (rule 26) from an enabled source reaches `extracted` or `verified`. A person on ERPMe's own shop-floor screen or scanner needs no agent (ADR-0061 rule 9).
+    - **Trigger:** `shop_floor_report_extracted`, raised when an extraction of purpose `shop_floor_report` (rule 26) from an enabled source reaches `extracted` or `verified`. A person on NativeFlows's own shop-floor screen or scanner needs no agent (ADR-0061 rule 9).
     - **Scope resolver:** the extraction's `production_order_number` field must be trusted ([ADR-0057](0057-document-intake-and-extraction.md) rule 17: closed shape, resolved to exactly one production order) and the order must be in the record scope of the human the run acts for. Then the run's subject is that order. Otherwise `agent_scope_unresolved`; the item stays with a person, and the response does not say whether such an order exists elsewhere.
     - **Taint:** the run starts tainted (outside content). It reads its order and the order's lines (rule 13), its work item with the extraction as evidence, its own drafts and reference data. The company's scrap reason codes are passed as the closed list of the mapping step, a reading added to the same grouped question.
     - **D1 `resolve`:** the operation by a scanned order-and-operation barcode first, then by a trusted operation number of the order.

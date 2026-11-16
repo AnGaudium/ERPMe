@@ -1,7 +1,7 @@
 -- DS-35 minimal CRM: DDL draft for ADR-0052 (on the foundation of ADR-0019). PostgreSQL 18.
 -- Loaded after DS-20-master-data.sql and together with DS-06 in the design lab
 -- (docs/reviews/2026-11-14-design-validation, t11_crm.py). The ADRs win if this file disagrees.
--- Conventions as DS-20: tables in schema erpme, keys inline (migrations name them by the MetaData naming convention,
+-- Conventions as DS-20: tables in schema nativeflows, keys inline (migrations name them by the MetaData naming convention,
 -- ADR-0004 rule 15), UUIDv7 IDs from context.new_id or the client, no ID defaults, recorded_at on every row (ADR-0007 rule 9).
 -- Every table carries company_id, FORCE ROW LEVEL SECURITY and the generated company policy (ADR-0017 rule 19),
 -- except the global catalog public_mail_domain. The lab checks this list (ADR-0052 rule 3).
@@ -487,8 +487,8 @@ CREATE INDEX ix_personal_data_processing_log_subject_id ON personal_data_process
 -- ===== Append-only guard (ADR-0052 rule 7) =====
 -- Arguments: columns that may change; columns that may be set once from null; columns only the erasure command may
 -- change; optionally the column naming the row's document, for the content tables whose rows the generated Delete of a
--- draft removes (rule 7): the dispatcher sets erpme.document_delete_id to that document's ID for Delete alone, and the
--- delete is allowed only while the document is a draft. Generated columns follow their sources and are skipped. The dispatcher sets erpme.erasure_command_id only for
+-- draft removes (rule 7): the dispatcher sets nativeflows.document_delete_id to that document's ID for Delete alone, and the
+-- delete is allowed only while the document is a draft. Generated columns follow their sources and are skipped. The dispatcher sets nativeflows.erasure_command_id only for
 -- EraseDataSubject (ADR-0038 rule 4); DS-36 adds the check that it names an idempotency record of that command in the
 -- same transaction.
 CREATE FUNCTION crm_check_append_only() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -504,7 +504,7 @@ DECLARE
 BEGIN
     IF TG_OP = 'DELETE' THEN
         IF TG_NARGS > 3
-           AND coalesce(current_setting('erpme.document_delete_id', true), '') = to_jsonb(OLD) ->> TG_ARGV[3]
+           AND coalesce(current_setting('nativeflows.document_delete_id', true), '') = to_jsonb(OLD) ->> TG_ARGV[3]
            AND EXISTS (SELECT 1 FROM document d WHERE d.id = (to_jsonb(OLD) ->> TG_ARGV[3])::uuid AND d.state = 'draft') THEN
             RETURN OLD;
         END IF;
@@ -515,7 +515,7 @@ BEGIN
     v_erasure_only := TG_ARGV[2]::text[];
     SELECT coalesce(array_agg(attname::text), '{}') INTO v_generated
         FROM pg_attribute WHERE attrelid = TG_RELID AND attgenerated <> '' AND NOT attisdropped;
-    v_is_erasing := coalesce(current_setting('erpme.erasure_command_id', true), '') <> '';
+    v_is_erasing := coalesce(current_setting('nativeflows.erasure_command_id', true), '') <> '';
     v_old := to_jsonb(OLD);
     v_new := to_jsonb(NEW);
     FOR v_key IN SELECT jsonb_object_keys(v_new) LOOP

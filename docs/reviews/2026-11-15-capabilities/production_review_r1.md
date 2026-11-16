@@ -25,7 +25,7 @@ DDL probes (after t25 `--load`):
 - exception kinds: both production kinds need `production_order_id`, `item_id` and `warehouse_id`; other kinds with an order are refused; a second open row with the same `exception_key` is refused by `ux_planning_exception_open`.
 - row-level security is off on all three changed tables in the lab load, so t25's D20 proves nothing (N3).
 
-Cleaned up: database `erpme_lab_rv64` dropped, `/tmp/rv64*` removed. base-integrated untouched; no git run.
+Cleaned up: database `nativeflows_lab_rv64` dropped, `/tmp/rv64*` removed. base-integrated untouched; no git run.
 
 ## Builder-flagged points
 

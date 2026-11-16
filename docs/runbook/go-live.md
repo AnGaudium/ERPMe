@@ -1,6 +1,6 @@
 # Go-live: steps 10–11 and the Phase 1 gate
 
-No parallel run with the old software; the pilot goes live fully on ERPMe, tax books included (D11). No commitment to any pilot before the step 10 gate (D11, B5). One pilot only until the Phase 1 gate ([risks.md](../risks.md)). Pilot data never enters the repository ([AGENTS.md](../../AGENTS.md)). This file stays high level; the cut-over checklist and rehearsal procedure are designed in DS-40.
+No parallel run with the old software; the pilot goes live fully on NativeFlows, tax books included (D11). No commitment to any pilot before the step 10 gate (D11, B5). One pilot only until the Phase 1 gate ([risks.md](../risks.md)). Pilot data never enters the repository ([AGENTS.md](../../AGENTS.md)). This file stays high level; the cut-over checklist and rehearsal procedure are designed in DS-40.
 
 ---
 
@@ -53,7 +53,7 @@ No parallel run with the old software; the pilot goes live fully on ERPMe, tax b
 2. **Go-live date:** the start of an accounting period, preferably a quarter.
 3. **Reader** for the pilot's current system if none exists (e.g. MISA), using the data migration agent and the DS-21 batch format (D16).
 4. **Load real data on staging** (author-operated servers in Vietnam, author-only access; real data deleted within 7 days after the rehearsal, [ADR-0003](../adr/0003-build-operating-rules.md) R12): master data, opening balances, AR/AP open items per invoice, inventory per warehouse, lots and serials with opening cost, each as a simulated command batch, never an SQL script ([15-migration-ux-docs.md](../spec/15-migration-ux-docs.md)).
-5. **Rehearsal:** replay the pilot's latest month on staging; compare with their books in the current system; classify every difference (reader mapping, ERPMe defect, error in the old books) and resolve it.
+5. **Rehearsal:** replay the pilot's latest month on staging; compare with their books in the current system; classify every difference (reader mapping, NativeFlows defect, error in the old books) and resolve it.
 6. **Schema freeze** 4 weeks before go-live (B8). After the freeze, a schema change needs the author's approval and a tested migration.
 7. User accounts, roles and segregation of duties for the pilot's team; the customer decides the routing switch (D12) and who is recorded as accountable.
 8. Training with the shipped Vietnamese UI and user guides.
@@ -70,7 +70,7 @@ Before the gate, every localization rule the pilot's transactions use is verifie
 
 **Risks:** the pilot's old books contain errors; the pilot withdraws; the reader takes longer than planned.
 
-**Fallback:** rehearse again with the next month. Differences caused by errors in the old books are agreed with the chief accountant and corrected in the opening balances, never by forcing ERPMe to reproduce them. If the pilot withdraws, select another pilot by the same criteria.
+**Fallback:** rehearse again with the next month. Differences caused by errors in the old books are agreed with the chief accountant and corrected in the opening balances, never by forcing NativeFlows to reproduce them. If the pilot withdraws, select another pilot by the same criteria.
 
 ---
 
@@ -85,14 +85,14 @@ DS-40 turns this outline into the checklist. Order on cut-over:
 5. AR/AP open items per invoice reconciled to the old subledgers; inventory per warehouse reconciled to a physical count; bank balances to statements.
 6. Posting period opened; first documents entered on the first day; first e-invoice issued and checked.
 7. Full data export works ("what if we want to leave", [15-migration-ux-docs.md](../spec/15-migration-ux-docs.md)).
-8. Fallback ([ADR-0003](../adr/0003-build-operating-rules.md) R13): fix forward by default. Abort is the owner's and chief accountant's decision: the open period is re-entered in the old system from ERPMe's export. The old system stays installed and licensed, closed for entry, until the Phase 1 gate. The last clean abort point is before the first VAT return is filed from ERPMe.
+8. Fallback ([ADR-0003](../adr/0003-build-operating-rules.md) R13): fix forward by default. Abort is the owner's and chief accountant's decision: the open period is re-entered in the old system from NativeFlows's export. The old system stays installed and licensed, closed for entry, until the Phase 1 gate. The last clean abort point is before the first VAT return is filed from NativeFlows.
 
 ---
 
 ## First three monthly closes
 
 - Each month: the close checklist (DS-12) run with the chief accountant; unconfirmed agent auto-posts block the close ([03-agent-safety.md](../spec/03-agent-safety.md), rule 6); stock count, partner confirmations and bank statements reconciled; the period locked by a human, never by an agent.
-- The VAT return for the first tax period is generated from ERPMe (01/GTGT) and filed by the customer.
+- The VAT return for the first tax period is generated from NativeFlows (01/GTGT) and filed by the customer.
 - Agents start in shadow mode on the pilot's real transactions; an agent gains auto-posting only after its accuracy exceeds the threshold ([14-agent-workflows.md](../spec/14-agent-workflows.md)). Anonymized pilot data for evaluation stays outside the repository.
 - Every defect found in production becomes a synthetic regression scenario reproduced with fictional data, never with pilot data.
 

@@ -2,7 +2,7 @@
 
 0 blocking, 1 should-fix, 2 nits. Round-4 S1, S2, N1 and N2 are resolved and the arithmetic is sound. The one open item is the design consequence you asked me to check: the text does not yet say that a refused real receipt is a master-data problem, and the error does not guide the person. It is a wording fix in three places; no rule or DDL has to change. File:line refer to the round-5 review copy ("0056" = `adr/0056-multiple-units-of-measure.md`).
 
-What I ran, on my own database `erpme_lab_ru`, dropping the schemas in separate statements before each load:
+What I ran, on my own database `nativeflows_lab_ru`, dropping the schemas in separate statements before each load:
 - `t17_uom.py --load`: 112/112. `t14`: 83/83. `t16 --load`: 99/99.
 - `t01` 16/16, `t02` 6/6, `t03` 4/4, `t04` 5/5, `t05` 62/62, `t06` 60/60, `t07` 38/38, `t08` 46/46.
 - `check_package.py` on tt99: PASS; self-test 28 of 28 caught.

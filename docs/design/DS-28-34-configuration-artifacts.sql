@@ -7,7 +7,7 @@
 -- bank_statement_line.match_parameters_hash (ADR-0059 rule 6).
 -- PostgreSQL 18. Loaded with every other design/*.sql file by load_all.py (docs/reviews/2026-11-14-design-validation,
 -- t22_workflows.py and t23_ai_artifacts.py with --load). The ADRs win if this file disagrees.
--- Conventions of DS-20, DS-15 and DS-05: tables in schema erpme, domains in types; IDs are UUIDv7 from context.new_id,
+-- Conventions of DS-20, DS-15 and DS-05: tables in schema nativeflows, domains in types; IDs are UUIDv7 from context.new_id,
 -- no ID defaults; references between company tables are composite on (company_id, id); recorded_at on every row.
 -- Every table here has company_id NOT NULL and gets FORCE ROW LEVEL SECURITY and the company policy of ADR-0017 rule 19;
 -- the last section writes them out as DS-05-platform.sql does (the rls_v1 pattern of ADR-0022 rule 8).
@@ -663,8 +663,8 @@ BEGIN
         'artifact_monitor_snapshot'] LOOP
         EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', v_table);
         EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', v_table);
-        EXECUTE format('CREATE POLICY company_policy ON %I USING (company_id::text = current_setting(''erpme.company_id'', true))', v_table);
-        EXECUTE format('CREATE POLICY company_ids_policy ON %I FOR SELECT USING (company_id::text = ANY (string_to_array(current_setting(''erpme.company_ids'', true), '','')))', v_table);
+        EXECUTE format('CREATE POLICY company_policy ON %I USING (company_id::text = current_setting(''nativeflows.company_id'', true))', v_table);
+        EXECUTE format('CREATE POLICY company_ids_policy ON %I FOR SELECT USING (company_id::text = ANY (string_to_array(current_setting(''nativeflows.company_ids'', true), '','')))', v_table);
     END LOOP;
 END
 $$;

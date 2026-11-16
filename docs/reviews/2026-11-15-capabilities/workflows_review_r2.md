@@ -7,7 +7,7 @@ What I ran:
 - `load_all.py` on a fresh database: 307 tables.
 - `t22_workflows.py --load`: 112/112 pass. `t23_ai_artifacts.py --load`: 85/85 pass. Each on a freshly created database.
 - My own probes on the loaded DDL (cited in S5, S6, N1 and the round-1 table).
-- Cleanup done: `erpme_lab_rv58` dropped, `/tmp/rv58` deleted, repo untouched (clean, HEAD ec0c126). This file is the only file written.
+- Cleanup done: `nativeflows_lab_rv58` dropped, `/tmp/rv58` deleted, repo untouched (clean, HEAD ec0c126). This file is the only file written.
 
 ## Round-1 items
 

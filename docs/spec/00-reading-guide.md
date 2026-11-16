@@ -279,13 +279,13 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Unit conversion | uom\_conversion | Exact global conversion between two units of one kind: one from-unit = numerator / denominator to-units |
 | Product unit | product\_uom | Another unit a product may use, with its exact conversion to the inventory unit; with the inventory unit, the spec's UoM group |
 | Item barcode | item\_barcode | Barcode of an item in one unit (e.g. a carton) |
-| Barcode | barcode | A code printed as bars or a matrix that a scanner reads; in ERPMe a GS1 key, an internal code or a legacy code, registered once per company ([ADR-0061](../adr/0061-barcodes.md)) |
+| Barcode | barcode | A code printed as bars or a matrix that a scanner reads; in NativeFlows a GS1 key, an internal code or a legacy code, registered once per company ([ADR-0061](../adr/0061-barcodes.md)) |
 | Barcode registry | barcode | One row per barcode of a company, unique across item units, bins, handling units, lots, serials, barcoded documents and reserved codes, and for numeric codes on their digits padded to 14; written by a trigger on the typed tables |
 | Barcode type | barcode.barcode\_type | item\_unit, bin, handling\_unit, lot, serial, document, or internal (a reserved code with no owner) |
 | Internal code | — | A barcode that is not a GS1 key: one upper-case letter, then up to 47 of A–Z, 0–9, - . / \_ |
 | Reserved barcode | barcode.retired\_type, barcode.retired\_owner\_id | A code retired from its object or reserved by the company; it never resolves to another object, and its own owner may take it back |
 | Legacy barcode | is\_legacy\_barcode, barcode.is\_legacy | An old system's label code kept on migration: unique in the registry, may start with a digit, never parsed as GS1 or treated as a GTIN |
-| GS1 element string, application identifier (AI) | erpme.gs1 | GS1 data as AIs of two to four digits, each followed by its value, separated by FNC1 (GS) after variable-length values |
+| GS1 element string, application identifier (AI) | nativeflows.gs1 | GS1 data as AIs of two to four digits, each followed by its value, separated by FNC1 (GS) after variable-length values |
 | GTIN, SSCC | — | GS1 keys of a trade item (stored as 14 digits) and of a logistic unit (18 digits), each with a mod-10 check digit |
 | GS1 company prefix | gs1\_company\_prefix | A prefix licensed from GS1; a company may hold several, one of which generates new GTINs |
 | GS1 Digital Link | — | A URI form of GS1 keys and attributes; parsed like an element string, never fetched |
@@ -369,25 +369,25 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Golden scenario | golden\_scenario | A business case with expected results from a hand-built spreadsheet; directory with `scenario.yaml`, the author's workbook (single source) and the generated `expected.csv` ([DS-16](../design/DS-16-invariants-and-harness.md)) |
 | Regression scenario | regression\_scenario | The shrunk event sequence of a defect, frozen with `expected_failure` until fixed and kept in CI |
 | Proposed scenario | proposed\_scenario | Events proposed by the test-scenario model, without expected values |
-| Naive recomputation | erpme\_reference | Expected results computed from the business-event log alone, written from the spec without core code |
+| Naive recomputation | nativeflows\_reference | Expected results computed from the business-event log alone, written from the spec without core code |
 | Check point | check\_point: command, day, run | When an invariant is checked: around each command, after each simulated day or state-machine step, or at the end of a run |
 | Outcome class | outcome: must\_succeed, must\_reject, may\_reject | Expected result of a business event, set before execution by the simulator or state machine, never by the core (INV-19) |
 | Violation | violation | JSON record of a failed check: check ID (INV-xx, REF-…, PAR-xx), business keys, expected and actual, first failing command |
-| Invariant checker, scenario tool | erpme-check, erpme-scenario | CLIs: run the invariant registry read-only against a database (JSON output); export, freeze and run scenarios |
-| Test tooling packages | erpme\_events, erpme\_client, erpme\_adapters, erpme\_testkit, erpme\_reference, erpme\_simulator | Top-level packages outside `erpme` that the product never imports (DS-16, DS-17) |
+| Invariant checker, scenario tool | nativeflows-check, nativeflows-scenario | CLIs: run the invariant registry read-only against a database (JSON output); export, freeze and run scenarios |
+| Test tooling packages | nativeflows\_events, nativeflows\_client, nativeflows\_adapters, nativeflows\_testkit, nativeflows\_reference, nativeflows\_simulator | Top-level packages outside `nativeflows` that the product never imports (DS-16, DS-17) |
 | Invariant | INV-xx | A named rule checked at its check point (around commands, after each simulated day); catalog [invariants.csv](../catalogs/invariants.csv) (DS-16) |
 | Edge case | EC-xx | A named situation the simulator injects at a known frequency; catalog [edge-cases.csv](../catalogs/edge-cases.csv) (DS-17) |
 | Business event, business event type | business\_event, business\_event\_type | A fact of the business written by the simulator (`goods_received`): snake\_case enumerated values in the past tense, never outbox events; contrast the core event `GoodsReceiptPosted` (ADR-0004 rule 22) |
 | Business-event log | business\_event\_log | JSON Lines of business events, one per line with `ref`, outcome class and retry flag; schema `docs/catalogs/business-events.schema.json` ([DS-17](../design/DS-17-synthetic-dataset.md)) |
 | Simulator triple | (simulator version, seed, dataset version) | Identifies a run; with the package and catalog versions it yields a byte-identical log and input files |
-| Adapter | erpme\_adapters.step\_n | Translates business events mechanically into the commands that exist at build step n; decides no accounting |
+| Adapter | nativeflows\_adapters.step\_n | Translates business events mechanically into the commands that exist at build step n; decides no accounting |
 | Profile | profile | Versioned simulator parameters for a dataset size, e.g. `vn_trading_small@1` |
-| Module | module | Python package `erpme.<module>`; list, layers and database layout in [ADR-0022](../adr/0022-repository-and-engineering-conventions.md) |
+| Module | module | Python package `nativeflows.<module>`; list, layers and database layout in [ADR-0022](../adr/0022-repository-and-engineering-conventions.md) |
 | Posting interface | `<module>.contract.<verb>_<noun>` | A function in a module's `contract.py` that takes the caller's `context` and writes within the calling command's transaction and plan (ADR-0022 rule 4) |
-| Composition root | erpme.app | Registers every module's handlers and runs startup checks; entry points `erpme serve`, `erpme worker`, `erpme admin` |
-| Build step marker | build\_step | `[tool.erpme] build_step` in the root `pyproject.toml`: the current build step, raised by the author at each gate |
-| Developer CLI | erpme-dev | Runs every check; CI jobs call only its subcommands (ADR-0022 rule 14) |
-| Check role | erpme\_check | Database role for invariant checks: SELECT only, subject to RLS |
+| Composition root | nativeflows.app | Registers every module's handlers and runs startup checks; entry points `nativeflows serve`, `nativeflows worker`, `nativeflows admin` |
+| Build step marker | build\_step | `[tool.nativeflows] build_step` in the root `pyproject.toml`: the current build step, raised by the author at each gate |
+| Developer CLI | nativeflows-dev | Runs every check; CI jobs call only its subcommands (ADR-0022 rule 14) |
+| Check role | nativeflows\_check | Database role for invariant checks: SELECT only, subject to RLS |
 | Command type | command\_type | Name of a command: `PascalCase` verb from the command verb list + glossary noun, e.g. `PostGoodsReceipt`; `snake_case` form for MCP tools and handlers |
 | Query | query | Read-only operation: `Get<Noun>` (one record), `List<Noun>` (filtered list). Not a command; no idempotency key; `Evaluate<Noun>` computes a result from given inputs ([ADR-0004](../adr/0004-naming-conventions.md) rule 21 note) |
 | Event, event type | event, event\_type | A fact written to the outbox: `PascalCase` noun + the verb's event form, e.g. `GoodsReceiptPosted`; schema in DS-13 |
@@ -534,14 +534,14 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Recording timestamp | recorded\_at | Instant (transaction start) of the command that wrote the row or row version; set by the system, never by a client; never an ordering key |
 | Company time zone | time\_zone | IANA name per company (e.g. `Asia/Ho_Chi_Minh`); used only to turn an instant into the company's date |
 | Fiscal year | fiscal\_year | Row per company with `start_date`, `end_date`, `code`; contiguous; contains regular posting periods; found by date lookup; ranges immutable once used |
-| Clock | erpme.clock | The only source of the current instant and business date: `now()` is always the real transaction time; `today(company)` can be set per company in test and simulation environments (`business_date_override`). Also defines the types `BusinessDate` and `Instant` |
+| Clock | nativeflows.clock | The only source of the current instant and business date: `now()` is always the real transaction time; `today(company)` can be set per company in test and simulation environments (`business_date_override`). Also defines the types `BusinessDate` and `Instant` |
 | Command envelope | envelope | The fields around every command payload: `command_type`, `schema_version`, `company_id`, `idempotency_key`, `mode`, `expected_plan_hash`, `payload`; the actor, `on_behalf_of` and `agent_run_id` come from the credential ([ADR-0008](../adr/0008-command-envelope-and-registry.md)) |
 | Mode | mode | `simulate` (run and roll back) or `execute` (run and commit); the same envelope is sent in both |
 | Plan | plan | What a command does: its journal lines and stock movements (response field `plan`) plus its result (response field `result`); `plan_hash` covers all three |
 | Check result | check\_result (response field `checks`) | A finding that does not stop a command, with code, message, rule, field and details; part of `plan_hash` by code and field ([ADR-0040](../adr/0040-ui-architecture.md)) |
 | Allowed command | allowed\_command (query `ListAllowedCommand`) | A command applicable to a record now, or the error code it would return |
 | Session context | session\_context (query `GetSessionContext`) | The signed-in user's companies, permissions, field classes, record scope, language and time zone, returned for the UI to draw itself |
-| UI metadata | ui\_metadata (`x-erpme-*` annotations) | Hints in the generated JSON Schemas from which the renderer draws screens |
+| UI metadata | ui\_metadata (`x-nativeflows-*` annotations) | Hints in the generated JSON Schemas from which the renderer draws screens |
 | Command palette | command\_palette | Keyboard search (`Ctrl/Cmd+K`) over the commands, queries, lists and records the user may use |
 | Expected plan hash | expected\_plan\_hash | The `plan_hash` the client reviewed; required to execute; a different hash rejects the execution |
 | Command registry | command\_registry | The one place where command types and queries are registered; REST, MCP, JSON Schema and TypeScript are generated from it |

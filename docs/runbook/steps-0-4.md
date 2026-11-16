@@ -12,7 +12,7 @@ Applies to every step below:
 
 ## Step 0 · Preparation (month 1)
 
-**Entry criteria:** specification committed (D17); ADR-0001 and ADR-0002 accepted. `main` is on the public repository `AnGaudium/ERPMe`, because CI runs on GitHub Actions (ADR-0002) ([ADR-0003](../adr/0003-build-operating-rules.md) R3).
+**Entry criteria:** specification committed (D17); ADR-0001 and ADR-0002 accepted. `main` is on the public repository `AnGaudium/NativeFlows`, because CI runs on GitHub Actions (ADR-0002) ([ADR-0003](../adr/0003-build-operating-rules.md) R3).
 
 **Design items first:** DS-01 to DS-18 (DS-09 ADR only; DS-10 and DS-11 ADR only; DS-15 envelope part only). These cover every ADR in "Decide by ADR before writing code" in [11-build-order.md](../spec/11-build-order.md). No production code before they are accepted ([AGENTS.md](../../AGENTS.md)).
 

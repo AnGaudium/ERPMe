@@ -162,7 +162,7 @@ It loads together with the DS-06 journal in the design lab, and the earlier jour
     - **Checks.** The combination respects `product_attribute_value` and covers every variant-mode attribute of the product.
     - **Code.** The item's code is the product's code, a hyphen and the next number of `product.last_item_number`, incremented under the product row's lock (gaps allowed; it is not a legal series).
     - **What it lacks.** The new item has no price entry, preliminary price, planning parameters or production version. `find_price` returns none, so the line's price is entered (outside the list, `price_missing`) or comes from DS-56's configured price, and a made item cannot be released (ADR-0033 rule 16) until DS-56 supplies its production version.
-    - Every item still exists before stock or cost touches it. This is Odoo's "dynamic" mode, with ERPMe's agent safety.
+    - Every item still exists before stock or cost touches it. This is Odoo's "dynamic" mode, with NativeFlows's agent safety.
 
     Only document types with the registry flag `is_item_creating` (sales orders, and production orders by ADR-0046) create items when they leave draft; quotations never do ([ADR-0047](0047-commercial-documents-and-pricing.md) rule 1).
 
@@ -185,7 +185,7 @@ ADR-0018 (items) and ADR-0019 (partners) settled the shape of most master data, 
 - tax group ownership;
 - DDL for any master table.
 
-The design assessment (finding C-3) found that pricing had no single owner. SAP keeps prices in condition records with access sequences, and Odoo in pricelists with rules. ERPMe keeps price data simple (dated entries per item, unit and break) and leaves the procedure to DS-22, so agents read one table and one lookup.
+The design assessment (finding C-3) found that pricing had no single owner. SAP keeps prices in condition records with access sequences, and Odoo in pricelists with rules. NativeFlows keeps price data simple (dated entries per item, unit and break) and leaves the procedure to DS-22, so agents read one table and one lookup.
 
 The review of this ADR found child tables without `company_id` (so without row-level security), decimal conversion factors against ADR-0006 rule 11, and items created by a document line outside agent safety. All three are fixed here, and the lab checks the first two.
 

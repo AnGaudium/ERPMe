@@ -1,11 +1,11 @@
 #!/bin/bash
-# usage: simrun.sh NAME  -> fresh database erpme_sim_NAME, dry LLM fixtures, logs/trace in build/runs/NAME.*
+# usage: simrun.sh NAME  -> fresh database nativeflows_sim_NAME, dry LLM fixtures, logs/trace in build/runs/NAME.*
 set -u
 N=$1
 export PGPASSWORD=lab
-export ERPME_DOCS=${ERPME_DOCS:?set ERPME_DOCS to a docs directory}
+export NATIVEFLOWS_DOCS=${NATIVEFLOWS_DOCS:?set NATIVEFLOWS_DOCS to a docs directory}
 export SIM_LLM=off
-DB=erpme_sim_$N
+DB=nativeflows_sim_$N
 PY=${PYTHON:-python3}
 $PY - <<PYEOF
 import psycopg
@@ -13,7 +13,7 @@ cx = psycopg.connect("host=127.0.0.1 port=5561 dbname=postgres user=lab password
 cx.execute("DROP DATABASE IF EXISTS $DB WITH (FORCE)")
 cx.execute("CREATE DATABASE $DB")
 PYEOF
-export ERPME_SIM_DSN="host=127.0.0.1 port=5561 dbname=$DB user=lab password=lab"
+export NATIVEFLOWS_SIM_DSN="host=127.0.0.1 port=5561 dbname=$DB user=lab password=lab"
 cd "$(dirname "$0")"
 $PY run_all.py > build/runs/$N.log 2>&1
 rc=$?

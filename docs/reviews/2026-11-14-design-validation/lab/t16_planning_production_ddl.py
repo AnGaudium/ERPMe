@@ -1,8 +1,8 @@
 """Scenario: DS-43 and DS-51 to DS-55 planning and production DDL (ADR-0024, ADR-0033 to ADR-0037), loaded with DS-20, DS-56, DS-15 and DS-06.
 
 Run: python t16_planning_production_ddl.py [--load]
-  ERPME_LAB_DSN must name a throwaway database; --load drops and rebuilds schemas erpme and types there.
-  ERPME_DOCS points at the docs/ tree to load (default ~/Projects/ERPMe/docs); ERPME_LAB_DIR at lab.py and
+  NATIVEFLOWS_LAB_DSN must name a throwaway database; --load drops and rebuilds schemas nativeflows and types there.
+  NATIVEFLOWS_DOCS points at the docs/ tree to load (default ~/Projects/NativeFlows/docs); NATIVEFLOWS_LAB_DIR at lab.py and
   load_ds06.py (default: this file's directory).
 
 S: static checks on the loaded schema: load order without cycles, external references only to stub tables, company_id
@@ -21,11 +21,11 @@ costing_lab2.py).
 import os, re, subprocess, sys, tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-LAB = os.environ.get("ERPME_LAB_DIR", HERE)
+LAB = os.environ.get("NATIVEFLOWS_LAB_DIR", HERE)
 sys.path.insert(0, LAB)
 from lab import conn, expect, new, RESULTS  # noqa: E402
 
-DOCS = os.path.expanduser(os.environ.get("ERPME_DOCS", "~/Projects/ERPMe/docs"))
+DOCS = os.path.expanduser(os.environ.get("NATIVEFLOWS_DOCS", "~/Projects/NativeFlows/docs"))
 DESIGN = os.path.join(DOCS, "design")
 STUBS = os.path.join(DOCS, "reviews/2026-11-14-design-validation/lab/00_stubs.sql")
 NEW = "DS-43-54-planning-production.sql"
@@ -33,10 +33,10 @@ FILES = ["DS-20-master-data.sql", "DS-56-product-configuration.sql", "DS-06-univ
 STUB_TABLES = {"document", "material_document", "material_document_line", "posting_period", "posting_period_area_state", "fiscal_year",
                "account", "system_account", "applied_rate", "close_task", "tax_code", "transaction_key"}
 # Lab-only stub additions: the shared document row's columns and composite key of ADR-0052 rule 18.
-EXTRA_STUBS = """SET search_path = erpme;
+EXTRA_STUBS = """SET search_path = nativeflows;
 ALTER TABLE document ADD COLUMN IF NOT EXISTS partner_id uuid, ADD COLUMN IF NOT EXISTS document_date date;
 DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'erpme.document'::regclass AND contype = 'u') THEN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'nativeflows.document'::regclass AND contype = 'u') THEN
     ALTER TABLE document ADD CONSTRAINT uq_document_company_id_id UNIQUE (company_id, id);
   END IF;
 END $$;
@@ -72,28 +72,28 @@ if "--load" in sys.argv:
     cx = conn(); cx.autocommit = True
     cx.execute(stubs)
     cx.execute(EXTRA_STUBS)
-    cx.execute("SET search_path = erpme;\n" + p.stdout)
+    cx.execute("SET search_path = nativeflows;\n" + p.stdout)
     cx.close()
 
 c = conn(); c.autocommit = True
 X = c.execute
 cols = {}
-for t_, col, nullable in X("select table_name, column_name, is_nullable from information_schema.columns where table_schema='erpme'").fetchall():
+for t_, col, nullable in X("select table_name, column_name, is_nullable from information_schema.columns where table_schema='nativeflows'").fetchall():
     cols.setdefault(t_, {})[col] = nullable
 check(f"S03 all {len(NEW_TABLES)} tables of {NEW} exist and carry company_id", all("company_id" in cols.get(t_, {}) for t_ in NEW_TABLES),
       [t_ for t_ in NEW_TABLES if "company_id" not in cols.get(t_, {})])
 check("S04 every new table carries recorded_at NOT NULL (ADR-0007 rule 9)",
       all(cols.get(t_, {}).get("recorded_at") == "NO" for t_ in NEW_TABLES), [t_ for t_ in NEW_TABLES if cols.get(t_, {}).get("recorded_at") != "NO"])
 bad_ck = X("""select r.relname, k.conname from pg_constraint k join pg_class r on r.oid = k.conrelid join pg_namespace n on n.oid = r.relnamespace
-              where n.nspname='erpme' and k.contype='c' and r.relname = any(%s) and k.conname not like 'ck\\_' || r.relname || '\\_%%'""", (NEW_TABLES,)).fetchall()
+              where n.nspname='nativeflows' and k.contype='c' and r.relname = any(%s) and k.conname not like 'ck\\_' || r.relname || '\\_%%'""", (NEW_TABLES,)).fetchall()
 check("S05 every CHECK constraint of the new tables is named ck_<table>_<name> (ADR-0004 rule 15)", bad_ck == [], bad_ck[:5])
 # Every key to a table that has UNIQUE (company_id, id) uses it, so a reference cannot leave the company.
 company_keyed = {r[0] for r in X("""select r.relname from pg_constraint k join pg_class r on r.oid = k.conrelid join pg_namespace n on n.oid = r.relnamespace
-    where n.nspname='erpme' and k.contype in ('u','p') and (select array_agg(a.attname::text order by a.attname) from unnest(k.conkey) u(x)
+    where n.nspname='nativeflows' and k.contype in ('u','p') and (select array_agg(a.attname::text order by a.attname) from unnest(k.conkey) u(x)
     join pg_attribute a on a.attrelid = k.conrelid and a.attnum = u.x) = array['company_id','id']""").fetchall()}
 fks = X("""select r.relname, f.relname, k.conname, (select array_agg(a.attname::text) from unnest(k.conkey) u(x) join pg_attribute a on a.attrelid = k.conrelid and a.attnum = u.x)
            from pg_constraint k join pg_class r on r.oid = k.conrelid join pg_class f on f.oid = k.confrelid join pg_namespace n on n.oid = r.relnamespace
-           where n.nspname='erpme' and k.contype='f' and r.relname = any(%s)""", (NEW_TABLES,)).fetchall()
+           where n.nspname='nativeflows' and k.contype='f' and r.relname = any(%s)""", (NEW_TABLES,)).fetchall()
 loose = [(a, b, n) for a, b, n, cl in fks if b in company_keyed and "company_id" not in cl and a != "planning_setting"]
 check(f"S06 all {len(fks)} foreign keys of the new tables that reach a company-keyed table carry company_id", loose == [], loose[:5])
 check("S07 the B3 columns exist as the interim: demand_supply_line production line keys, for_demand_supply_line_id and owner_partner_id; owner_partner_id on order components and outputs",
@@ -540,23 +540,23 @@ bad("N65 a settlement line's step is one of the job's posting steps", "ck_produc
     ins("production_cost_settlement_line", production_cost_settlement_id=I["settle"], cost_object_id=I["CO"], cost_component="material", step="adjustment", company_amount=1))
 
 # ======================================================================= R: generated company policy
-ROLE = "erpme_lab_t13"
+ROLE = "nativeflows_lab_t13"
 try:
     X(f"DROP OWNED BY {ROLE}") if X("select 1 from pg_roles where rolname=%s", (ROLE,)).fetchone() else X(f"CREATE ROLE {ROLE} NOLOGIN")
     if X("select 1 from pg_roles where rolname=%s", (ROLE,)).fetchone() is None:
         X(f"CREATE ROLE {ROLE} NOLOGIN")
-    X(f"GRANT USAGE ON SCHEMA erpme, types TO {ROLE}")
+    X(f"GRANT USAGE ON SCHEMA nativeflows, types TO {ROLE}")
     for t_ in NEW_TABLES:
         X(f"ALTER TABLE {t_} ENABLE ROW LEVEL SECURITY")
         X(f"ALTER TABLE {t_} FORCE ROW LEVEL SECURITY")
         X(f"DROP POLICY IF EXISTS company ON {t_}")
-        X(f"CREATE POLICY company ON {t_} USING (company_id = current_setting('erpme.company_id', true)::uuid) WITH CHECK (company_id = current_setting('erpme.company_id', true)::uuid)")
+        X(f"CREATE POLICY company ON {t_} USING (company_id = current_setting('nativeflows.company_id', true)::uuid) WITH CHECK (company_id = current_setting('nativeflows.company_id', true)::uuid)")
         X(f"GRANT SELECT, INSERT ON {t_} TO {ROLE}")
-    X(f"GRANT SELECT ON ALL TABLES IN SCHEMA erpme TO {ROLE}")
+    X(f"GRANT SELECT ON ALL TABLES IN SCHEMA nativeflows TO {ROLE}")
     def seen(co):
         with c.transaction():
             X(f"SET LOCAL ROLE {ROLE}")
-            X("SELECT set_config('erpme.company_id', %s, true)", (str(I[co]),))
+            X("SELECT set_config('nativeflows.company_id', %s, true)", (str(I[co]),))
             r = X("select (select count(*) from production_order), (select count(*) from planned_order), (select count(*) from demand_supply_line)").fetchone()
         return r
     own, other = seen("co"), seen("co2")
@@ -564,7 +564,7 @@ try:
           min(own) > 0 and other == (0, 0, 0), (own, other))
     def cross(cx):
         cx.execute(f"SET LOCAL ROLE {ROLE}")
-        cx.execute("SELECT set_config('erpme.company_id', %s, true)", (str(I["co2"]),))
+        cx.execute("SELECT set_config('nativeflows.company_id', %s, true)", (str(I["co2"]),))
         cx.execute(*ins("transfer_route", id=new(), source_warehouse_id=I["WP"], destination_warehouse_id=I["WX"], lead_time_days=1))
     expect("R02 a row for another company is refused by the policy's WITH CHECK", cross, True, "row-level security")
 finally:

@@ -1,6 +1,6 @@
 """Lab helpers (not product code)."""
 import os, uuid, psycopg
-DSN = os.environ.get("ERPME_LAB_DSN", "host=127.0.0.1 port=5561 dbname=erpme_lab user=lab") + " options=-csearch_path=erpme"
+DSN = os.environ.get("NATIVEFLOWS_LAB_DSN", "host=127.0.0.1 port=5561 dbname=nativeflows_lab user=lab") + " options=-csearch_path=nativeflows"
 def new(): return uuid.uuid7() if hasattr(uuid, "uuid7") else uuid.UUID(bytes=uuid.uuid4().bytes)
 def conn(): return psycopg.connect(DSN)
 RESULTS = []

@@ -5,7 +5,7 @@
 -- columns as an interim, the forecast, message and exception tables). PostgreSQL 18. Loaded with DS-20, DS-56, DS-15
 -- and DS-06 in the design lab (docs/reviews/2026-11-14-design-validation, t16_planning_production_ddl.py). The ADRs
 -- win if this file disagrees.
--- Conventions as DS-20: tables in schema erpme, domains in types; keys inline (migrations name them by the MetaData
+-- Conventions as DS-20: tables in schema nativeflows, domains in types; keys inline (migrations name them by the MetaData
 -- naming convention, ADR-0004 rule 15); UUIDv7 IDs from context.new_id or the client, no ID defaults; recorded_at on
 -- every row (ADR-0007 rule 9). Every table carries company_id, FORCE ROW LEVEL SECURITY and the generated company
 -- policy (ADR-0017 rule 19; ADR-0022 rule 8). References inside a company are composite on (company_id, id); composite

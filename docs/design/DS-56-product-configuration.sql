@@ -1,6 +1,6 @@
 -- DS-56 product configuration: DDL draft for ADR-0046 (master_data tables). PostgreSQL 18.
 -- Loaded with DS-20 and DS-06 in the design lab (t06_configuration.py). The ADR wins if this file disagrees.
--- Conventions as in DS-20-master-data.sql: schema erpme, company_id and row-level security on every table, composite
+-- Conventions as in DS-20-master-data.sql: schema nativeflows, company_id and row-level security on every table, composite
 -- keys within a company, UUIDv7 IDs without defaults. Every model row carries product_id, so its characteristics are
 -- keyed to the product's product_variant_attribute rows. The production columns of ADR-0046 rules 12-13
 -- (product-level bills of materials and versions, selection conditions and sizing) belong to the production DDL,

@@ -1,6 +1,6 @@
 # ADR-0061 Barcodes: independent review, round 3 (2026-11-15)
 
-Reviewed: copies of `base-ds-uom` and `base-uom-sim` in `/tmp`, each with `drafts/ds-barcode/apply_barcode.py` applied (54 writes over 33 files on both). Paths are relative to `docs/` after the apply script. No git command was run in `~/Projects/ERPMe` and the bases were not changed.
+Reviewed: copies of `base-ds-uom` and `base-uom-sim` in `/tmp`, each with `drafts/ds-barcode/apply_barcode.py` applied (54 writes over 33 files on both). Paths are relative to `docs/` after the apply script. No git command was run in `~/Projects/NativeFlows` and the bases were not changed.
 
 ## Verdict: NOT YET
 
@@ -24,7 +24,7 @@ No "out of shared memory" occurred.
 **S1. The cleanup job can delete an SSCC under the company's own prefix once that prefix row is deleted.**
 `adr/0061-barcodes.md:80` (the job), rule 11 (`:111`); `design/DS-04-command-envelope.md:209`; `lab/t19_barcode.py:424-428`.
 - The job tells own from supplier SSCCs only by the rows of `gs1_company_prefix` at the time it runs.
-- `DeleteGs1CompanyPrefix` is refused only for "a prefix that generated GTINs". A prefix with `next_item_reference` 0 can be deleted (probe: the database deletes `893987654`). That is every prefix used only for SSCCs, or whose GTINs were typed and not generated, which is the normal case in Phase 1, where ERPMe generates no SSCC.
+- `DeleteGs1CompanyPrefix` is refused only for "a prefix that generated GTINs". A prefix with `next_item_reference` 0 can be deleted (probe: the database deletes `893987654`). That is every prefix used only for SSCCs, or whose GTINs were typed and not generated, which is the normal case in Phase 1, where NativeFlows generates no SSCC.
 - There is no retired state for a prefix, so "a prefix that has since been retired" can only mean a deleted row. After the delete, the company's own retired SSCCs under it look like a supplier's and the next daily run deletes them. Rule 7 says such an SSCC "is deleted only by a person".
 - The lab passes the own prefixes as a list and does not test a deleted one.
 
@@ -63,4 +63,4 @@ Fix: register it `is_internal_only` with no level, add it to the ADR-0054 rule 2
 - The GS1 facts the ADR flags as open (Dictionary tables, Digital Link key search, SSCC reuse period, prefix lengths) and Zint's licences were not checked against their sources.
 - Row-level security is not enabled by the lab load.
 
-Cleanup done: database `erpme_lab_rv61` dropped; `/tmp/rv61`, `/tmp/rv61sim` and `/tmp/rv61r1` deleted; the bases, the repository and the drafts were not changed.
+Cleanup done: database `nativeflows_lab_rv61` dropped; `/tmp/rv61`, `/tmp/rv61sim` and `/tmp/rv61r1` deleted; the bases, the repository and the drafts were not changed.

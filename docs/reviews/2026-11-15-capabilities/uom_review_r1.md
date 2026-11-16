@@ -6,7 +6,7 @@ What I ran:
 - `t17_uom.py --load`: 89/89 pass on my throwaway database.
 - `t14`: 83/83 pass on the draft.
 - `t01`, `t05`, `t06`, `t16`: not verified. I could not reproduce their own load setups; under `load_all.py` they fail identically on base and draft.
-- Cleanup done: `erpme_lab_ru` dropped, `/tmp/ru` deleted, repo untouched (`git status` clean).
+- Cleanup done: `nativeflows_lab_ru` dropped, `/tmp/ru` deleted, repo untouched (`git status` clean).
 
 ## Blocking
 

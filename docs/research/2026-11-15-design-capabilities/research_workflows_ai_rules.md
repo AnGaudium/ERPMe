@@ -1,21 +1,21 @@
 # Research: configurable workflows, AI-tuned deterministic functions, and agentic workflow architecture
 
-Date: 2026-11-15. Scope: input for the ERPMe architect. Three topics: (1) configuring business processes without code, and where configuration ends and code begins; (2) using AI to tune existing deterministic functions or build new ones; (3) cross-cutting agentic workflow architecture in enterprise software, 2024 to 2026.
+Date: 2026-11-15. Scope: input for the NativeFlows architect. Three topics: (1) configuring business processes without code, and where configuration ends and code begins; (2) using AI to tune existing deterministic functions or build new ones; (3) cross-cutting agentic workflow architecture in enterprise software, 2024 to 2026.
 
 ## How to read this
 
 - **Claim tags.** `[doc]` official vendor or project documentation; `[blog]` vendor engineering or product blog, trade press, or practitioner blog; `[paper]` research paper or preprint; `[inference]` my synthesis or judgement, not stated by a source.
 - **Source quality.** Several vendor product pages are marketing. Where the only source was secondary, the claim says so. Specific numbers from vendors (hit rates, accuracy) are self-reported and unaudited.
 - **Naming.** Only vendors and products are named. No customer names.
-- **ERPMe context assumed.** A strict deterministic core: commands with plan hashes (ADR-0008); the LLM never computes numbers or posts; agents draft, people submit and approve through the policy table (ADR-0043) and approval pools (ADR-0055); agent types are versioned code with fixed tool lists, a taint model and shadow to assisted promotion with frozen evidence (ADR-0029, ADR-0050, ADR-0051); change proposals for master data; golden sets and replay evaluation; an outbox (ADR-0013) and a work queue (ADR-0042).
+- **NativeFlows context assumed.** A strict deterministic core: commands with plan hashes (ADR-0008); the LLM never computes numbers or posts; agents draft, people submit and approve through the policy table (ADR-0043) and approval pools (ADR-0055); agent types are versioned code with fixed tool lists, a taint model and shadow to assisted promotion with frozen evidence (ADR-0029, ADR-0050, ADR-0051); change proposals for master data; golden sets and replay evaluation; an outbox (ADR-0013) and a work queue (ADR-0042).
 
 ## Executive summary
 
 1. **Every mature platform converged on the same split** `[inference]`: business users configure *parameters, decision tables, conditions and routing* over a fixed, vendor-owned vocabulary of events and actions; anything that needs new vocabulary is code. SAP Flexible Workflow (preconditions in an app, new conditions through a BAdI), Dynamics 365 workflow editor (conditions and hierarchies, new workflow types in X++), ServiceNow (flows for most things, business rules when ordering or same-transaction semantics matter) and Agentforce ("if you can express a decision as code, it should be written as logic") all draw the line in roughly the same place.
 2. **The failure modes are well documented and repeat across vendors.** Self-triggering loops (Power Automate warns at save; ServiceNow caps indirect recursion at 3 by default; Odoo keeps a per-chain "already done" set); unspecified execution order between automations on the same object (Salesforce); running instances silently picking up new decision versions when bound to "latest" (Camunda); transports overwriting decision-table data (BRF+); versions that cannot be undeployed (SAP Build decisions, per community reports); history kept only for days (n8n tiers); and runaway error-flooding turned off by the platform (Zapier auto-off).
-3. **For ERPMe Phase 1, do not build a general workflow engine or a scripting language.** Use three configuration tiers already latent in the design: (a) parameters and the policy table; (b) typed decision tables with order-independent hit policies; (c) event-condition-action automation rules whose actions are only registered commands or drafts, executed through the normal command envelope and policy. Everything else is code in a package, reviewed like code.
-4. **AI should never edit running logic; it proposes versioned artifacts that a deterministic engine executes, and evidence decides promotion.** This is the pattern behind SAP Cash Application (two confidence thresholds: show-proposal vs auto-clear), BlackLine and Oracle Account Reconciliation (suggested vs confirmed match rules), FICO-style champion/challenger, MLflow-style alias promotion and Temporal-style replay testing. ERPMe already has the right primitives: change proposals, golden sets, replay, shadow to assisted promotion. Extend them from agent types to *every AI-produced artifact*: parameter sets, decision tables, matching rule sets, report definitions and (later) extension code.
-5. **The agentic platforms of 2025 to 2026 all retreated from pure LLM orchestration toward hybrid, deterministic graphs with bounded LLM steps** (Agentforce Agent Script and hybrid reasoning, Copilot Studio agent flows, Oracle workflow agents, LangGraph graphs, Microsoft Agent Framework workflows, SAP Joule Studio 2.0 approval loops). Prompt-injection research converged on architectural defences (dual LLM, plan-then-execute, CaMeL capabilities, FIDES information-flow labels) rather than filters. ERPMe's taint model and fixed tool lists sit squarely in this mainstream; the main gaps worth closing are calibrated abstention, cost budgets as hard limits, OTel-compatible traces, and a single registry of every versioned "decision artifact".
+3. **For NativeFlows Phase 1, do not build a general workflow engine or a scripting language.** Use three configuration tiers already latent in the design: (a) parameters and the policy table; (b) typed decision tables with order-independent hit policies; (c) event-condition-action automation rules whose actions are only registered commands or drafts, executed through the normal command envelope and policy. Everything else is code in a package, reviewed like code.
+4. **AI should never edit running logic; it proposes versioned artifacts that a deterministic engine executes, and evidence decides promotion.** This is the pattern behind SAP Cash Application (two confidence thresholds: show-proposal vs auto-clear), BlackLine and Oracle Account Reconciliation (suggested vs confirmed match rules), FICO-style champion/challenger, MLflow-style alias promotion and Temporal-style replay testing. NativeFlows already has the right primitives: change proposals, golden sets, replay, shadow to assisted promotion. Extend them from agent types to *every AI-produced artifact*: parameter sets, decision tables, matching rule sets, report definitions and (later) extension code.
+5. **The agentic platforms of 2025 to 2026 all retreated from pure LLM orchestration toward hybrid, deterministic graphs with bounded LLM steps** (Agentforce Agent Script and hybrid reasoning, Copilot Studio agent flows, Oracle workflow agents, LangGraph graphs, Microsoft Agent Framework workflows, SAP Joule Studio 2.0 approval loops). Prompt-injection research converged on architectural defences (dual LLM, plan-then-execute, CaMeL capabilities, FIDES information-flow labels) rather than filters. NativeFlows's taint model and fixed tool lists sit squarely in this mainstream; the main gaps worth closing are calibrated abstention, cost budgets as hard limits, OTel-compatible traces, and a single registry of every versioned "decision artifact".
 
 ---
 
@@ -49,7 +49,7 @@ Date: 2026-11-15. Scope: input for the ERPMe architect. Three topics: (1) config
 ### Odoo: automation rules, server actions, Studio
 - **Automation rules** (module `base_automation`) run one or more **server actions** on a trigger: field-value changes (stage, user, tag, state, priority), create/write/delete, archive, UI on-change, time-based (relative to a date field, creation or update), mail received/sent, and **webhook**. Server actions update or create records, send mail, run other actions, or **execute Python code**. Studio exposes this no-code. `[doc]` https://www.odoo.com/documentation/18.0/applications/studio/automated_actions.html ; https://www.odoo.com/documentation/18.0/developer/reference/backend/actions.html
 - **Loop guard in code:** a context dict `__action_done` maps each rule to the records it already processed in the current call chain; records are marked done *before* actions run so nested writes cannot re-trigger the same rule on the same records; rules on write fire only if a watched field actually changed. `[doc]` (source) https://github.com/odoo/odoo/blob/18.0/addons/base_automation/models/base_automation.py
-- Lesson `[inference]`: "execute Python code" in a server action is where configuration silently becomes unreviewed code inside the database; that is the line ERPMe should not cross in Phase 1.
+- Lesson `[inference]`: "execute Python code" in a server action is where configuration silently becomes unreviewed code inside the database; that is the line NativeFlows should not cross in Phase 1.
 
 ### ServiceNow Flow Designer (Workflow Studio)
 - ServiceNow recommends **flows instead of business rules** in most cases, but keeps business rules when logic must run in a specific order relative to other business rules, must run immediately before or after a database write in the same thread, or only calls a script include. `[doc]` https://www.servicenow.com/docs/r/zurich/application-development/flow-designer.html
@@ -72,7 +72,7 @@ Date: 2026-11-15. Scope: input for the ERPMe architect. Three topics: (1) config
 ### Temporal and durable execution
 - Workflow code must be **deterministic**; side effects go in Activities. Changes to running workflows need **patching** (per-change branches) or **Worker Versioning** (pin workflows to a code revision; "We strongly recommend using Worker Versioning"). `[doc]` https://docs.temporal.io/develop/python/workflows/versioning
 - **Safe deployment:** replay existing event histories against new code in development (checked-in histories), pre-deployment and at deployment time; gate the rollout with a "verify" worker that replays recent production histories before the rest deploy; pinned workflows stay on their version, auto-upgrade ones move. `[doc]` https://docs.temporal.io/develop/safe-deployments
-- Lesson `[inference]`: **replay of recorded histories against new logic** is the most transferable testing idea in the whole survey. ERPMe's replay evaluation for agents is the same idea; it should also apply to configuration.
+- Lesson `[inference]`: **replay of recorded histories against new logic** is the most transferable testing idea in the whole survey. NativeFlows's replay evaluation for agents is the same idea; it should also apply to configuration.
 
 ### Zapier and n8n
 - Zapier: failed steps auto-replay up to 5 times; runs halted by **flood protection** (triggered at 100+ items from one poll) are *held*, not errored, and are not auto-replayed; a Zap that errors on 95% of runs over 7 days (minimum 20 runs) is **turned off automatically**. `[doc]` https://help.zapier.com/hc/en-us/articles/14167175792909-Decide-how-your-Zap-handles-errors-with-advanced-settings ; https://help.zapier.com/hc/en-us/articles/37454233721869-How-to-troubleshoot-held-Zap-or-step-runs
@@ -85,7 +85,7 @@ A spectrum, from safest to most powerful `[inference, synthesised from the syste
 | Tier | What users change | Examples | Who can change | Risk |
 |---|---|---|---|---|
 | 0. Parameters | Scalars, tolerances, thresholds, lists | Matching tolerance, auto-clear threshold, approval amount limits | Key user via change proposal | Low; bounded domain |
-| 1. Decision tables | Rows of a typed table with a fixed hit policy | BRF+, DMN, SAP Build decisions, D365 activation conditions, ERPMe `policy_rule` | Key user, reviewed | Low-medium; overlap and gaps are checkable |
+| 1. Decision tables | Rows of a typed table with a fixed hit policy | BRF+, DMN, SAP Build decisions, D365 activation conditions, NativeFlows `policy_rule` | Key user, reviewed | Low-medium; overlap and gaps are checkable |
 | 2. Declarative automation over a fixed vocabulary | Event + condition + action, actions picked from a registered list | Odoo automation rules without Python, SAP Flexible Workflow, D365 workflow editor, Power Automate with approved connectors | Key user or admin, reviewed, tested | Medium; loops, ordering, side effects |
 | 3. Orchestration graphs | Multi-step, long-running processes with waits and compensation | BPMN in Camunda, ServiceNow flows, Salesforce orchestrations, Temporal workflows | Developer or process engineer | High; versioning of in-flight instances |
 | 4. Scripts in configuration | Arbitrary code stored as data | Odoo "execute Python code", ServiceNow script steps, Power Automate inline code | Developer, often unreviewed | Highest; bypasses code review and upgrade testing |
@@ -113,7 +113,7 @@ The consistent vendor rule `[inference]`: **vocabulary is code; composition is c
 - **P1.1 Fixed vocabulary, composed by configuration.** Event types, actions and condition fields are a published, versioned registry owned by code. `[inference]`
 - **P1.2 Immutable versions, one active per scope, validation before activation** (D365, SAP Build, Camunda). `[doc]`
 - **P1.3 Pin the version at start; migrate explicitly** (Camunda, Temporal pinned workers). `[doc]`
-- **P1.4 Order-independent combination or explicit priority** (DMN Unique / Collect-with-aggregator; ERPMe `policy_rule` already takes the maximum per dimension). `[doc]` `[inference]`
+- **P1.4 Order-independent combination or explicit priority** (DMN Unique / Collect-with-aggregator; NativeFlows `policy_rule` already takes the maximum per dimension). `[doc]` `[inference]`
 - **P1.5 Trigger on change predicates, not on "any write"** (Odoo watched fields, Salesforce entry criteria, Power Automate trigger conditions). `[doc]`
 - **P1.6 Causation-chain loop guards with a small depth cap** (ServiceNow 3; Odoo per-chain set). `[doc]`
 - **P1.7 Circuit breakers and flood protection** (Zapier). `[doc]`
@@ -122,7 +122,7 @@ The consistent vendor rule `[inference]`: **vocabulary is code; composition is c
 - **P1.10 Per-execution trace record**: version, inputs, matched rows, outputs. `[doc]`
 - **P1.11 Events as the integration contract** (D365 business events). `[doc]`
 
-## 1.5 Design recommendations for ERPMe (Topic 1)
+## 1.5 Design recommendations for NativeFlows (Topic 1)
 
 ### Phase 1
 
@@ -141,7 +141,7 @@ The consistent vendor rule `[inference]`: **vocabulary is code; composition is c
 **W3. Every configuration artifact is a versioned record changed only through a change proposal.** `[inference, from D365/SAP Build/Camunda]`
 - Immutable versions, at most one active version per scope (company, document type, action) and effective date.
 - Activation requires: schema validation passing, the artifact's own test cases passing, and an approval through the same proposal flow as master data (ADR-0029), so AI-drafted configuration carries taint and needs a person.
-- Each decision record and each automation execution stores the **artifact version ID** it used. In-flight documents are evaluated against the version active at evaluation time, and the record says which. (ERPMe documents are short-lived, so "pin per evaluation, record the version" is enough; no migration machinery.)
+- Each decision record and each automation execution stores the **artifact version ID** it used. In-flight documents are evaluated against the version active at evaluation time, and the record says which. (NativeFlows documents are short-lived, so "pin per evaluation, record the version" is enough; no migration machinery.)
 
 **W4. Order independence by construction.** `[inference, from DMN and ADR-0043]`
 - Decision tables allow only two hit policies in Phase 1: **Unique** (overlaps are a validation error at activation) and **monotone combine** (each output dimension combined by max/min/union, as `policy_rule` already does).
@@ -157,8 +157,8 @@ The consistent vendor rule `[inference]`: **vocabulary is code; composition is c
 
 **W6. Tests, simulation and replay before activation.** `[doc-backed patterns]`
 - Each decision table and automation rule stores **test cases** (input, expected output) alongside it; a debug run in the UI can be saved as a test (Salesforce pattern).
-- **What-if replay:** before activation, run the candidate version over the last N days of recorded events or decision inputs (from the outbox and decision records) and show a diff against the active version: which documents would have had a different outcome, with amounts. This is Temporal-style replay applied to configuration, and it reuses the replay suite ERPMe already plans for agents.
-- *Tradeoff:* decision inputs must be stored in full (or reconstructable as of a point in time) for replay. That is a storage cost, but ERPMe's audit design (ADR-0038) already leans this way.
+- **What-if replay:** before activation, run the candidate version over the last N days of recorded events or decision inputs (from the outbox and decision records) and show a diff against the active version: which documents would have had a different outcome, with amounts. This is Temporal-style replay applied to configuration, and it reuses the replay suite NativeFlows already plans for agents.
+- *Tradeoff:* decision inputs must be stored in full (or reconstructable as of a point in time) for replay. That is a storage cost, but NativeFlows's audit design (ADR-0038) already leans this way.
 
 **W7. Explainable execution records.** `[doc-backed]`
 - For each evaluation: artifact ID and version, input snapshot hash (and the inputs for decisions with money impact), matched rows, output, causation chain. Queryable by agents through the read-only query layer, so "why was this routed to pool X?" is answerable by an agent without guessing.
@@ -256,7 +256,7 @@ The consistent vendor rule `[inference]`: **vocabulary is code; composition is c
 - **P2.9 Ongoing monitoring with predefined demotion thresholds.** (SR 11-7.) `[doc]`
 - **P2.10 Code only in a sandbox with capability grants, plus human review assisted by static analysis.** `[blog]` `[paper]`
 
-## 2.5 Design recommendations for ERPMe (Topic 2)
+## 2.5 Design recommendations for NativeFlows (Topic 2)
 
 ### Phase 1
 
@@ -279,7 +279,7 @@ The consistent vendor rule `[inference]`: **vocabulary is code; composition is c
 - Auto-confirm passes require a person to approve the rule, with segregation of duties (rule proposer ≠ approver), and require backtested precision above a configured target at the chosen tolerance.
 - *Tradeoff:* lower automation rate than an ML scorer at first. Gain: every auto-match is explainable by a rule ID and version, which auditors and the Vietnamese overlay will want.
 
-**A4. Confidence that gates anything must be calibrated on ERPMe's own outcomes.** `[paper-backed]`
+**A4. Confidence that gates anything must be calibrated on NativeFlows's own outcomes.** `[paper-backed]`
 - Two thresholds per artifact (show-suggestion, auto-act), both **parameters** in the artifact, chosen from the backtest curve (precision vs coverage) to meet a target precision; never an LLM's self-reported confidence.
 - In Phase 1 the auto-act threshold is disabled by default (assisted only), matching the agent shadow → assisted stance.
 
@@ -288,7 +288,7 @@ The consistent vendor rule `[inference]`: **vocabulary is code; composition is c
 - Saving a report for others is an artifact change (A1) with a small evidence bundle: sample output on a fixed period, compared with a hand-checked known answer for at least one cell.
 
 **A6. No AI-generated code runs in production in Phase 1.** `[paper-backed]`
-- AI may write code for the ERPMe codebase or a customer package only through the normal repository path: tests first, human code review, static analysis, CI with the invariant harness.
+- AI may write code for the NativeFlows codebase or a customer package only through the normal repository path: tests first, human code review, static analysis, CI with the invariant harness.
 - *Tradeoff:* company-specific functions wait for a developer. Given the security evidence, this is the right default.
 
 **A7. Monitoring and automatic demotion.** `[doc-backed: SR 11-7]`
@@ -344,9 +344,9 @@ The consistent vendor rule `[inference]`: **vocabulary is code; composition is c
 - **OpenTelemetry GenAI semantic conventions:** spans for model calls (`{gen_ai.operation.name} {gen_ai.request.model}`), agent creation and invocation, tool execution; content not recorded by default; still in Development status. `[doc]` https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-agent-spans/ ; https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-spans/
 - **Prompt and dataset versioning** with labels and CI experiments. `[doc]` https://langfuse.com/docs/prompt-management/features/prompt-version-control
 
-## 3.2 Common patterns, and where ERPMe stands
+## 3.2 Common patterns, and where NativeFlows stands
 
-| Pattern | Industry evidence | ERPMe today (from ADR titles and brief) | Gap or action |
+| Pattern | Industry evidence | NativeFlows today (from ADR titles and brief) | Gap or action |
 |---|---|---|---|
 | **Deterministic orchestration with bounded LLM steps** | Anthropic workflows; Agentforce hybrid reasoning and Agent Script; Copilot Studio agent flows; Oracle workflow agents; LangGraph graphs; SAP Joule 2.0 | Agent types are versioned code with fixed tool lists | Aligned. Make each LLM step's output a typed schema validated before use. |
 | **Typed tool contracts** | Anthropic tool guidance; OpenAI tool guardrails; MCP annotations; Agentforce `available when` | Fixed tool lists; commands with plan hashes | Add per-tool side-effect class and precondition gating, enforced server-side. |
@@ -368,9 +368,9 @@ The consistent vendor rule `[inference]`: **vocabulary is code; composition is c
 7. **LLM judges fooled by the same injection.** Prefer deterministic state checks for security evals (AgentDojo). `[paper]`
 8. **Model drift under a fixed name.** Provider model aliases change underneath; pin snapshots. `[inference]`
 9. **Unbounded loops and cost** (recursion limits exist because loops happen). `[doc]`
-10. **Taint laundering by a human edit** (ERPMe's own ADR-0029 finding F4), echoed by CaMeL/FIDES: provenance must survive transformations, and clearing taint must be an explicit, recorded act. `[inference]`
+10. **Taint laundering by a human edit** (NativeFlows's own ADR-0029 finding F4), echoed by CaMeL/FIDES: provenance must survive transformations, and clearing taint must be an explicit, recorded act. `[inference]`
 
-## 3.4 Design recommendations for ERPMe (cross-cutting)
+## 3.4 Design recommendations for NativeFlows (cross-cutting)
 
 ### Phase 1
 
@@ -407,7 +407,7 @@ The consistent vendor rule `[inference]`: **vocabulary is code; composition is c
 - A provider model deprecation is treated as an agent-type change, not an operational detail.
 
 **X8. Observability compatible with OpenTelemetry GenAI conventions.** `[doc: OTel]`
-- Emit spans for agent invocation, each LLM call and each tool call with the GenAI attribute names, linked to the command ID, document ID, agent run ID and work item ID. Content stored in ERPMe's own audit tables under its retention rules; spans carry hashes and references only (OTel's default of not recording content fits privacy needs).
+- Emit spans for agent invocation, each LLM call and each tool call with the GenAI attribute names, linked to the command ID, document ID, agent run ID and work item ID. Content stored in NativeFlows's own audit tables under its retention rules; spans carry hashes and references only (OTel's default of not recording content fits privacy needs).
 
 **X9. A single registry of agent types and decision artifacts.** `[doc: Workday ASOR, Business Central]`
 - One queryable inventory: agent types and their versions, decision artifacts (A1) and their versions, owner, promotion state, permissions (as the intersection with the assigning user, Business Central style), budgets, recent metrics. Agents can read it through the query layer; only people change it.
@@ -419,7 +419,7 @@ The consistent vendor rule `[inference]`: **vocabulary is code; composition is c
 
 - **X11. Orchestrator-worker agents** (Phase 2+) for open-ended analysis (for example "why did margin drop on product family X"), still read-only, outputting a report definition (A5) and a narrative with every number coming from the query layer. `[blog: Anthropic]`
 - **X12. Evaluator-optimizer loops for artifact generation** (Phase 2): an agent drafts a matching rule set or decision table, the deterministic backtester scores it, the agent revises, within a budget; the held-out set is never shown to the loop (AlphaEvolve lesson). `[blog]` `[inference]`
-- **X13. External agent interoperability** (Phase 3): expose ERPMe commands to external agents (MCP or similar) only as `draft`/`propose` tools with the same policy, taint and budget enforcement, and register external agents in X9 with their own identities. `[doc: Workday/Entra Agent ID; MCP]`
+- **X13. External agent interoperability** (Phase 3): expose NativeFlows commands to external agents (MCP or similar) only as `draft`/`propose` tools with the same policy, taint and budget enforcement, and register external agents in X9 with their own identities. `[doc: Workday/Entra Agent ID; MCP]`
 
 ---
 

@@ -1,6 +1,6 @@
-# ERPMe
+# NativeFlows
 
-ERPMe is a fully open-source ERP designed from the ground up for agentic workflows. It targets trading and assembly businesses worldwide, with CRM from day one. The accounting and inventory core follows the SAP model, every country-specific rule lives in a localization package, and the business core is fully deterministic: AI agents only propose, and the books never depend on an LLM being right.
+NativeFlows is a fully open-source ERP designed from the ground up for agentic workflows. It targets trading and assembly businesses worldwide, with CRM from day one. The accounting and inventory core follows the SAP model, every country-specific rule lives in a localization package, and the business core is fully deterministic: AI agents only propose, and the books never depend on an LLM being right.
 
 **Status:** design phase (Build step 0). There is no code yet. The specification, decisions and design backlog are in [`docs/`](docs/README.md).
 

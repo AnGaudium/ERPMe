@@ -1,6 +1,6 @@
 # Research: agent-assisted analysis and barcode capability
 
-Date: 2026-11-15. Input for the architect who designs both areas for ERPMe. Research only: nothing here is decided.
+Date: 2026-11-15. Input for the architect who designs both areas for NativeFlows. Research only: nothing here is decided.
 
 **Tags.** Each claim carries a source tag:
 
@@ -9,7 +9,7 @@ Date: 2026-11-15. Input for the architect who designs both areas for ERPMe. Rese
 - **[paper]**: a research paper or benchmark;
 - **[inference]**: my own reasoning or general knowledge, not taken from a source.
 
-**ERPMe facts this report builds on** (from ADR-0018, ADR-0023, ADR-0049, ADR-0050):
+**NativeFlows facts this report builds on** (from ADR-0018, ADR-0023, ADR-0049, ADR-0050):
 
 - Principle 13: every number shown comes from deterministic code.
 - Agents read through semantic views in schema `query`, exposed as `List<View>` and `Get<View>`. The builder composes one `SELECT`. Agents never write SQL. There is record scope, owner scope and field classes. Agent pages hold at most 200 rows, capped by `max_rows_read`. The views are described as MCP resources.
@@ -35,7 +35,7 @@ Date: 2026-11-15. Input for the architect who designs both areas for ERPMe. Rese
 | **BEAVER** | Real enterprise data warehouses | Very low accuracy for off-the-shelf models. Error mix: schema linking 35.2%, joins 10.9% | [paper] https://arxiv.org/pdf/2409.02038 |
 | **TrustSQL** | Whether a model abstains on unanswerable or likely-wrong questions, with penalty scoring | In v1, no method beat "always abstain" across penalty levels. Under severe penalties it stays hard | [paper] https://arxiv.org/abs/2403.15879v4 |
 
-**Reading the numbers [inference].** About 80% on a clean benchmark means one wrong answer in five, and it arrives with the same confidence as the right ones. Leaderboard gains come from heavy agent scaffolding: many samples, execution feedback and self-consistency. That raises cost and latency per question. The highest scores (Spider2-snow above 94%) come from systems that put a semantic or compiler layer between the model and SQL. That is the strongest evidence for the ERPMe direction: the model chooses, code computes.
+**Reading the numbers [inference].** About 80% on a clean benchmark means one wrong answer in five, and it arrives with the same confidence as the right ones. Leaderboard gains come from heavy agent scaffolding: many samples, execution feedback and self-consistency. That raises cost and latency per question. The highest scores (Spider2-snow above 94%) come from systems that put a semantic or compiler layer between the model and SQL. That is the strongest evidence for the NativeFlows direction: the model chooses, code computes.
 
 ### Failure modes [paper unless marked]
 
@@ -96,7 +96,7 @@ A semantic layer declares **measures** (aggregations with a fixed formula), **di
 - **Two uses of the same artifact.** As *retrieval context*: Cortex Analyst pulls similar verified queries into the prompt. As a *direct answer*: Genie's trusted assets execute a parameterized query or function, and the answer is labelled Trusted only when that exact asset produced it. [doc] https://docs.snowflake.com/user-guide/snowflake-cortex/cortex-analyst/verified-query-repository, https://learn.microsoft.com/da-dk/azure/databricks/genie/trusted-assets
 - **Evaluation discipline.** Snowflake evaluations remove the verified query under test from a temporary copy of the model, so the score measures generation, not lookup. They report regressions. Genie benchmarks are kept apart from instructions. [doc] https://docs.snowflake.com/user-guide/snowflake-cortex/cortex-analyst-evaluations
 - **Maintenance loop.** Feedback → review queue → a fix becomes a verified query or instruction. Snowflake suggests verified queries from usage logs; a human approves them. [doc] https://docs.snowflake.com/en/user-guide/snowflake-cortex/cortex-analyst/verified-query-suggestions
-- **For ERPMe [inference].** A "verified query" maps onto a **saved query plan** (A9) with parameters, an owner, a review state and test cases. When the planner's plan equals a verified plan up to its parameters, the answer carries a *verified* badge. Otherwise it is *generated*. The badge is computed by code from the plan hash, never claimed by the model.
+- **For NativeFlows [inference].** A "verified query" maps onto a **saved query plan** (A9) with parameters, an owner, a review state and test cases. When the planner's plan equals a verified plan up to its parameters, the answer carries a *verified* badge. Otherwise it is *generated*. The badge is computed by code from the plan hash, never claimed by the model.
 
 ## A5. Number grounding and citation
 
@@ -106,7 +106,7 @@ Sources here are mostly blogs; rigorous studies of numeric claim verification in
 - Deterministic settings make a wrong number repeatable, not correct. Freshness must be explicit, because the model has no sense of data age. [blog] same source
 - Tableau Pulse's order (statistics produce facts, then the LLM writes text) is the best documented product pattern for narrated numbers. [doc] https://help.tableau.com/current/online/en-us/pulse_insights_platform_insight_types.htm
 
-**Mechanism for ERPMe [inference]:**
+**Mechanism for NativeFlows [inference]:**
 
 1. **Result envelope.** Every query result returns typed cells with an id: `{cell_id, measure, dimension values, value, unit or currency, scale}`. It also carries `as_of` (transaction snapshot time), `is_scope_filtered`, the row count, the plan and its hash.
 2. **Template narration.** The model writes text with placeholders (`{{c3}}`), never digits. The renderer substitutes the formatted values: locale, currency and rounding all done by code. Principle 13 then holds by construction.
@@ -127,7 +127,7 @@ Sources here are mostly blogs; rigorous studies of numeric claim verification in
 1. **Additive contribution.** For an additive measure M and a dimension D, the change ΔM equals the sum over members d of (M₁(d) − M₀(d)). Rank members by |Δ|. The sum must reconcile exactly to the total, shown as a check row; "other" absorbs the tail.
 2. **Price-volume-mix** for revenue or margin. Price effect = Σ (p₁ − p₀)·q₁. Volume effect = (Q₁ − Q₀)·p̄₀. Mix effect = Σ (s₁ − s₀)·Q₁·p₀, where s is the share of each item. Use one documented convention. The remainder must be zero; that is a test.
 3. **Ratio measures** (margin %, on-time %) do not decompose additively. Decompose the numerator and denominator, or use a rate/mix split.
-4. **Manufacturing variances already exist as postings.** ERPMe's production costing (ADR-0035) posts deterministic variances: price, usage or quantity, lot size, scrap, rework. "Why is the cost of product X higher this month?" should be answered by reading those variance postings by type and order, not by a new statistical model. Statistical segment mining is for open questions ("which customer groups drove the sales drop").
+4. **Manufacturing variances already exist as postings.** NativeFlows's production costing (ADR-0035) posts deterministic variances: price, usage or quantity, lot size, scrap, rework. "Why is the cost of product X higher this month?" should be answered by reading those variance postings by type and order, not by a new statistical model. Statistical segment mining is for open questions ("which customer groups drove the sales drop").
 5. **Segment search** (two-dimension combinations, pruning by minimum support) is the only part that resembles ML. It can be a deterministic exhaustive search over declared dimensions with caps, so results stay reproducible.
 
 ## A7. Saved reports, KPI definitions, governance, row-level security, cost
@@ -149,7 +149,7 @@ The Tableau Pulse metric definition and the Snowflake semantic view metric are t
 
 - Every product enforces security in the engine under the end user's identity: Snowflake RBAC and row access policies, Cube's security context, Unity Catalog, Oracle's data security over MCP, Power BI RLS. Never in the prompt.
 - Pitfalls [inference]:
-  - **Silent partial totals.** Owner scope makes "total sales" mean "my sales". The answer must say so. ERPMe already computes `is_scope_filtered`; surface it in the answer text.
+  - **Silent partial totals.** Owner scope makes "total sales" mean "my sales". The answer must say so. NativeFlows already computes `is_scope_filtered`; surface it in the answer text.
   - **Inference through aggregates.** Small cells reveal individuals, such as the salary of a one-person department. A minimum cell size rule for personal or `cost` field-class measures.
   - **Cache leakage.** A cached result reused across users with different scope. Cache keys must include the scope fingerprint.
   - **Verified-query bypass.** A trusted query written by an admin must still run under the asker's scope.
@@ -161,14 +161,14 @@ The Tableau Pulse metric definition and the Snowflake semantic view metric are t
   - verified-plan hits skip the LLM (zero model cost);
   - plan caching by normalized question;
   - pre-aggregates for hot measures;
-  - statement timeouts and `max_rows_read` (ERPMe already has them);
+  - statement timeouts and `max_rows_read` (NativeFlows already has them);
   - per-user and per-company monthly budgets;
   - a cheap model for routing and clarification, the strong model only for planning;
   - no agent "exploration loops" that run dozens of queries without a budget.
 
 ## A8. Pitfalls (Topic 1)
 
-1. **Row listing as a substitute for aggregation [inference, ERPMe-specific].** Today agents only have `List<View>` with pages of at most 200 rows. Asked "total open receivables by customer", an agent will either sum rows itself, which breaks Principle 13, or truncate silently. **This is the biggest gap.** Aggregation must be a server operation.
+1. **Row listing as a substitute for aggregation [inference, NativeFlows-specific].** Today agents only have `List<View>` with pages of at most 200 rows. Asked "total open receivables by customer", an agent will either sum rows itself, which breaks Principle 13, or truncate silently. **This is the biggest gap.** Aggregation must be a server operation.
 2. **Fan-out** when a measure from a parent is grouped by a child dimension, such as document totals grouped by line item. [paper] BEAVER
 3. **Non-additive measures summed across dimensions:** averages, ratios, closing balances over time, stock on hand summed over dates. [inference]
 4. **Semantic drift.** Two "revenue" measures. Fix: one certified measure per business term, plus synonyms. [inference]
@@ -256,8 +256,8 @@ Each failure returns a machine code: `unknown_measure`, `ambiguous_term`, `fan_o
 
 ### A9.4 Compilation and execution
 
-- The compiler emits **one `SELECT`** over the semantic views: grouped aggregation, `ROLLUP` or `GROUPING SETS` for total rows, and window functions for share and rank. It keeps ADR-0050 rule 44 (no client SQL, single `SELECT`, bound parameters) and runs under `erpme_readonly` with the same timeouts.
-- Expose it as **one registered query**, for example `RunAnalysisPlan(plan)` → `ResultEnvelope`, plus `ExplainAnalysisPlan(plan)` → the compiled SQL text and the resolved absolute dates. The MCP resources gain `erpme://query/measures` and `erpme://query/dimensions`.
+- The compiler emits **one `SELECT`** over the semantic views: grouped aggregation, `ROLLUP` or `GROUPING SETS` for total rows, and window functions for share and rank. It keeps ADR-0050 rule 44 (no client SQL, single `SELECT`, bound parameters) and runs under `nativeflows_readonly` with the same timeouts.
+- Expose it as **one registered query**, for example `RunAnalysisPlan(plan)` → `ResultEnvelope`, plus `ExplainAnalysisPlan(plan)` → the compiled SQL text and the resolved absolute dates. The MCP resources gain `nativeflows://query/measures` and `nativeflows://query/dimensions`.
 
 ### A9.5 Answers that show the query and the drill path, and abstention
 
@@ -281,7 +281,7 @@ The answer always shows:
 - `data_not_ready`: the period is not closed, or the import is running;
 - `too_broad`: ask to narrow.
 
-The model never falls back to free SQL or mental arithmetic. In TrustSQL terms a wrong answer costs more than an abstention, so ERPMe should be tuned for high precision.
+The model never falls back to free SQL or mental arithmetic. In TrustSQL terms a wrong answer costs more than an abstention, so NativeFlows should be tuned for high precision.
 
 ### A9.6 Saved analyses, KPIs and evaluation
 
@@ -307,7 +307,7 @@ The model never falls back to free SQL or mental arithmetic. In TrustSQL terms a
 | A-12 | Cost controls: verified-plan and plan-cache hits skip the model; per-company budgets; cheap router model; existing timeouts and `max_rows_read` | **Phase 1** (budgets, cache); later (pre-aggregates) | Cache keys must include the scope fingerprint and `as_of` policy |
 | A-13 | Small-cell suppression for personal and `cost` field-class measures in aggregated answers | Later (Phase 1 only if HR analytics is in scope) | Can hide legitimate small numbers; make the threshold a company setting |
 | A-14 | Export the catalog as Apache Ossie YAML for outside BI tools | **Later** | Spec still 0.x; low value until customers bring a BI tool |
-| A-15 | Do not adopt an external semantic layer product (Cube, dbt SL) inside the core | Decision for Phase 1 | Building in-house costs some weeks. An external engine would duplicate scope, field classes and taint rules that ERPMe already enforces in its own views, and would add a second security model |
+| A-15 | Do not adopt an external semantic layer product (Cube, dbt SL) inside the core | Decision for Phase 1 | Building in-house costs some weeks. An external engine would duplicate scope, field classes and taint rules that NativeFlows already enforces in its own views, and would add a second security model |
 
 ---
 
@@ -374,7 +374,7 @@ The first two digits of the AI determine whether the element has a predefined le
 
 All other AIs are variable length and need a GS unless they come last. A frequent bug: hard-coding "(10) is up to 20" without terminating on GS.
 
-### Core AIs for ERPMe
+### Core AIs for NativeFlows
 
 | AI | Content | Format | Notes |
 | --- | --- | --- | --- |
@@ -442,13 +442,13 @@ Recommended order [inference, aligned with D365 and GS1 docs]:
    - Never parse a string like `01…` as GS1 *only* because it starts with 01. Prefer the registry lookup first (step 6) when no identifier is present.
 4. **Element string parse.** Read the AI using the table of valid AIs (the AI length follows from its first digits). Read a fixed length, or up to GS or end. Repeat. Validate with the Syntax Dictionary rules (B2). Unknown AI → a typed error, or skip by policy (D365's "Unknown application identifier policy": *Error* or *Skip*).
 5. **Interpret.** Dates → ISO dates (century window, DD=00 → last day). 310n → decimal with unit. (01) → GTIN-14.
-6. **Resolve** against ERPMe master data (B8).
+6. **Resolve** against NativeFlows master data (B8).
 
 **Libraries [doc]:**
 
 - **GS1 Barcode Syntax Engine**: C with bindings for C#, Java, Swift and JavaScript/WebAssembly; Apache-2.0. It is the reference for parsing, validation and Digital Link conversion, and runs in the browser (PWA) and on the server. https://github.com/gs1/gs1-syntax-engine
 - Python: `biip` parses GS1 element strings, GTINs and SSCCs [doc] https://biip.readthedocs.io/en/latest/api/sscc/. `python-stdnum` carries a GS1 AI table [doc] https://sources.debian.org/src/python-stdnum/2.2-1/stdnum/gs1_ai.dat.
-- Recommendation [inference]: one canonical parser on the server (Python, table generated from the Syntax Dictionary) and the WASM Syntax Engine in the PWA for instant feedback. A shared test corpus, GS1's Syntax Tests plus ERPMe's own, keeps the two in agreement.
+- Recommendation [inference]: one canonical parser on the server (Python, table generated from the Syntax Dictionary) and the WASM Syntax Engine in the PWA for instant feedback. A shared test corpus, GS1's Syntax Tests plus NativeFlows's own, keeps the two in agreement.
 
 ## B6. Internal codes (prefix 2 and company-specific)
 
@@ -475,9 +475,9 @@ Recommended order [inference, aligned with D365 and GS1 docs]:
 
 **Lessons [inference]:**
 
-1. Parsing is **configuration plus a standard table**. Every vendor ships the AI table; ERPMe should generate it from GS1's Syntax Dictionary instead of a hand-made list.
-2. Multi-field capture needs a **mapping from AI to the fields of the current step**. D365's per-menu-item policy is the most explicit model. In ERPMe this maps to each scan command's input schema.
-3. Every vendor depends on scanner configuration (prefix, GS substitution). ERPMe should ship a scanner profile and a **scan test page**.
+1. Parsing is **configuration plus a standard table**. Every vendor ships the AI table; NativeFlows should generate it from GS1's Syntax Dictionary instead of a hand-made list.
+2. Multi-field capture needs a **mapping from AI to the fields of the current step**. D365's per-menu-item policy is the most explicit model. In NativeFlows this maps to each scan command's input schema.
+3. Every vendor depends on scanner configuration (prefix, GS substitution). NativeFlows should ship a scanner profile and a **scan test page**.
 4. SAP's verification fields are the canonical **scan-to-confirm** design.
 
 ## B8. Scan resolution across item, lot, serial, bin, handling unit and document
@@ -537,7 +537,7 @@ ScanResolution {
   - GS1 QR needs recent firmware.
   - Sources: [doc] https://supportcommunity.zebra.com/articles/en_US/KM_Solution/Creating-GS1-Barcodes-with-Zebra-Printers-for-Data-Matrix-and-Code-128-using-ZPL, https://docs.zebra.com/us/en/printers/software/zpl-pg/c-zpl-zpl-commands/r-zpl-bc.html
 - **EPL** is legacy: Zebra desktop printers, still in the field. Support only through ZPL emulation. [inference]
-- **PDF labels** rendered on the server print on any printer, including office lasers on A4 label sheets, and fit ERPMe's existing print/render pipeline (ADR-0049). Thermal printers print PDFs too, but slower and with less exact barcode bars, because of rasterization at 203 or 300 dpi. [inference]
+- **PDF labels** rendered on the server print on any printer, including office lasers on A4 label sheets, and fit NativeFlows's existing print/render pipeline (ADR-0049). Thermal printers print PDFs too, but slower and with less exact barcode bars, because of rasterization at 203 or 300 dpi. [inference]
 
 **Recommendation [inference]:**
 
@@ -639,12 +639,12 @@ Rule [inference]: **posting-relevant steps are always scan-to-confirm.** Search 
   3. **Range entry** for consecutive serials, with a supervisor right.
   4. **Receipt of supplier-serialized parts.** Parse (01)(21) from the supplier's label; map their GTIN to the item through `item_barcode` or a supplier GTIN link.
 - **Production [inference].** Assembly manufacturers usually assign serials at final assembly or at a station. Generating serials from a number sequence, printing a DataMatrix label at the station and scanning it at confirmation closes the loop (ADR-0034). Component serials scanned into the parent serial build a genealogy, which is valuable for warranty and recall.
-- **Checks already in ERPMe:** `serial_not_in_bin` at confirmation (ADR-0023). Add `serial_wrong_item`, `serial_status_blocked` and `serial_reused`.
+- **Checks already in NativeFlows:** `serial_not_in_bin` at confirmation (ADR-0023). Add `serial_wrong_item`, `serial_status_blocked` and `serial_reused`.
 
 ## B14. Vietnamese context
 
 - **Prefix 893.** Assigned by GS1 to GS1 Vietnam, which works under the national standards, metrology and quality authority of the Ministry of Science and Technology. A company prefix is 893 plus an enterprise number (4–7 digits under the 2006 rules). [doc] https://hethongphapluat.com/decision-no-15-2006-qd-bkhcn-of-the-ministry-of-science-and-technology-promulgating-the-regulation-on-allocation-use-and-management-of-article-numbers-and-barcodes.html, https://vietnamnet.vn/en/vietnam-promotes-adoption-of-gs1-standards-2568839.html
-- **893 shows who allocated the prefix, not where the goods were made.** Customs reporting confirms that a Vietnamese code on imported goods does not by itself mean fake origin. [blog] https://english.haiquanonline.com.vn/imported-goods-with-vietnamese-code-not-grounds-to-conclude-fake-origin-13890.html. ERPMe must never infer country of origin from a GTIN prefix. [inference]
+- **893 shows who allocated the prefix, not where the goods were made.** Customs reporting confirms that a Vietnamese code on imported goods does not by itself mean fake origin. [blog] https://english.haiquanonline.com.vn/imported-goods-with-vietnamese-code-not-grounds-to-conclude-fake-origin-13890.html. NativeFlows must never infer country of origin from a GTIN prefix. [inference]
 - **Duties of prefix holders.** After allocation, users declare and update product information in the national database (Circular 10/2020/TT-BKHCN). [doc] https://english.luatvietnam.vn/circular-no-10-2020-tt-bkhcn-detailing-and-providing-measures-to-implement-a-numb-199216-doc1.html
 - **Decree 37/2026/NĐ-CP** (effective 23 Jan 2026; guides the Law on Product and Goods Quality; replaces Decree 132/2008) [blog, from legal portals; verify against the official gazette]:
   - defines a **traceability code** built from product trace code, location trace code and lot or serial;

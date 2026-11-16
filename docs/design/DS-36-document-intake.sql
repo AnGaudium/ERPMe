@@ -4,7 +4,7 @@
 -- Kept in a file of its own so that the platform lab's closed lists (installation tables, nullable company columns,
 -- policy counts) stay as they are; load_all.py loads it after the files of its FILE_ORDER (ADR-0057 rule 1).
 -- PostgreSQL 18. The ADRs win if this file disagrees.
--- Conventions of DS-20 and DS-05: tables in schema erpme, domains in types; keys inline, named by the MetaData naming
+-- Conventions of DS-20 and DS-05: tables in schema nativeflows, domains in types; keys inline, named by the MetaData naming
 -- convention in migrations (ADR-0004 rule 15); UUIDv7 IDs from context.new_id, no ID defaults; references between company
 -- tables are composite on (company_id, id); recorded_at on every row (ADR-0007 rule 9). Every table with company_id gets
 -- FORCE ROW LEVEL SECURITY and the company policy (ADR-0017 rule 19), written at the end as rls_v1 would.
@@ -363,8 +363,8 @@ BEGIN
                                    'extraction_result_link', 'extraction_mapping_rule', 'data_processing_permission'] LOOP
         EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', v_table);
         EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', v_table);
-        EXECUTE format('CREATE POLICY company_policy ON %I USING (company_id::text = current_setting(''erpme.company_id'', true))', v_table);
-        EXECUTE format('CREATE POLICY company_ids_policy ON %I FOR SELECT USING (company_id::text = ANY (string_to_array(current_setting(''erpme.company_ids'', true), '','')))', v_table);
+        EXECUTE format('CREATE POLICY company_policy ON %I USING (company_id::text = current_setting(''nativeflows.company_id'', true))', v_table);
+        EXECUTE format('CREATE POLICY company_ids_policy ON %I FOR SELECT USING (company_id::text = ANY (string_to_array(current_setting(''nativeflows.company_ids'', true), '','')))', v_table);
     END LOOP;
 END
 $$;

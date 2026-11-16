@@ -4,7 +4,7 @@ Date: 2026-11-15. Scope: input for the holistic review of the open questions on 
 
 Direction followed: survey best practice, keep hard locks few, make policy configurable at implementation, keep country law in localization packages.
 
-## 1. Where ERPMe stands
+## 1. Where NativeFlows stands
 
 - **Labels from the schema.** Every field has a label (`internal`, `personal`, `sensitive_personal`), evaluated per row (partner kind). An unknown kind counts as personal (ADR-0050 rule 9).
 - **`routing_switch`.** A company setting, default off. When on, the gateway replaces personal values with typed placeholders, scans the request for leftovers and blocks a step that needs a removed value. Sensitive personal values never leave in Phase 1.
@@ -33,16 +33,16 @@ Direction followed: survey best practice, keep hard locks few, make policy confi
 
 **Patterns across vendors.**
 1. **The provider is a subprocessor that the tenant opts into, with a default that depends on region.** Microsoft is the clearest case: the same toggle defaults on in one region and off in another. Users and groups narrow it further, and models whose retention terms differ need their own opt-in.
-2. **Region is an attribute of the endpoint or deployment.** Bedrock profiles, Azure Data Zones, ServiceNow overflow and Power Platform geographies all work this way. The customer picks an endpoint; nobody types a country into a request. ERPMe's provider registry already follows this pattern.
-3. **Masking by detection is the norm, and it is weak.** Salesforce, ServiceNow, SAP and Bedrock all detect PII with patterns or ML. Salesforce disables masking for agents because it breaks grounding, and Presidio states that detection is incomplete. ERPMe's schema labels are stronger: the system knows which fields are personal before it sends them. Detection should only add protection, never lower a label.
+2. **Region is an attribute of the endpoint or deployment.** Bedrock profiles, Azure Data Zones, ServiceNow overflow and Power Platform geographies all work this way. The customer picks an endpoint; nobody types a country into a request. NativeFlows's provider registry already follows this pattern.
+3. **Masking by detection is the norm, and it is weak.** Salesforce, ServiceNow, SAP and Bedrock all detect PII with patterns or ML. Salesforce disables masking for agents because it breaks grounding, and Presidio states that detection is incomplete. NativeFlows's schema labels are stronger: the system knows which fields are personal before it sends them. Detection should only add protection, never lower a label.
 4. **No vendor redacts whole document images by default before sending them to a cloud vision model.** Whole images go to the model under the provider's contract (DPA, no training, zero or limited retention) and the region controls. Redaction tools exist, but none claims completeness. So a page image is controlled as a whole, by permission, which matches ADR-0057 rule 19 ("redaction never makes an image non-personal").
 5. **A named role makes the change.** Microsoft uses AI Administrator, ServiceNow a data privacy admin and a data steward. Data protection is a separate duty from running agents.
-6. **A master kill switch exists beside the fine-grained settings,** for example disabling the subprocessor or opting out of overflow. ERPMe's `routing_switch` plays this role.
+6. **A master kill switch exists beside the fine-grained settings,** for example disabling the subprocessor or opting out of overflow. NativeFlows's `routing_switch` plays this role.
 
 ## 3. Survey: prompt-injection containment
 
 - **OWASP LLM01:2025** says no fool-proof prevention exists. Its mitigations are: constrain behavior; validate output formats deterministically; filter input and output; least privilege, with functions handled in code; human approval for high-risk actions; segregate and mark external content; and adversarial testing.
-- **Spotlighting** (Hines et al., 2024) marks untrusted text by delimiting, datamarking or encoding it. ERPMe uses delimiters and datamarking. Both lower the attack rate; neither is a control.
+- **Spotlighting** (Hines et al., 2024) marks untrusted text by delimiting, datamarking or encoding it. NativeFlows uses delimiters and datamarking. Both lower the attack rate; neither is a control.
 - **Lethal trifecta** (Willison, 2025): private data, untrusted content and an exfiltration channel together. Removing any one leg breaks the attack path. A read-only tool that reads private data is a leg, but it is dangerous only when the run also has a way out.
 - **Design patterns** (Beurer-Kellner et al., 2025): action-selector, plan-then-execute, map-reduce, dual LLM, code-then-execute and context-minimization. Under plan-then-execute, tools may still be called after untrusted data has been read, as long as the plan was fixed before; the paper warns that injection can still steer the tools' arguments. Under dual LLM, the quarantined model has no tools and returns symbolic references that code dereferences.
 - **CaMeL** (Debenedetti et al., Google DeepMind, 2025) derives control flow from the trusted query only. Values carry capabilities (sources, readers), and policies are checked when a tool is called. It reports 77% of AgentDojo tasks solved with provable security, against 84% undefended.
@@ -55,8 +55,8 @@ Direction followed: survey best practice, keep hard locks few, make policy confi
 **Answer: may a run that has read untrusted input call read-only lookups?** The literature says yes, under four conditions:
 1. The lookup is deterministic, and its arguments cannot widen what it reveals.
 2. Its result carries labels that propagate. Here, the run stays tainted.
-3. Every sink is controlled. Exfiltration needs an egress, and the only egress in ERPMe is drafts that people later send. A draft is a slow, reviewed exfiltration channel, so what a tainted run may copy into a draft that goes to an outside party is the real question.
-4. The result's information is bounded: closed shapes, few rows, no free text. This follows FIDES' capacity lattice and ERPMe's numeric projections.
+3. Every sink is controlled. Exfiltration needs an egress, and the only egress in NativeFlows is drafts that people later send. A draft is a slow, reviewed exfiltration channel, so what a tainted run may copy into a draft that goes to an outside party is the real question.
+4. The result's information is bounded: closed shapes, few rows, no free text. This follows FIDES' capacity lattice and NativeFlows's numeric projections.
 
 None of these sources supports opening the whole master data. All of them support narrow, declared projections.
 
@@ -109,7 +109,7 @@ None of these sources supports opening the whole master data. All of them suppor
   - The exact-text residual scan before sending.
   - The log is committed before the call.
   - No sensitive personal values in Phase 1.
-  - A PII detector (Presidio-like) may run on `internal` free text as a second line that can only raise a label, never lower one. Reason: vendors that rely on detection admit it misses data. ERPMe's labels from the schema are its advantage.
+  - A PII detector (Presidio-like) may run on `internal` free text as a second line that can only raise a label, never lower one. Reason: vendors that rely on detection admit it misses data. NativeFlows's labels from the schema are its advantage.
 
 ### R3. What a tainted run may read from catalogs
 
@@ -136,7 +136,7 @@ None of these sources supports opening the whole master data. All of them suppor
 **Recommendation.** Keep the label `personal`, not `internal`: user prompts are customer content under every vendor's DPA, and a question may name a person. Two changes remove most of the practical cost.
 
 1. Under R2, a question reaches the router and planner seats whenever a permission covers them. With the switch off and no permission, placeholders apply. With the switch on, nothing is sent (as now).
-2. **Deterministic pseudonymization of known data subjects.** Before the gateway call, code matches the question against the company's own personal records (individual and sole-proprietor partners, contacts, employees) that the asker may read. Each match is replaced by a handle such as `[partner:123]`, which the planner can use as a filter value and code dereferences. This is the symbolic-reference idea from dual LLM and CaMeL. It beats generic NER because ERPMe knows its data subjects, and it also helps the planner resolve names.
+2. **Deterministic pseudonymization of known data subjects.** Before the gateway call, code matches the question against the company's own personal records (individual and sole-proprietor partners, contacts, employees) that the asker may read. Each match is replaced by a handle such as `[partner:123]`, which the planner can use as a filter value and code dereferences. This is the symbolic-reference idea from dual LLM and CaMeL. It beats generic NER because NativeFlows knows its data subjects, and it also helps the planner resolve names.
 
 - **Setting:** `analysis.pseudonymize_known_subjects`. Scope: company. Default on. Bounds: on or off. Who: `full` on `agent`. Audit: the processing log records the question row as sent, plus the handles substituted (IDs, never values).
 - **Hard locks:**

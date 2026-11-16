@@ -4,10 +4,10 @@
 File:line refer to the review copy: "0058" = `adr/0058-configurable-workflows.md`, "0059" = `adr/0059-ai-tuning-and-development-of-deterministic-functions.md`, "DDL" = `design/DS-28-34-configuration-artifacts.sql`, "DS-05" = `design/DS-05-platform.sql`, "DS-04" = `design/DS-04-command-envelope.md`, "t22" = `lab/t22_workflows.py`.
 
 What I ran:
-- `load_all.py` on a fresh `erpme_lab_rv58`: 305 tables.
+- `load_all.py` on a fresh `nativeflows_lab_rv58`: 305 tables.
 - `t22_workflows.py --load`: 87/87 pass. `t23_ai_artifacts.py --load`: 76/76 pass. Each on a freshly created database.
 - My own probes against the loaded DDL and the lab's pure functions (results cited in S6, S8, S19, N2, N11).
-- Cleanup done: `erpme_lab_rv58` dropped, `/tmp/rv58` deleted, repo untouched (`git status` clean, HEAD 32e7b1c). This file is the only file written.
+- Cleanup done: `nativeflows_lab_rv58` dropped, `/tmp/rv58` deleted, repo untouched (`git status` clean, HEAD 32e7b1c). This file is the only file written.
 
 ## Blocking
 

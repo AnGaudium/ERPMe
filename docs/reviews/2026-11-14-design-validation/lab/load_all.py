@@ -2,29 +2,29 @@
 
 The combined loader of the catalog review (check 12), used by the final simulation:
 
-1. 00_stubs.sql drops and rebuilds schemas erpme and types with the domains, without the stub tables that a DDL file now
+1. 00_stubs.sql drops and rebuilds schemas nativeflows and types with the domains, without the stub tables that a DDL file now
    defines (user_account: DS-15; document: DS-05-platform; material_document and its lines: DS-22-09-42).
-2. The extensions btree_gist (ADR-0007) and pg_trgm (ADR-0002) live in schema erpme, the schema the DDL runs in, so the
-   gist and trigram operator classes resolve with search_path = erpme. An extension already installed in another schema
-   of the database is moved into erpme (dropping erpme later drops it with the schema).
+2. The extensions btree_gist (ADR-0007) and pg_trgm (ADR-0002) live in schema nativeflows, the schema the DDL runs in, so the
+   gist and trigram operator classes resolve with search_path = nativeflows. An extension already installed in another schema
+   of the database is moved into nativeflows (dropping nativeflows later drops it with the schema).
 3. All DDL files are split into statements and ordered in one pass, as load_ds06.py does: every CREATE TABLE in
    dependency order (REFERENCES and PARTITION OF), then every other statement in file order. The files are taken in
    the order of FILE_ORDER, then any other design/*.sql file by name. A table defined twice is an error.
-4. SET search_path = erpme, then each statement runs, in transactions of LOAD_BATCH statements after the stubs' own
+4. SET search_path = nativeflows, then each statement runs, in transactions of LOAD_BATCH statements after the stubs' own
    (one transaction for all of them exceeds max_locks_per_transaction at about 300 tables); a failure names
    the file and line.
 
 Guard: a line whose code ends in ';' followed by a trailing comment is refused. load_ds06.py splits statements at lines
 ending in ';', and such a line silently merges two statements there (lab finding L-13).
 
-Usage:  python3 load_all.py <dsn> <docs dir>      prints the number of tables in schema erpme
+Usage:  python3 load_all.py <dsn> <docs dir>      prints the number of tables in schema nativeflows
 Module: from load_all import load_all; load_all(dsn, docs_dir) -> int
 
-Reloading: the tables already in schema erpme are dropped in batches of DROP_BATCH, each in its own transaction, before
+Reloading: the tables already in schema nativeflows are dropped in batches of DROP_BATCH, each in its own transaction, before
 the stubs drop the schema, so no transaction needs more locks than max_locks_per_transaction allows.
 
 Tables of DS-05-platform.sql get FORCE ROW LEVEL SECURITY; a role without BYPASSRLS (or not the superuser) must set
-erpme.company_id before it reads or writes them (ADR-0017 rule 19).
+nativeflows.company_id before it reads or writes them (ADR-0017 rule 19).
 """
 import glob
 import os
@@ -169,13 +169,13 @@ def build(docs_dir):
 
 
 def drop_in_batches(cx):
-    """Drop the tables of schema erpme in batches, each in its own transaction (partitions go with their parent)."""
+    """Drop the tables of schema nativeflows in batches, each in its own transaction (partitions go with their parent)."""
     names = [r[0] for r in cx.execute("select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace"
-                                      " where n.nspname = 'erpme' and c.relkind in ('r', 'p') and not c.relispartition"
+                                      " where n.nspname = 'nativeflows' and c.relkind in ('r', 'p') and not c.relispartition"
                                       " order by c.relname").fetchall()]
     for i in range(0, len(names), DROP_BATCH):
         with cx.transaction():
-            cx.execute("DROP TABLE IF EXISTS " + ", ".join(f"erpme.{n}" for n in names[i:i + DROP_BATCH]) + " CASCADE")
+            cx.execute("DROP TABLE IF EXISTS " + ", ".join(f"nativeflows.{n}" for n in names[i:i + DROP_BATCH]) + " CASCADE")
 
 
 def load_all(dsn, docs_dir):
@@ -192,23 +192,23 @@ def load_all(dsn, docs_dir):
                 row = cx.execute("select n.nspname from pg_extension e join pg_namespace n on n.oid = e.extnamespace"
                                  " where e.extname = %s", (ext,)).fetchone()
                 if row is None:
-                    cx.execute(f"CREATE EXTENSION {ext} SCHEMA erpme")
-                elif row[0] != "erpme":
-                    print(f"note: extension {ext} moved from schema {row[0]} to erpme", file=sys.stderr)
-                    cx.execute(f"ALTER EXTENSION {ext} SET SCHEMA erpme")
+                    cx.execute(f"CREATE EXTENSION {ext} SCHEMA nativeflows")
+                elif row[0] != "nativeflows":
+                    print(f"note: extension {ext} moved from schema {row[0]} to nativeflows", file=sys.stderr)
+                    cx.execute(f"ALTER EXTENSION {ext} SET SCHEMA nativeflows")
         for i in range(0, len(ordered), LOAD_BATCH):
             with cx.transaction():
-                cx.execute("SET LOCAL search_path = erpme")
+                cx.execute("SET LOCAL search_path = nativeflows")
                 for stmt, where in ordered[i:i + LOAD_BATCH]:
                     try:
                         cx.execute(stmt)
                     except psycopg.Error as e:
                         raise SystemExit(f"{where}: {str(e).splitlines()[0]}") from None
         return cx.execute("select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace"
-                          " where n.nspname = 'erpme' and c.relkind in ('r', 'p')").fetchone()[0]
+                          " where n.nspname = 'nativeflows' and c.relkind in ('r', 'p')").fetchone()[0]
 
 
 if __name__ == "__main__":
     if len(sys.argv) != 3:
         sys.exit("usage: load_all.py <dsn> <docs dir>")
-    print(f"{load_all(sys.argv[1], sys.argv[2])} tables in schema erpme")
+    print(f"{load_all(sys.argv[1], sys.argv[2])} tables in schema nativeflows")

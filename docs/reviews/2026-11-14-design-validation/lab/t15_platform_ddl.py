@@ -15,24 +15,24 @@ Not covered: commands, the dispatcher, consumers, the matching cascade, stage el
 modules (INV-82, INV-95's amount, INV-212 over usage rows), partition maintenance.
 
 Run: python t15_platform_ddl.py
-  ERPME_LAB_DSN must name a throwaway database (schemas erpme and types are dropped and rebuilt); PGPASSWORD its password.
-  ERPME_DOCS points at the docs/ tree whose design files and lab stubs are loaded (default ~/Projects/ERPMe/docs).
-  ERPME_PLATFORM_DDL, ERPME_DS22 and ERPME_DS43 override the paths of the three drafts (default <docs>/design/<file>);
+  NATIVEFLOWS_LAB_DSN must name a throwaway database (schemas nativeflows and types are dropped and rebuilt); PGPASSWORD its password.
+  NATIVEFLOWS_DOCS points at the docs/ tree whose design files and lab stubs are loaded (default ~/Projects/NativeFlows/docs).
+  NATIVEFLOWS_PLATFORM_DDL, NATIVEFLOWS_DS22 and NATIVEFLOWS_DS43 override the paths of the three drafts (default <docs>/design/<file>);
   the combined load of part A is skipped when DS-22-09-42 or DS-43-54 is not found.
 """
 import hashlib, json, os, re, subprocess, sys, tempfile
 from datetime import date, datetime, timedelta, timezone
 
-DOCS = os.path.expanduser(os.environ.get("ERPME_DOCS", "~/Projects/ERPMe/docs"))
+DOCS = os.path.expanduser(os.environ.get("NATIVEFLOWS_DOCS", "~/Projects/NativeFlows/docs"))
 LAB = os.path.join(DOCS, "reviews/2026-11-14-design-validation/lab")
 DESIGN = os.path.join(DOCS, "design")
-PLATFORM = os.environ.get("ERPME_PLATFORM_DDL", os.path.join(DESIGN, "DS-05-platform.sql"))
-DS22 = os.environ.get("ERPME_DS22", os.path.join(DESIGN, "DS-22-09-42-commercial-inventory.sql"))
-DS43 = os.environ.get("ERPME_DS43", os.path.join(DESIGN, "DS-43-54-planning-production.sql"))
+PLATFORM = os.environ.get("NATIVEFLOWS_PLATFORM_DDL", os.path.join(DESIGN, "DS-05-platform.sql"))
+DS22 = os.environ.get("NATIVEFLOWS_DS22", os.path.join(DESIGN, "DS-22-09-42-commercial-inventory.sql"))
+DS43 = os.environ.get("NATIVEFLOWS_DS43", os.path.join(DESIGN, "DS-43-54-planning-production.sql"))
 sys.path.insert(0, LAB)
 from lab import RESULTS, conn, new  # noqa: E402
 
-RLS_ROLE = "erpme_lab_rls"
+RLS_ROLE = "nativeflows_lab_rls"
 
 
 def check(name, ok, detail=""):
@@ -132,7 +132,7 @@ X = X0.execute
 X(stubs)
 X(p.stdout)
 check("A02 the stubs keep no document or user_account table of their own, and the loaded document is the platform one",
-      X("select count(*) from information_schema.columns where table_schema='erpme' and table_name='document'").fetchone()[0] > 10)
+      X("select count(*) from information_schema.columns where table_schema='nativeflows' and table_name='document'").fetchone()[0] > 10)
 
 tables = re.findall(r"^CREATE TABLE (\w+)", platform, flags=re.M)
 INSTALLATION = {"event_subject", "event_consumer", "agent_type", "agent_type_version"}
@@ -140,7 +140,7 @@ NULLABLE = {"outbox_event", "event_delivery", "audit_record", "audit_change", "a
 
 
 def cols(t):
-    return {r[0]: r[1] for r in X("select column_name, is_nullable from information_schema.columns where table_schema='erpme' and table_name=%s", (t,))}
+    return {r[0]: r[1] for r in X("select column_name, is_nullable from information_schema.columns where table_schema='nativeflows' and table_name=%s", (t,))}
 
 
 missing = [t for t in tables if t not in INSTALLATION and "company_id" not in cols(t)]
@@ -150,9 +150,9 @@ bad_null = [t for t in tables if t not in INSTALLATION and (cols(t)["company_id"
 check("A05 company_id is nullable exactly on the six tables with installation-scoped rows", bad_null == [], bad_null)
 check("A06 every platform table has recorded_at", [t for t in tables if "recorded_at" not in cols(t)] == [])
 not_forced = [t for t in tables if t not in INSTALLATION and not X(
-    "select relrowsecurity and relforcerowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace where nspname='erpme' and relname=%s", (t,)).fetchone()[0]]
+    "select relrowsecurity and relforcerowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace where nspname='nativeflows' and relname=%s", (t,)).fetchone()[0]]
 check("A07 every company table of the platform file has forced row-level security and a company policy",
-      not_forced == [] and X("select count(distinct tablename) from pg_policies where schemaname='erpme' and policyname='company_policy'").fetchone()[0] == len(tables) - len(INSTALLATION),
+      not_forced == [] and X("select count(distinct tablename) from pg_policies where schemaname='nativeflows' and policyname='company_policy'").fetchone()[0] == len(tables) - len(INSTALLATION),
       not_forced)
 names = re.findall(r"(?:CONSTRAINT|INDEX|TRIGGER|FUNCTION) (\w+)", platform)
 check("A08 every constraint, index, trigger and function name of the file is at most 63 bytes (ADR-0004 rule 6)",
@@ -255,17 +255,17 @@ d_rls = doc(X0, new(), "purchase_order")
 doc(X0, new(), "purchase_order", co="co2", by="uOther")
 if not X("select 1 from pg_roles where rolname=%s", (RLS_ROLE,)).fetchone():
     X(f"CREATE ROLE {RLS_ROLE} NOLOGIN NOSUPERUSER NOBYPASSRLS")
-X(f"GRANT USAGE ON SCHEMA erpme, types TO {RLS_ROLE}")
-X(f"GRANT SELECT ON ALL TABLES IN SCHEMA erpme TO {RLS_ROLE}")
+X(f"GRANT USAGE ON SCHEMA nativeflows, types TO {RLS_ROLE}")
+X(f"GRANT SELECT ON ALL TABLES IN SCHEMA nativeflows TO {RLS_ROLE}")
 
 
 def rls_counts(cx):
     cx.execute(f"SET LOCAL ROLE {RLS_ROLE}")
     none_ = cx.execute("select count(*) from document").fetchone()[0]
-    cx.execute("select set_config('erpme.company_id', %s, true)", (str(I["co"]),))
+    cx.execute("select set_config('nativeflows.company_id', %s, true)", (str(I["co"]),))
     own = cx.execute("select count(*) from document").fetchone()[0]
     other = cx.execute("select count(*) from document where company_id=%s", (I["co2"],)).fetchone()[0]
-    cx.execute("select set_config('erpme.company_id', 'installation', true)")
+    cx.execute("select set_config('nativeflows.company_id', 'installation', true)")
     inst = cx.execute("select count(*) from document").fetchone()[0]
     return none_, own, other, inst
 
@@ -291,8 +291,8 @@ trial("B03 a version hash that is not SHA-256 hex is refused", lambda cx: cx.exe
     (new(), I["co"], D1, I["uAcc"])), True, "ck_document_version_version_hash")
 trial("B04 a version of another company's document is refused (composite key)", lambda cx: version(cx, D1, 3, {"y": 1}, co="co2"), True, "fk")
 trial("B05 versions are never updated (ADR-0009 rule 14)", lambda cx: cx.execute("update document_version set content='{}' where id=%s", (V1,)), True, "never updated")
-trial("B06 a version is deleted only with its draft, under erpme.document_delete_id", lambda cx: (
-    cx.execute("select set_config('erpme.document_delete_id', %s, true)", (str(D1),)),
+trial("B06 a version is deleted only with its draft, under nativeflows.document_delete_id", lambda cx: (
+    cx.execute("select set_config('nativeflows.document_delete_id', %s, true)", (str(D1),)),
     cx.execute("delete from document_version where document_id=%s", (D1,)), cx.execute("delete from document where id=%s", (D1,))), False)
 trial("B07 without the setting a draft's versions cannot be deleted", lambda cx: cx.execute("delete from document_version where document_id=%s", (D1,)), True, "never updated or deleted")
 trial("B08 INV-43: a pending version without a change state is refused", lambda cx: doc(cx, new(), "sales_order", pending_version=2), True, "ck_document_pending_version")
@@ -519,8 +519,8 @@ trial("F03 a request body only on a request row", lambda cx: cx.execute(
     """insert into agent_run_step (id, company_id, agent_run_id, ordinal, step_code, kind, request_step_id, tool_name, request_body, recorded_at)
        values (%s,%s,%s,5,'x','tool_result',%s,'T','{}',now())""", (new(), I["co"], R2, TREQ)), True, "ck_agent_run_step_bodies")
 trial("F04 steps are append-only; erasure may blank bodies", lambda cx: cx.execute("update agent_run_step set step_code='y' where id=%s", (REQ,)), True, "append-only")
-trial("F05 ... with erpme.erasure_command_id the bodies are blanked", lambda cx: (
-    cx.execute("select set_config('erpme.erasure_command_id', %s, true)", (str(new()),)),
+trial("F05 ... with nativeflows.erasure_command_id the bodies are blanked", lambda cx: (
+    cx.execute("select set_config('nativeflows.erasure_command_id', %s, true)", (str(new()),)),
     cx.execute("update agent_run_step set request_body=null, erased_at=now() where id=%s", (REQ,))), False)
 trial("F06 rule 17: a completed run cannot carry a stop outcome", lambda cx: run(cx, new(), state="completed", outcome="budget_exceeded", wi=WIR), True, "ck_agent_run_outcome")
 trial("F07 the third denial stops a run; a fourth is never counted", lambda cx: run(cx, new(), wi=WIR, denials=4), True, "ck_agent_run_denial_count")
@@ -663,11 +663,11 @@ trial("H04 a consumer name is snake_case of at most 48 characters", lambda cx: c
     "insert into event_consumer (consumer, kind, queue, recorded_at) values (%s,'transactional','events',now())", ("c" * 49,)), True, "ck_event_consumer_consumer")
 AUD = audit(X0, command="ApproveChangeProposal", effect="other", reason="looks right", actor_kind="human", actor=I["uOwner"])
 trial("H05 audit records are append-only (ADR-0038 rule 4)", lambda cx: cx.execute("update audit_record set reason='x' where id=%s", (AUD,)), True, "append-only")
-trial("H06 ... except that erasure masks reason under erpme.erasure_command_id", lambda cx: (
-    cx.execute("select set_config('erpme.erasure_command_id', %s, true)", (str(new()),)),
+trial("H06 ... except that erasure masks reason under nativeflows.erasure_command_id", lambda cx: (
+    cx.execute("select set_config('nativeflows.erasure_command_id', %s, true)", (str(new()),)),
     cx.execute("update audit_record set reason='[erased]', erased_at=now() where id=%s", (AUD,))), False)
 trial("H07 ... and erasure changes nothing else", lambda cx: (
-    cx.execute("select set_config('erpme.erasure_command_id', %s, true)", (str(new()),)),
+    cx.execute("select set_config('nativeflows.erasure_command_id', %s, true)", (str(new()),)),
     cx.execute("update audit_record set command_type='X' where id=%s", (AUD,))), True, "append-only")
 trial("H08 a draft-only command is never of a posting effect class (ADR-0050 rule 26)", lambda cx: audit(cx, effect="posting", draft_only=True), True, "ck_audit_record_draft_only")
 check("H09 audit records with installation scope have no company and live in the default partition",

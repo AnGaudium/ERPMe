@@ -24,12 +24,12 @@ None.
 
 ## Should-fix
 
-**S1. Both new functions resolve their tables through the caller's search path, so a temporary table bypasses the trigger and feeds the security-definer function.** DDL:174-175 (`SET search_path = erpme`, unqualified `setting_value`); DDL:189, 195, 222, 227 (unqualified `setting_definition` and `setting_value`, no search path on the trigger function).
-PostgreSQL searches `pg_temp` first for tables unless it is listed, also under `SET search_path = erpme`. Probes as a plain role with the default TEMPORARY privilege:
-- a temporary `setting_definition` copied from the real one with `max_value` and `direction` changed: `automation.max_active_rules` 5000 is accepted without a proposal as `neutral` (bound 1000), with the session path `erpme, types, public` and with `erpme` alone;
+**S1. Both new functions resolve their tables through the caller's search path, so a temporary table bypasses the trigger and feeds the security-definer function.** DDL:174-175 (`SET search_path = nativeflows`, unqualified `setting_value`); DDL:189, 195, 222, 227 (unqualified `setting_definition` and `setting_value`, no search path on the trigger function).
+PostgreSQL searches `pg_temp` first for tables unless it is listed, also under `SET search_path = nativeflows`. Probes as a plain role with the default TEMPORARY privilege:
+- a temporary `setting_definition` copied from the real one with `max_value` and `direction` changed: `automation.max_active_rules` 5000 is accepted without a proposal as `neutral` (bound 1000), with the session path `nativeflows, types, public` and with `nativeflows` alone;
 - a temporary `setting_value` with SELECT granted to public: `setting_installation_value` returns the caller's row (`free_prose` as the installation maximum).
 This is the round 1 S3 guarantee ("ties every copy to `setting_definition`") and the standard rule for SECURITY DEFINER functions.
-Fix: schema-qualify every table in both functions (`erpme.setting_definition`, `erpme.setting_value`, `d erpme.setting_definition%ROWTYPE`) and the call `erpme.setting_installation_value`, and declare `SET search_path = erpme, pg_temp` on both functions. Add two lab checks that repeat the probes. The other trigger functions of the design share the unqualified style; that is outside this ADR, but a line in the DDL header or DS-18 that application roles get no TEMPORARY privilege would close it design-wide.
+Fix: schema-qualify every table in both functions (`nativeflows.setting_definition`, `nativeflows.setting_value`, `d nativeflows.setting_definition%ROWTYPE`) and the call `nativeflows.setting_installation_value`, and declare `SET search_path = nativeflows, pg_temp` on both functions. Add two lab checks that repeat the probes. The other trigger functions of the design share the unqualified style; that is outside this ADR, but a line in the DDL header or DS-18 that application roles get no TEMPORARY privilege would close it design-wide.
 
 ## Nits
 

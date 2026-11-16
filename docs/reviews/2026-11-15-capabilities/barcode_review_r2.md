@@ -60,4 +60,4 @@ Builder decisions: the revival owner as `item_id` is sound, since a barcode name
 - The GS1 facts the ADR itself flags (predefined-length table and AI pairs against the current Dictionary, Digital Link key search, SSCC reuse period, prefix lengths) were not checked against GS1 documents here; they are carried as open questions.
 - Row-level security is by the generated-policy convention and is not enabled by the lab load.
 
-Cleanup done: database `erpme_lab_rv61` dropped, `/tmp/rv61` deleted; the repository and the drafts were not changed.
+Cleanup done: database `nativeflows_lab_rv61` dropped, `/tmp/rv61` deleted; the repository and the drafts were not changed.

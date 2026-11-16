@@ -4,7 +4,7 @@ Status: accepted (2026-11-14). The scope and the production design principle (ru
 
 ## Decision
 
-On 2026-11-14 the author decided that every capability a customer cannot operate without is built in Phase 1, in full depth. The author prefers a longer build and a product people can use to a fast demo whose structure must later be reworked. On the same ground, production moves into Phase 1, so that ERPMe can be offered to manufacturers. The author also set the principle for production: a general core that is not built for one industry, learned from SAP's core, simplified, agentic-native and not copied blindly. Production costing likewise follows best practice.
+On 2026-11-14 the author decided that every capability a customer cannot operate without is built in Phase 1, in full depth. The author prefers a longer build and a product people can use to a fast demo whose structure must later be reworked. On the same ground, production moves into Phase 1, so that NativeFlows can be offered to manufacturers. The author also set the principle for production: a general core that is not built for one industry, learned from SAP's core, simplified, agentic-native and not copied blindly. Production costing likewise follows best practice.
 
 | Area | Before | Now |
 | --- | --- | --- |
@@ -95,7 +95,7 @@ On 2026-11-14 the author decided that every capability a customer cannot operate
 
 ## Context
 
-The author's words, in summary: core capabilities should all be in Phase 1, because without them the product does not run. The author would rather spend more time on a usable product than save time on a demo that is hard to fix later because its structure was incomplete. For the same reason production enters Phase 1, to offer ERPMe to manufacturers. The production core is to learn from SAP, simplified and agentic-native, not industry-specific, with costing by best practice.
+The author's words, in summary: core capabilities should all be in Phase 1, because without them the product does not run. The author would rather spend more time on a usable product than save time on a demo that is hard to fix later because its structure was incomplete. For the same reason production enters Phase 1, to offer NativeFlows to manufacturers. The production core is to learn from SAP, simplified and agentic-native, not industry-specific, with costing by best practice.
 
 The agent's view, recorded for the author:
 - **Structure.** The decision removes the main risk of the seams approach: production costing designed late against a core that cannot change after go-live.

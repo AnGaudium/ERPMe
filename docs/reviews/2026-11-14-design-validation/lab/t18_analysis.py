@@ -1,11 +1,11 @@
 """Scenario: agent-assisted reporting and analysis (ADR-0060), as pure functions and on the DDL drafts.
 
 Run: python t18_analysis.py [--load]
-  The pure checks (parts C to G) always run. With --load, ERPME_LAB_DSN must name a throwaway database: load_all.py drops
-  and rebuilds schemas erpme and types there and loads every DDL file of design/, this script rebuilds a lab schema
+  The pure checks (parts C to G) always run. With --load, NATIVEFLOWS_LAB_DSN must name a throwaway database: load_all.py drops
+  and rebuilds schemas nativeflows and types there and loads every DDL file of design/, this script rebuilds a lab schema
   query with three fact views and their label views, and the database checks (part D) run. Recreate the database before
   each --load: reloading an existing schema can exceed the container's lock limit.
-  ERPME_DOCS points at the docs/ tree (default ~/Projects/ERPMe/docs); ERPME_LAB_DIR at lab.py and load_all.py
+  NATIVEFLOWS_DOCS points at the docs/ tree (default ~/Projects/NativeFlows/docs); NATIVEFLOWS_LAB_DIR at lab.py and load_all.py
   (default: this file's directory).
 
 C: the core catalogs analysis-measures.csv and analysis-dimensions.csv: field counts, unique codes, fewer than 40
@@ -41,11 +41,11 @@ from datetime import date, timedelta
 from decimal import ROUND_HALF_UP, Decimal as D
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-LAB = os.environ.get("ERPME_LAB_DIR", HERE)
+LAB = os.environ.get("NATIVEFLOWS_LAB_DIR", HERE)
 sys.path.insert(0, LAB)
 from lab import RESULTS, conn, expect, new  # noqa: E402
 
-DOCS = os.path.expanduser(os.environ.get("ERPME_DOCS", "~/Projects/ERPMe/docs"))
+DOCS = os.path.expanduser(os.environ.get("NATIVEFLOWS_DOCS", "~/Projects/NativeFlows/docs"))
 CAT = os.path.join(DOCS, "catalogs")
 
 
@@ -852,7 +852,7 @@ def one_select(sql):
     s = sql.strip()
     allowed = set(FACTS) | set(LABEL_VIEWS.values()) | {f"{f.replace('_overview', '')}_line_dimension" for f in FACTS} | {"posting_period_dimension"}
     return (s.upper().startswith(("WITH", "SELECT")) and ";" not in s and not FORBIDDEN.search(s)
-            and set(re.findall(r"\bquery\.(\w+)", s)) <= allowed and "erpme." not in s)
+            and set(re.findall(r"\bquery\.(\w+)", s)) <= allowed and "nativeflows." not in s)
 
 
 def scan_rows(node):
@@ -1456,7 +1456,7 @@ check("V28 an unknown relative range and an unknown special-period option are re
 
 # ======================================================================= S: compiler
 COMP = [compile_plan(p, CTX) for p in (P_GOOD1, P_GOOD2, P_GOOD3, P_GOOD4, P_GOOD5)]
-check("S01 every compiled plan is one SELECT over declared query views, with no DML, no ';' and no erpme table",
+check("S01 every compiled plan is one SELECT over declared query views, with no DML, no ';' and no nativeflows table",
       all(one_select(s) for s, _, _ in COMP), [s[:80] for s, _, _ in COMP if not one_select(s)])
 SECRET = "Robert'); DROP TABLE x;--"
 pp = dict(P_GOOD1, filters=[{"dimension": "branch", "op": "in", "values": [SECRET, "B1"]}])
@@ -1853,16 +1853,16 @@ if "--load" in sys.argv:
     import psycopg  # noqa: E402
     from psycopg.types.json import Jsonb  # noqa: E402
     from load_all import load_all  # noqa: E402
-    dsn = os.environ.get("ERPME_LAB_DSN", "host=127.0.0.1 port=5561 dbname=erpme_lab user=lab")
+    dsn = os.environ.get("NATIVEFLOWS_LAB_DSN", "host=127.0.0.1 port=5561 dbname=nativeflows_lab user=lab")
     n_tables = load_all(dsn, DOCS)
     check("D01 load_all.py loads every DDL file of design/ into one schema, DS-33-analysis.sql included", n_tables > 200, n_tables)
     c = conn(); c.autocommit = True
     X = c.execute
     cols = {}
-    for t_, col in X("select table_name, column_name from information_schema.columns where table_schema='erpme'").fetchall():
+    for t_, col in X("select table_name, column_name from information_schema.columns where table_schema='nativeflows'").fetchall():
         cols.setdefault(t_, set()).add(col)
     T4 = ("analysis_question", "saved_analysis", "saved_analysis_version", "analysis_example")
-    forced = {r[0] for r in X("select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='erpme' and relforcerowsecurity")}
+    forced = {r[0] for r in X("select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='nativeflows' and relforcerowsecurity")}
     check("D02 the four tables exist with company_id and forced row-level security", all(t_ in cols and "company_id" in cols[t_] and t_ in forced for t_ in T4))
 
     I = {k: new() for k in ["user", "user2", "co", "b1", "b2", "g1", "p1", "p2", "p3", "ig1", "ig2", "itg", "pr1", "pr2", "i1", "i2", "u",
@@ -1873,7 +1873,7 @@ if "--load" in sys.argv:
         X("insert into user_account (id, login, display_name, language, password_hash, created_at) values (%s,%s,'Lab user','en','x',now())", (I[k], k + "18" + t))
     X("insert into company (id,code,legal_name,company_currency,time_zone,localization_package,accounting_regime,valuation_area_level,fiscal_calendar_owner_id,default_language)"
       " values (%s,%s,'Co','VND','Asia/Ho_Chi_Minh','lab','lab','company',%s,'en')", (I["co"], "C18-" + t, I["user"]))
-    X("select set_config('erpme.company_id', %s, false)", (str(I["co"]),))
+    X("select set_config('nativeflows.company_id', %s, false)", (str(I["co"]),))
     for k, code in (("b1", "B1"), ("b2", "B2")):
         X("insert into branch (id, company_id, code, name) values (%s,%s,%s,%s)", (I[k], I["co"], code, code))
     X("insert into partner_group (id, company_id, code, name, basis) values (%s,%s,'G1','Group 1','{}')", (I["g1"], I["co"]))
@@ -1958,7 +1958,7 @@ if "--load" in sys.argv:
         """is_in_scope from the view's own entry of the per-view grant map (rule 13); one grant per view in the lab."""
         return (f"coalesce((SELECT (NOT (g ? 'branches') OR {branch}::text IN (SELECT jsonb_array_elements_text(g -> 'branches')))"
                 f" AND (g ->> 'owner' = 'company' OR {owner}::text = g ->> 'user')"
-                f" FROM (SELECT nullif(current_setting('erpme.read_grants', true), '')::jsonb -> '{view}' AS g) s WHERE g IS NOT NULL), false)")
+                f" FROM (SELECT nullif(current_setting('nativeflows.read_grants', true), '')::jsonb -> '{view}' AS g) s WHERE g IS NOT NULL), false)")
     with c.transaction():
         X("DROP SCHEMA IF EXISTS query CASCADE")
         X("CREATE SCHEMA query")
@@ -1970,7 +1970,7 @@ if "--load" in sys.argv:
         X("""CREATE VIEW query.posting_period_dimension AS
              SELECT p.id::text AS key, p.kind || ' ' || p.start_date AS label, p.start_date, p.end_date, p.kind, p.fiscal_year_id,
                     row_number() OVER (ORDER BY p.start_date, p.kind) AS seq
-             FROM erpme.posting_period p WHERE p.company_id::text = current_setting('erpme.company_id', true)""")
+             FROM nativeflows.posting_period p WHERE p.company_id::text = current_setting('nativeflows.company_id', true)""")
         X(f"""CREATE VIEW query.journal_line_overview WITH (security_barrier) AS
               SELECT jl.id, jl.company_id, je.document_id, d.document_type, d.number AS document_number, je.posting_date, jl.posting_period_id, pd.seq AS period_seq,
                      split_part(sa.code, ':', 1) AS system_account_code, lsa.path AS system_account_path, jl.account_id, jl.partner_id, p.partner_group_id,
@@ -1979,44 +1979,44 @@ if "--load" in sys.argv:
                      je.is_closing_entry, (je.fiscal_year_id IN (SELECT id FROM query.lab_migration_fiscal_year)) AS is_migration_entry,
                      (pd.kind = 'special') AS is_special_period, d.created_by_user_id,
                      {grant_sql('journal_line_overview', 'jl.branch_id', 'd.created_by_user_id')} AS is_in_scope
-              FROM erpme.journal_line jl JOIN erpme.journal_entry je ON je.id = jl.journal_entry_id JOIN erpme.document d ON d.id = je.document_id
+              FROM nativeflows.journal_line jl JOIN nativeflows.journal_entry je ON je.id = jl.journal_entry_id JOIN nativeflows.document d ON d.id = je.document_id
               JOIN query.posting_period_dimension pd ON pd.key = jl.posting_period_id::text
-              JOIN erpme.system_account sa ON sa.id = jl.system_account_id JOIN query.lab_system_account lsa ON lsa.code = split_part(sa.code, ':', 1)
-              LEFT JOIN erpme.partner p ON p.id = jl.partner_id LEFT JOIN erpme.item it ON it.id = jl.item_id LEFT JOIN erpme.product pr ON pr.id = it.product_id
-              WHERE d.state IN ('posted', 'reversed') AND jl.company_id::text = current_setting('erpme.company_id', true)
+              JOIN nativeflows.system_account sa ON sa.id = jl.system_account_id JOIN query.lab_system_account lsa ON lsa.code = split_part(sa.code, ':', 1)
+              LEFT JOIN nativeflows.partner p ON p.id = jl.partner_id LEFT JOIN nativeflows.item it ON it.id = jl.item_id LEFT JOIN nativeflows.product pr ON pr.id = it.product_id
+              WHERE d.state IN ('posted', 'reversed') AND jl.company_id::text = current_setting('nativeflows.company_id', true)
               UNION ALL   -- opening_turnover rows (ADR-0049 rule 14; ADR-0060 rule 3): no document, owner or branch
               SELECT ot.id, ot.company_id, NULL::uuid, NULL::text, NULL::text, ot.end_date, NULL::uuid, NULL::bigint,
                      split_part(sa.code, ':', 1), lsa.path, ot.account_id, NULL::uuid, NULL::uuid, NULL::uuid, NULL::uuid, NULL::uuid, NULL::uuid, NULL::uuid,
                      NULL::uuid, NULL::uuid, NULL::uuid, NULL::text, NULL::text, ot.company_debit_turnover - ot.company_credit_turnover,
                      ot.company_debit_turnover - ot.company_credit_turnover, 'opening_turnover'::text, false, false, false, NULL::uuid,
                      coalesce((SELECT g ->> 'owner' = 'company' AND NOT (g ? 'branches')
-                               FROM (SELECT nullif(current_setting('erpme.read_grants', true), '')::jsonb -> 'journal_line_overview' AS g) s WHERE g IS NOT NULL), false)
-              FROM erpme.opening_turnover ot JOIN erpme.account a ON a.id = ot.account_id JOIN erpme.system_account sa ON sa.id = a.system_account_id
+                               FROM (SELECT nullif(current_setting('nativeflows.read_grants', true), '')::jsonb -> 'journal_line_overview' AS g) s WHERE g IS NOT NULL), false)
+              FROM nativeflows.opening_turnover ot JOIN nativeflows.account a ON a.id = ot.account_id JOIN nativeflows.system_account sa ON sa.id = a.system_account_id
               JOIN query.lab_system_account lsa ON lsa.code = split_part(sa.code, ':', 1)
-              WHERE ot.company_id::text = current_setting('erpme.company_id', true)""")
+              WHERE ot.company_id::text = current_setting('nativeflows.company_id', true)""")
         X(f"""CREATE VIEW query.sales_line_overview WITH (security_barrier) AS
               SELECT l.id, l.company_id, d.id AS document_id, d.document_type, si.posting_date, si.document_date, si.partner_id, p.partner_group_id,
                      si.salesperson_id, l.item_id, l.product_id, pr.item_group_id, d.branch_id, si.currency AS transaction_currency,
                      l.line_amount AS signed_line_amount, l.inventory_quantity AS signed_inventory_quantity,
                      {grant_sql('sales_line_overview', 'd.branch_id', 'd.created_by_user_id')} AS is_in_scope
-              FROM erpme.sales_invoice_line l JOIN erpme.sales_invoice si ON si.id = l.sales_invoice_id JOIN erpme.document d ON d.id = si.id
-              JOIN erpme.partner p ON p.id = si.partner_id JOIN erpme.product pr ON pr.id = l.product_id
-              WHERE d.state IN ('posted', 'reversed') AND l.company_id::text = current_setting('erpme.company_id', true)""")
+              FROM nativeflows.sales_invoice_line l JOIN nativeflows.sales_invoice si ON si.id = l.sales_invoice_id JOIN nativeflows.document d ON d.id = si.id
+              JOIN nativeflows.partner p ON p.id = si.partner_id JOIN nativeflows.product pr ON pr.id = l.product_id
+              WHERE d.state IN ('posted', 'reversed') AND l.company_id::text = current_setting('nativeflows.company_id', true)""")
         X(f"""CREATE VIEW query.system_account_turnover WITH (security_barrier) AS
               WITH t AS (SELECT jl.company_id, jl.posting_period_id, pd.end_date AS period_end, pd.seq AS period_seq, pd.fiscal_year_id,
                                 (pd.kind = 'special') AS is_special_period, split_part(sa.code, ':', 1) AS system_account_code,
                                 lsa.path AS system_account_path, jl.branch_id, jl.cost_center_id, jl.project_id, jl.transaction_currency,
                                 sum(jl.company_amount) AS company_net_turnover
-                         FROM erpme.journal_line jl JOIN erpme.journal_entry je ON je.id = jl.journal_entry_id JOIN erpme.document d ON d.id = je.document_id
+                         FROM nativeflows.journal_line jl JOIN nativeflows.journal_entry je ON je.id = jl.journal_entry_id JOIN nativeflows.document d ON d.id = je.document_id
                          JOIN query.posting_period_dimension pd ON pd.key = jl.posting_period_id::text
-                         JOIN erpme.system_account sa ON sa.id = jl.system_account_id JOIN query.lab_system_account lsa ON lsa.code = split_part(sa.code, ':', 1)
-                         WHERE d.state IN ('posted', 'reversed') AND jl.company_id::text = current_setting('erpme.company_id', true)
+                         JOIN nativeflows.system_account sa ON sa.id = jl.system_account_id JOIN query.lab_system_account lsa ON lsa.code = split_part(sa.code, ':', 1)
+                         WHERE d.state IN ('posted', 'reversed') AND jl.company_id::text = current_setting('nativeflows.company_id', true)
                          GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12)
               SELECT t.*, sum(company_net_turnover) OVER (PARTITION BY system_account_code, branch_id, cost_center_id, project_id, transaction_currency
                                                          ORDER BY period_seq) AS company_closing_balance,
                      {grant_sql('system_account_turnover', 't.branch_id', 'NULL')} AS is_in_scope FROM t""")
-        X("CREATE VIEW query.partner_dimension AS SELECT id::text AS key, name AS label FROM erpme.partner")
-        X("CREATE VIEW query.item_group_dimension AS SELECT id::text AS key, name AS label FROM erpme.item_group")
+        X("CREATE VIEW query.partner_dimension AS SELECT id::text AS key, name AS label FROM nativeflows.partner")
+        X("CREATE VIEW query.item_group_dimension AS SELECT id::text AS key, name AS label FROM nativeflows.item_group")
         X("CREATE VIEW query.system_account_dimension AS SELECT code AS key, label, path FROM query.lab_system_account")
 
     X("insert into opening_turnover (id, company_id, account_id, start_date, end_date, company_debit_turnover, company_credit_turnover) values (%s,%s,%s,'2026-04-01','2026-09-30',0,5000000)",
@@ -2029,7 +2029,7 @@ if "--load" in sys.argv:
 
     def tx(grants):
         X("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
-        X("select set_config('erpme.read_grants', %s, true)", (jdump(grants),))
+        X("select set_config('nativeflows.read_grants', %s, true)", (jdump(grants),))
 
     def run(plan, grants=None):
         sql, params, meta = compile_plan(plan, LCTX)
@@ -2250,7 +2250,7 @@ if "--load" in sys.argv:
 
     # ---- agent runs complete with each analysis outcome (ck_agent_run_outcome, DS-05-platform.sql)
     def run_row(cx, outcome, state="completed"):
-        cx.execute("select set_config('erpme.company_id', %s, true)", (str(I["co"]),))
+        cx.execute("select set_config('nativeflows.company_id', %s, true)", (str(I["co"]),))
         cx.execute("""insert into agent_run (id, company_id, agent_type_code, agent_type_version, seatmap_hash, mode, trigger_kind, started_by_kind, on_behalf_of_id,
                       scope_kind, subject_table, subject_id, budget, state, outcome, started_at, ended_at, recorded_at)
                       values (%s,%s,'analysis','1.0.0',%s,'evaluation','person','human',%s,'subject','analysis_question',%s,'{}',%s,%s,now(),now(),now())""",
@@ -2266,7 +2266,7 @@ if "--load" in sys.argv:
 
     # ---- the tables' checks and guards
     def ins(cx, table, **v):
-        cx.execute("select set_config('erpme.company_id', %s, true)", (str(I["co"]),))
+        cx.execute("select set_config('nativeflows.company_id', %s, true)", (str(I["co"]),))
         cx.execute(f"insert into {table} ({', '.join(v)}) values ({', '.join(['%s'] * len(v))})", [Jsonb(x) if isinstance(x, (dict, list)) else x for x in v.values()])
         return v.get("id")
     H = "a" * 64

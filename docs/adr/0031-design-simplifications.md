@@ -99,7 +99,7 @@ OPT-03 is accepted only for open quantities. Moving reservation quantities into 
 
 OPT-08 is the author's, because it replaces a tool chosen in ADR-0002. The open question carries the agent's recommendation and the points a design would have to settle.
 
-SAP practice, concepts only: every storage location has at least one storage bin in EWM; open quantities are kept on schedule lines. ERPMe takes neither model; it removes the null-bin branch and keeps one open-quantity store.
+SAP practice, concepts only: every storage location has at least one storage bin in EWM; open quantities are kept on schedule lines. NativeFlows takes neither model; it removes the null-bin branch and keeps one open-quantity store.
 
 ## Options considered
 

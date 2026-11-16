@@ -1,9 +1,9 @@
 """Scenario: document intake and extraction (ADR-0057). Not product code.
 
 Run: python t20_intake.py [--load]
-  Pure checks need no database. With --load, ERPME_LAB_DSN must name a throwaway database: load_all.py drops and
-  rebuilds schemas erpme and types there with every DDL file of ERPME_DOCS/design (default ~/Projects/ERPMe/docs);
-  ERPME_LAB_DIR points at lab.py and load_all.py (default: this file's directory).
+  Pure checks need no database. With --load, NATIVEFLOWS_LAB_DSN must name a throwaway database: load_all.py drops and
+  rebuilds schemas nativeflows and types there with every DDL file of NATIVEFLOWS_DOCS/design (default ~/Projects/NativeFlows/docs);
+  NATIVEFLOWS_LAB_DIR points at lab.py and load_all.py (default: this file's directory).
 
 L: the reader ladder (rule 4): fixed rung order whatever the registration order, stop at the first valid record,
    attempts recorded, the union with earlier rungs winning when none is valid, vision only where the seat is usable.
@@ -31,11 +31,11 @@ import xml.etree.ElementTree as ET
 from datetime import date, datetime, timezone
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-LAB = os.environ.get("ERPME_LAB_DIR", HERE)
+LAB = os.environ.get("NATIVEFLOWS_LAB_DIR", HERE)
 sys.path.insert(0, LAB)
 from lab import RESULTS, conn, new  # noqa: E402
 
-DOCS = os.path.expanduser(os.environ.get("ERPME_DOCS", "~/Projects/ERPMe/docs"))
+DOCS = os.path.expanduser(os.environ.get("NATIVEFLOWS_DOCS", "~/Projects/NativeFlows/docs"))
 
 
 def check(name, ok, detail=""):
@@ -50,9 +50,9 @@ def reset_and_load(raw_dsn, docs):
     from load_all import load_all
     with psycopg.connect(raw_dsn, autocommit=True) as cx:
         tables = [r[0] for r in cx.execute("select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace"
-                                           " where n.nspname = 'erpme' and c.relkind in ('r', 'p') and not c.relispartition").fetchall()]
+                                           " where n.nspname = 'nativeflows' and c.relkind in ('r', 'p') and not c.relispartition").fetchall()]
         for i in range(0, len(tables), 20):
-            cx.execute("DROP TABLE IF EXISTS " + ", ".join(f'erpme."{t}"' for t in tables[i:i + 20]) + " CASCADE")
+            cx.execute("DROP TABLE IF EXISTS " + ", ".join(f'nativeflows."{t}"' for t in tables[i:i + 20]) + " CASCADE")
     return load_all(raw_dsn, docs)
 
 
@@ -838,7 +838,7 @@ check("M06 a failed signature gives no partner from the file; an authenticated s
 
 # ======================================================================= X: the DDL (--load)
 if "--load" in sys.argv:
-    raw_dsn = os.environ.get("ERPME_LAB_DSN", "host=127.0.0.1 port=5561 dbname=erpme_lab user=lab")
+    raw_dsn = os.environ.get("NATIVEFLOWS_LAB_DSN", "host=127.0.0.1 port=5561 dbname=nativeflows_lab user=lab")
     n_tables = reset_and_load(raw_dsn, DOCS)
     check("X00 load_all.py loads every DDL file with DS-36-document-intake.sql", n_tables > 0, f"{n_tables} tables")
     c = conn()
@@ -846,12 +846,12 @@ if "--load" in sys.argv:
     X = c.execute
     COMPANY_TABLES = ("document_extraction", "extraction_word", "extraction_field", "extraction_rule_run", "extraction_confirmation",
                       "extraction_result_link", "extraction_mapping_rule", "data_processing_permission")
-    tabs = {r[0] for r in X("select table_name from information_schema.tables where table_schema='erpme'")}
+    tabs = {r[0] for r in X("select table_name from information_schema.tables where table_schema='nativeflows'")}
     check("X01 the intake tables and the trust view exist", set(COMPANY_TABLES) | {"document_reader", "extraction_field_trust"} <= tabs)
-    forced = X("""select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace where nspname='erpme'
+    forced = X("""select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace where nspname='nativeflows'
                   and relname = any(%s) and relrowsecurity and relforcerowsecurity""", (list(COMPANY_TABLES),)).fetchone()[0]
     check(f"X02 every company table of the file ({len(COMPANY_TABLES)}) has forced row-level security", forced == len(COMPANY_TABLES), forced)
-    cols = {r[0] for r in X("select column_name from information_schema.columns where table_schema='erpme' and table_name='extraction_field'")}
+    cols = {r[0] for r in X("select column_name from information_schema.columns where table_schema='nativeflows' and table_name='extraction_field'")}
     check("X03 trust is not stored on a field: no is_untrusted or rule_results column", not ({"is_untrusted", "rule_results", "verified_by_user_id"} & cols), cols & {"is_untrusted", "rule_results"})
 
     def trial(name, fn, should_fail, match=None):
@@ -1048,7 +1048,7 @@ if "--load" in sys.argv:
     trial("X55 without the erasure setting a field's value and evidence cannot be blanked", lambda cx: cx.execute(blank, (FX,)), True, "append-only")
 
     def erase(cx):
-        cx.execute("select set_config('erpme.erasure_command_id', %s, true)", (str(new()),))
+        cx.execute("select set_config('nativeflows.erasure_command_id', %s, true)", (str(new()),))
         cx.execute(blank, (FX,))
         cx.execute("update extraction_word set text='' where document_extraction_id=%s", (I["ex2"],))
     trial("X56 erasure blanks a field's value and evidence and the words' text, keeping the rows (rule 19)", erase, False)

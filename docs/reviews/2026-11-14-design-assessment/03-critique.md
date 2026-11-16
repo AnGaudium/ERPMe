@@ -1,4 +1,4 @@
-# ERPMe design review, part 3: adversarial critique
+# NativeFlows design review, part 3: adversarial critique
 
 Snapshot: `the read-only snapshot of commit 9ac727f` (AGENTS.md, README.md, docs/ without archive/ and prompts/). The reconstruction (`01-reconstruction.md`) was used as a map only. Every claim below was checked against the snapshot text, and the evidence column cites the source as `file:rule`. DS-41 is excluded, as the task instructs.
 

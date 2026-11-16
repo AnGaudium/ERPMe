@@ -6,7 +6,7 @@ Date: 2026-11-15. Reviewer: independent (read-only). Base: branch `ds-uom`, HEAD
 
 0 blocking, 3 should-fix, 7 nits. All eight round-2 items are addressed; R6 and R8 leave one new problem each, and the override contradicts an invariant.
 
-Lab, each on a fresh `erpme_lab_rv57` (dropped afterwards): t20 173/173, t21 91/91, t12 186/186, t15 146/146, t16 99/99, all with `--load`. t05 does not run on the combined schema of `load_all.py`, on the base either, so it says nothing about this draft. "Probe" means run against the loaded schema in a rolled-back transaction.
+Lab, each on a fresh `nativeflows_lab_rv57` (dropped afterwards): t20 173/173, t21 91/91, t12 186/186, t15 146/146, t16 99/99, all with `--load`. t05 does not run on the combined schema of `load_all.py`, on the base either, so it says nothing about this draft. "Probe" means run against the loaded schema in a rolled-back transaction.
 
 File references: `0057`, `0062`, `DS-36` are the drafts in `drafts/ds-intake/`.
 

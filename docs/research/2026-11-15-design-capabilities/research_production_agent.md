@@ -4,7 +4,7 @@ Date: 2026-11-15. Input for DS-57 (backlog row: plan proposals, component reserv
 
 ## 1. Summary
 
-Every vendor surveyed keeps the planning and execution engines deterministic. They put AI in three places: summarising and ranking exceptions, proposing a resolution from candidates the engine has computed, and capturing shop-floor facts. Releasing, rescheduling and reassigning wait for a person's confirmation everywhere; the only automatic exception is an explicit setting such as D365's auto-firming time fence. ERPMe's rules already say the same thing, more strictly. DS-57 therefore needs little new safety machinery. What it needs is deterministic functions that the design still lacks: a cross-order shortage list, a release readiness check, exceptions on real production orders, shortage resolution candidates, an in-flight usage variance and variance drivers, and an extraction purpose for shop-floor reports.
+Every vendor surveyed keeps the planning and execution engines deterministic. They put AI in three places: summarising and ranking exceptions, proposing a resolution from candidates the engine has computed, and capturing shop-floor facts. Releasing, rescheduling and reassigning wait for a person's confirmation everywhere; the only automatic exception is an explicit setting such as D365's auto-firming time fence. NativeFlows's rules already say the same thing, more strictly. DS-57 therefore needs little new safety machinery. What it needs is deterministic functions that the design still lacks: a cross-order shortage list, a release readiness check, exceptions on real production orders, shortage resolution candidates, an in-flight usage variance and variance drivers, and an extraction purpose for shop-floor reports.
 
 Recommended capabilities (section 4):
 
@@ -42,7 +42,7 @@ Planned production orders stay with the `planning` agent (ADR-0051 rules 23–25
 
 Sources: SAP exception messages and rescheduling horizon [1–4], release control [5–6], Joule agents [7–9]; D365 action messages [10–11], Copilot impact summaries [12]; Business Central [13]; Oracle [14–16]; Kinaxis [17–18]; o9 [19]; Epicor [20]; Plex [21].
 
-o9's published principles put the safety pattern most clearly [19]. Agents are "autonomous within boundaries, auditable by default, and accountable to human owners". Recommendation, action and approval can be separate duties. Tool permissions are checked before execution, and "a global halt" returns workflows to human-only control. ERPMe already has each of these:
+o9's published principles put the safety pattern most clearly [19]. Agents are "autonomous within boundaries, auditable by default, and accountable to human owners". Recommendation, action and approval can be separate duties. Tool permissions are checked before execution, and "a global halt" returns workflows to human-only control. NativeFlows already has each of these:
 - fixed tool lists (ADR-0050 rule 29);
 - the approver differs from the drafter (ADR-0017 rule 16);
 - modes `off`, `shadow` and `assisted`, with demotion always allowed (ADR-0051 rule 4);
@@ -52,7 +52,7 @@ Kinaxis likewise describes its Maestro Agents as planning "with you, not for you
 
 ### 2.2 How confirmations are captured and validated
 
-- **Sources.** Vendors capture confirmations from MES terminals (D365 production floor execution: report progress, scrap with a reason code [22]), from sensor counts (D365 Sensor Data Intelligence "production auto report" [23]) and from barcode scans of order and operation. Generative capture from photos and voice is mostly shop-floor guidance today (Siemens Industrial Copilot for Operations [24]), not transaction entry. ERPMe's `production_capture` would go beyond common practice, so the design is right to make its runs tainted and draft-only (ADR-0034 rule 12).
+- **Sources.** Vendors capture confirmations from MES terminals (D365 production floor execution: report progress, scrap with a reason code [22]), from sensor counts (D365 Sensor Data Intelligence "production auto report" [23]) and from barcode scans of order and operation. Generative capture from photos and voice is mostly shop-floor guidance today (Siemens Industrial Copilot for Operations [24]), not transaction entry. NativeFlows's `production_capture` would go beyond common practice, so the design is right to make its runs tainted and draft-only (ADR-0034 rule 12).
 - **Validation.** Validation is deterministic in every system surveyed:
   - under- and over-delivery tolerances on the yield, set to warn or reject (SAP order confirmation parameters [25]);
   - a mandatory scrap reason;
@@ -61,11 +61,11 @@ Kinaxis likewise describes its Maestro Agents as planning "with you, not for you
   - consumption control: Odoo had Allowed / Allowed with warning / Blocked per bill of materials and removed it in Odoo 20 in favour of flexible consumption [26].
 
   The trend is toward flexible capture with warnings, not hard blocks. That matches the author's direction.
-- **ISA-95.** ERP (level 4) sends the production schedule down. MES (level 3) returns production performance (actuals) and refines the shift-level sequence the ERP cannot see [27]. ERPMe is a level-4 system with a thin built-in level 3: confirmations, issues and receipts. An MES feed should be a deterministic import of production performance, not an agent's job.
+- **ISA-95.** ERP (level 4) sends the production schedule down. MES (level 3) returns production performance (actuals) and refines the shift-level sequence the ERP cannot see [27]. NativeFlows is a level-4 system with a thin built-in level 3: confirmations, issues and receipts. An MES feed should be a deterministic import of production performance, not an agent's job.
 
 ### 2.3 Exception message types
 
-| Family | SAP [1–3] | D365 / BC [10, 13] | ERPMe today (ADR-0024 rule 21) |
+| Family | SAP [1–3] | D365 / BC [10, 13] | NativeFlows today (ADR-0024 rule 21) |
 | --- | --- | --- | --- |
 | Reschedule in | 10 | Advance | `expedite`, on purchase and transfer supply |
 | Reschedule out | 15 | Postpone | `postpone`, later slice |
@@ -90,11 +90,11 @@ Other configurable controls:
 - confirmation tolerances: per material, with the warn or error level configurable [25];
 - consumption control: per bill of materials (Odoo up to 19) [26].
 
-No vendor publishes defaults that would suit ERPMe. Most default the tolerances to zero, which means every deviation is shown. ERPMe should do the same where hiding a deviation is the risk, and dampen only where the noise is in the planner's own direction (postpone).
+No vendor publishes defaults that would suit NativeFlows. Most default the tolerances to zero, which means every deviation is shown. NativeFlows should do the same where hiding a deviation is the risk, and dampen only where the noise is in the planner's own direction (postpone).
 
 ### 2.5 How variances are explained
 
-SAP's variance categories split input variances into price, resource-usage, quantity, scrap and remaining input, and output variances into lot size and others [28]. ERPMe's `GetProductionOrderVariance` already uses this split (ADR-0035 rule 15). Vendors and research keep computing deterministic; the AI ranks, links and narrates. The scheduling research says the same: LLM agents translate optimiser output into explanations that people review, and the optimiser computes [29, 30].
+SAP's variance categories split input variances into price, resource-usage, quantity, scrap and remaining input, and output variances into lot size and others [28]. NativeFlows's `GetProductionOrderVariance` already uses this split (ADR-0035 rule 15). Vendors and research keep computing deterministic; the AI ranks, links and narrates. The scheduling research says the same: LLM agents translate optimiser output into explanations that people review, and the optimiser computes [29, 30].
 
 ## 3. What the design already fixes (constraints for DS-57)
 
@@ -199,7 +199,7 @@ Common to all: deterministic first (ADR-0051 rule 1). Every number in LLM text m
 - **Metric:** agreement ≥ 90%; completions reopened within 30 days (defects).
 
 ### C6 Shop-floor capture (`production_capture`, tainted)
-- **Trigger:** a verified extraction of the new purpose `production_report` (photo of a traveller or worksheet, spreadsheet, later voice), or an inbound message matched to a shop-floor user. A person operating ERPMe's own shop-floor screen or scanner needs no agent: the production order barcode is already registered (ADR-0061 rule 9).
+- **Trigger:** a verified extraction of the new purpose `production_report` (photo of a traveller or worksheet, spreadsheet, later voice), or an inbound message matched to a shop-floor user. A person operating NativeFlows's own shop-floor screen or scanner needs no agent: the production order barcode is already registered (ADR-0061 rule 9).
 - **Deterministic:**
   - the ADR-0057 ladder (barcode or QR of order and operation first, then OCR, vision last);
   - the order resolves from a trusted, closed-shape order number, which sets the run's `subject` scope, else the report goes to a person;
@@ -323,7 +323,7 @@ Everything else is a setting, a policy rule or a decision table: release with sh
 4. **Reservation timing default.** `at_release` (current interim) or a lead-days window?
 5. **Substitute components.** They are later than Phase 1 (ADR-0033 rule 17), so C3 can only offer alternative versions. Is that enough for the target segment?
 6. **Order split as two documents.** Is a change order reducing G plus a new draft acceptable before order splitting exists?
-7. **Operators' own input.** Is a shop-floor user's chat message to ERPMe outside content (tainted) or a person's own entry? Recommended: messages and pictures are tainted; the ERPMe screen and scanner are a person's entry and need no agent.
+7. **Operators' own input.** Is a shop-floor user's chat message to NativeFlows outside content (tainted) or a person's own entry? Recommended: messages and pictures are tainted; the NativeFlows screen and scanner are a person's entry and need no agent.
 8. **MES and sensor feeds.** May a deterministic production-performance import post confirmations as `system` under a policy rule with shadow evidence (as the bank cascade may), or must a person always post?
 9. **Setting home.** Should these keys go into ADR-0063's registry once drafted, with the scope levels proposed here (company, production warehouse, work center, item or version)?
 

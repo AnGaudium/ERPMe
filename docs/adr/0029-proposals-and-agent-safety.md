@@ -205,7 +205,7 @@ The assessment found six gaps:
 
 All of this is technical design under ADR-0005, except three points flagged for the author: the read-scope hard floor, taint clearing and the bank account rule.
 
-SAP practice, concepts only: change documents and dual control for sensitive fields. ERPMe uses one carrier that reuses the document machinery, so agents learn one way to propose anything.
+SAP practice, concepts only: change documents and dual control for sensitive fields. NativeFlows uses one carrier that reuses the document machinery, so agents learn one way to propose anything.
 
 ## Options considered
 

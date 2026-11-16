@@ -2,9 +2,9 @@
 ADR-0030) loaded with DS-20, DS-56, DS-06, DS-15 and the planning and production draft, on a small real P2P and O2C dataset.
 
 Run: python t14_commercial_inventory_ddl.py
-  ERPME_LAB_DSN must name a throwaway database (and PGPASSWORD its password): the script drops and rebuilds schemas
-  erpme and types there. ERPME_DOCS points at the docs/ tree to load (default ~/Projects/ERPMe/docs); its lab folder
-  gives lab.py, load_ds06.py and 00_stubs.sql. ERPME_DS22 may point at another copy of the draft.
+  NATIVEFLOWS_LAB_DSN must name a throwaway database (and PGPASSWORD its password): the script drops and rebuilds schemas
+  nativeflows and types there. NATIVEFLOWS_DOCS points at the docs/ tree to load (default ~/Projects/NativeFlows/docs); its lab folder
+  gives lab.py, load_ds06.py and 00_stubs.sql. NATIVEFLOWS_DS22 may point at another copy of the draft.
 
 A: the loader orders DS-20, DS-56, DS-06, DS-15, the planning and production draft (DS-43-54, which owns
    demand_supply_line) and this draft together, and they load.
@@ -17,7 +17,7 @@ O: O2C: a quotation line without an item (product plus configuration), a sales o
 T: constraint and trigger scenarios, each matched to the constraint that must refuse it.
 Not covered: commands, the stock lock helper, consumers, RLS policies, the documents module's final-state trigger, and
 the tables of DS-05-platform.sql (document, line taxes, money accounts, payments, bank statements; t15_platform_ddl.py).
-demand_supply_line belongs to the planning DDL (DS-43-54-planning-production.sql in design/, or ERPME_DS43); this draft
+demand_supply_line belongs to the planning DDL (DS-43-54-planning-production.sql in design/, or NATIVEFLOWS_DS43); this draft
 relies on its hold_reasons set and adds the keys of its sales order, purchase order and purchase request line columns.
 """
 import os, re, subprocess, sys, tempfile
@@ -25,11 +25,11 @@ from decimal import Decimal as D, ROUND_HALF_UP
 from datetime import datetime, timezone
 from fractions import Fraction as F
 
-DOCS = os.path.expanduser(os.environ.get("ERPME_DOCS", "~/Projects/ERPMe/docs"))
+DOCS = os.path.expanduser(os.environ.get("NATIVEFLOWS_DOCS", "~/Projects/NativeFlows/docs"))
 DESIGN = os.path.join(DOCS, "design")
 LAB = os.path.join(DOCS, "reviews/2026-11-14-design-validation/lab")
-DS22 = os.environ.get("ERPME_DS22", os.path.join(DESIGN, "DS-22-09-42-commercial-inventory.sql"))
-DS43 = os.environ.get("ERPME_DS43", os.path.join(DESIGN, "DS-43-54-planning-production.sql"))   # owns demand_supply_line
+DS22 = os.environ.get("NATIVEFLOWS_DS22", os.path.join(DESIGN, "DS-22-09-42-commercial-inventory.sql"))
+DS43 = os.environ.get("NATIVEFLOWS_DS43", os.path.join(DESIGN, "DS-43-54-planning-production.sql"))   # owns demand_supply_line
 sys.path.insert(0, LAB)
 from lab import conn, new, RESULTS  # noqa: E402
 
@@ -61,7 +61,7 @@ def trial(name, fn, match):
 # ======================================================================= A: load
 # Lab-only: the shared document row's columns (ADR-0009 rule 1; ADR-0052 rule 18), document_version (documents) and
 # work_item, which DS-05-platform.sql defines and the credit hold keys to (this lab does not load DS-05).
-EXTRA_STUBS = """SET search_path = erpme;
+EXTRA_STUBS = """SET search_path = nativeflows;
 ALTER TABLE document ADD COLUMN partner_id uuid, ADD COLUMN document_date date, ADD COLUMN number text, ADD COLUMN version integer NOT NULL DEFAULT 1,
   ADD COLUMN reversal_of_id uuid REFERENCES document (id), ADD COLUMN correction_of_id uuid REFERENCES document (id),
   ADD CONSTRAINT uq_document_company_id_id UNIQUE (company_id, id);
@@ -88,7 +88,7 @@ check("A1 the loader orders DS-20, DS-56, DS-06, DS-15, DS-43-54 and the draft t
 c = conn(); c.autocommit = True
 X = c.execute
 try:
-    X(stubs); X(EXTRA_STUBS); X("SET search_path = erpme;\n" + p.stdout)
+    X(stubs); X(EXTRA_STUBS); X("SET search_path = nativeflows;\n" + p.stdout)
     loaded = "loaded"
 except Exception as e:
     loaded = str(e).splitlines()[0]
@@ -100,7 +100,7 @@ check("A3 DS-06's journal_line follows the draft's material_document_line and pu
 tables = re.findall(r"^CREATE TABLE (\w+)", ddl22, re.M)
 GLOBAL = {"movement_type"}
 def has_col(t, col):
-    return X("select 1 from information_schema.columns where table_schema='erpme' and table_name=%s and column_name=%s", (t, col)).fetchone() is not None
+    return X("select 1 from information_schema.columns where table_schema='nativeflows' and table_name=%s and column_name=%s", (t, col)).fetchone() is not None
 missing = [t for t in tables if t not in GLOBAL and not has_col(t, "company_id")]
 check(f"M1 all {len(tables) - len(GLOBAL)} company tables of the draft carry company_id (missing: {missing or 'none'})", missing, [])
 check("M2 the global catalog movement_type has no company_id", [t for t in GLOBAL if has_col(t, "company_id")], [])

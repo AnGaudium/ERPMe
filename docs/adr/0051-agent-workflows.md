@@ -334,7 +334,7 @@ Spec 14 names four first workflows and the planning agent; ADR-0032 adds a produ
 
 The literal read scope is the main constraint. Spec 14 has the LLM map item descriptions in quotations and supplier invoices, which needs the catalog, while spec 03 rule 1 limits a run that read a customer's e-mail to that partner's records. Until the author decides, this ADR keeps the floor and lets the LLM choose only among items the partner already has a relation with. A person's own notes do not taint, so a salesperson can still get full drafting from notes.
 
-SAP practice, concepts only: intelligent scenarios in S/4HANA (cash application, invoice matching) learn from accountants' decisions and propose; postings stay rule-based with tolerance groups. ERPMe stores what was learned as visible rules and mappings instead of a hidden model (spec 03 rule 9).
+SAP practice, concepts only: intelligent scenarios in S/4HANA (cash application, invoice matching) learn from accountants' decisions and propose; postings stay rule-based with tolerance groups. NativeFlows stores what was learned as visible rules and mappings instead of a hidden model (spec 03 rule 9).
 
 ## Options considered
 

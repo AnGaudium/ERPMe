@@ -4,14 +4,14 @@
 File:line refer to the review copy (`base-integrated` with `apply_workflows.py` applied): "0058" = `adr/0058-configurable-workflows.md`, "0059" = `adr/0059-ai-tuning-and-development-of-deterministic-functions.md`, "DDL" = `design/DS-28-34-configuration-artifacts.sql`, "t22" = `lab/t22_workflows.py`.
 
 What I ran:
-- No git in `~/Projects/ERPMe`. A `/tmp` copy of `base-integrated`, and a second unpatched copy for comparison; the base was not touched.
+- No git in `~/Projects/NativeFlows`. A `/tmp` copy of `base-integrated`, and a second unpatched copy for comparison; the base was not touched.
 - `apply_workflows.py` applies cleanly: 73 writes over 34 files, lab findings L-27 and L-28, each numbered once.
 - With `--load`, each on its own fresh database: t22 137/137, t23 102/102, t12 189/189, t15 146/146, t17 117/117, t19 177/177, t20 184/184, t21 93/93, t11 163/163, t14 83/83, t16 99/99.
 - With the standard load (extensions, `00_stubs.sql`, the `load_ds06.py` output, then the test without `--load`), each on its own fresh database, no load errors: t01 16/16, t02 6/6, t03 4/4, t04 5/5, t05 62/62, t06 60/60, t07 38/38, t08 46/46, t09 60/60, t10 69/69, t13 24/24. t01 to t06 give the same counts on the unpatched copy.
 - `check_package.py` on the `DS-19-vietnam-tt99` package: RESULT PASS, SELF-TEST PASS.
 - CSV check (my own, since the lab has no script for it): all 13 catalog files parse with a constant column count; no duplicate code in `invariants.csv`, `edge-cases.csv` or `work-item-kinds.csv`; 173 invariants, which DS-16 states.
 - No run hit "out of shared memory".
-- Cleanup done: every `erpme_lab_rv58_*` database dropped, both `/tmp` copies deleted. This file is the only file written.
+- Cleanup done: every `nativeflows_lab_rv58_*` database dropped, both `/tmp` copies deleted. This file is the only file written.
 
 ## Round-4 items
 

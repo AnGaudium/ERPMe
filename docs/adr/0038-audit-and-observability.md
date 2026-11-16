@@ -47,7 +47,7 @@ The retention periods and the strictness of scanning are flagged for the author.
    - **Personal data.** Personal fields keep their data labels (spec 17). Creating a record and erasing a data subject store field names without values for personal fields.
 4. Erasure (ADR-0019 rule 10, which gets a note):
    - **Who may update.** `audit_change` and `audit_record` are append-only, except that `EraseDataSubject` replaces `before` and `after` of the subject's change rows, and `reason` on audit records whose subject is an erased record, with a marker and sets `erased_at`.
-   - **How the trigger knows.** The dispatcher alone runs `SET LOCAL erpme.erasure_command_id` to the ID of the running command's `idempotency_record`, and only for the command registered as the erasure command. The trigger allows the update only when that setting is present and matches an idempotency record of that command type in the same transaction, and no other column changes.
+   - **How the trigger knows.** The dispatcher alone runs `SET LOCAL nativeflows.erasure_command_id` to the ID of the running command's `idempotency_record`, and only for the command registered as the erasure command. The trigger allows the update only when that setting is present and matches an idempotency record of that command type in the same transaction, and no other column changes.
    - **Finding the rows.** An index on (`subject_table`, `row_id`).
 5. Denial records, `audit_denial`:
    - **When.** A command or query refused with one of these codes writes a denial record, in simulate and execute mode alike: `permission_denied`, `human_only`, `proposal_required`, `policy_denied`, `outbound_content_out_of_scope` and `segregation_of_duties`. The dispatcher classifies by error code, wherever the error was raised.
@@ -91,7 +91,7 @@ The retention periods and the strictness of scanning are flagged for the author.
    - **Period state changes.** Recorded with `reason` (rule 2) and the approval through `policy_decision_id` (ADR-0012 rule 9).
    - **Enabling unverified regime rules.** Audited as tracked changes of regime settings (rule 3; ADR-0016).
    - **Exports and erasures.** Write both an audit record and an entry in the personal data processing log (ADR-0019 rule 11). The breach notification procedure belongs to DS-40 under the existing open question on Law 91/2025; audit and denial records are its evidence. The processing log is owned by `audit` ([ADR-0052](0052-minimal-crm.md) rule 26).
-   - **`erpme-check` against production** (DS-16) may run, only with the read-only role, on a standby replica or with `statement_timeout`, and never with write rights.
+   - **`nativeflows-check` against production** (DS-16) may run, only with the read-only role, on a standby replica or with `statement_timeout`, and never with write rights.
 
 **Observability**
 
@@ -123,7 +123,7 @@ The retention periods and the strictness of scanning are flagged for the author.
     The allow-listed attributes of gateway spans are in [ADR-0050](0050-agent-runtime-and-query-layer.md) rule 21; prompts and outputs stay in `agent_run_step` only.
 12. Telemetry goes through OTLP to a collector:
     - **Tool choices.** The backend and the attachment scanner are new tool categories, chosen by ADR in DS-37, not from ADR-0002's list of tools not used. The byte-level media detection library is chosen by ADR at the first step that builds upload.
-    - **Dashboard.** In Phase 1 the operations dashboard is the backend's, with panels generated from the metric names. Held deliveries and their `last_error` (ADR-0013 rule 8) are read through the delivery query, not the dashboard, because they carry values. An ERPMe screen comes later.
+    - **Dashboard.** In Phase 1 the operations dashboard is the backend's, with panels generated from the metric names. Held deliveries and their `last_error` (ADR-0013 rule 8) are read through the delivery query, not the dashboard, because they carry values. An NativeFlows screen comes later.
 
     Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), proposed 2026-11-15): management dashboards are not this operations dashboard: they are saved analyses and KPI tiles of the analysis layer, run through `EvaluateAnalysisPlan` under the viewer's rights. Metrics add analysis answers by outcome and badge, abstentions by code and model cost per answer, with codes as labels (rules 26, 27, 32).
 
@@ -171,7 +171,7 @@ The retention periods and the strictness of scanning are flagged for the author.
 
 INV-81 and INV-85 to INV-87 query audit rows, change proposals link to them, and spec 03 links agent runs to audit. ADR-0002 already says audit data is never deleted. The first review of this ADR found that it had contradicted that rule, left the change capture unowned, and lacked a workable model for denials and attachment scanning. This version closes those gaps.
 
-SAP's change documents record field-level changes of master data. ERPMe does the same for a registered set of tables and leaves document history to versions.
+SAP's change documents record field-level changes of master data. NativeFlows does the same for a registered set of tables and leaves document history to versions.
 
 ## Options considered
 

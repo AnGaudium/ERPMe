@@ -14,7 +14,7 @@ from .common import llm_step, llm_view, approval_walk
 HORIZON = 28
 EXPLAIN_SCHEMA = {"type": "object", "required": ["explanation", "recommended", "reason_codes"], "properties": {
     "explanation": {"type": "string", "maxlen": 1200}, "recommended": {"type": "string"}, "reason_codes": {"type": "array", "items": {"type": "string"}}}}
-SYS_EXPLAIN = ("You are step L1 explain of ERPMe's planning workflow (ADR-0051 rule 24), seat analysis. Explain the planning exception to a planner "
+SYS_EXPLAIN = ("You are step L1 explain of NativeFlows's planning workflow (ADR-0051 rule 24), seat analysis. Explain the planning exception to a planner "
                "in Vietnamese in at most 1200 characters, using only the facts and numbers given, and recommend one of the offered candidate "
                "handles or none. You compute nothing new and change nothing. Return only JSON PlanningExplainOutput 1.0.0: {\"explanation\", "
                "\"recommended\": a candidate handle or \"none\", \"reason_codes\": [short codes]}.")

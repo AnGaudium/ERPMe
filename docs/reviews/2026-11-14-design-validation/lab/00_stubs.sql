@@ -1,7 +1,7 @@
 -- Lab only: minimal stubs for tables DS-06 references but other design items define.
-DROP SCHEMA IF EXISTS erpme CASCADE; DROP SCHEMA IF EXISTS types CASCADE;
-CREATE SCHEMA types; CREATE SCHEMA erpme;
-SET search_path = erpme;
+DROP SCHEMA IF EXISTS nativeflows CASCADE; DROP SCHEMA IF EXISTS types CASCADE;
+CREATE SCHEMA types; CREATE SCHEMA nativeflows;
+SET search_path = nativeflows;
 CREATE EXTENSION IF NOT EXISTS btree_gist;             -- installed in production (ADR-0022 rule 8)
 CREATE DOMAIN types.amount AS numeric(24,4);
 CREATE DOMAIN types.quantity AS numeric(24,6);

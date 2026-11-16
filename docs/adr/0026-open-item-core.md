@@ -106,7 +106,7 @@ DS-25 keeps payments, bank statements, matching UX, netting, payment allocation 
 
 - Assessment finding F2: the step 1 journal declares `open_item_id` with a foreign key and a trigger requiring it on receivable and payable lines (ADR-0014 rule 10; DS-06); INV-30..32 start at step 4; opening balances hold AR/AP per invoice at step 4 (spec 15); invoices and the credit limit come at step 5; DS-25 (step 6) was the only owner, and B3 forbids core changes after step 5.
 - ADR-0010 rule 15, ADR-0011 rules 15–19 and ADR-0025 depend on the open-item model.
-- SAP practice, concepts only: open-item managed reconciliation accounts, one line item per installment, clearing documents, residual items. ERPMe keeps an item record with the journal as the only source of amounts and requires explicit references, so agents never guess.
+- SAP practice, concepts only: open-item managed reconciliation accounts, one line item per installment, clearing documents, residual items. NativeFlows keeps an item record with the journal as the only source of amounts and requires explicit references, so agents never guess.
 
 ## Options considered
 

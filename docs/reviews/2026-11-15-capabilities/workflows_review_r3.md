@@ -4,7 +4,7 @@
 File:line refer to the review copy (`base-ds-uom` with `apply_workflows.py` applied): "0058" = `adr/0058-configurable-workflows.md`, "0059" = `adr/0059-ai-tuning-and-development-of-deterministic-functions.md`, "DDL" = `design/DS-28-34-configuration-artifacts.sql`, "DS-05" = `design/DS-05-platform.sql`.
 
 What I ran:
-- No git in `~/Projects/ERPMe`. Copies of `base-ds-uom` and `base-uom-sim` in `/tmp`; the bases were not touched.
+- No git in `~/Projects/NativeFlows`. Copies of `base-ds-uom` and `base-uom-sim` in `/tmp`; the bases were not touched.
 - `apply_workflows.py` applies cleanly to both: 71 writes over 33 files each.
 - Full lab on the ds-uom copy, each test on its own fresh database, and the same tests on an unpatched copy for comparison:
   - `t22_workflows.py --load` 124/124, `t23_ai_artifacts.py --load` 95/95;
@@ -13,7 +13,7 @@ What I ran:
 - On the `base-uom-sim` copy: t12 188/188, t22 124/124, t23 95/95.
 - No run hit "out of shared memory".
 - Catalogs: no duplicate codes; 155 invariants, matching DS-16, on both copies.
-- Cleanup done: every `erpme_lab_rv58_*` database dropped, `/tmp/rv58`, `/tmp/rv58b`, `/tmp/rv58s` deleted. This file is the only file written.
+- Cleanup done: every `nativeflows_lab_rv58_*` database dropped, `/tmp/rv58`, `/tmp/rv58b`, `/tmp/rv58s` deleted. This file is the only file written.
 
 ## Round-2 items
 

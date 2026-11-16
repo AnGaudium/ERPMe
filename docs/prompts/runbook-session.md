@@ -1,10 +1,10 @@
 # Session prompt: high-level implementation runbook
 
-Use this prompt to start a session that writes the ERPMe implementation runbook.
+Use this prompt to start a session that writes the NativeFlows implementation runbook.
 
 ---
 
-You are working in the ERPMe repository. ERPMe is a fully open-source, agentic-by-design ERP built by one author who directs AI coding agents. The specification in `docs/` is the source of truth and is finished for now; the project is in Build step 0 (design). Your task is to write a **high-level implementation runbook**: the operating manual the author and the AI agents follow to execute the build plan from today until the Phase 1 gate.
+You are working in the NativeFlows repository. NativeFlows is a fully open-source, agentic-by-design ERP built by one author who directs AI coding agents. The specification in `docs/` is the source of truth and is finished for now; the project is in Build step 0 (design). Your task is to write a **high-level implementation runbook**: the operating manual the author and the AI agents follow to execute the build plan from today until the Phase 1 gate.
 
 ## Read first
 

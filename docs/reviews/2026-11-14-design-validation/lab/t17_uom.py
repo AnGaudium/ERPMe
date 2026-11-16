@@ -1,9 +1,9 @@
 """Scenario: multiple units of measure (ADR-0056), as pure functions and on the DDL drafts.
 
 Run: python t17_uom.py [--load]
-  The pure checks (part U) always run. With --load, ERPME_LAB_DSN must name a throwaway database: load_all.py drops and
-  rebuilds schemas erpme and types there and loads every DDL file of design/, and the database checks (part D) run.
-  ERPME_DOCS points at the docs/ tree (default ~/Projects/ERPMe/docs); ERPME_LAB_DIR at lab.py and load_all.py
+  The pure checks (part U) always run. With --load, NATIVEFLOWS_LAB_DSN must name a throwaway database: load_all.py drops and
+  rebuilds schemas nativeflows and types there and loads every DDL file of design/, and the database checks (part D) run.
+  NATIVEFLOWS_DOCS points at the docs/ tree (default ~/Projects/NativeFlows/docs); NATIVEFLOWS_LAB_DIR at lab.py and load_all.py
   (default: this file's directory).
 
 U: the rules of ADR-0056 as lab functions, with exact fractions: the core unit catalogs; convert_quantity resolution
@@ -28,11 +28,11 @@ from decimal import Decimal as D_
 from fractions import Fraction as F
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-LAB = os.environ.get("ERPME_LAB_DIR", HERE)
+LAB = os.environ.get("NATIVEFLOWS_LAB_DIR", HERE)
 sys.path.insert(0, LAB)
 from lab import RESULTS, conn, expect, new  # noqa: E402
 
-DOCS = os.path.expanduser(os.environ.get("ERPME_DOCS", "~/Projects/ERPMe/docs"))
+DOCS = os.path.expanduser(os.environ.get("NATIVEFLOWS_DOCS", "~/Projects/NativeFlows/docs"))
 CAT = os.path.join(DOCS, "catalogs")
 NS = uuid.UUID("f244ce09-3c6c-4c82-af14-918bdeca6be3")           # ADR-0006 rule 4
 
@@ -778,13 +778,13 @@ if "--load" in sys.argv:
         def dump(self, obj):
             return str(D_(obj.numerator) / D_(obj.denominator)).encode()
     psycopg.adapters.register_dumper(F, FractionDumper)
-    dsn = os.environ.get("ERPME_LAB_DSN", "host=127.0.0.1 port=5561 dbname=erpme_lab user=lab")
+    dsn = os.environ.get("NATIVEFLOWS_LAB_DSN", "host=127.0.0.1 port=5561 dbname=nativeflows_lab user=lab")
     n_tables = load_all(dsn, DOCS)
     check("D01 load_all.py loads every DDL file of design/ into one schema", n_tables > 200, n_tables)
     c = conn(); c.autocommit = True
     X = c.execute
     cols = {}
-    for t_, col, nullable in X("select table_name, column_name, is_nullable from information_schema.columns where table_schema='erpme'").fetchall():
+    for t_, col, nullable in X("select table_name, column_name, is_nullable from information_schema.columns where table_schema='nativeflows'").fetchall():
         cols.setdefault(t_, {})[col] = nullable
     BLOCK = ("quantity", "uom_id", "uom_numerator", "uom_denominator", "uom_factor_source", "inventory_quantity")
     REQUIRED = ["quotation_line", "sales_order_line", "delivery_line", "return_from_customer_line", "sales_invoice_line", "sales_return_line",
@@ -800,7 +800,7 @@ if "--load" in sys.argv:
           sorted(found) == sorted(REQUIRED + OPTIONAL) and all("uom_factor_source" in cols[t_] for t_ in found), sorted(set(found) ^ set(REQUIRED + OPTIONAL)))
     pu = {"id", "item_id", "inventory_uom_id", "factor_source", "is_exact", "contains_uom_id", "contains_quantity", "is_counting_unit",
           "is_default_pick_unit", "is_active", "retired_at", "recorded_at"}
-    defaults = X("""select table_name, column_name from information_schema.columns where table_schema='erpme' and column_default is not null
+    defaults = X("""select table_name, column_name from information_schema.columns where table_schema='nativeflows' and column_default is not null
                     and table_name in ('bill_of_materials_component', 'bill_of_materials_output') and column_name like 'uom_%%'""").fetchall()
     check("D04 the master data and planning columns: product_uom rebuilt, uom.name, uom_conversion.id and is_active, uom_alias, supplier_item.order_uom_id NOT NULL, the planned order's order unit, bill of materials snapshots without defaults and issue_multiple",
           pu <= set(cols["product_uom"]) and cols["uom"].get("name") == "NO" and {"id", "is_active"} <= set(cols["uom_conversion"]) and "uom_alias" in cols
@@ -831,7 +831,7 @@ if "--load" in sys.argv:
     X("insert into user_account (id, login, display_name, language, password_hash, created_at) values (%s,%s,'Lab user','en','x',now())", (I["user"], "u17" + t))
     X("insert into company (id,code,legal_name,company_currency,time_zone,localization_package,accounting_regime,valuation_area_level,fiscal_calendar_owner_id,default_language)"
       " values (%s,%s,'Co','VND','Asia/Ho_Chi_Minh','l10n_vn','tt99','warehouse',%s,'vi')", (I["co"], "C17-" + t, I["user"]))
-    X("select set_config('erpme.company_id', %s, false)", (str(I["co"]),))
+    X("select set_config('nativeflows.company_id', %s, false)", (str(I["co"]),))
     for code, name in (("x-carton", "Carton"), ("x-bag", "Bag"), ("x-pack", "Pack"), ("x-pallet", "Pallet")):
         U[code] = new()
         X("insert into uom (id, company_id, code, name, quantity_kind, decimal_places) values (%s,%s,%s,%s,'count',0)", (U[code], I["co"], code, name))
@@ -930,12 +930,12 @@ if "--load" in sys.argv:
 
     def X_bad(name, match, fn):
         def run(cx):
-            cx.execute("select set_config('erpme.company_id', %s, true)", (str(I["co"]),))
+            cx.execute("select set_config('nativeflows.company_id', %s, true)", (str(I["co"]),))
             fn(cx)
         expect(name, run, True, match)
     def X_good(name, fn):
         def run(cx):
-            cx.execute("select set_config('erpme.company_id', %s, true)", (str(I["co"]),))
+            cx.execute("select set_config('nativeflows.company_id', %s, true)", (str(I["co"]),))
             fn(cx)
         expect(name, run, False)
     X_bad("D09 a product unit's factor is positive", "ck_product_uom_numerator",

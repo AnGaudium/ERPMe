@@ -207,7 +207,7 @@ Every exception, pending approval and other piece of business work is one `work_
 
 Principle 8 makes exceptions, approvals, unmatched bank lines and low stock into work items that a person or an agent takes, never both at once. ADR-0031 rule 16 made every exception one work item. About fifteen earlier rules raise work items without a defined model.
 
-SAP spreads this across workflow inboxes and situation handling. Odoo uses activities on records. ERPMe keeps one queue with a registered kind per exception, so agents and people work from the same list and an agent run always has one claimed item behind it.
+SAP spreads this across workflow inboxes and situation handling. Odoo uses activities on records. NativeFlows keeps one queue with a registered kind per exception, so agents and people work from the same list and an agent run always has one claimed item behind it.
 
 ## Options considered
 

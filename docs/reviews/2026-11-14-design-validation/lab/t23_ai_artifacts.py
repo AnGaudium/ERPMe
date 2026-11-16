@@ -1,9 +1,9 @@
 """Scenario: AI tuning and development of deterministic functions (ADR-0059), as pure functions and on the DDL drafts.
 
 Run: python t23_ai_artifacts.py [--load]
-  The pure checks (part A) always run. With --load, ERPME_LAB_DSN must name a throwaway database: load_all.py drops and
-  rebuilds schemas erpme and types there and loads every DDL file of design/, and the database checks (part D) run.
-  ERPME_DOCS points at the docs/ tree (default ~/Projects/ERPMe/docs); ERPME_LAB_DIR at lab.py and load_all.py
+  The pure checks (part A) always run. With --load, NATIVEFLOWS_LAB_DSN must name a throwaway database: load_all.py drops and
+  rebuilds schemas nativeflows and types there and loads every DDL file of design/, and the database checks (part D) run.
+  NATIVEFLOWS_DOCS points at the docs/ tree (default ~/Projects/NativeFlows/docs); NATIVEFLOWS_LAB_DIR at lab.py and load_all.py
   (default: this file's directory).
 
 A: the rules of ADR-0059 as lab functions: the lifecycle moves of each ladder, allowed and refused (rules 9, 12); pointers,
@@ -26,11 +26,11 @@ from datetime import date, timedelta
 from fractions import Fraction as F
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-LAB = os.environ.get("ERPME_LAB_DIR", HERE)
+LAB = os.environ.get("NATIVEFLOWS_LAB_DIR", HERE)
 sys.path.insert(0, LAB)
 from lab import RESULTS, conn, expect, new  # noqa: E402
 
-DOCS = os.path.expanduser(os.environ.get("ERPME_DOCS", "~/Projects/ERPMe/docs"))
+DOCS = os.path.expanduser(os.environ.get("NATIVEFLOWS_DOCS", "~/Projects/NativeFlows/docs"))
 random.seed(59)
 
 
@@ -650,7 +650,7 @@ check("A58 a draft under the unverified (or third-party) cap carries the flag an
 if "--load" in sys.argv:
     import psycopg  # noqa: E402,F401
     from load_all import load_all  # noqa: E402
-    dsn = os.environ.get("ERPME_LAB_DSN", "host=127.0.0.1 port=5561 dbname=erpme_lab user=lab")
+    dsn = os.environ.get("NATIVEFLOWS_LAB_DSN", "host=127.0.0.1 port=5561 dbname=nativeflows_lab user=lab")
     n_tables = load_all(dsn, DOCS)
     check("D01 load_all.py loads every DDL file of design/ with the configuration file", n_tables > 200, n_tables)
     c = conn(); c.autocommit = True
@@ -661,7 +661,7 @@ if "--load" in sys.argv:
     X("insert into user_account (id, login, display_name, language, password_hash, created_at) values (%s,%s,'Lab user','en','x',now())", (I["u"], "u23" + t))
     X("insert into company (id,code,legal_name,company_currency,time_zone,localization_package,accounting_regime,valuation_area_level,fiscal_calendar_owner_id,default_language)"
       " values (%s,%s,'Co','USD','UTC','l10n_test','test','warehouse',%s,'en')", (I["co"], "C23-" + t, I["u"]))
-    X("select set_config('erpme.company_id', %s, false)", (str(I["co"]),))
+    X("select set_config('nativeflows.company_id', %s, false)", (str(I["co"]),))
     H = hashlib.sha256(b"y").hexdigest()
     X("insert into parameter_set (id, company_id, function_code, owner_user_id, recorded_at) values (%s,%s,'cash.match_bank_line',%s,now())", (I["ps"], I["co"], I["u"]))
     X("""insert into parameter_set_version (id, company_id, parameter_set_id, version, function_version, parameters_hash, content_hash, registry_version, drafted_by_kind, drafted_by_id,
@@ -677,13 +677,13 @@ if "--load" in sys.argv:
 
     def D_bad(name, match, fn):
         def run(cx):
-            cx.execute("select set_config('erpme.company_id', %s, true)", (str(I["co"]),))
+            cx.execute("select set_config('nativeflows.company_id', %s, true)", (str(I["co"]),))
             fn(cx)
         expect(name, run, True, match)
 
     def D_good(name, fn):
         def run(cx):
-            cx.execute("select set_config('erpme.company_id', %s, true)", (str(I["co"]),))
+            cx.execute("select set_config('nativeflows.company_id', %s, true)", (str(I["co"]),))
             fn(cx)
         expect(name, run, False)
     D_good("D02 backtest evidence on a window after the drafting window, above its minimum, is written", lambda cx: ev_row(cx, eid=I["ev1"]))

@@ -124,9 +124,9 @@ The migration period is then locked.
       - the trial balance per old account;
       - open items per partner, account and currency, by count and sum;
       - GR/IR per receipt;
-      - stock quantity per item, warehouse, bin, lot or serial, and stock value per item and valuation area, the level ERPMe holds (ADR-0020).
-    - **Comparing.** `GetMigrationReconciliation` compares them with ERPMe's figures on `opening_date`, through the old-account map.
-    - **Accepting a difference.** `AcceptMigrationDifference` (`human_only`, by a holder of the `chief_accountant` role, with a reason) accepts a difference where ERPMe's figure stands because the old one is wrong (go-live). Differences do not touch the clearing account, because ERPMe's documents balance by construction.
+      - stock quantity per item, warehouse, bin, lot or serial, and stock value per item and valuation area, the level NativeFlows holds (ADR-0020).
+    - **Comparing.** `GetMigrationReconciliation` compares them with NativeFlows's figures on `opening_date`, through the old-account map.
+    - **Accepting a difference.** `AcceptMigrationDifference` (`human_only`, by a holder of the `chief_accountant` role, with a reason) accepts a difference where NativeFlows's figure stands because the old one is wrong (go-live). Differences do not touch the clearing account, because NativeFlows's documents balance by construction.
 
     Note: "a holder of the `chief_accountant` role" means the permission `AcceptMigrationDifference`, on the leaf `opening_balance_entry` at level `full`, held through Finance `full` by templates `owner` and `chief_accountant` ([ADR-0054](0054-users-roles-and-authorizations.md) rules 8, 24).
 12. `CompleteMigration` runs these steps:
@@ -138,7 +138,7 @@ The migration period is then locked.
 13. Opening VAT:
     - **Balances.** VAT balances load as balances (control kind `none`). Opening open items have no `tax_line`, so the `tax_payment_evidence` consumer ignores their settlements (ADR-0041 rule 15).
     - **The first return.** It carries forward `opening_vat_carry_forward` where `carry:` finds no earlier filed return (ADR-0041 rule 19).
-    - **Corrections of pre-cut-over invoices.** They carry the original tax date and rate as entered fields, since no original exists in ERPMe.
+    - **Corrections of pre-cut-over invoices.** They carry the original tax date and rate as entered fields, since no original exists in NativeFlows.
     - **All flagged.**
 
 **Reversal, agents, data**
@@ -186,7 +186,7 @@ The first review found four problems in the earlier text:
 - a migration period inside an ordinary fiscal year left open periods;
 - year-to-date income and expense double-counted retained earnings under TT99's monthly closing.
 
-SAP migrates with the Migration Cockpit, staging tables and migration clearing accounts; Odoo imports CSV per model. ERPMe keeps SAP's staging and clearing discipline, with every row going through the commands of daily work, simulated before it posts.
+SAP migrates with the Migration Cockpit, staging tables and migration clearing accounts; Odoo imports CSV per model. NativeFlows keeps SAP's staging and clearing discipline, with every row going through the commands of daily work, simulated before it posts.
 
 ## Options considered
 

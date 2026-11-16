@@ -234,7 +234,7 @@ SAP S/4HANA keeps country rules in country versions on top of a neutral core:
 - deductibility per tax code;
 - per-country procedures.
 
-Odoo does the same with `l10n_*` modules and generic tax groups. ERPMe already follows that pattern. This ADR removes what slipped through.
+Odoo does the same with `l10n_*` modules and generic tax groups. NativeFlows already follows that pattern. This ADR removes what slipped through.
 
 ## Options considered
 

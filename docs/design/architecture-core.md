@@ -1,12 +1,12 @@
-# ERPMe architecture: coder core
+# NativeFlows architecture: coder core
 
 Read this before every coding task. It summarizes rules and creates none. If it disagrees with an ADR, the ADR wins; report the difference in [open-questions.md](../open-questions.md). Full overview: [architecture-overview.md](architecture-overview.md).
 
-## A1. ERPMe in five lines
+## A1. NativeFlows in five lines
 
-1. ERPMe is an ERP with a deterministic core. AI only drafts and proposes (D2).
+1. NativeFlows is an ERP with a deterministic core. AI only drafts and proposes (D2).
 2. Every write is a command. A client sends it twice: simulate, then execute with the same `plan_hash` ([ADR-0008](../adr/0008-command-envelope-and-registry.md)).
-3. One Python distribution `erpme`, one PostgreSQL database, all tables in schema `erpme` ([ADR-0022](../adr/0022-repository-and-engineering-conventions.md) rules 1, 7).
+3. One Python distribution `nativeflows`, one PostgreSQL database, all tables in schema `nativeflows` ([ADR-0022](../adr/0022-repository-and-engineering-conventions.md) rules 1, 7).
 4. Modules sit in six layers and import downward (ADR-0022 rule 2).
 5. Events go to a transactional outbox, delivered after commit ([ADR-0013](../adr/0013-outbox-and-events.md)).
 
@@ -25,9 +25,9 @@ Import rules (ADR-0022 rules 2, 5, 6; [ADR-0027](../adr/0027-cross-cutting-owner
 - Another module is imported only through its `contract.py`, from any layer (rule 3). Foundation modules and `db` publish through `__init__`. Rule 6 keeps modules of layers 3 and 4 independent except their `contract`; rule 2 names one same-layer exception, `tax` to `ledger` (`ledger` never imports `tax`; see the overview's findings). `reporting` imports no other layer-4 module (rule 2 note).
 - Layer 2: `registry` imports `work` and `policy`, and the `agent_runs` contract. `documents`, `outbox`, `permissions`, `attachments`, `agent_runs` and `policy` import `work`. `documents` and `permissions` may import the `agent_runs` contract; `documents` may import the `attachments` contract. `configuration` imports the `registry` contract and `work`.
 - Layer 5 modules import no layer-5 peer. `query` imports `db`, `registry`, `agent_runs` and the `work` contract. `agents` imports `registry` and the `agent_runs` and `work` contracts, plus the contracts of the layer 3–4 modules whose subjects its agent types declare ([ADR-0050](../adr/0050-agent-runtime-and-query-layer.md) rule 1). `automation` imports `registry` and the `configuration`, `work` and `permissions` contracts (ADR-0022 rule 2 note).
-- `erpme.registry.dispatch` loads `app` through an entry point, never a static import.
+- `nativeflows.registry.dispatch` loads `app` through an entry point, never a static import.
 - Sideways or up: use a hook. A module declares it; a module of the same or a higher layer registers it; `app` wires it.
-- `erpme` imports no tool package and no `l10n_*`. `l10n_*` imports only `erpme.sdk`. Only `erpme.agents.gateway.adapters` imports an LLM provider library.
+- `nativeflows` imports no tool package and no `l10n_*`. `l10n_*` imports only `nativeflows.sdk`. Only `nativeflows.agents.gateway.adapters` imports an LLM provider library.
 
 The complete list is the import-linter contracts in the root `pyproject.toml` (ADR-0022 rules 1, 6). This section names the exceptions the ADRs state.
 
@@ -37,7 +37,7 @@ Rules: ADR-0022 rules 3, 4, 7, 8, 17, 23 unless named.
 
 | Thing | Place |
 | --- | --- |
-| Schemas, posting interfaces, interfaces packages implement | `backend/src/erpme/<module>/contract.py` |
+| Schemas, posting interfaces, interfaces packages implement | `backend/src/nativeflows/<module>/contract.py` |
 | Command handler | `<module>/handlers/`, function in `snake_case` (`post_goods_receipt`, [ADR-0004](../adr/0004-naming-conventions.md) rule 19) |
 | Consumer | Registered handler of the owning module; `app` registers it ([ADR-0013](../adr/0013-outbox-and-events.md) rule 6; ADR-0022 rule 5). No ADR names its folder: ask first |
 | Query | Schema in `contract.py`; `app` registers it (ADR-0008 rule 1; ADR-0022 rule 5). No ADR names its folder |
@@ -45,7 +45,7 @@ Rules: ADR-0022 rules 3, 4, 7, 8, 17, 23 unless named.
 | Private logic | `<module>/services/` |
 | Local rules; tests | `<module>/AGENTS.md` (≤ 40 lines); `backend/tests/<module>/` |
 | Migration; RLS (`rls_v1`), triggers, functions, grants by hand | `backend/migrations/`, one linear Alembic history |
-| Views for agents and reports | Schema `query`, owner `erpme_query_owner` |
+| Views for agents and reports | Schema `query`, owner `nativeflows_query_owner` |
 | Generated files (never edit) | `backend/generated/`, `frontend/src/generated/` |
 | Setting | Settings registry ([ADR-0063](../adr/0063-configurable-policy-settings.md) rule 1); seed `docs/catalogs/settings.csv` |
 | Work item kind | Registered like a command ([ADR-0042](../adr/0042-work-queue.md) rule 1); seed `docs/catalogs/work-item-kinds.csv` |
@@ -99,13 +99,13 @@ Steps 6 to 10 are for commands only. In a batch, steps 1 to 5, 7 and 8 run per i
 Names marked `# shape` are not fixed by an ADR. The rest is.
 
 ```python
-# backend/src/erpme/inventory/handlers/post_goods_receipt.py   # shape: file name
-from erpme.documents import contract as documents   # layer 2: downward
-from erpme.ledger import contract as ledger         # layer 3: another module's contract only
-from erpme.periods import contract as periods       # layer 2: downward
-from erpme.inventory.contract import (
+# backend/src/nativeflows/inventory/handlers/post_goods_receipt.py   # shape: file name
+from nativeflows.documents import contract as documents   # layer 2: downward
+from nativeflows.ledger import contract as ledger         # layer 3: another module's contract only
+from nativeflows.periods import contract as periods       # layer 2: downward
+from nativeflows.inventory.contract import (
     GoodsReceiptPosted, PostGoodsReceipt, PostGoodsReceiptResult, move_stock)
-from erpme.inventory.services import receipts       # private to inventory
+from nativeflows.inventory.services import receipts       # private to inventory
 
 def post_goods_receipt(context, payload: PostGoodsReceipt) -> PostGoodsReceiptResult:
     doc = documents.lock_document(context, payload.id, payload.version)  # shape; ADR-0009 rule 10
@@ -143,7 +143,7 @@ The dispatcher, not the handler, writes the audit record and the deliveries.
 - `Create` accepts an optional client `id` (UUID v7). Commands refer to records by `id` only, never by `code` or number. Foreign keys end in `_id` (ADR-0004 rule 12).
 
 **Company and RLS** ([ADR-0017](../adr/0017-permission-envelope.md) rules 18–19)
-- Company tables have `company_id` and `FORCE ROW LEVEL SECURITY`. Each transaction sets `erpme.company_id`; without it no row is visible. Null-company rows need the value `installation`.
+- Company tables have `company_id` and `FORCE ROW LEVEL SECURITY`. Each transaction sets `nativeflows.company_id`; without it no row is visible. Null-company rows need the value `installation`.
 - In `master_data` and `crm`, references between company tables are composite on (`company_id`, `id`) wherever the parent has that key; other references are validated by the handler under RLS ([ADR-0045](../adr/0045-master-data-and-price-lists.md) rule 1; [ADR-0052](../adr/0052-minimal-crm.md) rule 3). No ADR states this for the other modules; follow the module's DDL.
 
 **Time** ([ADR-0007](../adr/0007-time-model.md))
@@ -162,7 +162,7 @@ The dispatcher, not the handler, writes the audit record and the deliveries.
 - `is_reversible` is set per document type, default false (ADR-0009 rule 19). Internal types are reversible. Documents from or to an outside party (goods receipts, deliveries, payments, purchase invoices) are reversible under a flagged interim rule while no live document refers to them. Sales invoices and e-invoiced documents are never reversed. `Reverse<Type>` is `human_only`, and a reversal document is never reversed (rules 18, 21).
 
 **Numbers** (ADR-0006 rules 8–21)
-- Domains `types.amount` (24,4), `types.quantity` (24,6), `types.unit_price` (28,10), `types.exchange_rate` (30,15), `types.percent` (9,6); Python types `Amount`, `Quantity`, `UnitPrice`, `ExchangeRate`, `Percent` in `erpme.numeric`.
+- Domains `types.amount` (24,4), `types.quantity` (24,6), `types.unit_price` (28,10), `types.exchange_rate` (30,15), `types.percent` (9,6); Python types `Amount`, `Quantity`, `UnitPrice`, `ExchangeRate`, `Percent` in `nativeflows.numeric`.
 - JSON carries them as canonical strings; a JSON number is rejected. Amounts are stored at the currency's minor unit; extra input decimals are rejected, never rounded.
 - Rounding goes only through `round_amount`, `round_quantity`, `round_unit_price`, `round_exchange_rate`, `round_percent`. Conversion only through `convert_amount`.
 - Line amount: `round_amount(quantity × unit_price, currency)`; totals sum rounded lines. Conversion differences go to one rounding line on `rounding_gain` or `rounding_loss`. `_percent` columns hold 8 for 8%.
@@ -176,7 +176,7 @@ Some DDL drafts break these rules ([findings](architecture-overview.md#findings-
 
 ## A5. Never do this
 
-"check: X" is the `erpme-dev check` custom check X of ADR-0022 rule 13.
+"check: X" is the `nativeflows-dev check` custom check X of ADR-0022 rule 13.
 
 | Never | Rule | Check |
 | --- | --- | --- |
@@ -185,11 +185,11 @@ Some DDL drafts break these rules ([findings](architecture-overview.md#findings-
 | Read or write a serialized table (stock balances, numbering counters, open items) outside its lock helper | ADR-0008 rule 10; ADR-0026 rule 3 | check: Serialized tables |
 | Take locks out of the registered order | ADR-0027 rule 10 | Lock helper raises in tests (ADR-0022 rule 10) |
 | Use a float for money, quantities, prices, rates or percentages | ADR-0006 rule 12 | check: Floats |
-| Round or convert outside `erpme.numeric` | ADR-0006 rules 10, 15 | check: Rounding and conversion |
+| Round or convert outside `nativeflows.numeric` | ADR-0006 rules 10, 15 | check: Rounding and conversion |
 | Compute money in the client | ADR-0040 rule 2 | no check exists yet (finding) |
 | Call `datetime.now`, `date.today`, `time.time`; use `current_date`, `clock_timestamp()` in SQL | ADR-0007 rule 16 | ruff `TID251`, `DTZ`; check: Database time functions |
 | Import upward or sideways | ADR-0022 rules 2, 6 | import-linter layers and independence contracts |
-| Import a tool package, a lab script or `l10n_*` from `erpme` | ADR-0022 rule 6; [lab README](../reviews/2026-11-14-design-validation/README.md):5 | import-linter for tools and `l10n_*`; no check exists yet for lab code (finding) |
+| Import a tool package, a lab script or `l10n_*` from `nativeflows` | ADR-0022 rule 6; [lab README](../reviews/2026-11-14-design-validation/README.md):5 | import-linter for tools and `l10n_*`; no check exists yet for lab code (finding) |
 | Edit a document in a final state | ADR-0009 rules 14, 23 | Database triggers (ADR-0009 rule 14); trigger tests |
 | Let an agent submit, post, issue, approve or send | ADR-0050 rule 30; ADR-0017 rule 15 | Registry CI check and INV-214 |
 | Post as `system` or `integration` outside the auto-post gateway, or change a draft or call an LLM in a checker | [ADR-0065](../adr/0065-deterministic-auto-post-gateway.md) rules 3, 7 (proposed) | INV-760, INV-762; no check exists yet (finding) |
@@ -200,7 +200,7 @@ Some DDL drafts break these rules ([findings](architecture-overview.md#findings-
 | Use camelCase, aliases, `status`, a PostgreSQL `ENUM`, or a name over 63 bytes | ADR-0004 rules 3, 6, 13, 14 | ruff `N`; check: Identifiers; no check exists yet for `status` and `ENUM` (finding) |
 | Hard-code a country rule or an unverified legal rule in the core | ADR-0053; ADR-0016; AGENTS.md | no check exists yet (finding); review |
 | Put personal data or a snapshot in an event payload | ADR-0013 rule 4 | Registry CI check of payload fields against data labels |
-| Edit a generated file | ADR-0022 rules 17, 24 | `erpme-dev generate --check` |
+| Edit a generated file | ADR-0022 rules 17, 24 | `nativeflows-dev generate --check` |
 | Write separate simulation code | ADR-0008 rule 9; ADR-0004 rule 18 | INV-12 `executed_equals_simulated` |
 | Execute over a transport without simulating first, or change `as_of_date` between simulate and execute | ADR-0008 rules 12, 13 and notes; Principle 2 | Dispatcher: `expected_plan_hash` required; `plan_hash_mismatch` |
 | Omit `company_id` on a company table | ADR-0017 rule 19 | RLS policy test against `pg_policies` (ADR-0022 rule 8) |
@@ -218,16 +218,16 @@ Some DDL drafts break these rules ([findings](architecture-overview.md#findings-
 ## A7. Testing on one page
 
 - **Real database:** PostgreSQL as the product roles, via testcontainers (ADR-0022 rules 7, 14).
-- **Invariants.** [invariants.csv](../catalogs/invariants.csv) lists INV-xx, one check each (`@invariant("INV-nn")`). A row at or below `build_step` without a check fails CI. Checks use plain SQL as `erpme_check`, never core code ([DS-16](DS-16-invariants-and-harness.md) rules 2, 4–5).
+- **Invariants.** [invariants.csv](../catalogs/invariants.csv) lists INV-xx, one check each (`@invariant("INV-nn")`). A row at or below `build_step` without a check fails CI. Checks use plain SQL as `nativeflows_check`, never core code ([DS-16](DS-16-invariants-and-harness.md) rules 2, 4–5).
 - **One protocol.** Each harness command is simulated, executed with the plan hash (INV-12), and checked for outcome (INV-19), field classes (INV-15) and events (INV-18); retries reuse the key (INV-11) (DS-16 rule 15).
 - **Synthetic data.** The simulator writes business events; per-step adapters turn them into commands; generated tax IDs carry the fictional prefix ([DS-17](DS-17-synthetic-dataset.md) rules 1, 7, 19).
 - **Edge cases** EC-xx in [edge-cases.csv](../catalogs/edge-cases.csv) (DS-17 section 7); parallel tests `PAR-nn` (DS-16 rule 31).
 - The design lab is not an acceptance test. State machines, recomputation and coverage: overview B16.
-- **Done means** `erpme-dev ci --json` passes (every CI job's subcommands). Its summary goes into the pull request (ADR-0022 rules 14, 22).
+- **Done means** `nativeflows-dev ci --json` passes (every CI job's subcommands). Its summary goes into the pull request (ADR-0022 rules 14, 22).
 
 ## A8. Pointers
 
-- **Coding-rules gate:** no product code until `erpme-dev check` passes on the empty skeleton with every contract and check; limits, suppressions, lock order and the two check speeds are in the note on [ADR-0022](../adr/0022-repository-and-engineering-conventions.md) rule 13 (2026-11-16).
+- **Coding-rules gate:** no product code until `nativeflows-dev check` passes on the empty skeleton with every contract and check; limits, suppressions, lock order and the two check speeds are in the note on [ADR-0022](../adr/0022-repository-and-engineering-conventions.md) rule 13 (2026-11-16).
 - Root [AGENTS.md](../../AGENTS.md) first; then the module's `AGENTS.md` and the task's skill in `.claude/skills/` (`new-command`, `new-migration`, `posting-change-review`, …; ADR-0022 rule 23).
 - [Glossary](../spec/00-reading-guide.md); [DS-04](DS-04-command-envelope.md) (envelope, errors); [backlog](backlog.md); [escalation](../runbook/escalation.md).
 - Generated: [data map](generated/data-map.md), [module cards](generated/module-cards.md), [events](generated/event-matrix.md), [ADRs](generated/adr-index.md).

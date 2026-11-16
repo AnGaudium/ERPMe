@@ -1,9 +1,9 @@
 """Scenario: the product engineering workflow (ADR-0062). Not product code.
 
 Run: python t21_product_engineering.py [--load]
-  Pure checks need no database. With --load, ERPME_LAB_DSN must name a throwaway database: load_all.py drops and
-  rebuilds schemas erpme and types there with every DDL file of ERPME_DOCS/design (default ~/Projects/ERPMe/docs);
-  ERPME_LAB_DIR points at lab.py and load_all.py (default: this file's directory).
+  Pure checks need no database. With --load, NATIVEFLOWS_LAB_DSN must name a throwaway database: load_all.py drops and
+  rebuilds schemas nativeflows and types there with every DDL file of NATIVEFLOWS_DOCS/design (default ~/Projects/NativeFlows/docs);
+  NATIVEFLOWS_LAB_DIR points at lab.py and load_all.py (default: this file's directory).
 
 R: component resolution (rule 7): exact code, barcode, the named supplier's code, the named manufacturer's part number,
    then ranking blocked by unit kind (and category when stated); each step needs exactly one item, several go to the
@@ -32,11 +32,11 @@ from datetime import datetime, timezone
 from decimal import Decimal as D
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-LAB = os.environ.get("ERPME_LAB_DIR", HERE)
+LAB = os.environ.get("NATIVEFLOWS_LAB_DIR", HERE)
 sys.path.insert(0, LAB)
 from lab import RESULTS, conn, new  # noqa: E402
 
-DOCS = os.path.expanduser(os.environ.get("ERPME_DOCS", "~/Projects/ERPMe/docs"))
+DOCS = os.path.expanduser(os.environ.get("NATIVEFLOWS_DOCS", "~/Projects/NativeFlows/docs"))
 
 
 def check(name, ok, detail=""):
@@ -51,9 +51,9 @@ def reset_and_load(raw_dsn, docs):
     from load_all import load_all
     with psycopg.connect(raw_dsn, autocommit=True) as cx:
         tables = [r[0] for r in cx.execute("select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace"
-                                           " where n.nspname = 'erpme' and c.relkind in ('r', 'p') and not c.relispartition").fetchall()]
+                                           " where n.nspname = 'nativeflows' and c.relkind in ('r', 'p') and not c.relispartition").fetchall()]
         for i in range(0, len(tables), 20):
-            cx.execute("DROP TABLE IF EXISTS " + ", ".join(f'erpme."{t}"' for t in tables[i:i + 20]) + " CASCADE")
+            cx.execute("DROP TABLE IF EXISTS " + ", ".join(f'nativeflows."{t}"' for t in tables[i:i + 20]) + " CASCADE")
     return load_all(raw_dsn, docs)
 
 
@@ -443,14 +443,14 @@ check("E01 the change evidence names removed components, their open orders and s
 
 # ======================================================================= X: the DDL (--load)
 if "--load" in sys.argv:
-    raw_dsn = os.environ.get("ERPME_LAB_DSN", "host=127.0.0.1 port=5561 dbname=erpme_lab user=lab")
+    raw_dsn = os.environ.get("NATIVEFLOWS_LAB_DSN", "host=127.0.0.1 port=5561 dbname=nativeflows_lab user=lab")
     n_tables = reset_and_load(raw_dsn, DOCS)
     check("X00 load_all.py loads every DDL file with the ADR-0062 changes", n_tables > 0, f"{n_tables} tables")
     c = conn()
     c.autocommit = True
     X = c.execute
     cols = {}
-    for t_, col, nul in X("select table_name, column_name, is_nullable from information_schema.columns where table_schema='erpme'").fetchall():
+    for t_, col, nul in X("select table_name, column_name, is_nullable from information_schema.columns where table_schema='nativeflows'").fetchall():
         cols.setdefault(t_, {})[col] = nul
     check("X01 the new columns and tables exist: stable proposal-item references, setup and run flags, previous_cost_estimate_id, cost_estimate_gap, item_manufacturer_part, product_category_requirement",
           "proposed_change_proposal_item_id" in cols["bill_of_materials"] and "proposed_change_proposal_item_id" in cols["bill_of_materials_component"]

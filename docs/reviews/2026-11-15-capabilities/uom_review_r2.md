@@ -2,7 +2,7 @@
 
 0 blocking, 6 should-fix, 6 nits. B1 and S1–S9 of round 1 are resolved as designed; the should-fix items below are new, and four of them come from the round-1 fixes themselves. File:line refer to the round-2 review copy (`adr/0056-multiple-units-of-measure.md` = "0056").
 
-What I ran, on my own database `erpme_lab_ru` with the standard load you described:
+What I ran, on my own database `nativeflows_lab_ru` with the standard load you described:
 - `t17_uom.py --load`: 102/102.
 - `t14`: 83/83. `t16 --load`: 99/99.
 - `t01` 16/16, `t02` 6/6, `t03` 4/4, `t04` 5/5, `t05` 62/62, `t06` 60/60, `t07` 38/38, `t08` 46/46.

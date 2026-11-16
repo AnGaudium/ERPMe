@@ -1,4 +1,4 @@
-# ERPMe design reconstruction (independent review, part 1)
+# NativeFlows design reconstruction (independent review, part 1)
 
 Snapshot: `the read-only snapshot of commit 9ac727f` (AGENTS.md, README.md, docs/ without archive/ and prompts/). Reconstructed from the documents alone. Nothing below is invented: where the documents are silent, this report says so and marks the point MISSING or "not stated".
 
@@ -29,7 +29,7 @@ Snapshot: `the read-only snapshot of commit 9ac727f` (AGENTS.md, README.md, docs
 
 | Layer | Modules | Notes |
 | --- | --- | --- |
-| 6 Composition | `app` | Registers handlers, consumers, queries; startup checks; entry points `erpme serve`, `erpme worker --queue`, `erpme admin migrate`, `erpme admin bootstrap` (r5) |
+| 6 Composition | `app` | Registers handlers, consumers, queries; startup checks; entry points `nativeflows serve`, `nativeflows worker --queue`, `nativeflows admin migrate`, `nativeflows admin bootstrap` (r5) |
 | 5 Interfaces | `api` (REST + MCP generated), `query` (DS-33), `agents` (after step 4), `sdk` | `sdk` re-exports package-facing interfaces; its licence is an OQ (interim AGPL, r25) |
 | 4 Commercial | `sales`, `purchasing`, `cash`, `crm`, `planning` | `planning` reads `inventory.contract`'s `demand_supply_line`, hands over through `inventory.contract.request_replenishment` |
 | 3 Core business | `ledger` (journal, accounts, determination, multi-currency), `inventory` (material docs, stock, costing, landed cost, warehouse management tables), `master_data` (partners, products, warehouses, units, currencies), `tax` | |
@@ -38,8 +38,8 @@ Snapshot: `the read-only snapshot of commit 9ac727f` (AGENTS.md, README.md, docs
 
 - A module imports only lower layers; layers 3–4 are independent except via `contract.py` (r6, import-linter). Handlers may not import network/file/LLM/job libraries (forbidden contract, r6; ADR-0008 r4).
 - Each owning module: `contract.py` (schemas, posting interfaces, package interfaces), `handlers/`, private `tables.py`, `services/`, `AGENTS.md` ≤40 lines (r3).
-- One schema `erpme`, domains in `types`, Procrastinate in `procrastinate`; every table owned by exactly one module's `tables.py`, CI-checked (r7).
-- Test tooling packages outside `erpme`, never imported by product: `erpme_events`, `erpme_client`, `erpme_adapters`, `erpme_simulator`, `erpme_testkit`, `erpme_reference`, `erpme_dev` (r1, r6; DS-16 §1).
+- One schema `nativeflows`, domains in `types`, Procrastinate in `procrastinate`; every table owned by exactly one module's `tables.py`, CI-checked (r7).
+- Test tooling packages outside `nativeflows`, never imported by product: `nativeflows_events`, `nativeflows_client`, `nativeflows_adapters`, `nativeflows_simulator`, `nativeflows_testkit`, `nativeflows_reference`, `nativeflows_dev` (r1, r6; DS-16 §1).
 
 ### A.3 Command envelope and dispatcher (ADR-0008; DS-04)
 
@@ -109,7 +109,7 @@ Named consumers: `planning_work_items` on `PlanningCompleted` (ADR-0024 r21); th
 - Agent effective permissions = intersection of agent type and `on_behalf_of` human, re-evaluated per command (r11). `on_behalf_of` bound at start: starter / schedule owner / intake owner; never an email sender (r12).
 - System jobs/consumers hold registered permissions; `on_behalf_of` for accountability, except where an ADR conditions on that human (r13).
 - Hard floors: only humans approve (r15); `segregation_of_duties` if any version was written by an agent run (directly or through consumers, via `origin_agent_run_id`) on behalf of the approver (r16); agents never execute `human_only` (r14; ADR-0008 r2). Small-team rules are an OQ; interim: floors apply to all, policy stub allows posting without approval (r17).
-- DB defense: roles `erpme_migration` (only BYPASSRLS), `erpme_app`, `erpme_worker`, `erpme_claim`, `erpme_readonly`, `erpme_check`; `FORCE ROW LEVEL SECURITY` on every `company_id` table; `set_config('erpme.company_id', …, true)`; fail closed; claim via security-definer function (r18–r19; ADR-0022 r7–r8).
+- DB defense: roles `nativeflows_migration` (only BYPASSRLS), `nativeflows_app`, `nativeflows_worker`, `nativeflows_claim`, `nativeflows_readonly`, `nativeflows_check`; `FORCE ROW LEVEL SECURITY` on every `company_id` table; `set_config('nativeflows.company_id', …, true)`; fail closed; claim via security-definer function (r18–r19; ADR-0022 r7–r8).
 - Full role/scope/policy model for step 5: DEFERRED (DS-15 full, DS-28).
 
 ### A.8 Localization packages (ADR-0016; DS-14; spec 06)
@@ -136,19 +136,19 @@ Named consumers: `planning_work_items` on `PlanningCompleted` (ADR-0024 r21); th
 ### A.10 Time, numbers, IDs
 
 - UUIDv7 single-column `id` everywhere; core catalog rows uuid5 from code; commands refer by `id` only (ADR-0006 r1–r7).
-- Domains `types.amount numeric(24,4)`, `quantity (24,6)`, `unit_price (28,10)`, `exchange_rate (30,15)`, `percent (9,6)`; JSON strings in canonical form; rounding only in `erpme.numeric`, per-currency rounding mode; one rounding line per entry on `rounding_gain`/`rounding_loss` (ADR-0006 r8–r21).
+- Domains `types.amount numeric(24,4)`, `quantity (24,6)`, `unit_price (28,10)`, `exchange_rate (30,15)`, `percent (9,6)`; JSON strings in canonical form; rounding only in `nativeflows.numeric`, per-currency rounding mode; one rounding line per entry on `rounding_gain`/`rounding_loss` (ADR-0006 r8–r21).
 - `document_date`, `posting_date` (explicit at posting, no default), `recorded_at`; company IANA time zone; `clock.today(company)` overridable only in test/simulation via `business_date_override`; fiscal calendar as data (ADR-0007).
 
 ### A.11 Test harness (DS-16, DS-17, ADR-0003, ADR-0022)
 
-- Three reference layers: synthetic dataset replayed day by day; golden scenarios from the author's workbooks; naive recomputation (`erpme_reference`, stdlib only, `Fraction`) (spec 12; DS-16 §7).
-- 43 invariants INV-01…INV-62 with check points `command`/`day`/`run`, checked as `erpme_check` role with plain SQL, never core code (DS-16 r2, r4–r13).
+- Three reference layers: synthetic dataset replayed day by day; golden scenarios from the author's workbooks; naive recomputation (`nativeflows_reference`, stdlib only, `Fraction`) (spec 12; DS-16 §7).
+- 43 invariants INV-01…INV-62 with check points `command`/`day`/`run`, checked as `nativeflows_check` role with plain SQL, never core code (DS-16 r2, r4–r13).
 - Outcome oracle: each business event carries `must_succeed`/`must_reject`/`may_reject`, set by simulator, never core (INV-19; DS-16 r14).
 - Command protocol for every harness command: simulate → execute with hash → outcome → field classes → events vs simulation → period rule; retries for `retry:true` (DS-16 r15).
 - Hypothesis state machines drawing business events through step adapters (DS-16 r17); two installations (with/without group currency) (r18).
 - Parallel tests PAR-01…PAR-09 (DS-16 r31).
 - Simulator: seeded, day by day, business-event log (JSONL) + input files (e-invoice XML, bank CSV, .eml, migration files); per-step adapters; 45 edge cases EC-01…EC-45 with `first_executable_step`; profiles small/medium/large; locks of hashes (DS-17).
-- CI via `erpme-dev`; nightly on the test server by timer; defects as GitHub issues (ADR-0003 R6–R7; ADR-0022 r14–r18).
+- CI via `nativeflows-dev`; nightly on the test server by timer; defects as GitHub issues (ADR-0003 R6–R7; ADR-0022 r14–r18).
 
 ---
 

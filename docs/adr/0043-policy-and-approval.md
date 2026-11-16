@@ -232,7 +232,7 @@ DS-28 is needed by step 5. Until then the policy engine is a stub that allows ev
 - **The brief:** runbook B7 asks for a threshold table per action type with one-level approval, generalized only at the second or third concrete case.
 - **The first review:** a single ordered outcome scale was not a strictness order, system defaults would have stopped close jobs, and the monotonicity check covered amount only. This version separates the approval rank from the human-post requirement, evaluates consequence postings as their person, and checks every ordered condition.
 
-SAP's release strategies classify documents and assign release codes; Odoo's approvals are per model. ERPMe keeps one table across documents, with safety floors in the dispatcher.
+SAP's release strategies classify documents and assign release codes; Odoo's approvals are per model. NativeFlows keeps one table across documents, with safety floors in the dispatcher.
 
 ## Options considered
 

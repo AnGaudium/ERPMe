@@ -11,7 +11,7 @@ def _j(x, n=1600):
 
 def render(t, path):
     m = t["meta"]
-    out = [f"# ERPMe six-flow simulation trace", "",
+    out = [f"# NativeFlows six-flow simulation trace", "",
            f"Run {m['run_at']} on `{m['database']}` ({m['tables']} tables). Trace format {m['format_version']}. "
            f"LLM: {m['llm']['model']} ({m['llm']['mode']}), {m['llm']['live']} live call(s), {m['llm']['fallback']} fallback(s).", "",
            "Schema: " + m["schema"]["recipe"] + ". Lab stubs: " + ", ".join(m["schema"]["lab_stub_tables"]) +

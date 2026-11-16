@@ -94,7 +94,7 @@ Allocation is always explicit. A deterministic query proposes it, and a person o
 5. Policy and agents:
    - **Agents** may draft payments and propose allocations. An agent's posting gets `human_post` (ADR-0043 rule 9, floor 4). A payment is posted by `system` only through rule 9's auto-post, which is disabled by default. The system postings of rules 4 and 14 are adjustments and close jobs, not payments.
    - **Bank account changes** keep ADR-0029 rule 4: a proposal approved by a human who wrote no version of it.
-   - **No money moves from ERPMe in Phase 1.** Payment documents record payments made through the bank or the cash box. Payment files and bank connections that send money are add-ons after the core, like the e-invoice provider (open question).
+   - **No money moves from NativeFlows in Phase 1.** Payment documents record payments made through the bank or the cash box. Payment files and bank connections that send money are add-ons after the core, like the e-invoice provider (open question).
 
 **Allocation and discounts**
 
@@ -314,7 +314,7 @@ The reference systems:
 - **D365:** journals for payments, bank reconciliation with matching rules, collections.
 - **Odoo:** payments, and bank statement lines reconciled with models and follow-up levels.
 
-ERPMe keeps the documents Vietnamese accountants know and the matching rules explicit and deterministic.
+NativeFlows keeps the documents Vietnamese accountants know and the matching rules explicit and deterministic.
 
 The first review found five things:
 - the exchange clearing sat on a revalued account;
@@ -367,7 +367,7 @@ The dedicated clearing account, the cumulative-balance book rate with the all-da
 
 ## Revisit when
 
-- Payments are sent from ERPMe (payment files, bank connections).
+- Payments are sent from NativeFlows (payment files, bank connections).
 - Netting across partners, interest on late payment, multi-tier payment discounts, or many-to-many statement matching enter scope.
 
 ## Documents updated

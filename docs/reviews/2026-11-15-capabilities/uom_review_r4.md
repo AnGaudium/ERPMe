@@ -2,7 +2,7 @@
 
 0 blocking, 2 should-fix, 2 nits. Round-3 S1, S2 and N1–N7 are resolved. The 2-unit bound is provable and held under adversarial runs. One should-fix is a new effect of the clamp's one-step floor; the other is a catalog row left behind. File:line refer to the round-4 review copy ("0056" = `adr/0056-multiple-units-of-measure.md`).
 
-What I ran, on my own database `erpme_lab_ru`:
+What I ran, on my own database `nativeflows_lab_ru`:
 - `t17_uom.py --load`: 110/110. `t14`: 83/83. `t16 --load`: 99/99.
 - `t01` 16/16, `t02` 6/6, `t03` 4/4, `t04` 5/5, `t05` 62/62, `t06` 60/60, `t07` 38/38, `t08` 46/46.
 - `check_package.py` on tt99: PASS; self-test 28 of 28 caught.

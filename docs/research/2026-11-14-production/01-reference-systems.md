@@ -64,7 +64,7 @@ Research note for DS-51 to DS-55 ([ADR-0032](../../adr/0032-phase-1-scope-with-p
 - During the period, goods move at standard price and differences are collected.
 - At period end, single-level and then multilevel price determination roll the differences up the actual quantity structure ([SAP Help](https://help.sap.com/saphelp_46c/helpdata/en/0b/ca29f87cc411d38aa60000e83234f3/content.htm)).
 - Cycles are handled iteratively [background].
-- ERPMe's exact solver over the whole graph (ADR-0025 rule 6) reaches actual cost without standard price, differences and iteration.
+- NativeFlows's exact solver over the whole graph (ADR-0025 rule 6) reaches actual cost without standard price, differences and iteration.
 
 ## Odoo 17/18 MRP
 
@@ -134,7 +134,7 @@ Textbook mechanics (APICS; [IFS](https://docs.ifs.com/ifsclouddocs/25r1/Planning
 ## What agent-first design adds
 
 - **Vendors.** SAP announced production agents in 2025–2026 ([SAP](https://www.sap.com/products/erp/production-planning-and-operations-agent.html)). These agents sit on systems built for screens.
-- **Agent roles in ERPMe.** Each role only proposes; deterministic engines compute every number:
+- **Agent roles in NativeFlows.** Each role only proposes; deterministic engines compute every number:
   1. **Planning agent:** groups action messages, explains each one through pegging, and proposes conversions.
   2. **Master-data agent:** drafts BOMs and routings from spreadsheets or drawings, and checks cycles, units, missing rates and validity.
   3. **Shop-floor capture agent:** turns chat messages, photos or voice notes into draft confirmations, issues and scrap, checked against tolerances.

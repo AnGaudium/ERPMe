@@ -163,7 +163,7 @@ ADR-0024 designed planning per (item, warehouse) and left bills of materials for
 - firm fences;
 - an SME capacity minimum.
 
-ERPMe keeps one deterministic run over one network, so the planning agent explains every number from pegging. The lab prototype showed that make-to-order breaks on conversion unless the real order's supply is linked to its demand line, which rule 9 now requires. The review showed that the cross-kind cycle check is redundant (rule 2), and that the run and the conversion must share one planning function (rule 3).
+NativeFlows keeps one deterministic run over one network, so the planning agent explains every number from pegging. The lab prototype showed that make-to-order breaks on conversion unless the real order's supply is linked to its demand line, which rule 9 now requires. The review showed that the cross-kind cycle check is redundant (rule 2), and that the run and the conversion must share one planning function (rule 3).
 
 ## Options considered
 

@@ -1,9 +1,9 @@
 """Scenario: configurable policy settings (ADR-0063), on the settings catalog, as pure functions and on the DDL drafts.
 
 Run: python t24_settings.py [--load]
-  The catalog checks (part C) and the pure checks (part A) always run. With --load, ERPME_LAB_DSN must name a throwaway
-  database: load_all.py drops and rebuilds schemas erpme and types there and loads every DDL file of design/, and the
-  database checks (part D) run. ERPME_DOCS points at the docs/ tree (default ~/Projects/ERPMe/docs); ERPME_LAB_DIR at
+  The catalog checks (part C) and the pure checks (part A) always run. With --load, NATIVEFLOWS_LAB_DSN must name a throwaway
+  database: load_all.py drops and rebuilds schemas nativeflows and types there and loads every DDL file of design/, and the
+  database checks (part D) run. NATIVEFLOWS_DOCS points at the docs/ tree (default ~/Projects/NativeFlows/docs); NATIVEFLOWS_LAB_DIR at
   lab.py and load_all.py (default: this file's directory). PGPASSWORD holds the database password.
 
 C: the catalog settings.csv: constant field count, unique keys, scope, storage, type, a core default or fail-closed,
@@ -29,11 +29,11 @@ from datetime import date, timedelta
 from decimal import Decimal as Dec
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-LAB = os.environ.get("ERPME_LAB_DIR", HERE)
+LAB = os.environ.get("NATIVEFLOWS_LAB_DIR", HERE)
 sys.path.insert(0, LAB)
 from lab import RESULTS, conn, expect, new  # noqa: E402
 
-DOCS = os.path.expanduser(os.environ.get("ERPME_DOCS", "~/Projects/ERPMe/docs"))
+DOCS = os.path.expanduser(os.environ.get("NATIVEFLOWS_DOCS", "~/Projects/NativeFlows/docs"))
 CAT = os.path.join(DOCS, "catalogs")
 ADR = os.path.join(DOCS, "adr", "0063-configurable-policy-settings.md")
 random.seed(63)
@@ -844,7 +844,7 @@ check("A36 the near check's settings are tighter when they catch more: a wider w
 if "--load" in sys.argv:
     import psycopg  # noqa: E402,F401
     from load_all import load_all  # noqa: E402
-    dsn = os.environ.get("ERPME_LAB_DSN", "host=127.0.0.1 port=5561 dbname=erpme_lab user=lab")
+    dsn = os.environ.get("NATIVEFLOWS_LAB_DSN", "host=127.0.0.1 port=5561 dbname=nativeflows_lab user=lab")
     n_tables = load_all(dsn, DOCS)
     check("D01 load_all.py loads every DDL file of design/ with the settings file", n_tables > 200, n_tables)
     c = conn(); c.autocommit = True
@@ -895,7 +895,7 @@ if "--load" in sys.argv:
         X("insert into user_account (id, login, display_name, language, password_hash, created_at) values (%s,%s,'Lab user','en','x',now())", (I[u], u + "s24" + t))
     X("insert into company (id,code,legal_name,company_currency,time_zone,localization_package,accounting_regime,valuation_area_level,fiscal_calendar_owner_id,default_language)"
       " values (%s,%s,'Co','USD','UTC','l10n_test','test','warehouse',%s,'en')", (I["co"], "C24-" + t, I["u1"]))
-    X("select set_config('erpme.company_id', %s, false)", (str(I["co"]),))
+    X("select set_config('nativeflows.company_id', %s, false)", (str(I["co"]),))
 
     VAL_SQL = """insert into setting_value (id, company_id, setting_key, scope_kind, scope_ref, placeholder_values, value_type, value, min_value, max_value, allowed_values,
                  direction, direction_order, replaced_value, change_kind, reason, effective_from, changed_by_user_id, change_proposal_id, approved_by_user_id,
@@ -920,13 +920,13 @@ if "--load" in sys.argv:
 
     def D_good(name, fn):
         def run(cx):
-            cx.execute("select set_config('erpme.company_id', %s, true)", (str(I["co"]),))
+            cx.execute("select set_config('nativeflows.company_id', %s, true)", (str(I["co"]),))
             fn(cx)
         expect(name, run, False)
 
     def D_bad(name, match, fn):
         def run(cx):
-            cx.execute("select set_config('erpme.company_id', %s, true)", (str(I["co"]),))
+            cx.execute("select set_config('nativeflows.company_id', %s, true)", (str(I["co"]),))
             fn(cx)
         expect(name, run, True, match)
     X("insert into document (id, company_id, document_type, state, version, created_by_user_id, recorded_at) values (%s,%s,'change_proposal','draft',1,%s,now())",
@@ -974,7 +974,7 @@ if "--load" in sys.argv:
     D_bad("D19 a value of an unregistered key is refused", "setting_scope_invalid",
           lambda cx: cx.execute(VAL_SQL, val(base, 10, key="automation.unknown_setting")))
     D_good("D20 an installation value has no company and is written under the installation setting", lambda cx: (
-        cx.execute("select set_config('erpme.company_id', 'installation', true)"),
+        cx.execute("select set_config('nativeflows.company_id', 'installation', true)"),
         cx.execute(VAL_SQL, val(S["analysis.narrative_mode"], "facts_only", company_id=None, scope_kind="installation"))))
     nm = S["analysis.narrative_mode"]
     D_bad("D20b S3: a company value looser than the installation value in force (claim_plan under facts_only) is refused", "looser than the installation value",
@@ -1034,9 +1034,9 @@ if "--load" in sys.argv:
     # review rounds 3-4: run as an application role with SELECT on definitions and SELECT and INSERT on values
     APP = "lab_t24_app"
     X(f"""DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{APP}') THEN CREATE ROLE {APP} NOLOGIN; END IF; END $$""")
-    X(f"grant usage on schema erpme, types to {APP}")
-    X(f"grant select on erpme.setting_definition to {APP}")
-    X(f"grant select, insert on erpme.setting_value to {APP}")
+    X(f"grant usage on schema nativeflows, types to {APP}")
+    X(f"grant select on nativeflows.setting_definition to {APP}")
+    X(f"grant select, insert on nativeflows.setting_value to {APP}")
 
     def as_app(fn):
         def run(cx):
@@ -1044,12 +1044,12 @@ if "--load" in sys.argv:
             fn(cx)
         return run
     D_bad("D24t2 r4 S1: the application role cannot rewrite a definition (SELECT only)", "permission denied",
-          as_app(lambda cx: cx.execute("update erpme.setting_definition set max_value = 1000000 where setting_key = 'automation.max_active_rules'")))
+          as_app(lambda cx: cx.execute("update nativeflows.setting_definition set max_value = 1000000 where setting_key = 'automation.max_active_rules'")))
     D_good("D24t3 r4 S1: ... and still writes an honest tightening (the trigger needs no UPDATE on definitions)",
            as_app(lambda cx: cx.execute(VAL_SQL, val(S["automation.replay_min_events"], 25))))
 
     def temp_definition(cx):
-        cx.execute("create temp table setting_definition on commit drop as select * from erpme.setting_definition")
+        cx.execute("create temp table setting_definition on commit drop as select * from nativeflows.setting_definition")
         cx.execute("update pg_temp.setting_definition set max_value = 10000, direction = 'neutral' where setting_key = 'automation.max_active_rules'")
         cx.execute(VAL_SQL, val(base, 5000, proposal=I["cp"], approver=I["u2"]))
     D_bad("D24u r3 S1: as the application role, a temporary setting_definition with a wider bound and a neutral direction does not widen the bound (5000 refused against 1000)",
@@ -1058,17 +1058,17 @@ if "--load" in sys.argv:
     def temp_values(cx):
         cx.execute("create temp table setting_value (setting_key text, company_id uuid, placeholder_values jsonb, value jsonb, effective_from date, recorded_at timestamptz) on commit drop")
         cx.execute("insert into pg_temp.setting_value values ('analysis.narrative_mode', null, '{}', '\"free_prose\"', '2026-01-01', now())")
-        got_ = cx.execute("select value from erpme.setting_installation_value('analysis.narrative_mode', '{}', '2026-12-31')").fetchone()
+        got_ = cx.execute("select value from nativeflows.setting_installation_value('analysis.narrative_mode', '{}', '2026-12-31')").fetchone()
         if got_ != ("facts_only",):
             return
-        cx.execute(VAL_SQL.replace("insert into setting_value", "insert into erpme.setting_value"), val(nm, "claim_plan"))
+        cx.execute(VAL_SQL.replace("insert into setting_value", "insert into nativeflows.setting_value"), val(nm, "claim_plan"))
     D_bad("D24v r3 S1: as the application role, a temporary setting_value does not feed the definer function (it still returns facts_only), and claim_plan stays refused",
           "looser than the installation value", as_app(temp_values))
 
     def app_conn():
         c_ = conn()
         c_.execute(f"set role {APP}")
-        c_.execute("select set_config('erpme.company_id', %s, false)", (str(I["co"]),))
+        c_.execute("select set_config('nativeflows.company_id', %s, false)", (str(I["co"]),))
         return c_
     rw = S["automation.replay_window_days"]
 
@@ -1105,7 +1105,7 @@ if "--load" in sys.argv:
     check("D24x r4 N2: the waiting change is compared with the first change's committed value (45 after 50 is a loosening and is refused without a proposal)",
           waited and "ck_setting_value_loosen" in res.get("err", ""), (waited, res))
     D_bad("D24 a value without a reason is refused", "ck_setting_value_reason", lambda cx: cx.execute(VAL_SQL.replace("'lab'", "' '"), val(base, 10)))
-    rls = X("select relrowsecurity, relforcerowsecurity from pg_class where relname = 'setting_value' and relnamespace = 'erpme'::regnamespace").fetchone()
+    rls = X("select relrowsecurity, relforcerowsecurity from pg_class where relname = 'setting_value' and relnamespace = 'nativeflows'::regnamespace").fetchone()
     pol = X("select string_agg(qual, ' ') from pg_policies where tablename = 'setting_value'").fetchone()[0] or ""
     pols = {r[0] for r in X("select policyname from pg_policies where tablename = 'setting_value'")}
     check("D25 setting_value has forced row-level security: the company policy with the installation exception and company_ids, and no other read policy (ADR-0017 rule 19)",
@@ -1137,12 +1137,12 @@ if "--load" in sys.argv:
 
     def cdef(name):
         return X("select pg_get_constraintdef(oid) from pg_constraint where conname = %s", (name,)).fetchone()[0]
-    cols = {r[0] for r in X("select column_name from information_schema.columns where table_schema = 'erpme' and table_name = 'bank_statement_line'")}
+    cols = {r[0] for r in X("select column_name from information_schema.columns where table_schema = 'nativeflows' and table_name = 'bank_statement_line'")}
     check("D35 bank_statement_line carries bank_transaction_code, and match basis bank_charge_rule is allowed (rule 9)",
           "bank_transaction_code" in cols and "bank_charge_rule" in cdef("ck_bank_statement_line_match_basis"))
     check("D36 automation_execution allows the outcome rate_limited without an error code (rule 21)",
           "rate_limited" in cdef("ck_automation_execution_outcome") and "rate_limited" not in cdef("ck_automation_execution_error"))
-    lot_cols = {r[0] for r in X("select column_name from information_schema.columns where table_schema = 'erpme' and table_name = 'lot'")}
+    lot_cols = {r[0] for r in X("select column_name from information_schema.columns where table_schema = 'nativeflows' and table_name = 'lot'")}
     check("D37 lot carries best_before_date, checked against the manufacture date (rule 26)",
           "best_before_date" in lot_cols and "best_before_date >= manufacture_date" in cdef("ck_lot_best_before"))
     X("drop owned by lab_t24_app"); X("drop role lab_t24_app")

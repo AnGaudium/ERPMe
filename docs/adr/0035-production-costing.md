@@ -268,7 +268,7 @@ The accounting choices are the author's (ADR-0005 item 1). Each one below is a r
 
 The author asked for production costing by best practice, learning from SAP without copying it.
 - **What SAP does.** It values at standard during the period, then collects differences and settles them.
-- **What ERPMe does.** It reaches actual cost directly, because its solver values the whole graph exactly.
+- **What NativeFlows does.** It reaches actual cost directly, because its solver values the whole graph exactly.
 
 The design meets the Vietnamese rules the research found:
 - TT99's provisional price with a period-end true-up;

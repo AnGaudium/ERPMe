@@ -1,9 +1,9 @@
 """Scenario: barcodes (ADR-0061), as pure functions and on the DDL drafts.
 
 Run: python t19_barcode.py [--load]
-  The pure checks (part P) always run. With --load, ERPME_LAB_DSN must name a throwaway database: load_all.py drops and
-  rebuilds schemas erpme and types there and loads every DDL file of design/, and the database checks (part D) run.
-  ERPME_DOCS points at the docs/ tree (default ~/Projects/ERPMe/docs); ERPME_LAB_DIR at lab.py and load_all.py
+  The pure checks (part P) always run. With --load, NATIVEFLOWS_LAB_DSN must name a throwaway database: load_all.py drops and
+  rebuilds schemas nativeflows and types there and loads every DDL file of design/, and the database checks (part D) run.
+  NATIVEFLOWS_DOCS points at the docs/ tree (default ~/Projects/NativeFlows/docs); NATIVEFLOWS_LAB_DIR at lab.py and load_all.py
   (default: this file's directory). Part D needs ADR-0056's unit columns (uom.name, the product_uom rows, the line unit
   block).
 
@@ -41,11 +41,11 @@ from fractions import Fraction as F
 from urllib.parse import parse_qsl, unquote
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-LAB = os.environ.get("ERPME_LAB_DIR", HERE)
+LAB = os.environ.get("NATIVEFLOWS_LAB_DIR", HERE)
 sys.path.insert(0, LAB)
 from lab import RESULTS, conn, expect, new  # noqa: E402
 
-DOCS = os.path.expanduser(os.environ.get("ERPME_DOCS", "~/Projects/ERPMe/docs"))
+DOCS = os.path.expanduser(os.environ.get("NATIVEFLOWS_DOCS", "~/Projects/NativeFlows/docs"))
 CAT = os.path.join(DOCS, "catalogs")
 NS = uuid.UUID("f244ce09-3c6c-4c82-af14-918bdeca6be3")           # ADR-0006 rule 4
 TODAY = dt.date(2026, 11, 15)                                     # the business date of the step (rule 5)
@@ -1077,7 +1077,7 @@ if "--load" in sys.argv:
         def dump(self, obj):
             return str(D_(obj.numerator) / D_(obj.denominator)).encode()
     psycopg.adapters.register_dumper(F, FractionDumper)
-    dsn = os.environ.get("ERPME_LAB_DSN", "host=127.0.0.1 port=5561 dbname=erpme_lab user=lab")
+    dsn = os.environ.get("NATIVEFLOWS_LAB_DSN", "host=127.0.0.1 port=5561 dbname=nativeflows_lab user=lab")
     n_tables = load_all(dsn, DOCS)
     check("D01 load_all.py loads every DDL file of design/ into one schema", n_tables > 200, n_tables)
     c = conn(); c.autocommit = True
@@ -1107,7 +1107,7 @@ if "--load" in sys.argv:
     X("insert into user_account (id, login, display_name, language, password_hash, created_at) values (%s,%s,'Lab user','en','x',now())", (I["user"], "u19" + t.lower()))
     X("insert into company (id,code,legal_name,company_currency,time_zone,localization_package,accounting_regime,valuation_area_level,fiscal_calendar_owner_id,default_language)"
       " values (%s,%s,'Co','USD','UTC','l10n_xx','xx','warehouse',%s,'en')", (I["co"], "C19-" + t, I["user"]))
-    X("select set_config('erpme.company_id', %s, false)", (str(I["co"]),))
+    X("select set_config('nativeflows.company_id', %s, false)", (str(I["co"]),))
     U["x-carton"] = new()
     X("insert into uom (id, company_id, code, name, quantity_kind, decimal_places) values (%s,%s,'x-carton','Carton','count',0)", (U["x-carton"], I["co"]))
     X("insert into item_group (id, company_id, code, name, basis) values (%s,%s,'g','G',%s)", (I["ig"], I["co"], B))
@@ -1131,7 +1131,7 @@ if "--load" in sys.argv:
     X("insert into partner (id, company_id, code, name, partner_kind, country) values (%s,%s,'SUPP','Supplier (sample)','organization','XX')", (I["supp"], I["co"]))
     X("insert into partner_role (company_id, partner_id, role) values (%s,%s,'supplier')", (I["co"], I["supp"]))
     X("insert into handling_unit_type (id, company_id, code, name) values (%s,%s,'PAL','Pallet')", (I["hut"], I["co"]))
-    ib_cols = {r_[0] for r_ in X("select column_name from information_schema.columns where table_schema='erpme' and table_name='item_barcode'").fetchall()}
+    ib_cols = {r_[0] for r_ in X("select column_name from information_schema.columns where table_schema='nativeflows' and table_name='item_barcode'").fetchall()}
 
     def item_barcode(cx, item, unit, code, legacy=False):
         v = dict(company_id=I["co"], item_id=I[item], uom_id=U[unit], barcode=code, is_legacy_barcode=legacy)
@@ -1145,13 +1145,13 @@ if "--load" in sys.argv:
 
     def X_bad(name, match, fn):
         def run(cx):
-            cx.execute("select set_config('erpme.company_id', %s, true)", (str(I["co"]),))
+            cx.execute("select set_config('nativeflows.company_id', %s, true)", (str(I["co"]),))
             fn(cx)
         expect(name, run, True, match)
 
     def X_good(name, fn):
         def run(cx):
-            cx.execute("select set_config('erpme.company_id', %s, true)", (str(I["co"]),))
+            cx.execute("select set_config('nativeflows.company_id', %s, true)", (str(I["co"]),))
             fn(cx)
         expect(name, run, False)
 
@@ -1355,7 +1355,7 @@ if "--load" in sys.argv:
     leg = base + str(check_digit(base))
     c1, c2 = conn(), conn()
     for cx_ in (c1, c2):
-        cx_.execute("select set_config('erpme.company_id', %s, false)", (str(I["co"]),))
+        cx_.execute("select set_config('nativeflows.company_id', %s, false)", (str(I["co"]),))
     item_barcode(c1, "i_pcs", "H87", leg, legacy=True)            # not committed yet
     res = {}
 

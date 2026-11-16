@@ -9,7 +9,7 @@
 -- PostgreSQL 18. Loaded with DS-15, DS-20, DS-35, DS-56 and DS-06 in the design lab, and also together with the two
 -- other holistic drafts (docs/reviews/2026-11-14-design-validation, t15_platform_ddl.py). The ADRs win if this file
 -- disagrees.
--- Conventions of DS-20 and DS-15: tables in schema `erpme`, domains in `types`; keys inline, named by the MetaData naming
+-- Conventions of DS-20 and DS-15: tables in schema `nativeflows`, domains in `types`; keys inline, named by the MetaData naming
 -- convention in migrations (ADR-0004 rule 15); IDs are UUIDv7 from context.new_id (ADR-0006 rule 3), no ID defaults;
 -- references between company tables are composite on (company_id, id); recorded_at on every row (ADR-0007 rule 9).
 -- Every table with company_id gets FORCE ROW LEVEL SECURITY and the company policy of ADR-0017 rule 19; the last
@@ -1303,14 +1303,14 @@ ALTER TABLE interaction_summary ADD CONSTRAINT fk_interaction_summary_agent_run_
 
 -- ===== Guards =====
 -- Arguments: columns that may change; columns that may be set once from null; columns only the erasure command may
--- change (erpme.erasure_command_id, set by the dispatcher for EraseDataSubject alone, ADR-0038 rule 4; DS-36 adds the
+-- change (nativeflows.erasure_command_id, set by the dispatcher for EraseDataSubject alone, ADR-0038 rule 4; DS-36 adds the
 -- check that it names an idempotency record of that command in this transaction). Deletes are refused.
 CREATE FUNCTION platform_check_append_only() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE
     v_mutable       text[] := TG_ARGV[0]::text[];
     v_set_once      text[] := TG_ARGV[1]::text[];
     v_erasure_only  text[] := TG_ARGV[2]::text[];
-    v_is_erasing    boolean := coalesce(current_setting('erpme.erasure_command_id', true), '') <> '';
+    v_is_erasing    boolean := coalesce(current_setting('nativeflows.erasure_command_id', true), '') <> '';
     v_old           jsonb;
     v_new           jsonb;
     v_key           text;
@@ -1380,11 +1380,11 @@ BEGIN
 END
 $$;
 -- ADR-0009 rule 14: versions are never updated. The generated Delete of a draft removes them with the draft: the
--- dispatcher sets erpme.document_delete_id to that document's ID for Delete alone (the pattern of DS-35).
+-- dispatcher sets nativeflows.document_delete_id to that document's ID for Delete alone (the pattern of DS-35).
 CREATE FUNCTION document_version_check_change() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
     IF TG_OP = 'DELETE'
-       AND coalesce(current_setting('erpme.document_delete_id', true), '') = OLD.document_id::text
+       AND coalesce(current_setting('nativeflows.document_delete_id', true), '') = OLD.document_id::text
        AND EXISTS (SELECT 1 FROM document d WHERE d.id = OLD.document_id AND d.state = 'draft') THEN
         RETURN OLD;
     END IF;
@@ -1636,12 +1636,12 @@ BEGIN
         EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', v_table);
         EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', v_table);
         IF v_table = ANY (v_nullable) THEN
-            EXECUTE format('CREATE POLICY company_policy ON %I USING (company_id::text = current_setting(''erpme.company_id'', true)'
-                           ' OR (company_id IS NULL AND current_setting(''erpme.company_id'', true) = ''installation''))', v_table);
+            EXECUTE format('CREATE POLICY company_policy ON %I USING (company_id::text = current_setting(''nativeflows.company_id'', true)'
+                           ' OR (company_id IS NULL AND current_setting(''nativeflows.company_id'', true) = ''installation''))', v_table);
         ELSE
-            EXECUTE format('CREATE POLICY company_policy ON %I USING (company_id::text = current_setting(''erpme.company_id'', true))', v_table);
+            EXECUTE format('CREATE POLICY company_policy ON %I USING (company_id::text = current_setting(''nativeflows.company_id'', true))', v_table);
         END IF;
-        EXECUTE format('CREATE POLICY company_ids_policy ON %I FOR SELECT USING (company_id::text = ANY (string_to_array(current_setting(''erpme.company_ids'', true), '','')))', v_table);
+        EXECUTE format('CREATE POLICY company_ids_policy ON %I FOR SELECT USING (company_id::text = ANY (string_to_array(current_setting(''nativeflows.company_ids'', true), '','')))', v_table);
     END LOOP;
 END
 $$;

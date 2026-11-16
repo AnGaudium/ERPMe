@@ -162,7 +162,7 @@ SAP practice, concepts only: stable item numbers, change documents, release stra
 
 Vietnamese e-invoicing rules (spec 08) are unverified; the package defines acceptance.
 
-ERPMe's answer keeps three things true:
+NativeFlows's answer keeps three things true:
 - the books hold neither unissued invoices nor issued invoices without postings;
 - every posting effect is simulated and hashed before a human commits to it;
 - approvals hold while the procedure they satisfied still applies.

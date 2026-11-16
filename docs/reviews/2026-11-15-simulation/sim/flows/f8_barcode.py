@@ -118,7 +118,7 @@ def run(db):
         P.audit(db, "PostGoodsReceipt", wa, effect_class="posting", doc=gr, subject_table="goods_receipt", subject_id=gr["id"])
         ln.C += qty
         ln.P += v
-        TRACE.step("det", "inventory query EvaluateBarcode (erpme.gs1 parser, registry, typed rows)", "EvaluateBarcode",
+        TRACE.step("det", "inventory query EvaluateBarcode (nativeflows.gs1 parser, registry, typed rows)", "EvaluateBarcode",
                    label, label_vi, mode="query, pure function of the scan, the registry and the business date", rule="ADR-0061 rules 1-5, 12-14, 17",
                    inputs={"scan": scan}, outputs={"encoding": r["encoding"], "elements": el, "issues": r["issues"], "checks": r["checks"],
                                                     "candidate": {k: (str(v_) if isinstance(v_, F) else v_) for k, v_ in cand.items() if k not in ("item_id", "uom_id")}},

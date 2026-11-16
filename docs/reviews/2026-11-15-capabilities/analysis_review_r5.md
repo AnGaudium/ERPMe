@@ -12,7 +12,7 @@ Base: a `/tmp` copy of `base-integrated` (ADR-0061 and ADR-0057/0062 accepted). 
 | `check_package.py` | regime `tt99`: RESULT PASS | pass |
 | Catalog CSV files | 15 files, every row has its header's field count; no duplicate code in the files this draft touches | pass |
 
-No "out of shared memory" occurred. Database dropped and the copy deleted afterwards. No git was run in `~/Projects/ERPMe`.
+No "out of shared memory" occurred. Database dropped and the copy deleted afterwards. No git was run in `~/Projects/NativeFlows`.
 
 ## Verdict: NOT YET
 

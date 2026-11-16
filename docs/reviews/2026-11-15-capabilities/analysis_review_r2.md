@@ -40,7 +40,7 @@ References: `0060:N` is line N of the applied `docs/adr/0060-agent-assisted-repo
 - "net revenue in March 2026", "in 2025", "Q1 2026" and "the last three months" all fail the check: no relative range names a month, quarter or year, the absolute dates are not literally in the question, and number words are not normalized. The output is then invalid, and after rule 35's retries the run stops `output_invalid` and the question is `failed`.
 - Fix: add named periods to the plan, resolved by code: `{"month": "2026-03"}`, `{"calendar_quarter": "2026-Q1"}`, `{"calendar_year": 2025}`, `{"fiscal_year": …}`, `{"fiscal_quarter": …}`. The stated-value check then applies to the year digits and, through the language's month and number-word lists, to the month and `n`. A plan that fails the check after repairs maps to `ambiguous_term` with period options (rule 24 already offers them), never to `output_invalid`.
 
-**S3. `erpme.read_grants` has two formats for the same views.**
+**S3. `nativeflows.read_grants` has two formats for the same views.**
 - Where: 0060:180; the new note on ADR-0050 rule 48.
 - The earlier note on rule 48 makes it a list for a `List<View>` query. The new note makes it a map "for analysis plans". The fact views are also `List<View>` queries (ADR-0050 rule 46), and `open_item_overview`, `stock_overview` and `system_account_turnover` already exist. One view's `is_in_scope` cannot read both.
 - Fix: the setting is always a map keyed by view name; a `List<View>` query sets a one-entry map. Say so in the note, replacing the list format for every view.

@@ -1,9 +1,9 @@
 """Scenario: the production agent (ADR-0064), as pure functions, on the applied docs and on the DDL drafts.
 
 Run: python t25_production_agent.py [--load]
-  The pure checks (part P) and the document checks (part C) always run. With --load, ERPME_LAB_DSN must name a throwaway
-  database: load_all.py drops and rebuilds schemas erpme and types there and loads every DDL file of design/, and the
-  database checks (part D) run. ERPME_DOCS points at the docs/ tree (default ~/Projects/ERPMe/docs); ERPME_LAB_DIR at
+  The pure checks (part P) and the document checks (part C) always run. With --load, NATIVEFLOWS_LAB_DSN must name a throwaway
+  database: load_all.py drops and rebuilds schemas nativeflows and types there and loads every DDL file of design/, and the
+  database checks (part D) run. NATIVEFLOWS_DOCS points at the docs/ tree (default ~/Projects/NativeFlows/docs); NATIVEFLOWS_LAB_DIR at
   lab.py and load_all.py (default: this file's directory).
 
 P: the rules of ADR-0064 as lab functions: the settings rows of rule 23 parsed from the ADR (defaults inside bounds,
@@ -26,11 +26,11 @@ Not covered: commands, the planning run, the dispatcher, the gateway.
 import collections, csv, datetime as dt, json, os, random, re, sys, threading, time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-LAB = os.environ.get("ERPME_LAB_DIR", HERE)
+LAB = os.environ.get("NATIVEFLOWS_LAB_DIR", HERE)
 sys.path.insert(0, LAB)
 from lab import RESULTS, conn, expect, new  # noqa: E402
 
-DOCS = os.path.expanduser(os.environ.get("ERPME_DOCS", "~/Projects/ERPMe/docs"))
+DOCS = os.path.expanduser(os.environ.get("NATIVEFLOWS_DOCS", "~/Projects/NativeFlows/docs"))
 ADR = os.path.join(DOCS, "adr", "0064-production-agent.md")
 random.seed(64)
 D = dt.date
@@ -953,7 +953,7 @@ if "--load" in sys.argv:
     print("== D: database checks")
     import psycopg  # noqa: F401
     from load_all import load_all  # noqa: E402
-    dsn = os.environ.get("ERPME_LAB_DSN", "host=127.0.0.1 port=5561 dbname=erpme_lab user=lab")
+    dsn = os.environ.get("NATIVEFLOWS_LAB_DSN", "host=127.0.0.1 port=5561 dbname=nativeflows_lab user=lab")
     n_tables = load_all(dsn, DOCS)
     check("D01 load_all.py loads every DDL file of design/", n_tables > 200, n_tables)
     c = conn(); c.autocommit = True
@@ -966,7 +966,7 @@ if "--load" in sys.argv:
     for k, code in (("co", "C25-"), ("co2", "C25B-")):
         X("insert into company (id,code,legal_name,company_currency,time_zone,localization_package,accounting_regime,valuation_area_level,fiscal_calendar_owner_id,default_language)"
           " values (%s,%s,'Co','USD','UTC','l10n_test','test','warehouse',%s,'en')", (I[k], code + t, I["u"]))
-    X("select set_config('erpme.company_id', %s, false)", (str(I["co"]),))
+    X("select set_config('nativeflows.company_id', %s, false)", (str(I["co"]),))
     X("insert into uom (id, code, name, quantity_kind, decimal_places) values (%s,%s,'EA','count',2)", (I["ea"], "EA25" + t))
     for tbl, k in (("item_group", "ig"), ("valuation_class", "vc"), ("item_tax_group", "itg")):
         X(f"insert into {tbl} (id, company_id, code, name, basis) values (%s,%s,'std','Std',%s)", (I[k], I["co"], B_))
@@ -1053,7 +1053,7 @@ if "--load" in sys.argv:
     defs = dict(X("""select conname, pg_get_constraintdef(oid) from pg_constraint where conname in
                     ('ck_document_reader_purposes','ck_document_extraction_purpose','ck_extraction_mapping_rule_purpose','ck_mailbox_document_intake_purpose')""").fetchall())
     check("D18 the purpose value shop_floor_report is in the four purpose checks", len(defs) == 4 and all("shop_floor_report" in v for v in defs.values()), sorted(defs))
-    idx = X("select indexdef from pg_indexes where schemaname='erpme' and indexname='ux_operation_confirmation_external_reference'").fetchone()
+    idx = X("select indexdef from pg_indexes where schemaname='nativeflows' and indexname='ux_operation_confirmation_external_reference'").fetchone()
     check("D19 the import reference index is unique per company and partial", idx and "UNIQUE" in idx[0] and "company_id" in idx[0] and "WHERE" in idx[0], idx)
     X("""insert into product (id, company_id, code, name, product_type, item_group_id, valuation_class_id, inventory_uom_id, purchase_uom_id, sales_uom_id,
          item_tax_group_id, tracking) values (%s,%s,'C25B','C25B','stock',%s,%s,%s,%s,%s,%s,'none')""", (I["p3"], I["co"], I["ig"], I["vc"], I["ea"], I["ea"], I["ea"], I["itg"]))

@@ -64,7 +64,7 @@ Every platform ships key-user configuration (fields, conditions, approval routin
   - a jailer that sets up chroot, namespaces, cgroups and seccomp, and is mandatory in production.
 
   It suits untrusted programs that need a runtime, not pure functions.
-- **Shopify's choice** of Wasm with a deterministic instruction budget, for business logic inside a transaction, is the closest precedent to ERPMe's A10. `[inference]`
+- **Shopify's choice** of Wasm with a deterministic instruction budget, for business logic inside a transaction, is the closest precedent to NativeFlows's A10. `[inference]`
 
 ## 2. Recommendations
 
@@ -177,7 +177,7 @@ Never the message body, and never an amount the LLM extracted: these are `is_unt
 
 ### R4. Automation circuit breaker
 
-**Keep the defaults and make all three values settings.** The defaults are 5 refusals or failures in 60 minutes, or 20 in a row. Market practice is fixed per-execution quotas plus auto-disable on sustained failure, which only Zapier lets a user switch off. ERPMe's breaker disables a rule that can create drafts and work items, so staying off until a person re-enables it is right. A half-open auto-retry suits network calls, not business side effects.
+**Keep the defaults and make all three values settings.** The defaults are 5 refusals or failures in 60 minutes, or 20 in a row. Market practice is fixed per-execution quotas plus auto-disable on sustained failure, which only Zapier lets a user switch off. NativeFlows's breaker disables a rule that can create drafts and work items, so staying off until a person re-enables it is right. A half-open auto-retry suits network calls, not business side effects.
 
 | Setting | Scope | Safe default | Bounds | Who changes it |
 | --- | --- | --- | --- | --- |
