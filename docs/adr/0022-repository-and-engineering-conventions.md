@@ -213,6 +213,17 @@ Checks:
 
     Note ([ADR-0063](0063-configurable-policy-settings.md), proposed 2026-11-15): transaction-level advisory locks (`pg_advisory_xact_lock`) are allowed on handler and trigger paths, because they end with the transaction; session-level advisory locks stay banned. The first user is the settings trigger, which serializes changes per company and key ([ADR-0063](0063-configurable-policy-settings.md) rule 2).
 
+    Note (coding-rules gate, 2026-11-16; chief architect under ADR-0005, the author asked that the way code is written and checked be fixed before the first line of product code):
+    - **Gate 0.** No product code (anything under `erpme` beyond the empty module skeleton) is merged until `erpme-dev check` exists and passes on that skeleton with every contract of rule 6 and every check of rule 13 implemented, or reporting `skipped` with its reason where its inputs do not exist yet (rule 14). CI runs the same command, and `main` is protected: the CI checks are required and no direct push. Pre-commit hooks are a convenience, not the gate.
+    - **Tools stay as decided.** pyright strict (no second type checker), ruff with the rule sets above, import-linter configured in `pyproject.toml`, checks in `erpme_dev.checks`.
+    - **Size and complexity,** chosen for review by people and small coding models: ruff `C901` with `max-complexity = 10`; the `PL` limits at 6 arguments, 12 branches, 6 returns and 50 statements per function; at most 400 lines per Python file outside `generated/` and migrations (a rule 13 check). Raising a limit for one function needs `# noqa: <code>  # reason`, counted in the check summary.
+    - **Suppressions.** No bare `# noqa` or `# type: ignore`: each names its code and a reason after it; `typing.Any` is banned in `erpme` by `TID251` except in adapters and `generated/`. A rule 13 check counts suppressions per module, and an increase is shown in the pull request summary.
+    - **Lock order is checked at run time,** not by parsing: the lock helper of `db` raises `lock_order_violation` in test and development when a lock is taken out of the registered order (ADR-0027 rule 10). The static check only forbids `FOR UPDATE`, `pg_advisory_xact_lock` and raw lock SQL outside the helper.
+    - **Database access through `context` only** is enforced by the `forbidden` import contract of rule 6 (handlers import no database library) and by a rule 13 check that forbids `.execute(` on any object not reached from the handler's `context` argument.
+    - **Floats:** the rule 13 check also flags `Decimal(<float>)`, `json.loads` without `parse_float=Decimal`, and `float`, `real` or `double precision` columns in migrations.
+    - **Two speeds.** `erpme-dev check --fast` (ruff, format, import-linter and the rule 13 checks on changed files) for pre-commit and agents' inner loop; the full `check` (adds pyright and generated-file drift through `generate --check`) on pre-push and CI.
+    - **Agents read the rules in one place:** the root `AGENTS.md` points to this note and to `docs/design/architecture-core.md` section A5; every failure prints `file:line`, the rule ID and a one-line fix (rule 13).
+
 **One command for agents and CI**
 
 14. `erpme-dev` subcommands. Each prints a JSON summary as its last line with `--json`; at `build_step` 0 a subcommand whose inputs do not exist yet reports `skipped` with the reason:

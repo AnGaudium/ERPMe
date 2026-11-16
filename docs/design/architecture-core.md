@@ -227,6 +227,7 @@ Some DDL drafts break these rules ([findings](architecture-overview.md#findings-
 
 ## A8. Pointers
 
+- **Coding-rules gate:** no product code until `erpme-dev check` passes on the empty skeleton with every contract and check; limits, suppressions, lock order and the two check speeds are in the note on [ADR-0022](../adr/0022-repository-and-engineering-conventions.md) rule 13 (2026-11-16).
 - Root [AGENTS.md](../../AGENTS.md) first; then the module's `AGENTS.md` and the task's skill in `.claude/skills/` (`new-command`, `new-migration`, `posting-change-review`, …; ADR-0022 rule 23).
 - [Glossary](../spec/00-reading-guide.md); [DS-04](DS-04-command-envelope.md) (envelope, errors); [backlog](backlog.md); [escalation](../runbook/escalation.md).
 - Generated: [data map](generated/data-map.md), [module cards](generated/module-cards.md), [events](generated/event-matrix.md), [ADRs](generated/adr-index.md).
