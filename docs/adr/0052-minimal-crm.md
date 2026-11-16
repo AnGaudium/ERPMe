@@ -290,6 +290,8 @@ Leads, opportunities, marketing automation, appointments, chat connectors and se
 
     Note (flow review, 2026-11-15): check 3 also refuses a message whose linked document, or the source document of an attached print, is in `draft` or `pending_approval` at send, with `document_not_approved` ([ADR-0049](0049-statutory-reporting-and-printing.md) rule 28 note). For a quotation reply the order is therefore: approve the quotation, then send.
 
+    Note (Design hardening, 2026-11-16): where the connector can search the sent folder, an `unknown` attempt follows [ADR-0013](0013-outbox-and-events.md) rule 10's note: the message stays in `sending`; `crm_mail_sender` waits the settle delay, searches for the `Message-ID` (our reference, which serves as the message's idempotency key) twice, at least the delay apart, and submits again only when both searches find nothing; after the configured unknown rounds the attempt records `unknown` and the message returns to `approved` with `outbound_message_failed`. Where the connector cannot search, this rule stands as written: the message returns to `approved` at once and is never resent blindly.
+
 **Personal data and untrusted content**
 
 29. Data labels (ADR-0019 rule 7; spec 17) and the `is_untrusted` attribute (ADR-0029 rule 10) per field:

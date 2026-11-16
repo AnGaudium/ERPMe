@@ -102,6 +102,8 @@ Six agent types are designed now, each as a code-orchestrated workflow on the ru
 
    Note ([ADR-0064](0064-production-agent.md), proposed 2026-11-15): `production` 10 LLM calls, 120 tool calls, 200,000 input and 10,000 output tokens, USD 1.00, 600 seconds, 10,000 rows, USD 15 and 400 runs a day; `production_capture` 6, 30, 80,000, 5,000, USD 0.40, 180 seconds, 500 rows, USD 10 and 500 runs; `production_variance` 14, 40, 140,000, 12,000, USD 0.95, 180 seconds, 2,000 rows, USD 10 and 100 runs (rule 28).
 
+   Note (Design hardening, 2026-11-16): these values are the core defaults of the company settings `agents.<agent_type>.daily_max_cost` and `agents.<agent_type>.daily_max_runs` and the ceilings of the per-run settings. A company lowers any of them at once and raises a daily value, or a per-run value up to its ceiling, by a proposal another person approves ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 22 note). "Every daily cost stays below the company cap of USD 50" holds for the defaults; the company cap and the reserve pool still bind every run.
+
 10. The literal read scope (ADR-0050 rule 27; ADR-0029 rule 14) in these workflows:
     - **Tainted runs choose among related items only.** A tainted `quotation` run reads items only through the partner's `partner_item_overview` rows and its earlier document lines. A tainted `purchase_invoice` run reads the supplier's `partner_item` and `supplier_item` rows and its open purchase order lines. Lines that need anything else stay unresolved and go to a person.
     - **Configuration** reads the product's model. That is catalog data, so tainted `quotation` runs do not configure (rule 14).

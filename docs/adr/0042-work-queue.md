@@ -129,6 +129,13 @@ Every exception, pending approval and other piece of business work is one `work_
     - `ResolveWorkItem` (resolution code and note) is for kinds a person resolves.
     - `CancelWorkItem` takes a reason; the system cancels items whose subject is canceled or deleted.
     - `CreateWorkItemNote`.
+
+    Note (Design hardening, 2026-11-16): bulk review. A person may select several work items or drafts in the work queue and submit or approve them together when every selected item:
+    - is a draft or change proposal whose field values are all trusted ([ADR-0057](0057-document-intake-and-extraction.md) rule 17's reading: no `is_untrusted` field, extraction values as the trust view serves them) and whose simulation returns no check result;
+    - passes every check of the dispatcher's order for that person, shown by its own simulation, so eligibility, segregation of duties and approval stages hold for each item; and
+    - is executed as its own command, with its own idempotency key, `expected_plan_hash`, `as_of_date`, audit record and approval record; there is no batch command, no batch approval record and no shared plan hash.
+
+    The UI simulates each item, lists them with each plan's summary, and on one confirmation sends one execution per item. An item that fails a condition, or whose execution fails, stays in the queue for single review; the others are unaffected. `work.bulk_review_max_items` (company, default 50, bounds 1 to 500) caps one selection. Bulk review is a person's action in the UI, on no agent tool list and never an automation action. It reduces clicks without weakening spec 03's floor: a person still submits or approves each item.
 13. Queries:
     - `ListWorkItem`, filtered by kind, state, owner (me, my roles), subject, due and overdue, with the visibility of rule 10;
     - `GetWorkItem`, with links, notes and claim.

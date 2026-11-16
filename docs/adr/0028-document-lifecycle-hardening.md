@@ -99,6 +99,8 @@ This ADR amends the document lifecycle (ADR-0009) in five places, before step 3 
 10. Outages:
     - A document stays in `issuing` during an outage. The intent retries and its deliveries are held with work items (ADR-0013 rule 8).
     - `Recall<Type>` (verb Recall; `human_only`) returns it to `draft` only when the last status recorded on the e-invoice record by the external consumer's status query (ADR-0013 rule 10) is "nothing held". In the same transaction it skips the pending issue delivery, and it is rejected while that delivery is `running`.
+
+    Note (Design hardening, 2026-11-16): an unknown issuance outcome follows [ADR-0013](0013-outbox-and-events.md) rule 10's note: the e-invoice request sends our reference as the provider's idempotency key where it has one; the retry waits the settle delay and requests again only after two status queries, at least the delay apart, report nothing held; after the configured unknown rounds it stops with `external_call_outcome_unknown`. The document stays in `issuing` throughout. `Recall<Type>` likewise needs the last two status queries recorded on the e-invoice record, at least the delay apart, to report "nothing held".
 11. Close check. ADR-0012 rule 13 gets a required core check task that blocks `LockPostingPeriod` while the period has any document whose `posting_date` falls in it and that is either:
     - in `issuing`, or
     - accepted but not posted.
