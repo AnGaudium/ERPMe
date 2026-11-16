@@ -29,7 +29,7 @@ Title, status and design item come from each ADR's first lines. **Declared** ADR
 | [ADR-0019](../../adr/0019-partners-and-crm-foundation.md) | Partners, contacts and CRM foundation | accepted 2026-11-14 | DS-20 (partner part) and DS-35 (minimal CRM), drafted ahead of steps 2 and 5 | `crm`, `master_data`, `audit` | 4, 3, 2 | `master_data`, `crm`, `audit` |
 | [ADR-0020](../../adr/0020-inventory-and-costing-model.md) | Inventory and costing model | accepted 2026-11-14 | DS-09 (ADR part for step 0; the period-end costing algorithm is specified for step 3) | `inventory`, `master_data` | 3 | `inventory`, `master_data`, `documents` |
 | [ADR-0021](../../adr/0021-landed-cost.md) | Landed cost | accepted 2026-11-14 | DS-11 (ADR part for step 0; formulas and layouts specified for step 3) | — | — | `inventory` |
-| [ADR-0022](../../adr/0022-repository-and-engineering-conventions.md) | Repository and engineering conventions | accepted 2026-11-14 | DS-18 | `automation`, `inventory`, `configuration` | 5, 3, 2 | `query`, `work`, `attachments`, `documents` |
+| [ADR-0022](../../adr/0022-repository-and-engineering-conventions.md) | Repository and engineering conventions | accepted 2026-11-14 | DS-18 | `automation`, `inventory`, `configuration` | 5, 3, 2 | `work`, `query`, `attachments`, `documents` |
 | [ADR-0023](../../adr/0023-warehouse-management.md) | Warehouse management | accepted 2026-11-14 | DS-42 (new) | `inventory`, `master_data` | 3 | `inventory`, `master_data` |
 | [ADR-0024](../../adr/0024-planning.md) | Planning | accepted 2026-11-14 | DS-43 (new) | `planning`, `inventory`, `master_data` | 4, 3 | `planning`, `inventory`, `production`, `master_data` |
 | [ADR-0025](../../adr/0025-later-phase-seams.md) | Seams for production and asset subledgers | accepted 2026-11-14 | DS-41 (new) | `production` | 3 | `production`, `ledger`, `inventory`, `assets` |
@@ -73,6 +73,7 @@ Title, status and design item come from each ADR's first lines. **Declared** ADR
 | [ADR-0063](../../adr/0063-configurable-policy-settings.md) | Configurable policy settings | accepted 2026-11-15 |  | `registry` | 2 | `registry`, `master_data`, `agent_runs`, `agents` |
 | [ADR-0064](../../adr/0064-production-agent.md) | Production agent | accepted 2026-11-15 |  | — | — | `production`, `master_data`, `planning`, `inventory` |
 | [ADR-0065](../../adr/0065-deterministic-auto-post-gateway.md) | Deterministic auto-post gateway (maker-checker) | proposed 2026-11-16 |  | — | — | `policy`, `automation`, `purchasing`, `agent_runs` |
+| [ADR-0066](../../adr/0066-work-cases.md) | Work cases | proposed 2026-11-16 |  | `work` | 2 | `work`, `crm`, `documents` |
 
 ## By module
 
@@ -86,7 +87,7 @@ Title, status and design item come from each ADR's first lines. **Declared** ADR
 | 5 | `query` | ADR-0060 | ADR-0022, ADR-0050, ADR-0060 |
 | 5 | `sdk` | — | — |
 | 4 | `cash` | ADR-0029, ADR-0030, ADR-0038, ADR-0048, ADR-0050 | ADR-0026, ADR-0048, ADR-0051, ADR-0052, ADR-0059 |
-| 4 | `crm` | ADR-0009, ADR-0019, ADR-0052 | ADR-0009, ADR-0019, ADR-0045, ADR-0048, ADR-0050, ADR-0051, ADR-0052, ADR-0057 |
+| 4 | `crm` | ADR-0009, ADR-0019, ADR-0052 | ADR-0009, ADR-0019, ADR-0045, ADR-0048, ADR-0050, ADR-0051, ADR-0052, ADR-0057, ADR-0066 |
 | 4 | `planning` | ADR-0024, ADR-0031, ADR-0036, ADR-0037 | ADR-0024, ADR-0036, ADR-0037, ADR-0051, ADR-0056, ADR-0064 |
 | 4 | `purchasing` | ADR-0028, ADR-0037, ADR-0047 | ADR-0037, ADR-0047, ADR-0054, ADR-0056, ADR-0065 |
 | 4 | `reporting` | ADR-0049 | ADR-0049 |
@@ -102,14 +103,14 @@ Title, status and design item come from each ADR's first lines. **Declared** ADR
 | 2 | `audit` | ADR-0019, ADR-0038, ADR-0052, ADR-0054 | ADR-0006, ADR-0019, ADR-0038, ADR-0052, ADR-0058 |
 | 2 | `configuration` | ADR-0022, ADR-0027, ADR-0058, ADR-0059 | ADR-0058, ADR-0059 |
 | 2 | `db` | — | — |
-| 2 | `documents` | ADR-0004, ADR-0008, ADR-0009, ADR-0028, ADR-0029, ADR-0030, ADR-0043, ADR-0052, ADR-0054, ADR-0055 | ADR-0009, ADR-0020, ADR-0022, ADR-0028, ADR-0029, ADR-0038, ADR-0043, ADR-0052, ADR-0054, ADR-0055, ADR-0061, ADR-0062 |
+| 2 | `documents` | ADR-0004, ADR-0008, ADR-0009, ADR-0028, ADR-0029, ADR-0030, ADR-0043, ADR-0052, ADR-0054, ADR-0055 | ADR-0009, ADR-0020, ADR-0022, ADR-0028, ADR-0029, ADR-0038, ADR-0043, ADR-0052, ADR-0054, ADR-0055, ADR-0061, ADR-0062, ADR-0066 |
 | 2 | `localization` | — | — |
 | 2 | `outbox` | ADR-0013 | ADR-0013 |
 | 2 | `periods` | — | — |
 | 2 | `permissions` | ADR-0017, ADR-0040, ADR-0054 | ADR-0017, ADR-0042, ADR-0054, ADR-0055 |
 | 2 | `policy` | ADR-0043, ADR-0055 | ADR-0042, ADR-0043, ADR-0055, ADR-0059, ADR-0065 |
 | 2 | `registry` | ADR-0063 | ADR-0063 |
-| 2 | `work` | ADR-0042, ADR-0054, ADR-0055 | ADR-0022, ADR-0042 |
+| 2 | `work` | ADR-0042, ADR-0054, ADR-0055, ADR-0066 | ADR-0022, ADR-0042, ADR-0066 |
 | 1 | `clock` | ADR-0007 | — |
 | 1 | `errors` | — | — |
 | 1 | `i18n` | — | — |
@@ -124,7 +125,7 @@ Title, status and design item come from each ADR's first lines. **Declared** ADR
 | 5 | ADR-0022, ADR-0030, ADR-0058, ADR-0060 |
 | 4 | ADR-0009, ADR-0019, ADR-0024, ADR-0028, ADR-0029, ADR-0030, ADR-0031, ADR-0036, ADR-0037, ADR-0038, ADR-0044, ADR-0045, ADR-0046, ADR-0047, ADR-0048, ADR-0049, ADR-0050, ADR-0052 |
 | 3 | ADR-0004, ADR-0006, ADR-0011, ADR-0018, ADR-0019, ADR-0020, ADR-0022, ADR-0023, ADR-0024, ADR-0025, ADR-0026, ADR-0027, ADR-0028, ADR-0029, ADR-0030, ADR-0031, ADR-0032, ADR-0033, ADR-0034, ADR-0035, ADR-0037, ADR-0041, ADR-0044, ADR-0045, ADR-0046, ADR-0047, ADR-0049, ADR-0053, ADR-0054, ADR-0055, ADR-0056, ADR-0057, ADR-0061, ADR-0062 |
-| 2 | ADR-0004, ADR-0008, ADR-0009, ADR-0013, ADR-0017, ADR-0019, ADR-0022, ADR-0027, ADR-0028, ADR-0029, ADR-0030, ADR-0038, ADR-0040, ADR-0042, ADR-0043, ADR-0049, ADR-0050, ADR-0052, ADR-0054, ADR-0055, ADR-0057, ADR-0058, ADR-0059, ADR-0063 |
+| 2 | ADR-0004, ADR-0008, ADR-0009, ADR-0013, ADR-0017, ADR-0019, ADR-0022, ADR-0027, ADR-0028, ADR-0029, ADR-0030, ADR-0038, ADR-0040, ADR-0042, ADR-0043, ADR-0049, ADR-0050, ADR-0052, ADR-0054, ADR-0055, ADR-0057, ADR-0058, ADR-0059, ADR-0063, ADR-0066 |
 | 1 | ADR-0006, ADR-0007 |
 
 ADRs declared for no module (platform-wide, process or not yet in the DDL): ADR-0001, ADR-0002, ADR-0003, ADR-0005, ADR-0010, ADR-0012, ADR-0014, ADR-0015, ADR-0016, ADR-0021, ADR-0039, ADR-0051, ADR-0064, ADR-0065.

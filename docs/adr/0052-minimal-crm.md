@@ -161,6 +161,8 @@ Leads, opportunities, marketing automation, appointments, chat connectors and se
 
     Note: the owner rule `role:sales` resolves as `role:sales_clerk`, through `role.template_code` ([ADR-0054](0054-users-roles-and-authorizations.md) rule 11).
 
+    Note ([ADR-0066](0066-work-cases.md), 2026-11-16 (proposed)): where the company sets `work_case.quote_request.mode` to `auto`, the raise of `inbound_message_matched` opens a `quote_request` work case through the consumer `work_case_opener` (and `interaction_unmatched` a `customer_onboarding` case, `complaint_open` a `customer_issue` case, each under its own mode). `crm` itself is unchanged, and the case copies `partner_id` only from the matched interaction ([ADR-0066](0066-work-cases.md) rules 3, 6).
+
 **Customer onboarding from e-mail**
 
 16. An e-mail from an unknown sender follows [ADR-0051](0051-agent-workflows.md) rules 11–13:
