@@ -73,6 +73,8 @@ Checks:
 
    Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), proposed 2026-11-15): `query` also owns the analysis layer: the catalog of facts, measures and dimensions, the plan validator, compiler and executor, and the tables `analysis_question`, `saved_analysis`, `saved_analysis_version` and `analysis_example`. Besides `db`, `registry` and `agent_runs` it now imports the `work` contract, downward, to raise `analysis_answer_disputed` and `analysis_catalog_request`. `agents` adds the `analysis` workflow, which reaches `query` only through the dispatcher. No external semantic engine runs in the core (rule 1).
 
+   Note ([ADR-0066](0066-work-cases.md), 2026-11-16 (proposed)): `work` also owns `work_case` and `work_case_link` and imports nothing new. `ListWorkCaseTimeline` is a query of `query` over views in schema `query`, and the consumer `work_case_opener` belongs to `automation`, which already imports the `configuration` and `work` contracts ([ADR-0066](0066-work-cases.md) rules 2, 6, 17).
+
 3. Shape of each module:
    - A module that owns tables or commands has:
      - `contract.py`, the only part other modules import (rule 4);

@@ -289,6 +289,8 @@ Status: accepted (2026-11-15) under ADR-0005, reviewed by Claude Fable 5.2 (buil
     - **Flagged.** Scope kind `subject`, items 2, 3 and 4, and the data migration agent's reading of its migration's mapping profile (ADR-0051 rule 26) are this ADR's readings of the literal rule. Through item 3 a tainted run also sees the server-computed prices and taxes in its own draft's plan. The author's answer to the open question may change all of them.
 
     Note ([ADR-0063](0063-configurable-policy-settings.md), proposed 2026-11-15): item 4 also covers declared projections (`tainted_projection` on a query's result model: closed shapes and internal names only, at most 20 rows per call and 10 calls per run) while `agents.tainted_reference_reads` reads `declared_projections`, the default; the run stays tainted (rule 16).
+
+    Note ([ADR-0066](0066-work-cases.md), 2026-11-16 (proposed)): work cases do not widen item 2: a run reads its work item, the item's evidence links and its notes, never the work case the item belongs to. `GetWorkCase` and `ListWorkCaseTimeline` are on no agent tool list in Phase 1 ([ADR-0066](0066-work-cases.md) rule 19).
 28. Untrusted fields:
     - **Omitted by default.** Views and query result models omit `is_untrusted` columns unless the request sets `include_untrusted: true` (ADR-0029 rule 10). Listing documents therefore does not taint.
     - **Agent types that must stay clean** declare `may_read_untrusted: false` (for example `planning`). For their runs, `include_untrusted` returns `untrusted_read_not_allowed`, and rows that would taint them are left out, with `is_taint_filtered: true` in the response.

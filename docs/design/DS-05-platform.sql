@@ -52,7 +52,7 @@ CREATE TABLE agent_type_version (                          -- installation data;
     UNIQUE (agent_type_code, version)
 );
 
--- ===== Work queue [work] (ADR-0042; ADR-0055 rule 12; ADR-0054 rule 11) =====
+-- ===== Work queue [work] (ADR-0042; ADR-0055 rule 12; ADR-0054 rule 11; work cases ADR-0066, proposed) =====
 CREATE TABLE work_item (
     id                       uuid PRIMARY KEY,
     company_id               uuid NOT NULL REFERENCES company (id),
@@ -73,6 +73,7 @@ CREATE TABLE work_item (
     is_tainted               boolean NOT NULL DEFAULT false,   -- OR over the raises (rule 5)
     origin_event_id          uuid,                         -- no key: outbox partitions are dropped after retention (ADR-0013 rule 15)
     origin_agent_run_id      uuid,                         -- kept from the first raise (rule 5); key added after agent_run
+    work_case_id             uuid,                         -- set once, kept by a re-raise (ADR-0066 rule 10); key added after work_case
     claimed_by_kind          text CONSTRAINT ck_work_item_claimed_by_kind CHECK (claimed_by_kind IN ('user', 'agent_run')),
     claimed_by_id            uuid,
     claimed_at               timestamptz,
@@ -128,6 +129,66 @@ CREATE TABLE work_item_note (                              -- append-only (rule 
     CONSTRAINT ck_work_item_note_author CHECK ((author_kind = 'system') = (author_id IS NULL))
 );
 CREATE INDEX ix_work_item_note_work_item_id ON work_item_note (work_item_id);
+CREATE TABLE work_case (                                   -- one business intent; links only, documents stay the source of truth (ADR-0066 rules 1-2)
+    id                uuid PRIMARY KEY,
+    company_id        uuid NOT NULL REFERENCES company (id),
+    kind              text NOT NULL CONSTRAINT ck_work_case_kind CHECK (kind ~ '^[a-z][a-z0-9_]*$'),   -- work-case-kinds.csv (rule 3)
+    open_key          text NOT NULL,                       -- the origin's ID unless the kind composes it (rule 5)
+    state             text NOT NULL CONSTRAINT ck_work_case_state CHECK (state IN ('open', 'resolved', 'canceled')),
+    owner_kind        text NOT NULL CONSTRAINT ck_work_case_owner_kind CHECK (owner_kind IN ('user', 'role')),
+    owner_user_id     uuid REFERENCES user_account (id),
+    owner_role        text CONSTRAINT ck_work_case_owner_role CHECK (owner_role ~ '^[a-z][a-z0-9_]*$'),   -- a template code or company_owner, as work_item
+    branch_id         uuid,
+    warehouse_id      uuid,
+    due_date          date NOT NULL,
+    priority          text NOT NULL DEFAULT 'normal' CONSTRAINT ck_work_case_priority CHECK (priority IN ('low', 'normal', 'high')),
+    title_key         text NOT NULL,                       -- the kind's i18n message; never text from outside content (rule 2)
+    title_details     jsonb NOT NULL DEFAULT '{}' CONSTRAINT ck_work_case_title_details CHECK (jsonb_typeof(title_details) = 'object'),   -- IDs, numbers and codes only
+    partner_id        uuid,                                -- only from a trusted source: a deterministic match or a person (rule 2)
+    origin_table      text,
+    origin_id         uuid,
+    resolution        text,
+    resolved_at       timestamptz,
+    cancel_reason     text,
+    version           integer NOT NULL CONSTRAINT ck_work_case_version CHECK (version >= 1),
+    recorded_at       timestamptz NOT NULL,
+    UNIQUE (company_id, id),
+    FOREIGN KEY (company_id, branch_id) REFERENCES branch (company_id, id),
+    FOREIGN KEY (company_id, warehouse_id) REFERENCES warehouse (company_id, id),
+    FOREIGN KEY (company_id, partner_id) REFERENCES partner (company_id, id),
+    CONSTRAINT ck_work_case_owner CHECK (
+        (owner_kind = 'user') = (owner_user_id IS NOT NULL)
+        AND (owner_kind = 'role') = (owner_role IS NOT NULL)),
+    CONSTRAINT ck_work_case_scope CHECK (owner_kind = 'role' OR (branch_id IS NULL AND warehouse_id IS NULL)),
+    CONSTRAINT ck_work_case_origin CHECK ((origin_table IS NULL) = (origin_id IS NULL)),
+    CONSTRAINT ck_work_case_final CHECK (
+        (state IN ('resolved', 'canceled')) = (resolved_at IS NOT NULL)
+        AND (state <> 'resolved' OR resolution IS NOT NULL)
+        AND (state = 'canceled') = (cancel_reason IS NOT NULL))
+);
+-- Rule 2: one open case per origin and kind.
+CREATE UNIQUE INDEX ux_work_case_open_key ON work_case (company_id, kind, open_key) WHERE state = 'open';
+CREATE INDEX ix_work_case_partner_id ON work_case (company_id, partner_id) WHERE state = 'open';
+CREATE INDEX ix_work_case_owner_user_id ON work_case (owner_user_id) WHERE state = 'open';
+CREATE TABLE work_case_link (                              -- append-only; unlinking sets unlinked_at once (ADR-0066 rule 8)
+    id               uuid PRIMARY KEY,
+    company_id       uuid NOT NULL,
+    work_case_id     uuid NOT NULL,
+    target_table     text NOT NULL,
+    target_id        uuid NOT NULL,
+    link_kind        text NOT NULL CONSTRAINT ck_work_case_link_kind CHECK (link_kind IN ('origin', 'evidence', 'artifact', 'related')),
+    linked_by_kind   text NOT NULL CONSTRAINT ck_work_case_link_linked_by_kind CHECK (linked_by_kind IN ('user', 'system')),
+    linked_by_id     uuid,                                 -- the user; null for system (the opener consumer, an automation rule)
+    unlinked_at      timestamptz,
+    recorded_at      timestamptz NOT NULL,
+    FOREIGN KEY (company_id, work_case_id) REFERENCES work_case (company_id, id),
+    CONSTRAINT ck_work_case_link_linked_by CHECK ((linked_by_kind = 'system') = (linked_by_id IS NULL))
+);
+-- One live link per target and kind; an unlinked row may be followed by a new link.
+CREATE UNIQUE INDEX ux_work_case_link_live ON work_case_link (work_case_id, target_table, target_id, link_kind) WHERE unlinked_at IS NULL;
+CREATE INDEX ix_work_case_link_target ON work_case_link (company_id, target_table, target_id) WHERE unlinked_at IS NULL;
+ALTER TABLE work_item ADD CONSTRAINT fk_work_item_work_case_id FOREIGN KEY (company_id, work_case_id) REFERENCES work_case (company_id, id);
+CREATE INDEX ix_work_item_work_case_id ON work_item (work_case_id) WHERE work_case_id IS NOT NULL;
 
 -- ===== Agent settings, runs and budgets [agent_runs] (ADR-0050 rules 14, 18-19, 22-23) =====
 CREATE TABLE agent_type_setting (                          -- company data, change-tracked (rule 14)
@@ -1389,8 +1450,23 @@ BEGIN
        IS DISTINCT FROM (OLD.company_id, OLD.kind, OLD.subject_table, OLD.subject_id, OLD.open_key, OLD.origin_event_id)
        OR (OLD.is_tainted AND NOT NEW.is_tainted)
        OR (OLD.origin_agent_run_id IS NOT NULL AND NEW.origin_agent_run_id IS DISTINCT FROM OLD.origin_agent_run_id)
+       OR (OLD.work_case_id IS NOT NULL AND NEW.work_case_id IS DISTINCT FROM OLD.work_case_id)
        OR OLD.state IN ('done', 'canceled') THEN
-        RAISE EXCEPTION 'work item identity, taint or end state changed (ADR-0042 rules 2, 5)' USING ERRCODE = 'restrict_violation';
+        RAISE EXCEPTION 'work item identity, taint, case or end state changed (ADR-0042 rules 2, 5; ADR-0066 rule 10)' USING ERRCODE = 'restrict_violation';
+    END IF;
+    RETURN NEW;
+END
+$$;
+-- ADR-0066 rule 2: a case is never deleted; identity and origin never change; resolved and canceled are final.
+CREATE FUNCTION work_case_check_change() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP = 'DELETE' THEN
+        RAISE EXCEPTION 'work cases are never deleted (ADR-0066 rule 2)' USING ERRCODE = 'restrict_violation';
+    END IF;
+    IF (NEW.company_id, NEW.kind, NEW.open_key, NEW.origin_table, NEW.origin_id)
+       IS DISTINCT FROM (OLD.company_id, OLD.kind, OLD.open_key, OLD.origin_table, OLD.origin_id)
+       OR OLD.state IN ('resolved', 'canceled') THEN
+        RAISE EXCEPTION 'work case identity, origin or final state changed (ADR-0066 rule 2)' USING ERRCODE = 'restrict_violation';
     END IF;
     RETURN NEW;
 END
@@ -1470,6 +1546,9 @@ CREATE TRIGGER trg_agent_type_version_immutable BEFORE UPDATE OR DELETE ON agent
 CREATE TRIGGER trg_agent_promotion_evidence_immutable BEFORE UPDATE OR DELETE ON agent_promotion_evidence FOR EACH ROW EXECUTE FUNCTION platform_reject_change();
 CREATE TRIGGER trg_work_item_check_change BEFORE UPDATE OR DELETE ON work_item FOR EACH ROW EXECUTE FUNCTION work_item_check_change();
 CREATE TRIGGER trg_work_item_note_immutable BEFORE UPDATE OR DELETE ON work_item_note FOR EACH ROW EXECUTE FUNCTION platform_reject_change();
+CREATE TRIGGER trg_work_case_check_change BEFORE UPDATE OR DELETE ON work_case FOR EACH ROW EXECUTE FUNCTION work_case_check_change();
+CREATE TRIGGER trg_work_case_link_append_only BEFORE UPDATE OR DELETE ON work_case_link FOR EACH ROW
+    EXECUTE FUNCTION platform_check_append_only('{}', '{unlinked_at}', '{}');
 CREATE TRIGGER trg_document_check_row_change BEFORE UPDATE OR DELETE ON document FOR EACH ROW EXECUTE FUNCTION document_check_row_change();
 CREATE TRIGGER trg_document_version_check_change BEFORE UPDATE OR DELETE ON document_version FOR EACH ROW EXECUTE FUNCTION document_version_check_change();
 CREATE TRIGGER trg_document_version_check_taint BEFORE INSERT ON document_version FOR EACH ROW EXECUTE FUNCTION document_version_check_taint();
@@ -1547,7 +1626,7 @@ DECLARE
     v_nullable  text[] := ARRAY['outbox_event', 'event_delivery', 'audit_record', 'audit_change', 'audit_denial', 'agent_budget_usage'];
 BEGIN
     FOREACH v_table IN ARRAY ARRAY[
-        'work_item', 'work_item_link', 'work_item_note', 'agent_type_setting', 'agent_run', 'agent_run_step', 'agent_budget_usage',
+        'work_item', 'work_item_link', 'work_item_note', 'work_case', 'work_case_link', 'agent_type_setting', 'agent_run', 'agent_run_step', 'agent_budget_usage',
         'approval_procedure', 'policy_rule', 'policy_rule_version', 'numbering_configuration', 'numbering_series', 'document',
         'document_version', 'taint_clearance', 'policy_decision', 'approval', 'auto_post_confirmation', 'period_unlock_request',
         'posting_intent', 'change_proposal', 'change_proposal_item', 'change_proposal_execution', 'change_proposal_execution_item',

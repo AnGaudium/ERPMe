@@ -112,6 +112,8 @@ ADR-0043 decides whether a document needs approval and at which rank, and approv
    Note ([ADR-0063](0063-configurable-policy-settings.md), proposed 2026-11-15): the approver of a change proposal that loosens a registered setting also meets conditions 5 and 6, and the small-company mode does not lift `approver_is_submitter` for it (rule 3).
 
    Note (Design hardening, 2026-11-16): an approval given through bulk review ([ADR-0042](0042-work-queue.md) rule 12 note) is one `Approve<Type>` per document, checked against conditions 1 to 8 and recorded as its own `approval` row; one approval never counts for more than one document.
+
+   Note ([ADR-0066](0066-work-cases.md), 2026-11-16 (proposed)): approvals given from a work case are the bulk review above: one `Approve<Type>` per document, checked against conditions 1 to 8. A case adds no approval object. Whether a company may skip a purchase order's approval because the purchase requests it comes from were approved is an open question for the author ([ADR-0066](0066-work-cases.md) rules 16, 20).
 8. Counting and completion:
    - **The round.** A round starts with a `Submit` from draft. It ends with `Post` (or `Issue`) of the document, a rejection, an edit or a cancel. A resubmission without edit after `approval_context_changed` continues it when the selected pool stays the same, and starts a new round when the pool changes (rule 11).
    - **Counted approvals** of a stage are its `approved` rows within the current round, for stages of the current plan. A round has one version, because an edit ends it. When a continued round's new plan drops a stage (a lower rank, or a stage deactivated in between), the approvals at that stage stay recorded but no longer count.

@@ -110,7 +110,7 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Work item kinds (9):** `complaint_open`, `data_subject_request_due`, `data_subject_request_received`, `follow_up_due`, `inbound_message_matched`, `interaction_unmatched`, `mailbox_unreachable`, `outbound_message_failed`, `partner_duplicate_suspected`
 - **Authorization areas (7):** `complaint`, `data_protection`, `data_subject_request`, `interaction`, `mailbox`, `outbound_message`, `partner_insight`
 - **ADRs (declared):** [ADR-0009](../../adr/0009-document-lifecycle.md), [ADR-0019](../../adr/0019-partners-and-crm-foundation.md), [ADR-0052](../../adr/0052-minimal-crm.md)
-- **ADRs that name this module most (mentions; not complete):** [ADR-0009](../../adr/0009-document-lifecycle.md), [ADR-0019](../../adr/0019-partners-and-crm-foundation.md), [ADR-0045](../../adr/0045-master-data-and-price-lists.md), [ADR-0048](../../adr/0048-cash-bank-receivables-payables.md), [ADR-0050](../../adr/0050-agent-runtime-and-query-layer.md), [ADR-0051](../../adr/0051-agent-workflows.md), [ADR-0052](../../adr/0052-minimal-crm.md), [ADR-0057](../../adr/0057-document-intake-and-extraction.md)
+- **ADRs that name this module most (mentions; not complete):** [ADR-0009](../../adr/0009-document-lifecycle.md), [ADR-0019](../../adr/0019-partners-and-crm-foundation.md), [ADR-0045](../../adr/0045-master-data-and-price-lists.md), [ADR-0048](../../adr/0048-cash-bank-receivables-payables.md), [ADR-0050](../../adr/0050-agent-runtime-and-query-layer.md), [ADR-0051](../../adr/0051-agent-workflows.md), [ADR-0052](../../adr/0052-minimal-crm.md), [ADR-0057](../../adr/0057-document-intake-and-extraction.md), [ADR-0066](../../adr/0066-work-cases.md)
 
 ## `planning` (layer 4)
 
@@ -308,7 +308,7 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Authorization areas (1):** `change_proposal`
 - **Tables in DS-05-platform.sql with no stated owner:** `auto_post_confirmation` (section names policy, documents), `period_unlock_request` (section names policy, documents), `policy_decision` (section names policy, documents) ([data-map findings](data-map.md#findings-tables-without-an-owner-and-lab-stubs))
 - **ADRs (declared):** [ADR-0004](../../adr/0004-naming-conventions.md), [ADR-0008](../../adr/0008-command-envelope-and-registry.md), [ADR-0009](../../adr/0009-document-lifecycle.md), [ADR-0028](../../adr/0028-document-lifecycle-hardening.md), [ADR-0029](../../adr/0029-proposals-and-agent-safety.md), [ADR-0030](../../adr/0030-commercial-seams-and-imports.md), [ADR-0043](../../adr/0043-policy-and-approval.md), [ADR-0052](../../adr/0052-minimal-crm.md), [ADR-0054](../../adr/0054-users-roles-and-authorizations.md), [ADR-0055](../../adr/0055-approval-pools-and-stages.md)
-- **ADRs that name this module most (mentions; not complete):** [ADR-0009](../../adr/0009-document-lifecycle.md), [ADR-0020](../../adr/0020-inventory-and-costing-model.md), [ADR-0022](../../adr/0022-repository-and-engineering-conventions.md), [ADR-0028](../../adr/0028-document-lifecycle-hardening.md), [ADR-0029](../../adr/0029-proposals-and-agent-safety.md), [ADR-0038](../../adr/0038-audit-and-observability.md), [ADR-0043](../../adr/0043-policy-and-approval.md), [ADR-0052](../../adr/0052-minimal-crm.md), [ADR-0054](../../adr/0054-users-roles-and-authorizations.md), [ADR-0055](../../adr/0055-approval-pools-and-stages.md), [ADR-0061](../../adr/0061-barcodes.md), [ADR-0062](../../adr/0062-product-engineering-workflow.md)
+- **ADRs that name this module most (mentions; not complete):** [ADR-0009](../../adr/0009-document-lifecycle.md), [ADR-0020](../../adr/0020-inventory-and-costing-model.md), [ADR-0022](../../adr/0022-repository-and-engineering-conventions.md), [ADR-0028](../../adr/0028-document-lifecycle-hardening.md), [ADR-0029](../../adr/0029-proposals-and-agent-safety.md), [ADR-0038](../../adr/0038-audit-and-observability.md), [ADR-0043](../../adr/0043-policy-and-approval.md), [ADR-0052](../../adr/0052-minimal-crm.md), [ADR-0054](../../adr/0054-users-roles-and-authorizations.md), [ADR-0055](../../adr/0055-approval-pools-and-stages.md), [ADR-0061](../../adr/0061-barcodes.md), [ADR-0062](../../adr/0062-product-engineering-workflow.md), [ADR-0066](../../adr/0066-work-cases.md)
 
 ## `localization` (layer 2)
 
@@ -386,14 +386,14 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 ## `work` (layer 2)
 
 - **Note in ADR-0022 rule 2:** —
-- **Owned tables (3):** `work_item`, `work_item_link`, `work_item_note`
-- **Events produced (6):** `WorkItemAssigned`, `WorkItemCanceled`, `WorkItemClaimed`, `WorkItemRaised`, `WorkItemResolved`, `WorkItemUnclaimed`
-- **Commands and queries named in ADRs (8):** `AssignWorkItem`, `CancelWorkItem`, `ClaimWorkItem`, `CreateWorkItemNote`, `GetWorkItem`, `ListWorkItem`, `ResolveWorkItem`, `UnclaimWorkItem`
-- **Settings (1):** `work.bulk_review_max_items`
+- **Owned tables (5):** `work_case`, `work_case_link`, `work_item`, `work_item_link`, `work_item_note`
+- **Events produced (11):** `WorkCaseAssigned`, `WorkCaseCanceled`, `WorkCaseOpened`, `WorkCaseResolved`, `WorkCaseUpdated`, `WorkItemAssigned`, `WorkItemCanceled`, `WorkItemClaimed`, `WorkItemRaised`, `WorkItemResolved`, `WorkItemUnclaimed`
+- **Commands and queries named in ADRs (16):** `AssignWorkCase`, `AssignWorkItem`, `CancelWorkCase`, `CancelWorkItem`, `ClaimWorkItem`, `CreateWorkCase`, `CreateWorkItemNote`, `GetWorkCase`, `GetWorkItem`, `ListWorkCase`, `ListWorkCaseTimeline`, `ListWorkItem`, `ResolveWorkCase`, `ResolveWorkItem`, `UnclaimWorkItem`, `UpdateWorkCase`
+- **Settings (4):** `work.bulk_review_max_items`, `work.landing_page`, `work_case.<kind>.due_days`, `work_case.<kind>.mode`
 - **Work item kinds (0):** none
 - **Authorization areas (2):** `work_queue`, `work_queue_administration`
-- **ADRs (declared):** [ADR-0042](../../adr/0042-work-queue.md), [ADR-0054](../../adr/0054-users-roles-and-authorizations.md), [ADR-0055](../../adr/0055-approval-pools-and-stages.md)
-- **ADRs that name this module most (mentions; not complete):** [ADR-0022](../../adr/0022-repository-and-engineering-conventions.md), [ADR-0042](../../adr/0042-work-queue.md)
+- **ADRs (declared):** [ADR-0042](../../adr/0042-work-queue.md), [ADR-0054](../../adr/0054-users-roles-and-authorizations.md), [ADR-0055](../../adr/0055-approval-pools-and-stages.md), [ADR-0066](../../adr/0066-work-cases.md)
+- **ADRs that name this module most (mentions; not complete):** [ADR-0022](../../adr/0022-repository-and-engineering-conventions.md), [ADR-0042](../../adr/0042-work-queue.md), [ADR-0066](../../adr/0066-work-cases.md)
 
 ## `clock` (layer 1)
 

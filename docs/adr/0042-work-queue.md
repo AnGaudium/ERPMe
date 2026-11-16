@@ -48,6 +48,8 @@ Every exception, pending approval and other piece of business work is one `work_
    Note: owner kind `approval_stage` with `owner_approval_stage_id`; the item is visible to everyone eligible for the stage ([ADR-0055](0055-approval-pools-and-stages.md) rule 12).
 
    Note: `owner_role` stores the symbolic rule, a template code or `company_owner`, with its scope dimensions, never a role ID. Who holds it, and the fallback to `company_owner` when no active role has the template, are resolved when the item is read, by the registered visibility function ([ADR-0054](0054-users-roles-and-authorizations.md) rules 2, 11). So the holders of every active role with that template code own the item, and a role created later counts at once.
+
+   Note ([ADR-0066](0066-work-cases.md), 2026-11-16 (proposed)): `work_item` gains `work_case_id` (nullable), set once and kept by a re-raise; the item then belongs to that work case. A case only links: no rule of this ADR changes for an item in a case ([ADR-0066](0066-work-cases.md) rules 2, 10).
 3. `work_item_link` (`work_item_id`, `target_table`, `target_id`, `link_kind`: `evidence`, `draft`, `result`) holds the evidence and what was done about it, such as a derivation trace, a pegging row, a task, a delivery, or a draft the agent made.
    - **Notes.** `work_item_note` (author, text, `created_at`) is append-only. A note an agent writes from outside content is marked untrusted (ADR-0029 rule 10).
 4. Uniqueness. A unique partial index on (`company_id`, `kind`, `open_key`) where `state` is `open` or `claimed` allows one open item per exception.
@@ -63,6 +65,8 @@ Every exception, pending approval and other piece of business work is one `work_
    - **The plan.** Raised items are listed in the plan like events and never hashed (ADR-0008 rule 12).
 
    Note: the calling module computes user-kind owners and applies their fallback at raise. A role-kind owner is stored as the symbolic rule (rule 2 note) and resolved at read time, so layer-2 callers need no import to learn whether a role with the template exists.
+
+   Note ([ADR-0066](0066-work-cases.md), 2026-11-16 (proposed)): `raise_work_item` takes an optional `work_case_id`. Without one, it sets the case when the subject is an `artifact` target of exactly one open work case, or a `draft`-linked target of a work item of exactly one open case; both lookups read only `work`'s tables ([ADR-0066](0066-work-cases.md) rule 10).
 6. `work.contract.resolve_work_item(kind, open_key, resolution)` closes the open item when the exception ends: a planning run no longer raises it (ADR-0024 rule 21), or a held posting completes (ADR-0028 rule 7). It sets `state: done`, `resolution` and `resolved_at`, and drops any claim. Resolving a key with no open item does nothing.
 7. Owner rules:
    - **Kind rules:**
@@ -136,6 +140,8 @@ Every exception, pending approval and other piece of business work is one `work_
     - is executed as its own command, with its own idempotency key, `expected_plan_hash`, `as_of_date`, audit record and approval record; there is no batch command, no batch approval record and no shared plan hash.
 
     The UI simulates each item, lists them with each plan's summary, and on one confirmation sends one execution per item. An item that fails a condition, or whose execution fails, stays in the queue for single review; the others are unaffected. `work.bulk_review_max_items` (company, default 50, bounds 1 to 500) caps one selection. Bulk review is a person's action in the UI, on no agent tool list and never an automation action. It reduces clicks without weakening spec 03's floor: a person still submits or approves each item.
+
+    Note ([ADR-0066](0066-work-cases.md), 2026-11-16 (proposed)): the case view offers the bulk review above for the pending commands of one work case, under the same conditions and the same cap `work.bulk_review_max_items`: one command, idempotency key, plan hash and approval record per item ([ADR-0066](0066-work-cases.md) rule 16).
 13. Queries:
     - `ListWorkItem`, filtered by kind, state, owner (me, my roles), subject, due and overdue, with the visibility of rule 10;
     - `GetWorkItem`, with links, notes and claim.

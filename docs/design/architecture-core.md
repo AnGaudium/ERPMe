@@ -49,6 +49,7 @@ Rules: ADR-0022 rules 3, 4, 7, 8, 17, 23 unless named.
 | Generated files (never edit) | `backend/generated/`, `frontend/src/generated/` |
 | Setting | Settings registry ([ADR-0063](../adr/0063-configurable-policy-settings.md) rule 1); seed `docs/catalogs/settings.csv` |
 | Work item kind | Registered like a command ([ADR-0042](../adr/0042-work-queue.md) rule 1); seed `docs/catalogs/work-item-kinds.csv` |
+| Work case kind | Registered like a work item kind ([ADR-0066](../adr/0066-work-cases.md) rule 3, proposed); seed `docs/catalogs/work-case-kinds.csv`; turned on per company by `work_case.<kind>.mode` |
 | Country rule | `l10n/l10n_<country>/`, never the core ([ADR-0016](../adr/0016-localization-package-structure.md); [ADR-0053](../adr/0053-core-neutrality.md)) |
 
 ## A3. The life of a command
