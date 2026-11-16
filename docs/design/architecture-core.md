@@ -73,7 +73,7 @@ ADR-0008 rule 5; [DS-04](DS-04-command-envelope.md#dispatcher-check-order). Simu
 6. **Idempotency.** Execute inserts `idempotency_record` first. Same key and request hash: stored response (`replayed: true`), steps 7–10 skipped; different hash: `idempotency_key_reused`. Simulate only looks up.
 7. **Work item claim** of an agent run's bound item (`FOR KEY SHARE`). Shadow runs skip it.
 8. **State-dependent authorization.** `segregation_of_duties`, `approver_not_eligible`, `approval_already_given`, `approval_would_strand_stage`.
-9. **Policy point and floors.** `policy_denied`, `approval_required`; inside the handler for `is_policy_in_handler`.
+9. **Policy point and floors.** `policy_denied`, `approval_required`; inside the handler for `is_policy_in_handler`, and for a `system` or `integration` post of a document type with an auto-post checker, where the gateway reads the built plan ([ADR-0065](../adr/0065-deterministic-auto-post-gateway.md) rule 3, proposed).
 10. **Handler, audit record, events.** The handler runs; the dispatcher writes the audit record, events, deliveries and stored response.
 
 Steps 6 to 10 are for commands only. In a batch, steps 1 to 5, 7 and 8 run per item; step 6 runs once (DS-04).
@@ -133,6 +133,7 @@ The dispatcher, not the handler, writes the audit record and the deliveries.
 - A transactional consumer runs in a second transaction that also marks the delivery `done`. It writes only through commands, as `system` on behalf of the event's human, key `<consumer>:<event id>:<n>` (ADR-0013 rules 7, 9).
 - Every agent run starts through `StartAgentRun` and is bound to a work item. Callers: the consumer `agent_wake_up` on `WorkItemRaised`, a schedule, a person, or an automation rule's `start_agent`. For a subject without an item the handler creates and claims an `agent_task` item. It emits `AgentRunStarted`; the consumer `agent_runner` runs it on queue `agents` (ADR-0013 rules 12, 13; ADR-0050 rules 15–16; [ADR-0058](../adr/0058-configurable-workflows.md) rule 7).
 - A tainted event's consumer may run only `is_draft_only` commands (plus work item raises; `CompleteAgentRun` is exempt) (ADR-0013 rule 11).
+- Unattended postings go only through the auto-post gateway: `RunAutoPostGateway` simulates `Post<Type>` as `system` in its own chain, then executes with `expected_plan_hash` and `as_of_date` when the decision is `auto_post`. A consumer never posts a draft for an agent, and a checker never calls an LLM or writes ([ADR-0065](../adr/0065-deterministic-auto-post-gateway.md) rules 3, 7, proposed).
 
 ## A4. Data rules every table follows
 
@@ -190,6 +191,7 @@ Some DDL drafts break these rules ([findings](architecture-overview.md#findings-
 | Import a tool package, a lab script or `l10n_*` from `erpme` | ADR-0022 rule 6; [lab README](../reviews/2026-11-14-design-validation/README.md):5 | import-linter for tools and `l10n_*`; no check exists yet for lab code (finding) |
 | Edit a document in a final state | ADR-0009 rules 14, 23 | Database triggers (ADR-0009 rule 14); trigger tests |
 | Let an agent submit, post, issue, approve or send | ADR-0050 rule 30; ADR-0017 rule 15 | Registry CI check and INV-214 |
+| Post as `system` or `integration` outside the auto-post gateway, or change a draft or call an LLM in a checker | [ADR-0065](../adr/0065-deterministic-auto-post-gateway.md) rules 3, 7 (proposed) | INV-760, INV-762; no check exists yet (finding) |
 | Check permissions or policy inside a handler, except the one `context.evaluate_policy` call of an `is_policy_in_handler` command | ADR-0008 rule 5; ADR-0030 rule 7 | no check exists yet (finding) |
 | Give a plan row its `id` from a column default, trigger or sequence | ADR-0008 rule 12; ADR-0006 rule 2 | Test named in ADR-0008 rule 12 |
 | Use sequences, session advisory locks or non-`LOCAL` `SET` on handler or trigger paths | ADR-0008 rule 9; ADR-0022 rule 13 note | check: Session locks and settings |

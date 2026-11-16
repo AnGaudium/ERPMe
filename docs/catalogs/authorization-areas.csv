@@ -143,3 +143,4 @@ data_processing,agent,function,agents,Data processing,0.1.0,"Data-processing per
 agent_production,agent,function,agents,Production agent,0.1.0,Capability start_agent:production at edit (ADR-0064 rule 1; ADR-0054 rule 24).
 agent_production_capture,agent,function,agents,Production capture agent,0.1.0,Capability start_agent:production_capture at edit (ADR-0064 rule 1; ADR-0054 rule 24).
 agent_production_variance,agent,function,agents,Production variance agent,0.1.0,Capability start_agent:production_variance at edit (ADR-0064 rule 1; ADR-0054 rule 24).
+agent_auto_post_advisor,agent,function,agents,Auto-post advisor agent,0.1.0,Capability start_agent:auto_post_advisor at edit (ADR-0065 rule 18; ADR-0054 rule 24).

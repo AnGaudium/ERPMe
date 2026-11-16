@@ -268,3 +268,4 @@ production_planner,agent_production_variance,edit,false
 shop_floor_lead,agent_production_capture,edit,false
 chief_accountant,agent_production_variance,edit,false
 production_planner,stock_reservation,post,false
+chief_accountant,agent_auto_post_advisor,edit,false
