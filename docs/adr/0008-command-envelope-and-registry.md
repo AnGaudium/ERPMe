@@ -56,6 +56,8 @@ Every write goes through one command registry. A command is a pydantic payload w
 
     Note (Design hardening, 2026-11-16): who executes without a simulation: only internal callers, that is consumers and system jobs calling the dispatcher in process ([ADR-0013](0013-outbox-and-events.md) rule 9), the change-proposal executor among them with its stored plan hash. Every other actor (people through the UI, agents, integrations and MCP clients) simulates first and executes with `expected_plan_hash` (Principle 2). An `as_of_date` more than one day from the business date returns `as_of_date_out_of_range`; the dispatcher checks it after step 6 of the check order, so a replay of a committed execution still returns its stored response.
 
+    Note ([ADR-0067](0067-quickflows-operating-presets.md), 2026-11-17 (proposed)): with the company setting `ui.post_review` at `on_exceptions`, a person's `Post<Type>` is still simulated and executed with `expected_plan_hash`; the client only skips showing the plan when the simulation's `review_reasons` is empty, and marks the execution with the optional envelope field `is_review_skipped` (outside the request hash, like `mode`), which rule 7's field list gains. The dispatcher recomputes the reasons before commit and refuses with `post_review_required` when any applies ([ADR-0067](0067-quickflows-operating-presets.md) rules 12–13).
+
 **Idempotency**
 
 14. `idempotency_key` is required in both modes; a client builds one envelope and changes only `mode`. It is a string of 1–128 characters from `A-Z a-z 0-9 _ - . :`; a UUID version 7 is recommended. Its scope is (actor, command type), and `command_batch` for batches (Principle 9).

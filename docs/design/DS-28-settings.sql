@@ -6,11 +6,12 @@
 -- t24_settings.py with --load). The ADRs win if this file disagrees.
 -- Conventions of DS-20, DS-15 and DS-05: tables in schema nativeflows, domains in types; IDs are UUIDv7 from context.new_id,
 -- no ID defaults; references between company tables are composite on (company_id, id); recorded_at on every row.
--- setting_definition and extension_point are installation data written by the registry at startup (like agent_type),
+-- setting_definition, extension_point, setting_preset and setting_preset_item are installation data written by the
+-- registry at startup (like agent_type),
 -- without company_id and without row-level security; application roles get SELECT only on them, so no command or trigger
 -- path can rewrite a definition. setting_value holds company rows and, with company_id null, the
 -- installation values; the last section writes out its row-level security with the installation exception of rls_v1
--- (ADR-0022 rule 8; ADR-0017 rule 19).
+-- (ADR-0022 rule 8; ADR-0017 rule 19), and that of company_setup_acknowledgement (ADR-0067 rule 8).
 -- Referenced tables defined elsewhere: company (DS-20); user_account (DS-15); change_proposal (DS-05).
 -- Functions of DS-05-platform.sql used here: platform_reject_change.
 -- Owner module (ADR-0022 rule 2): registry owns every table here; agents and configuration read them through its contract.
@@ -74,6 +75,72 @@ CREATE TABLE setting_definition (                          -- installation data;
         AND (change_effect <> 'deployment' OR storage = 'deployment'))
 );
 
+-- ===== Operating presets and setup acknowledgements [registry] (ADR-0067 rules 2-9) =====
+-- A preset is a named, versioned bundle of items: parameters entered when applying, registry settings at company scope,
+-- policy rule templates, company settings with their own commands, and setup defaults for new records. Applying one runs
+-- the ordinary commands; no business code reads a preset code (ADR-0067 rule 1). That a setting item names a registered
+-- company-scope key stored in setting_value, with outdates none and a value within its bounds, and that standard covers the
+-- other presets' keys, is checked by the registry at startup (INV-802); the rows hold the shape.
+CREATE TABLE setting_preset (                              -- installation data; one row per preset version, written at startup
+    preset_code          text NOT NULL CONSTRAINT ck_setting_preset_code CHECK (preset_code ~ '^[a-z][a-z0-9_]*$'),
+    preset_version       integer NOT NULL CONSTRAINT ck_setting_preset_version CHECK (preset_version >= 1),
+    registry_version     text NOT NULL CONSTRAINT ck_setting_preset_registry_version CHECK (registry_version ~ '^[0-9]+\.[0-9]+\.[0-9]+$'),
+    recorded_at          timestamptz NOT NULL,
+    PRIMARY KEY (preset_code, preset_version)
+);
+CREATE TABLE setting_preset_item (                         -- installation data; one row per preset version, kind and key
+    preset_code          text NOT NULL,
+    preset_version       integer NOT NULL,
+    item_kind            text NOT NULL CONSTRAINT ck_setting_preset_item_kind CHECK (item_kind IN (
+                             'parameter', 'setting', 'policy_rule', 'command_setting', 'record_default')),
+    item_key             text NOT NULL CONSTRAINT ck_setting_preset_item_key CHECK (item_key ~ '^[a-z][a-z0-9_]*(\.[a-z0-9_]+)*$'),
+    value                jsonb,                                -- the item's value; null for a parameter and for a setting filled by one
+    parameter_ref        text,                                 -- a setting filled by a parameter of the same preset version
+    parameter_value_type text CONSTRAINT ck_setting_preset_item_parameter_type CHECK (parameter_value_type IN ('integer', 'decimal', 'percent', 'amount')),
+    parameter_min        numeric,                              -- a parameter's bounds, within the bounds of every key it fills
+    parameter_max        numeric,
+    recorded_at          timestamptz NOT NULL,
+    PRIMARY KEY (preset_code, preset_version, item_kind, item_key),
+    FOREIGN KEY (preset_code, preset_version) REFERENCES setting_preset (preset_code, preset_version),
+    CONSTRAINT ck_setting_preset_item_parameter CHECK ((item_kind = 'parameter') = (parameter_value_type IS NOT NULL AND parameter_min IS NOT NULL)
+        AND (parameter_max IS NULL OR parameter_min <= parameter_max)),
+    CONSTRAINT ck_setting_preset_item_value CHECK (CASE item_kind
+        WHEN 'parameter' THEN value IS NULL AND parameter_ref IS NULL
+        WHEN 'setting' THEN (value IS NULL) <> (parameter_ref IS NULL)
+        ELSE value IS NOT NULL AND parameter_ref IS NULL END),
+    -- a preset never lifts a non-human baseline or lets a non-human post (ADR-0067 rule 3; ADR-0043 rule 7)
+    CONSTRAINT ck_setting_preset_item_policy_rule CHECK (item_kind <> 'policy_rule'
+        OR (jsonb_typeof(value) = 'object' AND value ->> 'effect' IN ('require_approval', 'require_human_post', 'deny')))
+);
+-- The owner's acknowledgement of the implementer who may set loosenings without a second approver before go-live
+-- (ADR-0067 rules 8-9). Never deleted; only revoked_at and revoked_by_user_id are set, once.
+CREATE TABLE company_setup_acknowledgement (               -- company data
+    id                   uuid PRIMARY KEY,
+    company_id           uuid NOT NULL REFERENCES company (id),
+    owner_user_id        uuid NOT NULL REFERENCES user_account (id),   -- holds an assignment of the owner role template (checked by the command)
+    implementer_user_id  uuid NOT NULL REFERENCES user_account (id),   -- may be the owner
+    reason               text NOT NULL CONSTRAINT ck_company_setup_acknowledgement_reason CHECK (length(btrim(reason)) > 0),
+    acknowledged_at      timestamptz NOT NULL,
+    revoked_at           timestamptz,
+    revoked_by_user_id   uuid REFERENCES user_account (id),
+    recorded_at          timestamptz NOT NULL,
+    UNIQUE (company_id, id),
+    CONSTRAINT ck_company_setup_acknowledgement_revoked CHECK ((revoked_at IS NULL) = (revoked_by_user_id IS NULL)
+        AND (revoked_at IS NULL OR revoked_at >= acknowledged_at))
+);
+CREATE FUNCTION company_setup_acknowledgement_guard() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
+BEGIN
+    IF TG_OP = 'DELETE' OR OLD.revoked_at IS NOT NULL OR NEW.revoked_at IS NULL
+       OR (NEW.id, NEW.company_id, NEW.owner_user_id, NEW.implementer_user_id, NEW.reason, NEW.acknowledged_at, NEW.recorded_at)
+          IS DISTINCT FROM (OLD.id, OLD.company_id, OLD.owner_user_id, OLD.implementer_user_id, OLD.reason, OLD.acknowledged_at, OLD.recorded_at) THEN
+        RAISE EXCEPTION 'company_setup_acknowledgement is only revoked, once (ADR-0067 rule 8)' USING ERRCODE = 'restrict_violation';
+    END IF;
+    RETURN NEW;
+END
+$$;
+CREATE TRIGGER trg_company_setup_acknowledgement_guard BEFORE UPDATE OR DELETE ON company_setup_acknowledgement
+    FOR EACH ROW EXECUTE FUNCTION company_setup_acknowledgement_guard();
+
 -- ===== Setting values [registry] (ADR-0063 rules 2-4) =====
 -- Append-only: a change is a new row, effective from its date; the value in force for a key, scope, scope reference and
 -- placeholder values is the row with the latest effective_from on or before the date, the latest recorded among equals.
@@ -106,16 +173,25 @@ CREATE TABLE setting_value (                               -- company data (inst
     changed_by_user_id    uuid NOT NULL REFERENCES user_account (id),   -- the person who made the change, submitted the loosening, or (installation) the operator named in the deployment change
     change_proposal_id    uuid,                                 -- the executed proposal of a loosening
     approved_by_user_id   uuid REFERENCES user_account (id),    -- for an installation loosening: the second operator who approved the deployment change
+    setup_acknowledgement_id uuid,                             -- a loosening set before go-live under the owner's acknowledgement, without a proposal (ADR-0067 rule 9)
+    preset_code           text,                                 -- the operating preset whose application wrote the row (ADR-0067 rule 4); never read to decide anything
+    preset_version        integer,
     registry_version      text NOT NULL CONSTRAINT ck_setting_value_registry_version CHECK (registry_version ~ '^[0-9]+\.[0-9]+\.[0-9]+$'),
     recorded_at           timestamptz NOT NULL,
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, change_proposal_id) REFERENCES change_proposal (company_id, id),
+    FOREIGN KEY (company_id, setup_acknowledgement_id) REFERENCES company_setup_acknowledgement (company_id, id),
+    FOREIGN KEY (preset_code, preset_version) REFERENCES setting_preset (preset_code, preset_version),
+    CONSTRAINT ck_setting_value_preset CHECK ((preset_code IS NULL) = (preset_version IS NULL)),
     CONSTRAINT ck_setting_value_installation CHECK ((scope_kind = 'installation') = (company_id IS NULL)),
     CONSTRAINT ck_setting_value_scope_ref CHECK ((scope_kind IN ('installation', 'company')) = (scope_ref = '')),
     -- a loosening is executed from an approved proposal (an installation value: from the operators' approved change), approved
-    -- by someone other than its submitter (rule 3)
+    -- by someone other than its submitter (rule 3), or, before go-live, set under the owner's setup acknowledgement with no
+    -- proposal (ADR-0067 rule 9; the trigger checks the acknowledgement and the setup phase)
     CONSTRAINT ck_setting_value_loosen CHECK (change_kind <> 'loosen' OR ((change_proposal_id IS NOT NULL OR company_id IS NULL)
-        AND approved_by_user_id IS NOT NULL AND approved_by_user_id <> changed_by_user_id)),
+        AND approved_by_user_id IS NOT NULL AND approved_by_user_id <> changed_by_user_id AND setup_acknowledgement_id IS NULL)
+        OR (setup_acknowledgement_id IS NOT NULL AND company_id IS NOT NULL AND change_proposal_id IS NULL AND approved_by_user_id IS NULL)),
+    CONSTRAINT ck_setting_value_setup_loosen_only CHECK (setup_acknowledgement_id IS NULL OR change_kind = 'loosen'),
     CONSTRAINT ck_setting_value_numeric CHECK ((value_type IN ('integer', 'decimal', 'percent', 'amount')) = (min_value IS NOT NULL)
         AND (max_value IS NULL OR min_value <= max_value)),
     CONSTRAINT ck_setting_value_allowed CHECK ((value_type IN ('boolean', 'enum')) = (allowed_values IS NOT NULL)),
@@ -255,6 +331,23 @@ BEGIN
         RAISE EXCEPTION 'setting_value change_kind % differs from the derived %', NEW.change_kind, v_kind USING ERRCODE = 'check_violation';
     END IF;
     NEW.change_kind := v_kind;
+    -- ADR-0067 rule 9: a setup-path loosening needs an active acknowledgement of the same company naming the person as its
+    -- implementer, a key that outdates no evidence, a scope other than installation, and a company still in its setup phase.
+    -- The command read the company row FOR SHARE first (rule 7), so the first operating posting cannot overlap it.
+    IF NEW.setup_acknowledgement_id IS NOT NULL AND v_kind = 'loosen' THEN
+        IF d.outdates <> 'none' OR NEW.scope_kind = 'installation' THEN
+            RAISE EXCEPTION 'setup_acknowledgement_invalid: % is not on the setup path', NEW.setting_key USING ERRCODE = 'check_violation';
+        END IF;
+        PERFORM 1 FROM nativeflows.company_setup_acknowledgement a
+         WHERE a.company_id = NEW.company_id AND a.id = NEW.setup_acknowledgement_id AND a.revoked_at IS NULL
+           AND a.implementer_user_id = NEW.changed_by_user_id;
+        IF NOT FOUND THEN
+            RAISE EXCEPTION 'setup_acknowledgement_invalid: no active acknowledgement names % as implementer', NEW.changed_by_user_id USING ERRCODE = 'check_violation';
+        END IF;
+        IF EXISTS (SELECT 1 FROM nativeflows.company c WHERE c.id = NEW.company_id AND c.first_operating_posting_at IS NOT NULL) THEN
+            RAISE EXCEPTION 'setup_phase_closed: the company has posted outside the migration period' USING ERRCODE = 'check_violation';
+        END IF;
+    END IF;
     RETURN NEW;
 END
 $$;
@@ -270,3 +363,7 @@ ALTER TABLE setting_value FORCE ROW LEVEL SECURITY;
 CREATE POLICY company_policy ON setting_value USING (company_id::text = current_setting('nativeflows.company_id', true)
     OR (company_id IS NULL AND current_setting('nativeflows.company_id', true) = 'installation'));
 CREATE POLICY company_ids_policy ON setting_value FOR SELECT USING (company_id::text = ANY (string_to_array(current_setting('nativeflows.company_ids', true), ',')));
+ALTER TABLE company_setup_acknowledgement ENABLE ROW LEVEL SECURITY;
+ALTER TABLE company_setup_acknowledgement FORCE ROW LEVEL SECURITY;
+CREATE POLICY company_policy ON company_setup_acknowledgement USING (company_id::text = current_setting('nativeflows.company_id', true));
+CREATE POLICY company_ids_policy ON company_setup_acknowledgement FOR SELECT USING (company_id::text = ANY (string_to_array(current_setting('nativeflows.company_ids', true), ',')));

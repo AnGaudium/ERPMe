@@ -321,6 +321,8 @@ ADR-0017 fixed the envelope: permissions are the names of registered commands, q
 
     Note: interim, flagged for the author: the mode never lifts [ADR-0029](0029-proposals-and-agent-safety.md) rule 4's bank-account rule either; a bank account proposal is approved by a human who wrote no version of it (open question).
 
+    Note ([ADR-0067](0067-quickflows-operating-presets.md), 2026-11-17 (proposed)): proposed for the author, under a reading of spec 03 rule 5 in which "the person who triggers" is the human whose own act started the run: while the mode is on, an `Approve<Type>` that ADR-0017 rule 16 would refuse runs as a recorded exception of kind `own_agent_draft_approval` when every agent run that wrote a version for the approver was started by an event or schedule (the approver as workflow owner), the approved version has no effective taint (never tainted, or cleared by another person), and the approver holds the `owner` or `chief_accountant` role template. It joins the period review through `segregation_review_due` and `ConfirmSegregationReview`. Under that reading the floor of "what it never relaxes" stands: a run the approver started by their own act stays refused, and self-clearance of taint stays forbidden (open questions). The operating preset `quickflows` enables the mode through `EnableSmallCompanyMode` while its bound holds ([ADR-0067](0067-quickflows-operating-presets.md) rules 6, 16, 17).
+
 **Delegation**
 
 21. `delegation` (company data, change-tracked):

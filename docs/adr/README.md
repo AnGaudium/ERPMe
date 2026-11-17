@@ -70,3 +70,4 @@ One file per decision, named `NNNN-short-title.md`, using [template.md](template
 | [ADR-0064](0064-production-agent.md) | Production agent (DS-57) | Accepted (2026-11-15) |
 | [ADR-0065](0065-deterministic-auto-post-gateway.md) | Deterministic auto-post gateway (maker-checker) (DS-28, DS-34) | Proposed (2026-11-16) |
 | [ADR-0066](0066-work-cases.md) | Work cases (DS-29, DS-30) | Proposed (2026-11-16) |
+| [ADR-0067](0067-quickflows-operating-presets.md) | QuickFlows mode: operating presets for small teams (DS-28, DS-30) | Proposed (2026-11-17) |

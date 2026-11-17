@@ -126,6 +126,8 @@ The web UI is one more client of the command and query layer. It writes data onl
      - **Request hash.** Like `mode`, it is left out of the request hash of ADR-0008 rule 15.
      - **Response.** The response then carries `canonical_plan`, filtered by field class like the plan. `plan_hash_mismatch` carries the new canonical plan in `details`.
      - **Batches.** In a batch, each item carries its canonical plan when `include_plan` and `include_canonical_plan` are both set.
+
+   Note ([ADR-0067](0067-quickflows-operating-presets.md), 2026-11-17 (proposed)): under the company setting `ui.post_review` at `on_exceptions`, the Post button sends Review and, when the response's `review_reasons` is empty, Confirm at once with `is_review_skipped: true`; otherwise, or on `post_review_required`, the plan panel opens as above with the reasons listed. The client computes no reason itself (rule 2); the default `always` keeps this rule unchanged ([ADR-0067](0067-quickflows-operating-presets.md) rules 11–13).
 10. Check results. Command responses gain `checks`: a list of `{code, message, rule, field, details}` from the check-result catalog (DS-04), in simulate and execute and per batch item.
     - **`message`** is English, as for errors.
     - **`details`** are filtered by field class.

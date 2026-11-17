@@ -8,7 +8,7 @@ Event types named in backticks in the ADRs, recognised by the event forms of the
 | --- | --- | --- | --- | --- |
 | `AgentRunCompleted` | `agent_run` | agent_runs | — | ADR-0050:180, ADR-0060:265 |
 | `AgentRunStarted` | `agent_run` | agent_runs | — | ADR-0050:158, ADR-0050:164 |
-| `AttachmentCreated` | `attachment` | attachments | — | ADR-0038:134, ADR-0038:142 |
+| `AttachmentCreated` | `attachment` | attachments | — | ADR-0038:136, ADR-0038:144 |
 | `BankLineSuggestionRecorded` | — | — | a consumer in `cash` | ADR-0048:124, ADR-0051:184, ADR-0051:188 |
 | `ChangeProposalApproved` | `change_proposal` | documents | — | ADR-0029:48 |
 | `ComplaintClosed` | `complaint` | crm | a consumer in `cash` | ADR-0048:237, ADR-0052:224, ADR-0052:354 |
@@ -110,5 +110,5 @@ A module name here means the ADR speaks of a consumer of that module without nam
 | `render_worker` | 2 | ADR-0013:25, ADR-0049:199 |
 | a consumer in `sales` | 3 | ADR-0047:104, ADR-0047:234, ADR-0048:256 |
 | a consumer in `tax` | 2 | ADR-0041:150, ADR-0057:253 |
-| `tax_payment_evidence` | 2 | ADR-0044:139, ADR-0053:182 |
+| `tax_payment_evidence` | 2 | ADR-0044:141, ADR-0053:182 |
 | `work_case_opener` | 4 | ADR-0013:53, ADR-0022:76, ADR-0052:164 |

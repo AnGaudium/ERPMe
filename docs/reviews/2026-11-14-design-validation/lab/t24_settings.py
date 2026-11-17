@@ -10,6 +10,8 @@ C: the catalog settings.csv: constant field count, unique keys, scope, storage, 
    bounds, direction and a known leaf on every row, defaults within bounds, order directions listing every allowed value,
    every setting key ADR-0063 names catalogued, every catalog key named by an ADR its row's source cites, no country content; the ADR's invariant, edge case,
    work item kind and leaf rows, their codes unique and the tables they name defined; the DS-04 codes they use.
+   The operating presets catalog setting-presets.csv, when present (ADR-0067 rules 2-3): field count, item kinds, unique
+   items; setting items within the registry and its bounds; policy rule items never allowing; standard covering the rest.
 A: rule 3's change path (tighten at once by one person, loosen only through another person's approved proposal, neutral
    directly, outdating dependent auto-post evidence, period starts, scope overrides); rule 4's bounds as a property test
    over random values and orders between settings; rule 10's acting ceiling (the rule of three against the exact
@@ -263,6 +265,65 @@ check("C22 the new DS-04 codes have rows, and every code an ADR-0063 edge case e
 QUERIES = re.findall(r"`((?:Get|List|Evaluate|Render|Resolve|Find|Search|Compute)[A-Z]\w+)`", adr_text.split("28. Commands and queries:")[1].split("29. Catalog rows:")[0])
 check("C23 every query of rule 28 starts with Get, List, Evaluate or Render (ADR-0004 rule 21; ResolveItemCandidates is renamed)",
       QUERIES and all(q.startswith(("Get", "List", "Evaluate", "Render")) for q in QUERIES) and "ListItemCandidate" in QUERIES, QUERIES)
+
+# ----------------------------------------------------------------------- C24-C28: operating presets (ADR-0067 rules 2-3)
+# Generic: any preset in setting-presets.csv is checked against the settings catalog above; no preset code is special
+# except standard, which must cover the others.
+if os.path.exists(os.path.join(CAT, "setting-presets.csv")):
+    PRAW = read_rows("setting-presets.csv")
+    PRE = read_dicts("setting-presets.csv")
+    PKINDS = {"parameter", "setting", "policy_rule", "command_setting", "record_default"}
+    ids = [(r["preset_code"], r["preset_version"], r["item_kind"], r["item_key"]) for r in PRE]
+    bad = [i for i, x in enumerate(PRAW) if len(x) != len(PRAW[0])]
+    bad += [r["item_key"] for r in PRE if r["item_kind"] not in PKINDS or not re.fullmatch(r"[a-z][a-z0-9_]*", r["preset_code"])
+            or not r["preset_version"].isdigit() or not re.fullmatch(r"[a-z][a-z0-9_]*(\.[a-z0-9_]+)*", r["item_key"])]
+    check("C24 setting-presets.csv: constant field count, item kinds from the list, well-formed codes, unique (preset, version, kind, key)",
+          not bad and len(set(ids)) == len(ids) and any(r["preset_code"] == "standard" for r in PRE), bad)
+    params = {(r["preset_code"], r["preset_version"], r["item_key"]): r for r in PRE if r["item_kind"] == "parameter"}
+    bad = []
+    for r in PRE:
+        if r["item_kind"] != "setting":
+            continue
+        d = S.get(r["item_key"])
+        if not d or "company" not in d["scope"].split(";") or d["storage"] != "setting_value" or d["leaf"] in ("package", "operator") \
+                or d["core_default"] == "fail_closed" or d["outdates"] != "none":
+            bad.append((r["preset_code"], r["item_key"], "registry"))
+            continue
+        v = r["value"]
+        if v.startswith("param:"):
+            p_ = params.get((r["preset_code"], r["preset_version"], v[len("param:"):]))
+            try:
+                pb, db = bounds_of({"bounds": p_["value"], "value_type": d["value_type"]}), bounds_of(d)
+                ok = d["value_type"] in NUMERIC and pb["min"] >= db["min"] and (db["max"] is None or (pb["max"] is not None and pb["max"] <= db["max"]))
+            except (TypeError, ValueError, KeyError):
+                ok = False
+            if not ok:
+                bad.append((r["preset_code"], r["item_key"], "parameter"))
+        elif not in_bounds(d, default_of(dict(d, core_default=v))):
+            bad.append((r["preset_code"], r["item_key"], "bounds"))
+    check("C25 every preset setting item names a company-scope key stored in setting_value, not fail-closed, package, operator or evidence-outdating, "
+          "with a value within its bounds or a parameter of its preset version whose bounds lie within them (ADR-0067 rule 3)", not bad, bad)
+    bad = []
+    for r in PRE:
+        if r["item_kind"] != "policy_rule":
+            continue
+        try:
+            j = json.loads(r["value"])
+            if j.get("effect") not in ("require_approval", "require_human_post", "deny") or not j.get("actions") \
+                    or not set(j["actions"]) <= {"submit", "post", "issue"}:
+                bad.append(r["item_key"])
+        except (ValueError, AttributeError):
+            bad.append(r["item_key"])
+    check("C26 every preset policy rule item parses, names actions among submit, post and issue, and never has effect allow (ADR-0067 rule 3; ADR-0043 rule 7)",
+          not bad, bad)
+    std = {(r["item_kind"], r["item_key"]): r["value"] for r in PRE if r["preset_code"] == "standard"}
+    others = {(r["item_kind"], r["item_key"]) for r in PRE if r["preset_code"] != "standard" and r["item_kind"] in ("setting", "command_setting", "record_default")}
+    bad = sorted(k for k in others if k not in std) + sorted(k for k, v in std.items() if k[0] == "setting" and k[1] in S and v != S[k[1]]["core_default"]) \
+        + sorted(k for k in std if k[0] in ("policy_rule", "parameter"))
+    check("C27 standard lists every setting, command setting and record default key another preset lists, at the core default for settings, and has no policy rule or parameter (ADR-0067 rule 3)",
+          not bad, bad)
+    bad = sorted({r["item_key"] for r in PRE if not cited_adrs(r) or not any(f"`{r['item_key']}`" in adr_text_of(n) for n in cited_adrs(r))})
+    check("C28 every preset item key is named by an ADR its row's source cites", not bad, bad)
 
 # ======================================================================= A: the change path (rules 3-4)
 TODAY = date(2026, 11, 16)

@@ -39,6 +39,8 @@ The retention periods and the strictness of scanning are flagged for the author.
    Note: the command columns also hold `is_draft_only` as registered at the time, read by INV-216 ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 55 note).
 
    Note ([ADR-0058](0058-configurable-workflows.md), proposed 2026-11-15): `audit_record` gains `causation_chain_id`, `causation_depth` (0 to 3, no default, a database check) and `automation_rule_version_id`, with a depth of at least 1 where a rule version is named (rule 12).
+
+   Note ([ADR-0067](0067-quickflows-operating-presets.md), 2026-11-17 (proposed)): `is_review_skipped`: true when a person's `Post<Type>` executed without the plan panel under `ui.post_review` `on_exceptions`. The commands of an operating preset's application carry the preset code and version in `reason` ([ADR-0067](0067-quickflows-operating-presets.md) rules 4, 13).
 3. Field changes, in `audit_change` (`id`, `company_id`, `audit_record_id`, `subject_table`, `row_id`, `field`, `before`, `after`, `erased_at`):
    - **Which tables.** A closed set, `is_change_tracked` in each module's table declarations and checked by CI: master data, settings including enabled regime settings (ADR-0016), role assignments, period area state and production structures. Documents rely on `document_version`. Balances, counters, open items and other derived rows are not tracked.
    - **How it is captured.** Only `context`'s write helpers capture it. They read the before row and compute the diff with the canonical forms and diff code of ADR-0029 rule 1. Handlers never build changes by hand.

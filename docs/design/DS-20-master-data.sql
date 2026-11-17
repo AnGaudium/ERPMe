@@ -80,7 +80,8 @@ CREATE TABLE company (
     fiscal_calendar_owner_id  uuid NOT NULL REFERENCES user_account (id),
     fiscal_year_lead_days     integer NOT NULL DEFAULT 30,
     default_language          text NOT NULL,                       -- BCP 47, set at company creation from the package; documents and partners may override (ADR-0016 rule 19)
-    is_active                 boolean NOT NULL DEFAULT true
+    is_active                 boolean NOT NULL DEFAULT true,
+    first_operating_posting_at timestamptz                         -- set once, by the first journal entry outside the migration fiscal year, which locks this row; null: the setup phase (ADR-0067 rule 7)
 );
 CREATE TABLE branch (
     id                 uuid PRIMARY KEY,

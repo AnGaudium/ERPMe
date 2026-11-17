@@ -210,7 +210,7 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Work item kinds (0):** none
 - **Authorization areas (10):** `master_data_group`, `organization`, `partner`, `partner_bank_account`, `price_list`, `print_profile`, `product`, `product_unit`, `uom_alias`, `warehouse`
 - **ADRs (declared):** [ADR-0006](../../adr/0006-id-and-numeric-model.md), [ADR-0011](../../adr/0011-multi-currency.md), [ADR-0018](../../adr/0018-product-and-item-model.md), [ADR-0019](../../adr/0019-partners-and-crm-foundation.md), [ADR-0020](../../adr/0020-inventory-and-costing-model.md), [ADR-0023](../../adr/0023-warehouse-management.md), [ADR-0024](../../adr/0024-planning.md), [ADR-0027](../../adr/0027-cross-cutting-ownership.md), [ADR-0029](../../adr/0029-proposals-and-agent-safety.md), [ADR-0031](../../adr/0031-design-simplifications.md), [ADR-0033](../../adr/0033-production-master-data.md), [ADR-0037](../../adr/0037-subcontracting.md), [ADR-0041](../../adr/0041-tax-engine.md), [ADR-0045](../../adr/0045-master-data-and-price-lists.md), [ADR-0046](../../adr/0046-product-configuration.md), [ADR-0049](../../adr/0049-statutory-reporting-and-printing.md), [ADR-0054](../../adr/0054-users-roles-and-authorizations.md), [ADR-0056](../../adr/0056-multiple-units-of-measure.md), [ADR-0057](../../adr/0057-document-intake-and-extraction.md), [ADR-0061](../../adr/0061-barcodes.md), [ADR-0062](../../adr/0062-product-engineering-workflow.md)
-- **ADRs that name this module most (mentions; not complete):** [ADR-0010](../../adr/0010-system-chart-of-accounts.md), [ADR-0015](../../adr/0015-account-determination.md), [ADR-0017](../../adr/0017-permission-envelope.md), [ADR-0018](../../adr/0018-product-and-item-model.md), [ADR-0019](../../adr/0019-partners-and-crm-foundation.md), [ADR-0020](../../adr/0020-inventory-and-costing-model.md), [ADR-0023](../../adr/0023-warehouse-management.md), [ADR-0024](../../adr/0024-planning.md), [ADR-0027](../../adr/0027-cross-cutting-ownership.md), [ADR-0033](../../adr/0033-production-master-data.md), [ADR-0045](../../adr/0045-master-data-and-price-lists.md), [ADR-0046](../../adr/0046-product-configuration.md), [ADR-0049](../../adr/0049-statutory-reporting-and-printing.md), [ADR-0051](../../adr/0051-agent-workflows.md), [ADR-0053](../../adr/0053-core-neutrality.md), [ADR-0054](../../adr/0054-users-roles-and-authorizations.md), [ADR-0056](../../adr/0056-multiple-units-of-measure.md), [ADR-0057](../../adr/0057-document-intake-and-extraction.md), [ADR-0058](../../adr/0058-configurable-workflows.md), [ADR-0060](../../adr/0060-agent-assisted-reporting-and-analysis.md), [ADR-0061](../../adr/0061-barcodes.md), [ADR-0062](../../adr/0062-product-engineering-workflow.md), [ADR-0063](../../adr/0063-configurable-policy-settings.md), [ADR-0064](../../adr/0064-production-agent.md)
+- **ADRs that name this module most (mentions; not complete):** [ADR-0010](../../adr/0010-system-chart-of-accounts.md), [ADR-0015](../../adr/0015-account-determination.md), [ADR-0017](../../adr/0017-permission-envelope.md), [ADR-0018](../../adr/0018-product-and-item-model.md), [ADR-0019](../../adr/0019-partners-and-crm-foundation.md), [ADR-0020](../../adr/0020-inventory-and-costing-model.md), [ADR-0023](../../adr/0023-warehouse-management.md), [ADR-0024](../../adr/0024-planning.md), [ADR-0027](../../adr/0027-cross-cutting-ownership.md), [ADR-0033](../../adr/0033-production-master-data.md), [ADR-0045](../../adr/0045-master-data-and-price-lists.md), [ADR-0046](../../adr/0046-product-configuration.md), [ADR-0049](../../adr/0049-statutory-reporting-and-printing.md), [ADR-0051](../../adr/0051-agent-workflows.md), [ADR-0053](../../adr/0053-core-neutrality.md), [ADR-0054](../../adr/0054-users-roles-and-authorizations.md), [ADR-0056](../../adr/0056-multiple-units-of-measure.md), [ADR-0057](../../adr/0057-document-intake-and-extraction.md), [ADR-0058](../../adr/0058-configurable-workflows.md), [ADR-0060](../../adr/0060-agent-assisted-reporting-and-analysis.md), [ADR-0061](../../adr/0061-barcodes.md), [ADR-0062](../../adr/0062-product-engineering-workflow.md), [ADR-0063](../../adr/0063-configurable-policy-settings.md), [ADR-0064](../../adr/0064-production-agent.md), [ADR-0067](../../adr/0067-quickflows-operating-presets.md)
 
 ## `production` (layer 3)
 
@@ -356,7 +356,7 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Work item kinds (3):** `owner_suspended`, `role_permission_held`, `segregation_review_due`
 - **Authorization areas (4):** `delegation`, `role`, `segregation_rule`, `user_account`
 - **ADRs (declared):** [ADR-0017](../../adr/0017-permission-envelope.md), [ADR-0040](../../adr/0040-ui-architecture.md), [ADR-0054](../../adr/0054-users-roles-and-authorizations.md)
-- **ADRs that name this module most (mentions; not complete):** [ADR-0017](../../adr/0017-permission-envelope.md), [ADR-0042](../../adr/0042-work-queue.md), [ADR-0054](../../adr/0054-users-roles-and-authorizations.md), [ADR-0055](../../adr/0055-approval-pools-and-stages.md)
+- **ADRs that name this module most (mentions; not complete):** [ADR-0017](../../adr/0017-permission-envelope.md), [ADR-0042](../../adr/0042-work-queue.md), [ADR-0054](../../adr/0054-users-roles-and-authorizations.md), [ADR-0055](../../adr/0055-approval-pools-and-stages.md), [ADR-0067](../../adr/0067-quickflows-operating-presets.md)
 
 ## `policy` (layer 2)
 
@@ -369,19 +369,19 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Authorization areas (2):** `period_unlock_request`, `policy`
 - **Tables in DS-05-platform.sql with no stated owner:** `auto_post_confirmation` (section names policy, documents), `period_unlock_request` (section names policy, documents), `policy_decision` (section names policy, documents) ([data-map findings](data-map.md#findings-tables-without-an-owner-and-lab-stubs))
 - **ADRs (declared):** [ADR-0043](../../adr/0043-policy-and-approval.md), [ADR-0055](../../adr/0055-approval-pools-and-stages.md)
-- **ADRs that name this module most (mentions; not complete):** [ADR-0042](../../adr/0042-work-queue.md), [ADR-0043](../../adr/0043-policy-and-approval.md), [ADR-0055](../../adr/0055-approval-pools-and-stages.md), [ADR-0059](../../adr/0059-ai-tuning-and-development-of-deterministic-functions.md), [ADR-0065](../../adr/0065-deterministic-auto-post-gateway.md)
+- **ADRs that name this module most (mentions; not complete):** [ADR-0042](../../adr/0042-work-queue.md), [ADR-0043](../../adr/0043-policy-and-approval.md), [ADR-0055](../../adr/0055-approval-pools-and-stages.md), [ADR-0059](../../adr/0059-ai-tuning-and-development-of-deterministic-functions.md), [ADR-0065](../../adr/0065-deterministic-auto-post-gateway.md), [ADR-0067](../../adr/0067-quickflows-operating-presets.md)
 
 ## `registry` (layer 2)
 
 - **Note in ADR-0022 rule 2:** command registry, dispatcher, envelope, idempotency; its public entry point `nativeflows.registry.dispatch`
-- **Owned tables (3):** `extension_point`, `setting_definition`, `setting_value`
+- **Owned tables (6):** `company_setup_acknowledgement`, `extension_point`, `setting_definition`, `setting_preset`, `setting_preset_item`, `setting_value`
 - **Events produced (0):** none found
-- **Commands and queries named in ADRs (2):** `ListSettingDefinition`, `ListSettingValue`
+- **Commands and queries named in ADRs (5):** `EvaluateSettingPreset`, `ListSettingDefinition`, `ListSettingPresetDrift`, `ListSettingPresetItem`, `ListSettingValue`
 - **Settings (0):** none in settings.csv
-- **Work item kinds (1):** `setting_review_required`
+- **Work item kinds (2):** `setting_review_required`, `setup_loosening_review`
 - **Authorization areas (2):** `company_setting`, `general_access`
-- **ADRs (declared):** [ADR-0063](../../adr/0063-configurable-policy-settings.md)
-- **ADRs that name this module most (mentions; not complete):** [ADR-0063](../../adr/0063-configurable-policy-settings.md)
+- **ADRs (declared):** [ADR-0063](../../adr/0063-configurable-policy-settings.md), [ADR-0067](../../adr/0067-quickflows-operating-presets.md)
+- **ADRs that name this module most (mentions; not complete):** [ADR-0063](../../adr/0063-configurable-policy-settings.md), [ADR-0067](../../adr/0067-quickflows-operating-presets.md)
 
 ## `work` (layer 2)
 
