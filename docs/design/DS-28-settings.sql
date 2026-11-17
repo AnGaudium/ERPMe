@@ -28,7 +28,7 @@ CREATE TABLE setting_definition (                          -- installation data;
     storage           text NOT NULL CONSTRAINT ck_setting_definition_storage CHECK (storage IN (
                           'setting_value', 'regime_setting', 'agent_type_setting', 'data_processing_permission', 'rule_version', 'deployment')),
     value_type        text NOT NULL CONSTRAINT ck_setting_definition_value_type CHECK (value_type IN (
-                          'boolean', 'integer', 'decimal', 'percent', 'amount', 'enum', 'code_list', 'field_list', 'object')),
+                          'boolean', 'integer', 'decimal', 'percent', 'amount', 'enum', 'code', 'code_list', 'field_list', 'object')),   -- code: one code of the table the bounds name, checked by the command (ADR-0069 rule 13)
     default_kind      text NOT NULL CONSTRAINT ck_setting_definition_default_kind CHECK (default_kind IN ('value', 'unset', 'fail_closed')),
     core_default      jsonb,                                -- the value when default_kind is value
     min_value         numeric,                              -- numeric types: the hard bounds; max null means open (rule 4)
@@ -56,6 +56,7 @@ CREATE TABLE setting_definition (                          -- installation data;
             AND (value_type <> 'integer' OR (core_default #>> '{}')::numeric = trunc((core_default #>> '{}')::numeric))
         WHEN value_type = 'boolean' THEN jsonb_typeof(core_default) = 'boolean' AND (core_default #>> '{}') = ANY (allowed_values)
         WHEN value_type = 'enum' THEN jsonb_typeof(core_default) = 'string' AND (core_default #>> '{}') = ANY (allowed_values)
+        WHEN value_type = 'code' THEN jsonb_typeof(core_default) = 'string'
         WHEN value_type IN ('code_list', 'field_list') THEN jsonb_typeof(core_default) = 'array'
         ELSE jsonb_typeof(core_default) = 'object' END),
     CONSTRAINT ck_setting_definition_order CHECK ((direction = 'order') = (direction_order IS NOT NULL)
@@ -159,7 +160,7 @@ CREATE TABLE setting_value (                               -- company data (inst
     scope_ref             text NOT NULL DEFAULT '',            -- the record's id, or a code (scanner profile, agent type); empty for company and installation
     placeholder_values    jsonb NOT NULL DEFAULT '{}' CONSTRAINT ck_setting_value_placeholders CHECK (jsonb_typeof(placeholder_values) = 'object'),   -- e.g. {"agent_type": "quotation", "kind": "inbound_message_matched"}
     value_type            text NOT NULL CONSTRAINT ck_setting_value_value_type CHECK (value_type IN (
-                              'boolean', 'integer', 'decimal', 'percent', 'amount', 'enum', 'code_list', 'field_list', 'object')),
+                              'boolean', 'integer', 'decimal', 'percent', 'amount', 'enum', 'code', 'code_list', 'field_list', 'object')),   -- code: one code of the table the bounds name, checked by the command (ADR-0069 rule 13)
     value                 jsonb NOT NULL,
     min_value             numeric,                              -- copies of the definition, checked by the trigger
     max_value             numeric,
@@ -202,6 +203,7 @@ CREATE TABLE setting_value (                               -- company data (inst
             AND (value_type <> 'integer' OR (value #>> '{}')::numeric = trunc((value #>> '{}')::numeric))
         WHEN value_type = 'boolean' THEN jsonb_typeof(value) = 'boolean' AND (value #>> '{}') = ANY (allowed_values)
         WHEN value_type = 'enum' THEN jsonb_typeof(value) = 'string' AND (value #>> '{}') = ANY (allowed_values)
+        WHEN value_type = 'code' THEN jsonb_typeof(value) = 'string'
         WHEN value_type IN ('code_list', 'field_list') THEN jsonb_typeof(value) = 'array'
         ELSE jsonb_typeof(value) = 'object' END)
 );

@@ -178,8 +178,8 @@ KIND = {r["code"]: r["kind"] for r in AREAS}
 VERB = {r["verb"]: r["level"] for r in read_csv("authorization-verb-levels.csv")}
 ORDER = {"none": 0, "read": 1, "edit": 2, "post": 3, "full": 4}
 EFFECT = {"posting": "post", "outbound_send": "post", "master_data_change": "edit", "other": "none"}
-check("C1 the area tree has eleven roots (crm included) and every parent exists",
-      sorted(k for k, v in PARENT.items() if v is None) == sorted(["sales", "purchasing", "inventory", "production", "planning", "finance", "banking", "master_data", "crm", "administration", "reports"])
+check("C1 the area tree has twelve roots (crm included; quality from ADR-0070) and every parent exists",
+      sorted(k for k, v in PARENT.items() if v is None) == sorted(["sales", "purchasing", "inventory", "production", "planning", "finance", "banking", "master_data", "crm", "administration", "reports", "quality"])
       and all(v is None or v in PARENT for v in PARENT.values()))
 
 def camel(s): return "".join(w.capitalize() for w in s.split("_"))
@@ -375,8 +375,8 @@ TPL = {}
 for r in read_csv("role-template-levels.csv"):
     TPL.setdefault(r["template"], {})[r["node"]] = (r["level"], r["can_approve"] == "true")
 TEMPLATES = {r["template"] for r in read_csv("role-templates.csv")}
-check("C2 template catalogs agree: 13 templates, every level row names a template and a node of the tree",
-      len(TEMPLATES) == 13 and set(TPL) == TEMPLATES and all(n in PARENT for rows in TPL.values() for n in rows))
+check("C2 template catalogs agree: 14 templates (quality_inspector from ADR-0070), every level row names a template and a node of the tree",
+      len(TEMPLATES) == 14 and set(TPL) == TEMPLATES and all(n in PARENT for rows in TPL.values() for n in rows))
 rnd = random.Random(12)
 ok = True
 for _ in range(200):
@@ -425,7 +425,7 @@ check("C14 a declared minimum level: UpdateEmployeeOrganization needs full on or
       and "UpdateEmployeeOrganization" in EXP["it_administrator"] and "UpdateEmployeeOrganization" in EXP["owner"])
 approvers = {t for t in TEMPLATES if any(a for _, a in TPL[t].values())}
 check("C15 every approving template can delegate its own approvals; delegate_for_others only owner and it_administrator",
-      approvers == {"owner", "chief_accountant", "accountant", "sales_manager", "purchasing_manager", "production_planner"}
+      approvers == {"owner", "chief_accountant", "accountant", "sales_manager", "purchasing_manager", "production_planner", "quality_inspector"}
       and all({"CreateDelegation", "CancelDelegation"} <= EXP[t] for t in approvers)
       and {t for t in TEMPLATES if "delegate_for_others" in EXP[t]} == {"owner", "it_administrator"})
 check("C16 IT administrator: no data import, no agent run bodies", not ({"ValidateImportBatch", "read_agent_run_bodies"} & EXP["it_administrator"]))

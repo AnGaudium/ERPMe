@@ -140,6 +140,8 @@ Agents read the structures through deterministic queries. They draft revisions f
 
     Note ([ADR-0062](0062-product-engineering-workflow.md), proposed 2026-11-15): `is_setup_duration_stated` and `is_run_duration_stated` (default true) mark a time no source stated; it is then 0, nothing reads it as real, and release refuses it. Agent workflows never write a time that is not in a source ([ADR-0062](0062-product-engineering-workflow.md) rule 10).
 
+    Note ([ADR-0071](0071-work-orders-and-shop-floor-execution.md), proposed 2026-11-17): the attachments of a routing operation are the WO's instructions on the tablet, found through the order's snapshot revision and operation number (ADR-0071 rule 14).
+
 **Work centers and calendars**
 
 11. A `work_center` has:
@@ -156,7 +158,13 @@ Agents read the structures through deterministic queries. They draft revisions f
     **Calendar ownership.** `working_calendar` moves from planning to `master_data` (layer 3), so that production can read it. ADR-0024 rule 4 gets a note.
 
     Note (catalog review, 2026-11-15): a work center's `code` is unique per company; its `name` is not (DS-43-54-planning-production.sql). "Unique per company" above applies to the code.
+
+    Note ([ADR-0068](0068-sites-and-core-logistics-payment-master-data.md), proposed 2026-11-17): the plant is the site of the production warehouse. This supersedes the Decision's "the production warehouse in place of a plant". `work_center` gets no `site_id`, because the site is derived through `production_warehouse_id`. It gains a nullable `resource_group_id`, and a site's calendar is the record default for its new work centers.
 12. `activity_type` is company data, for example `setup`, `machine` and `labor`, with a time unit (ADR-0018 rule 8, kind `time`). `work_center_activity` rows list which activity types a work center records, with a default `quantity` and `basis` copied into new routing operations. Planned and actual activity rates are DS-53's.
+
+    Note ([ADR-0068](0068-sites-and-core-logistics-payment-master-data.md), proposed 2026-11-17): the members of a resource group record equal sets of activity types (`resource_group_activity_mismatch`). To change a member's activity types, remove it from the group first.
+
+    Note ([ADR-0071](0071-work-orders-and-shop-floor-execution.md), proposed 2026-11-17): `activity_type.time_log_basis` (`none`, `labor`, `machine`; default `none`) says how a confirmation proposes the activity from time logs; `stop_reason` is new company data under the same leaf (ADR-0071 rules 10, 11).
 
 **Production versions and settings**
 

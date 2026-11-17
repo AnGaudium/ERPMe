@@ -67,6 +67,8 @@ Planning answers, per item and warehouse: what to buy or move, how much, and by 
    - `lead_time_days` (calendar days); the destination warehouse's `receiving_days` and calendar then apply, as for purchases.
 
    A `transfer` replenishment source names a route. Writing parameters that would form a cycle of transfer sources is rejected with `planning_network_cycle`.
+
+   Note ([ADR-0068](0068-sites-and-core-logistics-payment-master-data.md), proposed 2026-11-17): between two warehouses of one site, `lead_time_days` may be omitted and is then 0. Planning stays per (item, warehouse). Site-level pooled planning is an open question for after Phase 1.
 4. Working calendars:
    - `working_calendar` is company data: working weekdays and holiday dates, assigned to warehouses and suppliers. It moves to `master_data` so that production work centers can use it ([ADR-0033](0033-production-master-data.md) rule 11).
    - The localization package may seed public holidays as a template entry with a basis (ADR-0016). Tết dates are calendar data, not code.

@@ -68,6 +68,10 @@ A case never widens an agent's read scope.
    | `customer_onboarding` | `crm` | `interaction_unmatched` | `interaction` | `role:sales_clerk` | `days:1` | `person` |
 
    The kind `quote_request` mirrors the quotation agent's trigger (ADR-0051 rule 14). The kind `customer_onboarding` mirrors the onboarding agent's trigger (ADR-0051 rule 11).
+
+   Note ([ADR-0070](0070-quality-management-core.md), proposed 2026-11-17): a fifth kind, `nonconformance` (`quality`, trigger `nonconformance_open`, origins `nonconformance` and `inspection_lot`, `role:quality_inspector`, `days:5`, `person`). Containment and corrective actions are `nonconformance_action` items in the case (ADR-0070 rule 16).
+
+   Note ([ADR-0071](0071-work-orders-and-shop-floor-execution.md), proposed 2026-11-17): a sixth kind, `production_disruption` (`production`, trigger `operation_blocked`, origins `production_order_operation` and `production_order`, `role:shop_floor_lead`, `days:1`, `person`) (ADR-0071 rule 18).
 4. Company configuration (ADR-0063 rule 1; [settings.csv](../catalogs/settings.csv)):
    - **`work_case.<kind>.mode`** (company, enum, default `off`):
      - `off`: the kind opens no case;

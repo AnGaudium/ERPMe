@@ -46,6 +46,8 @@ ADR-0043 decides whether a document needs approval and at which rank, and approv
    Note: shop-floor facts never wait: `operation_confirmation`, `production_receipt` and `service_receipt` are registered `is_approval_hold_allowed: false`, so they reach no pool (rule 15). Pool `mo` holds `production_order` only. `production_issue` moves to `consumption`, beside the inventory consumption issues, because an issue above requirement may wait for approval (`is_above_requirement`, [ADR-0034](0034-production-orders-and-shop-floor.md) rule 5's note) (holistic review 2026-11-15, item P12).
 
    Note (flow review, 2026-11-15): the core seed stays minimal. Under [ADR-0043](0043-policy-and-approval.md) rule 15's seed, a person's `Submit` of a purchase request, purchase order, quotation or production order matches no rule, gets no rank and goes straight to `approved`, so pools `pr`, `po`, `mo` and, for quotations, `sales` are reached only through company rules. The core seeds no thresholds; DS-17's `vn_*` profiles add sample company rules and stage members through setup events ([DS-17](../design/DS-17-synthetic-dataset.md) rules 5 and 18, notes).
+
+   Note ([ADR-0070](0070-quality-management-core.md), proposed 2026-11-17): the core seeds the pool `quality` for `inspection_lot` (ADR-0070 rule 13).
 3. `approval_pool_document_type` (company data) holds the selector:
    - **Columns:** `document_type`, `position`, `condition_input`, `approval_pool_id`.
    - **The default row** has position 0 and no condition. The database allows exactly one per document type and company.

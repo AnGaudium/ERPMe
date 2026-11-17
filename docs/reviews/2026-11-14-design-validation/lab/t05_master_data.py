@@ -76,6 +76,8 @@ entry("item1", "ea", 100, "2026-01-01", "2026-12-31", "9000")
 entry("item1", "ea", 0, "2027-01-01", None, "11000")
 entry("item_kg", "kg", 0, "2026-01-01", None, "10000")
 entry("item_kg", "kg", 5, "2026-01-01", None, "9500")
+I["site"] = new()                                       # the company's default site (ADR-0068 rule 3)
+X("insert into site (id, company_id, code, name, kind) values (%s,%s,'MAIN','Main','factory')", (I["site"], I["co"]))
 c.close()
 
 def trial(name, fn, should_fail, match=None):
@@ -117,12 +119,13 @@ trial("M15 only a line-option value may ask for custom text", lambda cx: cx.exec
 trial("M16 a value must carry its attribute's mode", lambda cx: cx.execute("insert into variant_attribute_value (id, company_id, variant_attribute_id, variant_mode, code, name) values (%s,%s,%s,'line_option','c','C')", (new(), I["co"], I["attr_color"])), True, "fk_variant_attribute_value_attribute")
 trial("M17 an attribute's mode cannot change once it has values", lambda cx: cx.execute("update variant_attribute set variant_mode='line_option' where id=%s", (I["attr_color"],)), True, "fk_variant_attribute_value_attribute")
 trial("M18 a transit warehouse needs its valuation warehouse", lambda cx: cx.execute("insert into warehouse (id, company_id, code, name, kind, default_bin_id) values (%s,%s,'T1','T','transit',%s)", (new(), I["co"], new())), True, "ck_warehouse_valuation_warehouse")
-trial("M19 every warehouse has a default bin", lambda cx: cx.execute("insert into warehouse (id, company_id, code, name, kind) values (%s,%s,'W0','W','physical')", (new(), I["co"])), True, "default_bin_id")
+trial("M19 every warehouse has a default bin", lambda cx: cx.execute("insert into warehouse (id, company_id, site_id, code, name, kind) values (%s,%s,%s,'W0','W','physical')", (new(), I["co"], I["site"])), True, "default_bin_id")
+trial("M19b a physical warehouse names its site (ADR-0068 rule 2)", lambda cx: cx.execute("insert into warehouse (id, company_id, code, name, kind, default_bin_id) values (%s,%s,'W0','W','physical',%s)", (new(), I["co"], new())), True, "ck_warehouse_site")
 def wh_bins(cx, foreign_default=False, foreign_zone=False, same_barcode=False, bin_managed=False, processor=None, n=2):
     ws, zs, bs = [new() for _ in range(n)], [new() for _ in range(n)], [new() for _ in range(n)]
     for k in range(n):
-        cx.execute("insert into warehouse (id, company_id, code, name, kind, default_bin_id, is_bin_managed, processor_partner_id) values (%s,%s,%s,'W','physical',%s,%s,%s)",
-                   (ws[k], I["co"], 'W%d-' % k + str(ws[k])[-8:], bs[(k + 1) % n] if (foreign_default and k == 0) else bs[k], bin_managed and k == 0, processor))
+        cx.execute("insert into warehouse (id, company_id, site_id, code, name, kind, default_bin_id, is_bin_managed, processor_partner_id) values (%s,%s,%s,%s,'W','physical',%s,%s,%s)",
+                   (ws[k], I["co"], I["site"], 'W%d-' % k + str(ws[k])[-8:], bs[(k + 1) % n] if (foreign_default and k == 0) else bs[k], bin_managed and k == 0, processor))
         cx.execute("insert into zone (id, company_id, warehouse_id, code, name) values (%s,%s,%s,'DEFAULT','Default')", (zs[k], I["co"], ws[k]))
     for k in range(n):
         z = zs[(k + 1) % n] if (foreign_zone and k == 0) else zs[k]
@@ -160,7 +163,7 @@ trial("M41 a group row needs its basis", lambda cx: cx.execute("insert into item
 ddl = open(os.environ.get("NATIVEFLOWS_DS20", os.path.join(os.path.expanduser(os.environ.get("NATIVEFLOWS_DOCS", "~/Projects/NativeFlows/docs")), "design", "DS-20-master-data.sql"))).read()
 tables = re.findall(r"^CREATE TABLE (\w+)", ddl, re.M)
 cx = conn()
-missing = [tb for tb in tables if tb not in ("currency", "uom", "uom_conversion", "company") and not cx.execute(
+missing = [tb for tb in tables if tb not in ("currency", "uom", "uom_conversion", "incoterm", "company") and not cx.execute(
     "select 1 from information_schema.columns where table_schema='nativeflows' and table_name=%s and column_name='company_id'", (tb,)).fetchone()]
 cx.close()
 check(f"M42 all {len(tables) - 4} company tables of DS-20 carry company_id (missing: {missing or 'none'})", missing, [])

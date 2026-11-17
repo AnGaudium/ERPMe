@@ -977,7 +977,8 @@ if "--load" in sys.argv:
     X("insert into working_calendar (id, company_id, code, name, working_weekdays) values (%s,%s,'STD','Std','{1,2,3,4,5}')", (I["cal"], I["co"]))
     X("insert into cost_center (id, company_id, code, name, kind) values (%s,%s,'ASM','Assembly','production')", (I["cc"], I["co"]))
     with c.transaction():
-        X("insert into warehouse (id, company_id, code, name, kind, working_calendar_id, default_bin_id) values (%s,%s,'WP','WP','physical',%s,%s)", (I["WP"], I["co"], I["cal"], I["bP"]))
+        X("insert into site (id, company_id, code, name, kind) values (%s,%s,'MAIN','Main','factory')", (I.setdefault("site", new()), I["co"]))   # the default site (ADR-0068 rule 3)
+        X("insert into warehouse (id, company_id, site_id, code, name, kind, working_calendar_id, default_bin_id) values (%s,%s,%s,'WP','WP','physical',%s,%s)", (I["WP"], I["co"], I["site"], I["cal"], I["bP"]))
         X("insert into zone (id, company_id, warehouse_id, code, name) values (%s,%s,%s,'Z','Zone')", (I["zP"], I["co"], I["WP"]))
         X("insert into bin (id, company_id, warehouse_id, zone_id, code, barcode, bin_type) values (%s,%s,%s,%s,'DEF','WP25-DEF','storage')", (I["bP"], I["co"], I["WP"], I["zP"]))
     X("""insert into work_center (id, company_id, code, name, production_warehouse_id, working_calendar_id, hours_per_day, cost_center_id, recorded_at)
@@ -997,6 +998,8 @@ if "--load" in sys.argv:
         order(c, "doc")
         X("""insert into production_order_operation (id, company_id, production_order_id, line_number, operation_number, work_center_id, control, expected_quantity,
              scheduled_start_date, scheduled_end_date, recorded_at) values (%s,%s,%s,1,10,%s,'internal',10,'2026-12-01','2026-12-02',now())""", (I["OP"], I["co"], I["doc"], I["WC"]))
+        X("""insert into operation_execution (company_id, production_order_operation_id, production_order_id, work_center_id, state_changed_at, recorded_at)
+             values (%s,%s,%s,%s,now(),now())""", (I["co"], I["OP"], I["doc"], I["WC"]))   # the WO's execution row (ADR-0071 rule 6)
         X("""insert into production_order_component (id, company_id, production_order_id, line_number, component_item_id, required_quantity, issue_warehouse_id, operation_number,
              consumption_method, requested_date, recorded_at) values (%s,%s,%s,%s,%s,10,%s,10,'manual','2026-12-01',now())""", (I["comp"], I["co"], I["doc"], 1, I["i2"], I["WP"]))
         X("""insert into production_order_component (id, company_id, production_order_id, line_number, component_item_id, required_quantity, issue_warehouse_id, operation_number,
@@ -1025,13 +1028,13 @@ if "--load" in sys.argv:
     def conf(cx, dk, source=None, ref=None):
         document(cx, dk, "operation_confirmation", state="draft")
         cols, vals = "", ""
-        args = [I[dk], I["co"], I["doc"], I["OP"]]
+        args = [I[dk], I["co"], I["doc"], I["OP"], I["WC"]]
         if source:
             cols += ", entry_source"; vals += ",%s"; args.append(source)
         if ref is not None:
             cols += ", external_reference"; vals += ",%s"; args.append(ref)
-        cx.execute(f"""insert into operation_confirmation (id, company_id, production_order_id, production_order_operation_id, yield_quantity, scrap_quantity, posting_date{cols}, recorded_at)
-                       values (%s,%s,%s,%s,5,0,'2026-12-02'{vals},now())""", args)
+        cx.execute(f"""insert into operation_confirmation (id, company_id, production_order_id, production_order_operation_id, work_center_id, yield_quantity, scrap_quantity, posting_date{cols}, recorded_at)
+                       values (%s,%s,%s,%s,%s,5,0,'2026-12-02'{vals},now())""", args)
     expect("D08 a confirmation without an entry source defaults to person", lambda cx: conf(cx, "c1"), False)
     src = X("select entry_source from operation_confirmation where id=%s", (I["c1"],)).fetchone()
     check("D09 the stored entry source is person", src and src[0] == "person", src)

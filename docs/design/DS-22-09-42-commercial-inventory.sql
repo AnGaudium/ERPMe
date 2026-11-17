@@ -18,7 +18,8 @@
 -- Not here: the line taxes document_line_tax (ADR-0041 rule 6) and the money accounts, payments and bank statements of
 -- ADR-0048 are drafted in DS-05-platform.sql with the document row; invoices of this file carry their taxes there.
 -- Referenced tables defined elsewhere: document (documents, ADR-0009; DS-05-platform.sql, lab stubs), company, partner,
--- contact, item, product, uom, warehouse, bin, lot, serial_number, price_list, handling_unit_type, item_group,
+-- contact, item, product, uom, warehouse, bin, lot, serial_number, price_list, handling_unit_type, item_group, site,
+-- payment_method, delivery_method, incoterm (ADR-0068), business_unit (ADR-0069),
 -- partner_group, cost_center, project, variant_attribute (DS-20), product_configuration and configuration_model_revision
 -- (DS-56), account, payment_term, open_item, journal_line, derivation_trace, posting_period, tax_code, cost_object (DS-06
 -- and its stubs), user_account (DS-15), and from DS-43-54-planning-production.sql the inventory read model
@@ -113,6 +114,10 @@ CREATE TABLE quotation (
     print_language             text,                          -- ADR-0049 rule 27
     closed_reason              text CONSTRAINT ck_quotation_closed_reason CHECK (closed_reason IN ('fulfilled', 'short')),
     cancel_reason              text,                          -- interim: not stated in ADR-0047 (a lost quotation is canceled with a reason, rule 3)
+    payment_method_id          uuid,                          -- copied from the profile, then from the source; suggests only (ADR-0068 rules 15, 17)
+    incoterm_code              text REFERENCES incoterm (code),   -- advisory only (ADR-0068 rules 19, 20)
+    incoterm_place             text,                          -- the named place; requires a code
+    business_unit_id           uuid,                          -- set by a person or an agent, copied from the source (ADR-0069 rule 8)
     recorded_at                timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, id) REFERENCES document (company_id, id),
@@ -120,7 +125,10 @@ CREATE TABLE quotation (
     FOREIGN KEY (company_id, partner_id, contact_id) REFERENCES contact (company_id, partner_id, id),
     FOREIGN KEY (company_id, price_list_id, price_list_kind) REFERENCES price_list (company_id, id, kind),
     FOREIGN KEY (company_id, salesperson_id) REFERENCES partner (company_id, id),
-    CONSTRAINT ck_quotation_valid_until CHECK (valid_until >= document_date)
+    CONSTRAINT ck_quotation_valid_until CHECK (valid_until >= document_date),
+    FOREIGN KEY (company_id, payment_method_id) REFERENCES payment_method (company_id, id),
+    CONSTRAINT ck_quotation_incoterm_place CHECK (incoterm_place IS NULL OR incoterm_code IS NOT NULL),
+    FOREIGN KEY (company_id, business_unit_id) REFERENCES business_unit (company_id, id)
 );
 -- A quotation line may have no item: a configurable product with its configuration (holistic review B1; ADR-0045 rule 16;
 -- ADR-0046 rule 9). product_id is always set; an item, when set, belongs to it (the key item (id, product_id)), and so does
@@ -197,13 +205,22 @@ CREATE TABLE sales_order (
     document_discount_percent  types.percent NOT NULL DEFAULT 0 CONSTRAINT ck_sales_order_document_discount_percent CHECK (document_discount_percent BETWEEN 0 AND 100),
     print_language             text,
     closed_reason              text CONSTRAINT ck_sales_order_closed_reason CHECK (closed_reason IN ('fulfilled', 'short')),
+    payment_method_id          uuid,                          -- copied from the profile, then from the source; suggests only (ADR-0068 rules 15, 17)
+    delivery_method_id         uuid,                          -- ADR-0068 rule 22
+    incoterm_code              text REFERENCES incoterm (code),   -- advisory only (ADR-0068 rules 19, 20)
+    incoterm_place             text,                          -- the named place; requires a code
+    business_unit_id           uuid,                          -- set by a person or an agent, copied from the source (ADR-0069 rule 8)
     recorded_at                timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, id) REFERENCES document (company_id, id),
     FOREIGN KEY (company_id, partner_id) REFERENCES partner (company_id, id),
     FOREIGN KEY (company_id, partner_id, contact_id) REFERENCES contact (company_id, partner_id, id),
     FOREIGN KEY (company_id, price_list_id, price_list_kind) REFERENCES price_list (company_id, id, kind),
-    FOREIGN KEY (company_id, salesperson_id) REFERENCES partner (company_id, id)
+    FOREIGN KEY (company_id, salesperson_id) REFERENCES partner (company_id, id),
+    FOREIGN KEY (company_id, payment_method_id) REFERENCES payment_method (company_id, id),
+    FOREIGN KEY (company_id, delivery_method_id) REFERENCES delivery_method (company_id, id),
+    CONSTRAINT ck_sales_order_incoterm_place CHECK (incoterm_place IS NULL OR incoterm_code IS NOT NULL),
+    FOREIGN KEY (company_id, business_unit_id) REFERENCES business_unit (company_id, id)
 );
 -- item_id is empty only on a draft line of an item created on order; the item exists once the order leaves draft
 -- (ADR-0045 rule 16; ADR-0046 rule 11; INV-113, checked by the command and the invariant, since state lives on document).
@@ -310,10 +327,12 @@ CREATE TABLE purchase_request (
     document_date    date NOT NULL,
     closed_reason    text CONSTRAINT ck_purchase_request_closed_reason CHECK (closed_reason IN ('fulfilled', 'short')),
     print_language   text,
+    business_unit_id uuid,                          -- set by a person or an agent, copied from the source (ADR-0069 rule 8)
     recorded_at      timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, id) REFERENCES document (company_id, id),
-    FOREIGN KEY (company_id, buyer_id) REFERENCES partner (company_id, id)
+    FOREIGN KEY (company_id, buyer_id) REFERENCES partner (company_id, id),
+    FOREIGN KEY (company_id, business_unit_id) REFERENCES business_unit (company_id, id)
 );
 -- Quantity may be zero: a draft line whose supply row carries origin_planned_order_id or pegging is not removed, its
 -- quantity goes to zero (ADR-0047 rule 10; ADR-0028 rule 2).
@@ -368,12 +387,21 @@ CREATE TABLE purchase_order (
     document_discount_percent  types.percent NOT NULL DEFAULT 0 CONSTRAINT ck_purchase_order_document_discount_percent CHECK (document_discount_percent BETWEEN 0 AND 100),
     print_language             text,
     closed_reason              text CONSTRAINT ck_purchase_order_closed_reason CHECK (closed_reason IN ('fulfilled', 'short')),
+    payment_method_id          uuid,                          -- copied from the profile, then from the source; suggests only (ADR-0068 rules 15, 17)
+    delivery_method_id         uuid,                          -- ADR-0068 rule 22
+    incoterm_code              text REFERENCES incoterm (code),   -- advisory only (ADR-0068 rules 19, 20)
+    incoterm_place             text,                          -- the named place; requires a code
+    business_unit_id           uuid,                          -- set by a person or an agent, copied from the source (ADR-0069 rule 8)
     recorded_at                timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, id) REFERENCES document (company_id, id),
     FOREIGN KEY (company_id, partner_id) REFERENCES partner (company_id, id),
     FOREIGN KEY (company_id, price_list_id, price_list_kind) REFERENCES price_list (company_id, id, kind),
-    FOREIGN KEY (company_id, buyer_id) REFERENCES partner (company_id, id)
+    FOREIGN KEY (company_id, buyer_id) REFERENCES partner (company_id, id),
+    FOREIGN KEY (company_id, payment_method_id) REFERENCES payment_method (company_id, id),
+    FOREIGN KEY (company_id, delivery_method_id) REFERENCES delivery_method (company_id, id),
+    CONSTRAINT ck_purchase_order_incoterm_place CHECK (incoterm_place IS NULL OR incoterm_code IS NOT NULL),
+    FOREIGN KEY (company_id, business_unit_id) REFERENCES business_unit (company_id, id)
 );
 CREATE TABLE purchase_order_line (
     id                             uuid PRIMARY KEY,
@@ -458,10 +486,21 @@ CREATE TABLE goods_receipt (
     document_date      date NOT NULL,
     posting_date       date NOT NULL,
     print_language     text,
+    delivery_method_id uuid,                          -- ADR-0068 rule 22
+    carrier_partner_id uuid,                          -- copied from the method, changeable until posting; an active supplier role (partner_role_missing)
+    tracking_number    text,
+    vehicle_registration text,
+    incoterm_code      text REFERENCES incoterm (code),   -- advisory only (ADR-0068 rules 19, 20)
+    incoterm_place     text,                          -- the named place; requires a code
+    business_unit_id   uuid,                          -- set by a person or an agent, copied from the source (ADR-0069 rule 8)
     recorded_at        timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, id) REFERENCES document (company_id, id),
-    FOREIGN KEY (company_id, partner_id) REFERENCES partner (company_id, id)
+    FOREIGN KEY (company_id, partner_id) REFERENCES partner (company_id, id),
+    FOREIGN KEY (company_id, delivery_method_id) REFERENCES delivery_method (company_id, id),
+    FOREIGN KEY (company_id, carrier_partner_id) REFERENCES partner (company_id, id),
+    CONSTRAINT ck_goods_receipt_incoterm_place CHECK (incoterm_place IS NULL OR incoterm_code IS NOT NULL),
+    FOREIGN KEY (company_id, business_unit_id) REFERENCES business_unit (company_id, id)
 );
 -- A receipt of an order line is rejected while its supply row is unreleased (demand_supply_not_released, holistic review B2)
 -- and when received net would exceed the ordered inventory quantity times the receipt tolerance, plus the unit
@@ -513,10 +552,12 @@ CREATE TABLE return_to_supplier (
     document_date      date NOT NULL,
     posting_date       date NOT NULL,
     print_language     text,
+    business_unit_id   uuid,                          -- set by a person or an agent, copied from the source (ADR-0069 rule 8)
     recorded_at        timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, id) REFERENCES document (company_id, id),
-    FOREIGN KEY (company_id, partner_id) REFERENCES partner (company_id, id)
+    FOREIGN KEY (company_id, partner_id) REFERENCES partner (company_id, id),
+    FOREIGN KEY (company_id, business_unit_id) REFERENCES business_unit (company_id, id)
 );
 -- correction_of_id on the document row is the goods receipt; returned <= received per receipt line (inventory, ADR-0047 rule 15).
 CREATE TABLE return_to_supplier_line (
@@ -534,6 +575,7 @@ CREATE TABLE return_to_supplier_line (
     inventory_quantity      types.quantity NOT NULL CONSTRAINT ck_return_to_supplier_line_inventory_quantity CHECK (inventory_quantity > 0),
     warehouse_id            uuid NOT NULL,
     bin_id                  uuid,
+    stock_status            text NOT NULL DEFAULT 'available' CONSTRAINT ck_return_to_supplier_line_stock_status CHECK (stock_status IN ('available', 'quality_inspection', 'blocked')),   -- the status issued from (ADR-0023 rule 7; ADR-0070 rule 15)
     gr_ir_position_from     types.quantity,                  -- the GR/IR positions [from, to) the return actually debits: the order
     gr_ir_position_to       types.quantity,                  -- line's latest received positions (ADR-0047 rule 13 and its note); the
                                                              -- named receipt part, the part-as-source reference (ADR-0056 rule 10),
@@ -567,10 +609,21 @@ CREATE TABLE delivery (
     document_date      date NOT NULL,
     posting_date       date NOT NULL,
     print_language     text,
+    delivery_method_id uuid,                          -- ADR-0068 rule 22
+    carrier_partner_id uuid,                          -- copied from the method, changeable until posting; an active supplier role (partner_role_missing)
+    tracking_number    text,
+    vehicle_registration text,
+    incoterm_code      text REFERENCES incoterm (code),   -- advisory only (ADR-0068 rules 19, 20)
+    incoterm_place     text,                          -- the named place; requires a code
+    business_unit_id   uuid,                          -- set by a person or an agent, copied from the source (ADR-0069 rule 8)
     recorded_at        timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, id) REFERENCES document (company_id, id),
-    FOREIGN KEY (company_id, partner_id) REFERENCES partner (company_id, id)
+    FOREIGN KEY (company_id, partner_id) REFERENCES partner (company_id, id),
+    FOREIGN KEY (company_id, delivery_method_id) REFERENCES delivery_method (company_id, id),
+    FOREIGN KEY (company_id, carrier_partner_id) REFERENCES partner (company_id, id),
+    CONSTRAINT ck_delivery_incoterm_place CHECK (incoterm_place IS NULL OR incoterm_code IS NOT NULL),
+    FOREIGN KEY (company_id, business_unit_id) REFERENCES business_unit (company_id, id)
 );
 -- Created from confirmed picks or, in a warehouse without tasks, from order lines (ADR-0023 rule 16; ADR-0047 rule 5).
 -- At most the demand row's open quantity (quantity_exceeds_open); rejected while the row is unreleased or held
@@ -619,10 +672,12 @@ CREATE TABLE return_from_customer (
     document_date      date NOT NULL,
     posting_date       date NOT NULL,
     print_language     text,
+    business_unit_id   uuid,                          -- set by a person or an agent, copied from the source (ADR-0069 rule 8)
     recorded_at        timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, id) REFERENCES document (company_id, id),
-    FOREIGN KEY (company_id, partner_id) REFERENCES partner (company_id, id)
+    FOREIGN KEY (company_id, partner_id) REFERENCES partner (company_id, id),
+    FOREIGN KEY (company_id, business_unit_id) REFERENCES business_unit (company_id, id)
 );
 -- correction_of_id on the document row is the delivery; returned <= delivered per delivery line (ADR-0047 rule 7).
 -- Goods arrive in a returns bin as blocked (ADR-0023 rule 19).
@@ -671,10 +726,12 @@ CREATE TABLE service_receipt (
     document_date      date NOT NULL,
     posting_date       date NOT NULL,
     print_language     text,
+    business_unit_id   uuid,                          -- set by a person or an agent, copied from the source (ADR-0069 rule 8)
     recorded_at        timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, id) REFERENCES document (company_id, id),
-    FOREIGN KEY (company_id, partner_id) REFERENCES partner (company_id, id)
+    FOREIGN KEY (company_id, partner_id) REFERENCES partner (company_id, id),
+    FOREIGN KEY (company_id, business_unit_id) REFERENCES business_unit (company_id, id)
 );
 CREATE TABLE service_receipt_line (
     id                      uuid PRIMARY KEY,
@@ -726,11 +783,18 @@ CREATE TABLE sales_invoice (
     posting_date               date NOT NULL,             -- frozen at Issue (ADR-0028 rule 7)
     document_discount_percent  types.percent NOT NULL DEFAULT 0 CONSTRAINT ck_sales_invoice_document_discount_percent CHECK (document_discount_percent BETWEEN 0 AND 100),
     print_language             text,
+    payment_method_id          uuid,                          -- copied from the profile, then from the source; suggests only (ADR-0068 rules 15, 17)
+    incoterm_code              text REFERENCES incoterm (code),   -- advisory only (ADR-0068 rules 19, 20)
+    incoterm_place             text,                          -- the named place; requires a code
+    business_unit_id           uuid,                          -- set by a person or an agent, copied from the source (ADR-0069 rule 8)
     recorded_at                timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, id) REFERENCES document (company_id, id),
     FOREIGN KEY (company_id, partner_id) REFERENCES partner (company_id, id),
-    FOREIGN KEY (company_id, salesperson_id) REFERENCES partner (company_id, id)
+    FOREIGN KEY (company_id, salesperson_id) REFERENCES partner (company_id, id),
+    FOREIGN KEY (company_id, payment_method_id) REFERENCES payment_method (company_id, id),
+    CONSTRAINT ck_sales_invoice_incoterm_place CHECK (incoterm_place IS NULL OR incoterm_code IS NOT NULL),
+    FOREIGN KEY (company_id, business_unit_id) REFERENCES business_unit (company_id, id)
 );
 -- A stock line refers to a posted delivery line (invoice_exceeds_delivered); a non-stock or service line to an order
 -- line or to nothing (rule 6). A stock sale needs an order (sales_order_required, holistic review S9).
@@ -798,10 +862,12 @@ CREATE TABLE sales_return (
     posting_date       date NOT NULL,
     external_original  jsonb,
     print_language     text,
+    business_unit_id   uuid,                          -- set by a person or an agent, copied from the source (ADR-0069 rule 8)
     recorded_at        timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, id) REFERENCES document (company_id, id),
-    FOREIGN KEY (company_id, partner_id) REFERENCES partner (company_id, id)
+    FOREIGN KEY (company_id, partner_id) REFERENCES partner (company_id, id),
+    FOREIGN KEY (company_id, business_unit_id) REFERENCES business_unit (company_id, id)
 );
 CREATE TABLE sales_return_line (
     id                             uuid PRIMARY KEY,
@@ -849,10 +915,12 @@ CREATE TABLE credit_note (
     posting_date       date NOT NULL,
     external_original  jsonb,
     print_language     text,
+    business_unit_id   uuid,                          -- set by a person or an agent, copied from the source (ADR-0069 rule 8)
     recorded_at        timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, id) REFERENCES document (company_id, id),
-    FOREIGN KEY (company_id, partner_id) REFERENCES partner (company_id, id)
+    FOREIGN KEY (company_id, partner_id) REFERENCES partner (company_id, id),
+    FOREIGN KEY (company_id, business_unit_id) REFERENCES business_unit (company_id, id)
 );
 -- A quantity credit is round_amount(quantity x original net unit price after the document discount) (rule 8).
 CREATE TABLE credit_note_line (
@@ -900,10 +968,12 @@ CREATE TABLE debit_note (
     document_date      date NOT NULL,
     posting_date       date NOT NULL,
     print_language     text,
+    business_unit_id   uuid,                          -- set by a person or an agent, copied from the source (ADR-0069 rule 8)
     recorded_at        timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, id) REFERENCES document (company_id, id),
-    FOREIGN KEY (company_id, partner_id) REFERENCES partner (company_id, id)
+    FOREIGN KEY (company_id, partner_id) REFERENCES partner (company_id, id),
+    FOREIGN KEY (company_id, business_unit_id) REFERENCES business_unit (company_id, id)
 );
 CREATE TABLE debit_note_line (
     id                      uuid PRIMARY KEY,
@@ -940,11 +1010,18 @@ CREATE TABLE purchase_invoice (
     payment_term_id        uuid REFERENCES payment_term (id),
     document_discount_percent types.percent NOT NULL DEFAULT 0 CONSTRAINT ck_purchase_invoice_document_discount_percent CHECK (document_discount_percent BETWEEN 0 AND 100),
     print_language         text,
+    payment_method_id      uuid,                          -- copied from the profile, then from the source; suggests only (ADR-0068 rules 15, 17)
+    incoterm_code          text REFERENCES incoterm (code),   -- advisory only (ADR-0068 rules 19, 20)
+    incoterm_place         text,                          -- the named place; requires a code
+    business_unit_id       uuid,                          -- set by a person or an agent, copied from the source (ADR-0069 rule 8)
     recorded_at            timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, id) REFERENCES document (company_id, id),
     FOREIGN KEY (company_id, partner_id) REFERENCES partner (company_id, id),
-    CONSTRAINT ck_purchase_invoice_invoice_rate CHECK (invoice_rate IS NULL OR invoice_rate > 0)
+    CONSTRAINT ck_purchase_invoice_invoice_rate CHECK (invoice_rate IS NULL OR invoice_rate > 0),
+    FOREIGN KEY (company_id, payment_method_id) REFERENCES payment_method (company_id, id),
+    CONSTRAINT ck_purchase_invoice_incoterm_place CHECK (incoterm_place IS NULL OR incoterm_code IS NOT NULL),
+    FOREIGN KEY (company_id, business_unit_id) REFERENCES business_unit (company_id, id)
 );
 CREATE INDEX ix_purchase_invoice_company_id_partner_id_partner_reference ON purchase_invoice (company_id, partner_id, partner_reference);
 CREATE TABLE purchase_invoice_line (
@@ -971,6 +1048,7 @@ CREATE TABLE purchase_invoice_line (
     document_discount_amount types.amount NOT NULL DEFAULT 0 CONSTRAINT ck_purchase_invoice_line_document_discount_amount CHECK (document_discount_amount >= 0),
     input_use                text NOT NULL DEFAULT 'taxable' CONSTRAINT ck_purchase_invoice_line_input_use CHECK (input_use IN ('taxable', 'non_taxable', 'shared')),   -- ADR-0041 rule 6
     description              text,
+    business_unit_id         uuid,                          -- the explicit unit of the line, first in the derivation (ADR-0069 rules 8, 9)
     recorded_at              timestamptz NOT NULL DEFAULT now(),
     UNIQUE (purchase_invoice_id, line_number),
     UNIQUE (company_id, id),
@@ -992,7 +1070,8 @@ CREATE TABLE purchase_invoice_line (
         AND (uom_factor_source <> 'identity' OR (uom_numerator = 1 AND uom_denominator = 1))),
     CONSTRAINT ck_purchase_invoice_line_uom_quantity CHECK (abs(inventory_quantity * uom_denominator - quantity * uom_numerator) <= 2 * uom_denominator
         AND (uom_factor_source <> 'identity' OR inventory_quantity = quantity)),
-    CONSTRAINT ck_purchase_invoice_line_uom_snapshot CHECK (num_nulls(quantity, uom_id, uom_numerator, uom_denominator, uom_factor_source, inventory_quantity) IN (0, 6))
+    CONSTRAINT ck_purchase_invoice_line_uom_snapshot CHECK (num_nulls(quantity, uom_id, uom_numerator, uom_denominator, uom_factor_source, inventory_quantity) IN (0, 6)),
+    FOREIGN KEY (company_id, business_unit_id) REFERENCES business_unit (company_id, id)
 );
 CREATE INDEX ix_purchase_invoice_line_purchase_order_line_id ON purchase_invoice_line (purchase_order_line_id) WHERE purchase_order_line_id IS NOT NULL;
 CREATE TABLE purchase_return (
@@ -1007,10 +1086,12 @@ CREATE TABLE purchase_return (
     document_date      date NOT NULL,
     posting_date       date NOT NULL,
     external_original  jsonb,
+    business_unit_id   uuid,                          -- set by a person or an agent, copied from the source (ADR-0069 rule 8)
     recorded_at        timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, id) REFERENCES document (company_id, id),
-    FOREIGN KEY (company_id, partner_id) REFERENCES partner (company_id, id)
+    FOREIGN KEY (company_id, partner_id) REFERENCES partner (company_id, id),
+    FOREIGN KEY (company_id, business_unit_id) REFERENCES business_unit (company_id, id)
 );
 -- correction_of_id on the document row is the purchase invoice; a quantity credit on I by rule 13 (rule 15).
 CREATE TABLE purchase_return_line (
@@ -1056,10 +1137,12 @@ CREATE TABLE purchase_credit_note (
     document_date      date NOT NULL,
     posting_date       date NOT NULL,
     external_original  jsonb,
+    business_unit_id   uuid,                          -- set by a person or an agent, copied from the source (ADR-0069 rule 8)
     recorded_at        timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, id) REFERENCES document (company_id, id),
-    FOREIGN KEY (company_id, partner_id) REFERENCES partner (company_id, id)
+    FOREIGN KEY (company_id, partner_id) REFERENCES partner (company_id, id),
+    FOREIGN KEY (company_id, business_unit_id) REFERENCES business_unit (company_id, id)
 );
 -- Quantity lines are quantity credits on I (rule 13) within the invoice line's invoiced net; price lines are price-only.
 CREATE TABLE purchase_credit_note_line (
@@ -1105,10 +1188,12 @@ CREATE TABLE purchase_debit_note (
     currency           text NOT NULL REFERENCES currency (code),
     document_date      date NOT NULL,
     posting_date       date NOT NULL,
+    business_unit_id   uuid,                          -- set by a person or an agent, copied from the source (ADR-0069 rule 8)
     recorded_at        timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, id) REFERENCES document (company_id, id),
-    FOREIGN KEY (company_id, partner_id) REFERENCES partner (company_id, id)
+    FOREIGN KEY (company_id, partner_id) REFERENCES partner (company_id, id),
+    FOREIGN KEY (company_id, business_unit_id) REFERENCES business_unit (company_id, id)
 );
 CREATE TABLE purchase_debit_note_line (
     id                       uuid PRIMARY KEY,
@@ -1229,7 +1314,8 @@ CREATE TABLE material_document_line (
     lot_id                  uuid REFERENCES lot (id),
     serial_number_id        uuid REFERENCES serial_number (id),
     company_amount          types.amount NOT NULL CONSTRAINT ck_material_document_line_company_amount CHECK (company_amount >= 0),   -- the value moved; zero for non-owned stock
-    valuation_warehouse_id  uuid,                            -- null at company valuation level (ADR-0020 rule 2)
+    valuation_warehouse_id  uuid,                            -- the area at level warehouse; null at levels company and site (ADR-0020 rule 2; ADR-0068 rule 8)
+    valuation_site_id       uuid,                            -- the area at level site; null at levels company and warehouse; set by the stock lock helper (ADR-0068 rule 8; INV-810)
     derivation_trace_id     uuid REFERENCES derivation_trace (id),
     bin_id                  uuid NOT NULL,                   -- the default bin outside bin-managed warehouses (ADR-0031 rule 8)
     stock_status            text NOT NULL DEFAULT 'available' CONSTRAINT ck_material_document_line_stock_status CHECK (stock_status IN ('available', 'quality_inspection', 'blocked')),
@@ -1250,7 +1336,9 @@ CREATE TABLE material_document_line (
     FOREIGN KEY (company_id, owner_partner_id) REFERENCES partner (company_id, id),
     CONSTRAINT ck_material_document_line_lot_or_serial CHECK (lot_id IS NULL OR serial_number_id IS NULL),
     CONSTRAINT ck_material_document_line_serial_quantity CHECK (serial_number_id IS NULL OR quantity = 1),
-    CONSTRAINT ck_material_document_line_catch_weight CHECK (catch_weight_quantity IS NULL)
+    CONSTRAINT ck_material_document_line_catch_weight CHECK (catch_weight_quantity IS NULL),
+    FOREIGN KEY (company_id, valuation_site_id) REFERENCES site (company_id, id),
+    CONSTRAINT ck_material_document_line_valuation_area CHECK (valuation_site_id IS NULL OR valuation_warehouse_id IS NULL)
 );
 -- The dated negative-stock check reads posting_date per key (ADR-0020 rule 10; ADR-0031 rule 14).
 CREATE INDEX ix_material_document_line_company_id_item_id_warehouse_id_posting_date
@@ -1301,17 +1389,20 @@ CREATE TABLE preliminary_price (
     id                      uuid PRIMARY KEY,
     company_id              uuid NOT NULL,
     item_id                 uuid NOT NULL,
-    valuation_warehouse_id  uuid,                            -- the valuation area; null at company level
+    valuation_warehouse_id  uuid,                            -- the area at level warehouse; null at levels company and site (ADR-0068 rule 8)
+    valuation_site_id       uuid,                            -- the area at level site; null at levels company and warehouse
     posting_period_id       uuid NOT NULL REFERENCES posting_period (id),
     unit_price              types.unit_price NOT NULL CONSTRAINT ck_preliminary_price_unit_price CHECK (unit_price >= 0),   -- company currency per inventory unit
     price_source            text NOT NULL CONSTRAINT ck_preliminary_price_price_source CHECK (price_source IN ('prior_actual', 'area_receipt', 'company_receipt', 'cost_estimate', 'purchase_list', 'last_purchase_invoice', 'opening', 'manual')),   -- interim: not stated in ADR-0020 (which branch of rule 11 gave the price; purchase_list and last_purchase_invoice: its rule 11 note of the UoM simulation review)
     derivation_trace_id     uuid REFERENCES derivation_trace (id),
     set_by_user_id          uuid REFERENCES user_account (id),   -- UpdatePreliminaryPrice is human_only, audited
     recorded_at             timestamptz NOT NULL DEFAULT now(),
-    CONSTRAINT uq_preliminary_price_key UNIQUE NULLS NOT DISTINCT (company_id, item_id, valuation_warehouse_id, posting_period_id),
+    CONSTRAINT uq_preliminary_price_key UNIQUE NULLS NOT DISTINCT (company_id, item_id, valuation_site_id, valuation_warehouse_id, posting_period_id),   -- the area's pair (ADR-0068 rule 8)
     FOREIGN KEY (company_id, item_id) REFERENCES item (company_id, id),
     FOREIGN KEY (company_id, valuation_warehouse_id) REFERENCES warehouse (company_id, id),
-    CONSTRAINT ck_preliminary_price_manual CHECK ((price_source = 'manual') = (set_by_user_id IS NOT NULL))
+    CONSTRAINT ck_preliminary_price_manual CHECK ((price_source = 'manual') = (set_by_user_id IS NOT NULL)),
+    FOREIGN KEY (company_id, valuation_site_id) REFERENCES site (company_id, id),
+    CONSTRAINT ck_preliminary_price_valuation_area CHECK (valuation_site_id IS NULL OR valuation_warehouse_id IS NULL)
 );
 
 -- ===== Reservations and warehouse tasks [inventory] (ADR-0023 rules 13-15, 20; ADR-0028 rule 2; ADR-0031 rule 6) =====

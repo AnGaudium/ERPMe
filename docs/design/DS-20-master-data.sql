@@ -1,11 +1,13 @@
 -- DS-20 master data: DDL draft for ADR-0018, ADR-0019, ADR-0020, ADR-0023, ADR-0024, ADR-0027 rule 5, ADR-0031,
--- ADR-0033, ADR-0037 and ADR-0045, with the columns ADR-0046 (product configuration) adds; its tables are in DS-56-product-configuration.sql.
+-- ADR-0033, ADR-0037, ADR-0045, ADR-0068 (sites, payment and delivery methods, Incoterms) and ADR-0069 (business units), with the
+-- columns ADR-0046 (product configuration) and ADR-0070 (product.inspection_points) add; ADR-0046's tables are in
+-- DS-56-product-configuration.sql.
 -- PostgreSQL 18. Loaded together with DS-06 and tested in the design lab (docs/reviews/2026-11-14-design-validation,
 -- t05_master_data.py). The ADRs win if this file disagrees.
 -- Tables live in schema `nativeflows` (ADR-0022 rule 7); domains in schema `types` (ADR-0006 rule 8). Keys are shown inline;
 -- in migrations they get names from the MetaData naming convention (ADR-0004 rule 15). btree_gist is installed (ADR-0022 rule 8).
 -- Every table carries company_id, FORCE ROW LEVEL SECURITY and the generated company policy (ADR-0022 rule 8), except
--- the global catalogs currency, uom (core rows have a null company_id and are readable by all), uom_conversion, and
+-- the global catalogs currency, uom (core rows have a null company_id and are readable by all), uom_conversion, incoterm, and
 -- company itself, whose policy compares its own id. The lab checks this list (ADR-0045 rule 14).
 -- Owner module per table in brackets (ADR-0022 rule 2). Referenced tables defined elsewhere: user_account and department (DS-15-access.sql, which adds employee_profile's department key),
 -- account and payment_term (DS-06, ledger), tax groups' matrix (ADR-0041, tax).
@@ -76,7 +78,7 @@ CREATE TABLE company (
     localization_package      text NOT NULL,
     accounting_regime         text NOT NULL,
     legal_form                text,                                -- from the package's legal_forms; null where it declares none (ADR-0039 rule 5)
-    valuation_area_level      text NOT NULL CONSTRAINT ck_company_valuation_area_level CHECK (valuation_area_level IN ('company', 'warehouse')),
+    valuation_area_level      text NOT NULL CONSTRAINT ck_company_valuation_area_level CHECK (valuation_area_level IN ('company', 'site', 'warehouse')),   -- ADR-0020 rule 2; ADR-0068 rule 7
     fiscal_calendar_owner_id  uuid NOT NULL REFERENCES user_account (id),
     fiscal_year_lead_days     integer NOT NULL DEFAULT 30,
     default_language          text NOT NULL,                       -- BCP 47, set at company creation from the package; documents and partners may override (ADR-0016 rule 19)
@@ -114,6 +116,20 @@ CREATE TABLE print_profile (                              -- print header of the
     UNIQUE NULLS NOT DISTINCT (company_id, branch_id),
     FOREIGN KEY (company_id, branch_id) REFERENCES branch (company_id, id)
 );
+CREATE TABLE business_unit (                               -- [master_data] ADR-0069 rule 1; a line of business, an analysis dimension, not an entity
+    id           uuid PRIMARY KEY,
+    company_id   uuid NOT NULL REFERENCES company (id),
+    code         text NOT NULL,                       -- immutable once named anywhere (rule 1); group reporting matches on it
+    name         text NOT NULL,                       -- translated through data_translation (ADR-0018 rule 17)
+    parent_id    uuid,                                -- the reporting tree; no cycle (command, business_unit_invalid)
+    is_active    boolean NOT NULL DEFAULT true,       -- deactivation refused while a default names it (business_unit_in_use, rule 2)
+    recorded_at  timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (company_id, code),
+    UNIQUE (company_id, id),
+    FOREIGN KEY (company_id, parent_id) REFERENCES business_unit (company_id, id),
+    CONSTRAINT ck_business_unit_not_own_parent CHECK (parent_id IS NULL OR parent_id <> id)
+);
+CREATE INDEX ix_business_unit_company_id_parent_id ON business_unit (company_id, parent_id) WHERE parent_id IS NOT NULL;
 CREATE TABLE cost_center (
     id          uuid PRIMARY KEY,
     company_id  uuid NOT NULL REFERENCES company (id),
@@ -123,10 +139,12 @@ CREATE TABLE cost_center (
     parent_id   uuid,
     branch_id   uuid,
     is_active   boolean NOT NULL DEFAULT true,
+    business_unit_id uuid,                                    -- default unit of its profit-and-loss lines (ADR-0069 rule 7)
     UNIQUE (company_id, code),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, parent_id) REFERENCES cost_center (company_id, id),
-    FOREIGN KEY (company_id, branch_id) REFERENCES branch (company_id, id)
+    FOREIGN KEY (company_id, branch_id) REFERENCES branch (company_id, id),
+    FOREIGN KEY (company_id, business_unit_id) REFERENCES business_unit (company_id, id)
 );
 CREATE TABLE working_calendar (                            -- ADR-0024 rule 4
     id                uuid PRIMARY KEY,
@@ -145,6 +163,24 @@ CREATE TABLE working_calendar_holiday (                    -- copied from a pack
     basis                jsonb NOT NULL,
     PRIMARY KEY (working_calendar_id, holiday_date),
     FOREIGN KEY (company_id, working_calendar_id) REFERENCES working_calendar (company_id, id)
+);
+CREATE TABLE site (                                        -- [master_data] ADR-0068 rule 1; SAP plant, Dynamics 365 site
+    id                   uuid PRIMARY KEY,
+    company_id           uuid NOT NULL REFERENCES company (id),
+    code                 text NOT NULL,                       -- MAIN for the site CreateCompany creates (rule 3)
+    name                 text NOT NULL,
+    kind                 text NOT NULL CONSTRAINT ck_site_kind CHECK (kind IN ('factory', 'distribution', 'store', 'office')),   -- a label; no rule reads it
+    branch_id            uuid,                                -- optional; its physical warehouses then carry the same branch (command check, site_branch_mismatch)
+    address              jsonb,                               -- the columns of partner_address as keys (ADR-0045 rule 8)
+    working_calendar_id  uuid,                                -- record default for new warehouses and work centers of the site
+    business_unit_id     uuid,                                -- default unit of profit-and-loss lines from its warehouses (ADR-0069 rules 7, 9)
+    is_active            boolean NOT NULL DEFAULT true,       -- deactivation refused while an active warehouse names the site (site_in_use)
+    recorded_at          timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (company_id, code),
+    UNIQUE (company_id, id),
+    FOREIGN KEY (company_id, branch_id) REFERENCES branch (company_id, id),
+    FOREIGN KEY (company_id, working_calendar_id) REFERENCES working_calendar (company_id, id),
+    FOREIGN KEY (company_id, business_unit_id) REFERENCES business_unit (company_id, id)
 );
 CREATE TABLE data_translation (                            -- ADR-0018 rule 17
     company_id  uuid NOT NULL REFERENCES company (id),
@@ -168,7 +204,7 @@ CREATE TABLE partner_tax_group (                           -- read by the tax ma
 );
 CREATE TABLE item_group (
     id uuid PRIMARY KEY, company_id uuid NOT NULL REFERENCES company (id), code text NOT NULL, name text NOT NULL,
-    basis jsonb NOT NULL, is_active boolean NOT NULL DEFAULT true, UNIQUE (company_id, code)
+    basis jsonb NOT NULL, is_active boolean NOT NULL DEFAULT true, UNIQUE (company_id, code), UNIQUE (company_id, id)
 );
 CREATE TABLE valuation_class (
     id uuid PRIMARY KEY, company_id uuid NOT NULL REFERENCES company (id), code text NOT NULL, name text NOT NULL,
@@ -213,9 +249,11 @@ CREATE TABLE project (
     start_date           date,
     end_date             date,
     state                text NOT NULL DEFAULT 'open' CONSTRAINT ck_project_state CHECK (state IN ('open', 'closed')),
+    business_unit_id     uuid,                           -- default unit of its profit-and-loss lines (ADR-0069 rule 7)
     UNIQUE (company_id, code),
     FOREIGN KEY (company_id, customer_partner_id) REFERENCES partner (company_id, id),
-    CONSTRAINT ck_project_dates CHECK (end_date IS NULL OR start_date IS NULL OR end_date >= start_date)
+    CONSTRAINT ck_project_dates CHECK (end_date IS NULL OR start_date IS NULL OR end_date >= start_date),
+    FOREIGN KEY (company_id, business_unit_id) REFERENCES business_unit (company_id, id)
 );
 CREATE TABLE partner_role (
     company_id  uuid NOT NULL,
@@ -226,6 +264,50 @@ CREATE TABLE partner_role (
     FOREIGN KEY (company_id, partner_id) REFERENCES partner (company_id, id)
 );
 
+-- ===== Payment and delivery methods, Incoterms [master_data] (ADR-0068 rules 15-22) =====
+-- The profiles below and the commercial documents of DS-22 refer to them; none of them refers to a table of ledger, cash,
+-- inventory, tax or production, so the CRM-only profile keeps them (ADR-0068). The default money account of a payment
+-- method is cash's payment_method_money_account (DS-05-platform.sql).
+CREATE TABLE payment_method (                              -- [master_data] ADR-0068 rule 15
+    id           uuid PRIMARY KEY,
+    company_id   uuid NOT NULL REFERENCES company (id),
+    code         text NOT NULL,
+    name         text NOT NULL,
+    kind         text NOT NULL CONSTRAINT ck_payment_method_kind CHECK (kind IN ('cash', 'bank_transfer', 'card', 'e_wallet', 'cheque', 'direct_debit', 'cash_on_delivery', 'offset', 'other')),   -- suggests only; no posting rule reads it (rule 17)
+    is_active    boolean NOT NULL DEFAULT true,
+    recorded_at  timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (company_id, code),
+    UNIQUE (company_id, id)
+);
+CREATE TABLE incoterm (                                    -- [master_data] ADR-0068 rule 18; global catalog incoterms.csv, natural key (E1, as currency)
+    code                         text PRIMARY KEY CONSTRAINT ck_incoterm_code CHECK (code ~ '^[A-Z]{3}$'),
+    version                      smallint NOT NULL CONSTRAINT ck_incoterm_version CHECK (version >= 2020),   -- the edition the row describes
+    name                         text NOT NULL,
+    transport_scope              text NOT NULL CONSTRAINT ck_incoterm_transport_scope CHECK (transport_scope IN ('any', 'sea_inland_waterway')),
+    is_carriage_paid_by_seller   boolean NOT NULL,             -- the seller pays the main carriage
+    is_insurance_paid_by_seller  boolean NOT NULL,             -- the seller insures the main carriage
+    is_import_cleared_by_seller  boolean NOT NULL,             -- the seller clears import (DDP only)
+    risk_transfer_point          text NOT NULL,                -- where risk passes from seller to buyer, in plain words
+    is_active                    boolean NOT NULL DEFAULT true,   -- false: retired by a later edition; old documents keep it
+    recorded_at                  timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE delivery_method (                             -- [master_data] ADR-0068 rule 21
+    id                     uuid PRIMARY KEY,
+    company_id             uuid NOT NULL REFERENCES company (id),
+    code                   text NOT NULL,
+    name                   text NOT NULL,
+    kind                   text NOT NULL CONSTRAINT ck_delivery_method_kind CHECK (kind IN ('own_fleet', 'carrier', 'courier', 'customer_pickup', 'supplier_delivery')),
+    carrier_partner_id     uuid,                              -- an active supplier role (command check, partner_role_missing)
+    tracking_url_template  text,                              -- https URL containing {tracking_number}; the link is computed, never stored
+    is_active              boolean NOT NULL DEFAULT true,
+    recorded_at            timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (company_id, code),
+    UNIQUE (company_id, id),
+    FOREIGN KEY (company_id, carrier_partner_id) REFERENCES partner (company_id, id),
+    CONSTRAINT ck_delivery_method_carrier CHECK ((kind IN ('carrier', 'courier')) = (carrier_partner_id IS NOT NULL)),
+    CONSTRAINT ck_delivery_method_tracking_url_template CHECK (tracking_url_template IS NULL
+        OR (tracking_url_template LIKE 'https://%' AND strpos(tracking_url_template, '{tracking_number}') > 0))
+);
 -- ===== Price lists [master_data] (ADR-0045) =====
 CREATE TABLE price_list (
     id               uuid PRIMARY KEY,
@@ -259,10 +341,17 @@ CREATE TABLE customer_profile (
     salesperson_id                     uuid,                          -- a partner with the employee role (ADR-0027 rule 6)
     currency                           text REFERENCES currency (code),
     minimum_remaining_shelf_life_days  integer,
+    payment_method_id                  uuid,                          -- defaults copied to documents (ADR-0068 rules 15, 19, 22)
+    delivery_method_id                 uuid,
+    incoterm_code                      text REFERENCES incoterm (code),
+    incoterm_place                     text,                          -- the named place; requires a code
     FOREIGN KEY (company_id, partner_id) REFERENCES partner (company_id, id),
     CONSTRAINT fk_customer_profile_price_list FOREIGN KEY (company_id, price_list_id, price_list_kind) REFERENCES price_list (company_id, id, kind),
     FOREIGN KEY (company_id, salesperson_id) REFERENCES partner (company_id, id),
-    CONSTRAINT ck_customer_profile_credit_limit CHECK (credit_limit IS NULL OR (credit_limit >= 0 AND credit_limit_currency IS NOT NULL))
+    CONSTRAINT ck_customer_profile_credit_limit CHECK (credit_limit IS NULL OR (credit_limit >= 0 AND credit_limit_currency IS NOT NULL)),
+    FOREIGN KEY (company_id, payment_method_id) REFERENCES payment_method (company_id, id),
+    FOREIGN KEY (company_id, delivery_method_id) REFERENCES delivery_method (company_id, id),
+    CONSTRAINT ck_customer_profile_incoterm_place CHECK (incoterm_place IS NULL OR incoterm_code IS NOT NULL)
 );
 CREATE INDEX ix_customer_profile_price_list_id ON customer_profile (price_list_id);
 CREATE TABLE supplier_profile (
@@ -275,10 +364,17 @@ CREATE TABLE supplier_profile (
     price_list_kind      text NOT NULL DEFAULT 'purchase' CONSTRAINT ck_supplier_profile_price_list_kind CHECK (price_list_kind = 'purchase'),
     currency             text REFERENCES currency (code),
     working_calendar_id  uuid,                                    -- supplier processing days (ADR-0024 rule 4)
+    payment_method_id    uuid,                          -- defaults copied to documents (ADR-0068 rules 15, 19, 22)
+    delivery_method_id   uuid,
+    incoterm_code        text REFERENCES incoterm (code),
+    incoterm_place       text,                          -- the named place; requires a code
     FOREIGN KEY (company_id, partner_id) REFERENCES partner (company_id, id),
     FOREIGN KEY (company_id, price_list_id, price_list_kind) REFERENCES price_list (company_id, id, kind),
     FOREIGN KEY (company_id, buyer_id) REFERENCES partner (company_id, id),
-    FOREIGN KEY (company_id, working_calendar_id) REFERENCES working_calendar (company_id, id)
+    FOREIGN KEY (company_id, working_calendar_id) REFERENCES working_calendar (company_id, id),
+    FOREIGN KEY (company_id, payment_method_id) REFERENCES payment_method (company_id, id),
+    FOREIGN KEY (company_id, delivery_method_id) REFERENCES delivery_method (company_id, id),
+    CONSTRAINT ck_supplier_profile_incoterm_place CHECK (incoterm_place IS NULL OR incoterm_code IS NOT NULL)
 );
 CREATE INDEX ix_supplier_profile_price_list_id ON supplier_profile (price_list_id);
 CREATE TABLE employee_profile (                            -- personal data (ADR-0019 rule 7)
@@ -404,12 +500,13 @@ CREATE TABLE product (
     is_configurable                boolean NOT NULL DEFAULT false,  -- sold through a configuration model; its items are configured items (ADR-0046 rule 2)
     last_item_number               integer NOT NULL DEFAULT 0,      -- counter for codes of items created on order, under the product row lock
     price_control                  text NOT NULL DEFAULT 'periodic_average' CONSTRAINT ck_product_price_control CHECK (price_control IN ('periodic_average')),
-    is_inspection_required         boolean NOT NULL DEFAULT false,  -- ADR-0023 rule 3
+    inspection_points              text[] NOT NULL DEFAULT '{}' CONSTRAINT ck_product_inspection_points CHECK (inspection_points <@ ARRAY['goods_receipt', 'in_process', 'production_output', 'customer_return', 'stock_recheck']::text[]),   -- ADR-0070 rule 2: the points at which the product is inspected; replaced is_inspection_required (ADR-0023 rule 3)
     removal_strategy               text CONSTRAINT ck_product_removal_strategy CHECK (removal_strategy IN ('fefo', 'fifo')),
     storage_condition_id           uuid REFERENCES storage_condition (id),
     default_handling_unit_type_id  uuid REFERENCES handling_unit_type (id),
     hs_code                        text,                            -- ADR-0021 rule 13
     country_of_origin              text CONSTRAINT ck_product_country_of_origin CHECK (country_of_origin ~ '^[A-Z]{2}$'),
+    business_unit_id               uuid,                            -- default unit of its items' profit-and-loss lines, read through the item (ADR-0069 rule 7)
     is_active                      boolean NOT NULL DEFAULT true,
     UNIQUE (company_id, code),
     UNIQUE (company_id, id),
@@ -417,7 +514,8 @@ CREATE TABLE product (
     FOREIGN KEY (company_id, buyer_id) REFERENCES partner (company_id, id),
     CONSTRAINT ck_product_valuation_class CHECK ((product_type = 'stock') = (valuation_class_id IS NOT NULL)),
     CONSTRAINT ck_product_tracking_stock CHECK (tracking = 'none' OR product_type = 'stock'),
-    CONSTRAINT ck_product_configurable CHECK (NOT is_configurable OR (is_item_created_on_order AND product_type = 'stock'))
+    CONSTRAINT ck_product_configurable CHECK (NOT is_configurable OR (is_item_created_on_order AND product_type = 'stock')),
+    FOREIGN KEY (company_id, business_unit_id) REFERENCES business_unit (company_id, id)
 );
 CREATE TABLE product_uom (                                 -- other units of one product, or of one item: the item master's conversions (ADR-0018 rule 10; ADR-0056 rules 4-5, 15)
     id                    uuid PRIMARY KEY,
@@ -656,6 +754,7 @@ CREATE TABLE warehouse (
     code                       text NOT NULL,
     name                       text NOT NULL,
     kind                       text NOT NULL CONSTRAINT ck_warehouse_kind CHECK (kind IN ('physical', 'transit', 'goods_sent')),
+    site_id                    uuid,                                -- physical only, required (ADR-0068 rule 2); transit and goods_sent take the site of valuation_warehouse_id (master_data.contract.site_of_warehouse); fixed once the warehouse has a material document line (warehouse_site_fixed)
     branch_id                  uuid,
     address                    jsonb,                               -- the columns of partner_address as keys
     valuation_warehouse_id     uuid,                                -- transit and goods_sent only, naming a physical warehouse (ADR-0020 rule 2)
@@ -677,10 +776,14 @@ CREATE TABLE warehouse (
     FOREIGN KEY (company_id, working_calendar_id) REFERENCES working_calendar (company_id, id),
     CONSTRAINT ck_warehouse_valuation_warehouse CHECK ((kind = 'physical') = (valuation_warehouse_id IS NULL)),
     CONSTRAINT ck_warehouse_processor CHECK (processor_partner_id IS NULL OR (kind = 'physical' AND NOT is_bin_managed)),
-    CONSTRAINT ck_warehouse_bin_managed CHECK (NOT is_bin_managed OR (kind = 'physical' AND default_receiving_bin_id IS NOT NULL AND default_shipping_bin_id IS NOT NULL))
+    CONSTRAINT ck_warehouse_bin_managed CHECK (NOT is_bin_managed OR (kind = 'physical' AND default_receiving_bin_id IS NOT NULL AND default_shipping_bin_id IS NOT NULL)),
+    FOREIGN KEY (company_id, site_id) REFERENCES site (company_id, id),
+    CONSTRAINT ck_warehouse_site CHECK ((kind = 'physical') = (site_id IS NOT NULL))
 );
 -- One active processor warehouse per processor (ADR-0037 rule 1).
 CREATE UNIQUE INDEX ux_warehouse_processor ON warehouse (company_id, processor_partner_id) WHERE is_active AND processor_partner_id IS NOT NULL;
+-- The site roll-up and site_in_use (ADR-0068 rules 1, 5).
+CREATE INDEX ix_warehouse_company_id_site_id ON warehouse (company_id, site_id) WHERE site_id IS NOT NULL;
 CREATE TABLE zone (
     id uuid PRIMARY KEY, company_id uuid NOT NULL, warehouse_id uuid NOT NULL,
     code text NOT NULL, name text NOT NULL, UNIQUE (warehouse_id, code), UNIQUE (id, warehouse_id),

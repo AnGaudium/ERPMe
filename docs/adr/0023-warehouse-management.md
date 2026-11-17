@@ -79,6 +79,8 @@ A small shop and a managed distribution warehouse run on the same model.
    - Bins are created and changed in batches (ADR-0008). A bin with stock cannot be deactivated (`bin_not_empty`). Every warehouse also has a default zone and a default bin (code `DEFAULT`, barcode `<warehouse code>-DEFAULT`), which cannot be deactivated while the warehouse is not bin-managed ([ADR-0031](0031-design-simplifications.md) rule 7).
 
    Note ([ADR-0061](0061-barcodes.md), proposed 2026-11-15): the bin barcode is an internal code in normalized (upper-case) form, registered in the company's barcode registry: unique across bins, item units, handling units, lots, serials and barcoded documents, so a bin code equal to an item barcode is refused (`barcode_taken`). The default "the code" applies when the code fits the internal code format; an old system's numeric label may be kept as a legacy code (`is_legacy_barcode`). A changed barcode stays reserved: an old label resolves to `barcode_retired`, and the bin may take its old code back (rules 7, 8).
+
+   Note ([ADR-0068](0068-sites-and-core-logistics-payment-master-data.md), proposed 2026-11-17): the recommended model is one physical warehouse per site, with zones and bins for raw materials, the production floor, finished goods and quality. Split into several warehouses only when they need separate keepers, stock reports or accounts. The setup agent proposes this, and nothing enforces it.
 3. Product and partner fields:
    - The product (ADR-0018 rule 3) gets:
      - `is_inspection_required`;
@@ -88,6 +90,8 @@ A small shop and a managed distribution warehouse run on the same model.
    - The customer profile (ADR-0019) gets `minimum_remaining_shelf_life_days`.
 
    Whether shelf life may instead be a share of total shelf life, and whether expired lots may ever be picked, are open questions. The interim rules, flagged: days; expired lots are never picked.
+
+   Note ([ADR-0070](0070-quality-management-core.md), proposed 2026-11-17): `is_inspection_required` becomes `product.inspection_points` (`goods_receipt`, `in_process`, `production_output`, `customer_return`, `stock_recheck`). The upgrade sets `{goods_receipt, production_output}` where the boolean was true (ADR-0070 rule 2).
 
 **Stock key, statuses, handling units**
 
@@ -137,6 +141,8 @@ A small shop and a managed distribution warehouse run on the same model.
    - through a `transit` warehouse: two steps, with the handling unit keeping its identity.
 
    Dispatch to a customer may be a `sales_issue`, or a `transfer_out` to a `goods_sent` warehouse (ADR-0020 rule 4).
+
+   Note ([ADR-0070](0070-quality-management-core.md), proposed 2026-11-17): `purchase_receipt` and `other_receipt` lines post to `quality_inspection` when the product's `inspection_points` contains `goods_receipt`. Issuing documents name the status they issue from: `return_to_supplier_line` gains `stock_status`, and scrap and internal-consumption lines carry it too (ADR-0070 rules 2, 15).
 8. Warehouse movements:
    - **Lines.** `warehouse_movement` lines are written by confirmed tasks and by the pack and unpack commands. Each line holds item, lot or serial, quantity in the inventory unit, from and to bin, status and handling unit (inside one warehouse), `business_date` (`clock.today`, for history only), and its source: `warehouse_task_id`, or the pack, unpack or count-correction command that wrote it. They also carry the reserved `owner_partner_id` ([ADR-0030](0030-commercial-seams-and-imports.md) rule 8).
    - **Properties.** They are append-only and post no journal. Per (item, warehouse, lot or serial) their quantities net to zero (DS-16).
@@ -171,6 +177,8 @@ A small shop and a managed distribution warehouse run on the same model.
     - Tasks are written by the posting's own transaction through `inventory.contract.create_warehouse_task` (ADR-0022 rule 4): one task per (item, lot, handling unit, source bin) with quantity N. A handling unit is one task.
     - Every task proposal (putaway targets here, pick sources in rule 14) is listed in the plan like events, never in `plan_hash` (ADR-0013 rule 5), so concurrent warehouse work never causes `plan_hash_mismatch`. Check results that follow from proposals are not hashed either ([ADR-0040](0040-ui-architecture.md) rule 10).
     - Releasing from inspection is a `status_change` task to `available` or `blocked`.
+
+    Note ([ADR-0070](0070-quality-management-core.md), proposed 2026-11-17): for stock that an inspection lot claims, the `status_change` tasks that release or block it are created by `quality`'s usage-decision executor (ADR-0070 rule 15). A person's own status change stays possible, and a later decision is checked against the stock left (`inspection_stock_short`).
 12. Putaway rules are rows per warehouse, each with a unique `position`:
     - **Match** on item, product category, storage condition, status and handling unit type.
     - **Target** a zone or bin type, with a method:
@@ -200,6 +208,8 @@ A small shop and a managed distribution warehouse run on the same model.
     - **Build step.** Reservations, the check and the posting interfaces are step 3 core; documents call them at step 5. Production orders reserve components at release, passing `destination_bin_id` and `release_sequence` ([ADR-0034](0034-production-orders-and-shop-floor.md) rule 9). Picked and fulfilled quantities stay stored here, checked by INV-58; the open quantity of the demand line is stored in `demand_supply_line` ([ADR-0031](0031-design-simplifications.md) rules 5, 6).
 
     Note ([ADR-0064](0064-production-agent.md), proposed 2026-11-15): `TransferStockReservation` (module `inventory`, verb Transfer, `is_proposal_bound`, `stock_reservation` at `post`) moves open, unpicked reserved quantity from one production order component line to another of the same item and warehouse, at most the target's unreserved open requirement, only from the execution of an approved change proposal; the new reservation carries `transferred_from_reservation_id` (rule 24). Sales order reservations are not transferred in Phase 1. The production sweep orders production demands by requested date, not first come (rule 7; the reservation question in open-questions.md).
+
+    Note ([ADR-0071](0071-work-orders-and-shop-floor-execution.md), proposed 2026-11-17): `inventory.contract` gains a change of a reservation's `destination_bin_id`, used when a WO moves to another work center; staged stock gets a move task to the new supply bin (ADR-0071 rule 16).
 
 **Picking and outbound**
 
@@ -253,6 +263,8 @@ A small shop and a managed distribution warehouse run on the same model.
     - Returns arrive in a `returns` bin as `blocked` (rule 7).
     - A disposition creates a `status_change` task to restock (then putaway) or to quality, or a draft scrap document.
     - The return's value follows ADR-0020 rule 5.
+
+    Note ([ADR-0070](0070-quality-management-core.md), proposed 2026-11-17): for products with the point `customer_return`, the disposition is the inspection lot's usage decision: `release` restocks, and `scrap` and `rework` create drafts. Other returns keep this rule (ADR-0070 rules 8, 12).
 
 **Commands, events, agents, printing**
 

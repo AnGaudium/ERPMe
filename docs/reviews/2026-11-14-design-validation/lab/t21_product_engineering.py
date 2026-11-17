@@ -515,7 +515,8 @@ if "--load" in sys.argv:
     X("insert into working_calendar (id, company_id, code, name, working_weekdays) values (%s,%s,'STD','Std','{1,2,3,4,5}')", (I["cal"], I["co"]))
     X("insert into cost_center (id, company_id, code, name, kind) values (%s,%s,'FAB','Fabrication','production')", (I["cc"], I["co"]))
     with c.transaction():
-        X("insert into warehouse (id, company_id, code, name, kind, working_calendar_id, default_bin_id) values (%s,%s,'WP','WP','physical',%s,%s)", (I["WP"], I["co"], I["cal"], I["bP"]))
+        X("insert into site (id, company_id, code, name, kind) values (%s,%s,'MAIN','Main','factory')", (I.setdefault("site", new()), I["co"]))   # the default site (ADR-0068 rule 3)
+        X("insert into warehouse (id, company_id, site_id, code, name, kind, working_calendar_id, default_bin_id) values (%s,%s,%s,'WP','WP','physical',%s,%s)", (I["WP"], I["co"], I["site"], I["cal"], I["bP"]))
         X("insert into zone (id, company_id, warehouse_id, code, name) values (%s,%s,%s,'Z','Zone')", (I["zP"], I["co"], I["WP"]))
         X("insert into bin (id, company_id, warehouse_id, zone_id, code, barcode, bin_type) values (%s,%s,%s,%s,'DEF','WP-DEF','storage')", (I["bP"], I["co"], I["WP"], I["zP"]))
     X("insert into activity_type (id, company_id, code, name, time_uom_id, recorded_at) values (%s,%s,'labor','Labor',%s,now())", (I["labor"], I["co"], I["hr"]))

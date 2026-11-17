@@ -5,6 +5,7 @@ standard,1,command_setting,permissions.small_company_mode,company,false,ADR-0067
 standard,1,record_default,warehouse.is_bin_managed,,false,ADR-0067 rule 6,0.1.0,Column default: new warehouses are not bin-managed (ADR-0031 rule 9).
 standard,1,record_default,warehouse.outbound_flow,,direct,ADR-0067 rule 6,0.1.0,Column default: direct outbound (ADR-0023 rule 1).
 standard,1,record_default,bill_of_materials_component.consumption_method,,manual,ADR-0067 rule 6,0.1.0,Column default: components are issued by hand (ADR-0033).
+standard,1,record_default,company.valuation_area_level,,site,ADR-0068 rule 7,0.1.0,"Valuation per site: one average per factory or distribution centre, the same as warehouse level when each site has one physical warehouse (ADR-0020 rule 2)."
 quickflows,1,parameter,risk_amount,company,0..,ADR-0067 rule 6,0.1.0,"Amount in company currency that the implementer enters when applying the preset, at least 0; no default, because an amount depends on the currency. It sets the approval threshold. ui.post_review_max_amount is not a preset item: the implementer sets it at setup, and it stays 0 (always review) until then."
 quickflows,1,setting,ui.post_review,company,on_exceptions,ADR-0067 rule 6,0.1.0,One-click post: the plan panel opens only when a review reason applies (ADR-0067 rules 12-13).
 quickflows,1,command_setting,permissions.small_company_mode,company,true,ADR-0067 rule 6,0.1.0,Applied through EnableSmallCompanyMode while at most two users hold a posting or approval permission; otherwise reported and left out (ADR-0054 rule 20).
@@ -15,3 +16,4 @@ quickflows,1,policy_rule,quickflows.price_below_cost,company,"{""actions"": [""s
 quickflows,1,record_default,warehouse.is_bin_managed,,false,ADR-0067 rule 6,0.1.0,"No bin management; stock sits in the warehouse's default_bin_id (ADR-0031 rules 7, 9)."
 quickflows,1,record_default,warehouse.outbound_flow,,direct,ADR-0067 rule 6,0.1.0,Direct outbound (ADR-0023 rule 1).
 quickflows,1,record_default,bill_of_materials_component.consumption_method,,backflush_at_receipt,ADR-0067 rule 6,0.1.0,"Components backflush when output is received, so the workshop records only production orders and output receipts (ADR-0034 rule 12)."
+quickflows,1,record_default,company.valuation_area_level,,company,ADR-0068 rule 7,0.1.0,"One valuation area for the whole company, the usual choice of a small team (ADR-0020 rule 2)."

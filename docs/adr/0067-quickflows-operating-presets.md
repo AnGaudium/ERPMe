@@ -65,6 +65,7 @@ The author's proposal of 2026-11-17: a **QuickFlows mode** lets a lean company w
    | `record_default` | `warehouse.is_bin_managed` | `false` | `false` |
    | `record_default` | `warehouse.outbound_flow` | `direct` | `direct` |
    | `record_default` | `bill_of_materials_component.consumption_method` | `manual` | `backflush_at_receipt` |
+   | `record_default` | `company.valuation_area_level` | `site` | `company` ([ADR-0068](0068-sites-and-core-logistics-payment-master-data.md) rule 7, proposed 2026-11-17) |
 
 **Setup before go-live**
 

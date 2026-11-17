@@ -203,6 +203,8 @@ ADR-0017 fixed the envelope: permissions are the names of registered commands, q
 
     So drafting a rule or decision table, creating its evidence (`CreateArtifactEvidence`) and submitting its activation is open to the owner, the chief accountant and the three managers; approving it, which needs `ApproveChangeProposal` and the target `SetArtifactVersionState` (declared minimum `full`), to the owner and the chief accountant. A loosening of a setting on the leaf `policy` is submitted by the owner or the chief accountant and approved by the other, since `approver_is_submitter` and condition 5 of [ADR-0055](0055-approval-pools-and-stages.md) rule 7 exclude the submitter and the writers. The IT administrator keeps `configuration` `full` without change proposals: it drafts and rolls back, but neither submits nor approves. No segregation rule changes. Lab check `t12_access.py` G54 to G56. Interim, flagged with the template contents (open question).
 
+    Note ([ADR-0070](0070-quality-management-core.md), proposed 2026-11-17): a fourteenth template, `quality_inspector` (branch / branch): quality `post` with approval, inspection plans `edit`, inventory, products and production orders `read`, delegation of its own approvals `edit` (ADR-0070 rule 13).
+
 **Assignments, record scope and owner scope**
 
 12. `role_assignment` (company data, change-tracked):

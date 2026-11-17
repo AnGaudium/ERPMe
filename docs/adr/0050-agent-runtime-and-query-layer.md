@@ -462,6 +462,8 @@ Status: accepted (2026-11-15) under ADR-0005, reviewed by Claude Fable 5.2 (buil
     - **Statutory reports** stay DS-26's. Management reports are views and exports, never documents.
 
     Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), proposed 2026-11-15): management reports are analysis plans over the facts of the analysis catalog, `system_account_turnover` among them; saved analyses and KPIs keep them as company data (rules 3, 26, 27).
+
+    Note ([ADR-0069](0069-business-unit-dimension.md), proposed 2026-11-17): the grain of `system_account_turnover` gains the business unit, read like cost center and project.
 54. List export (ADR-0040 rule 6):
     - **`CreateListExport`** (module `query`, effect class `other`): a `List<…>` query, its filters, columns and language. It creates a `list_export` record (`state`: `queued`, `running`, `done`, `failed`) and emits `ListExportCreated`. A long-job consumer of that event on queue `jobs` (ADR-0031 rule 15) writes the file, so no job is enqueued on a handler's path (ADR-0013 rule 13).
     - **The consumer** pages through the query as the requester, so field classes and scope apply, translates headers and enumerations on the server, and writes an `.xlsx` with XlsxWriter (ADR-0002). More rows than `list_export_max_rows` (installation setting, default 100,000) fail with `list_export_too_large`.

@@ -12,3 +12,4 @@ production_planner,Production planner,false,company,company,cost,0.1.0,"Producti
 shop_floor_lead,Shop floor lead,false,branch,branch,,0.1.0,"Confirmations, production issues and receipts post; production orders read (ADR-0034 rule 18)."
 auditor,Auditor,false,company,own,cost;margin,0.1.0,Read everywhere including audit records; nothing else.
 it_administrator,IT administrator,true,company,company,,0.1.0,"Users, roles, assignments, delegations, organization and settings full; policy and segregation read; no Finance or Banking, no data import, no agent run bodies."
+quality_inspector,Quality inspector,false,branch,branch,,0.1.0,"Inspection lots, results and usage decisions post; approves; inspection plans edit; nonconformances edit; inventory, products and production orders read; delegation of its own approvals edit (ADR-0070; ADR-0054 rule 21)."

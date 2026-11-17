@@ -161,11 +161,11 @@ The [module cards](generated/module-cards.md) are generated. Layers and modules:
 - **Layer 1, Foundation** (`numeric`, `clock`, `ids`, `i18n`, `errors`): exact decimals, the two kinds of time, IDs and errors. No tables.
 - **Layer 2, Platform**: the command path (`registry`, `db`, `permissions`, `policy`), the document row and its versions and numbers (`documents`, `periods`), the outbox (`outbox`), audit (`audit`), files (`attachments`), the work queue (`work`), agent run records (`agent_runs`) and decision artifacts (`configuration`). `registry` also owns the settings tables (DS-28-settings.sql:16).
 - **Layer 3, Core business**: `ledger` (journal, accounts, account determination, multi-currency), `inventory` (material documents, stock, costing, warehouse management), `master_data`, `tax`, `production`; `assets` in Phase 3.
-- **Layer 4, Commercial**: `sales`, `purchasing`, `cash`, `reporting`, `crm`, `planning`.
+- **Layer 4, Commercial**: `sales`, `purchasing`, `cash`, `reporting`, `crm`, `planning`, `quality` ([ADR-0070](../adr/0070-quality-management-core.md), proposed 2026-11-17).
 - **Layer 5, Interfaces**: `api` (REST and MCP from the registry), `query` (read-only views and the analysis layer), `agents` (gateway, runtime, workflows), `sdk`, `imports`, `automation`.
 - **Layer 6**: `app`, the composition root.
 
-Generated counts from the DDL drafts: 318 tables, of which 302 have a stated owner in 21 modules; the largest are `master_data` (65), `production` (38), `inventory` (28) and `crm` (24) ([data map](generated/data-map.md)).
+Generated counts from the DDL drafts: 345 tables, of which 329 have a stated owner in 22 modules; the largest are `master_data` (70), `production` (44), `inventory` (28) and `crm` (24) ([data map](generated/data-map.md)).
 
 ## B6. Data architecture
 
