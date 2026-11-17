@@ -74,7 +74,7 @@ Title, status and design item come from each ADR's first lines. **Declared** ADR
 | [ADR-0064](../../adr/0064-production-agent.md) | Production agent | accepted 2026-11-15 |  | — | — | `production`, `master_data`, `planning`, `inventory` |
 | [ADR-0065](../../adr/0065-deterministic-auto-post-gateway.md) | Deterministic auto-post gateway (maker-checker) | proposed 2026-11-16 |  | — | — | `policy`, `automation`, `purchasing`, `agent_runs` |
 | [ADR-0066](../../adr/0066-work-cases.md) | Work cases | proposed 2026-11-16 |  | `work` | 2 | `work`, `crm`, `documents` |
-| [ADR-0067](../../adr/0067-quickflows-operating-presets.md) | QuickFlows mode: operating presets for small teams | proposed 2026-11-17 |  | `registry` | 2 | `registry`, `policy`, `master_data`, `permissions` |
+| [ADR-0067](../../adr/0067-quickflows-operating-presets.md) | QuickFlows mode: operating presets for small teams | proposed 2026-11-17 |  | `registry` | 2 | `registry`, `policy`, `permissions`, `master_data` |
 
 ## By module
 

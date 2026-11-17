@@ -305,7 +305,7 @@ CREATE TABLE company_segregation_rule (                    -- enablement of segr
 CREATE TABLE segregation_exception (                       -- small-company mode only; immutable (ADR-0054 rule 20)
     id                   uuid PRIMARY KEY,
     company_id           uuid NOT NULL REFERENCES company (id),
-    kind                 text NOT NULL CONSTRAINT ck_segregation_exception_kind CHECK (kind IN ('pair', 'own_document_approval', 'own_agent_draft_approval')),   -- own_agent_draft_approval: ADR-0067 rule 16 (proposed)
+    kind                 text NOT NULL CONSTRAINT ck_segregation_exception_kind CHECK (kind IN ('pair', 'own_document_approval', 'own_agent_draft_approval', 'own_run_taint_clearance')),   -- ADR-0067 rules 16, 17 (proposed); command_type ClearTaint for own_run_taint_clearance
     rule_code            text,                                -- the pair's rule; null for the other kinds
     user_account_id      uuid NOT NULL REFERENCES user_account (id),
     command_type         text NOT NULL,

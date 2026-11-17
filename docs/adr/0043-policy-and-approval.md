@@ -166,7 +166,7 @@ Policy is a deterministic threshold table per company, as runbook B7 asks.
 
     Note: `CreatePolicyRule` and `UpdatePolicyRule` no longer return `policy_no_eligible_approver`; the code is retired, and `approval_stage_unsatisfiable` (on pools, procedures and at `Submit`) is the one satisfiability check ([ADR-0055](0055-approval-pools-and-stages.md) rule 4).
 
-    Note ([ADR-0067](0067-quickflows-operating-presets.md), 2026-11-17 (proposed)): in the small-company mode the owner or chief accountant may approve an untainted draft that an agent wrote for them from an event or schedule, as a recorded segregation exception, under a reading of spec 03 rule 5 the author must confirm ([ADR-0054](0054-users-roles-and-authorizations.md) rule 20 note; [ADR-0067](0067-quickflows-operating-presets.md) rule 16).
+    Note ([ADR-0067](0067-quickflows-operating-presets.md), 2026-11-17 (proposed)): in the small-company mode the owner or chief accountant may approve an untainted draft that an agent wrote for them from an event or schedule, as a recorded segregation exception, under the reading of spec 03 rule 5 decided by the author's delegation to the chief architect (2026-11-17) ([ADR-0054](0054-users-roles-and-authorizations.md) rule 20 note; [ADR-0067](0067-quickflows-operating-presets.md) rule 16).
 14. Auto-posts and confirmation:
     - **Scope.** `is_confirmation_required` applies only to `post` and `issue` by `system` or `integration` actors.
     - **Work items.** Each such posting adds evidence to one `auto_post_unconfirmed` work item per rule and period (ADR-0042).
