@@ -39,6 +39,8 @@ ADR-0051 rule 29 left the production agents to their own ADR. The production rul
    - **Seeded templates:** `production_planner` holds `agent_production` and `agent_production_variance` at `edit`, `shop_floor_lead` holds `agent_production_capture`, and `chief_accountant` holds `agent_production_variance` (ADR-0054 rule 24). The owner and IT administrator get them through their `agent` level.
    - **Wake-up.** Every claimable kind is declared `wake_up: always`, and no type declares `configurable_triggers` (ADR-0050 rule 12, [ADR-0058](0058-configurable-workflows.md)'s note).
    - **Why three.** Taint and promotion evidence stay apart. A tainted capture run could never run the sweep or read other orders; a clean `production` run never reads a report's free text.
+
+   Note ([ADR-0072](0072-costing-sheet-and-cost-component-structure.md), proposed 2026-11-18): the `production` type gains the subject table `costing_sheet`. It drafts costing sheets, site assignments, detailed components and mappings only as change proposals, and rates only from a person's stated source or `GetCostingRateSuggestion`; the model never sees a rate (ADR-0072 rule 18).
 2. Boundary with planning (decision 2): planned orders, their firming and conversion stay with the `planning` agent (ADR-0051 rules 23–25; ADR-0036 rule 12). The production agent works on production orders from `CreateProductionOrder` until they are closed, and no production tool list holds a planned-order command.
 3. Common to the three types:
    - **Deterministic first.** Every quantity, date and amount comes from a deterministic function or is a stated value with its source (a span or an extraction field). Every number in model text appears in the step's input (ADR-0050 rule 36).

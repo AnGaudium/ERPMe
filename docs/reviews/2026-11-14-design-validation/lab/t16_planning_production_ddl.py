@@ -326,12 +326,17 @@ step("P12 a production receipt of the main output (serial S-1) into the output b
 ])
 step("P13 a cost estimate with a costing lot quantity and lines is released; rates, a pool allocation rule and normal capacity are set", [
     ("insert into posting_period (id, company_id, start_date, end_date) values (%s,%s,'2026-12-01','2026-12-31')", (I["per"], I["co"])),
+    # the four default detailed components CreateCompany seeds (ADR-0072 rule 2)
+    ("insert into cost_component_detail (id, company_id, code, name, cost_component, is_default, recorded_at) select gen_random_uuid(), %s, c, c, c, true, now()"
+     " from unnest(array['material','labor','overhead','other']) c", (I["co"],)),
     ("""insert into cost_estimate (id, company_id, production_version_id, costing_date, costing_lot_quantity, bill_of_materials_revision_id, routing_revision_id, recorded_at)
         values (%s,%s,%s,'2026-11-16',10,%s,%s,now())""", (I["CE"], I["co"], I["PV"], I["R1"], I["RR1"])),
-    ("insert into cost_estimate_line (company_id, cost_estimate_id, line_number, cost_component, component_item_id, quantity, price, company_amount, recorded_at) values (%s,%s,1,'material',%s,20,1000,20000,now())",
-     (I["co"], I["CE"], I["iC1"])),
-    ("insert into cost_estimate_line (company_id, cost_estimate_id, line_number, cost_component, activity_type_id, quantity, price, company_amount, recorded_at) values (%s,%s,2,'labor',%s,5,2000,10000,now())",
-     (I["co"], I["CE"], I["machine"])),
+    ("insert into cost_estimate_line (company_id, cost_estimate_id, line_number, cost_component, component_item_id, cost_component_detail_id, quantity, price, company_amount, recorded_at)"
+     " select %s,%s,1,'material',%s,d.id,20,1000,20000,now() from cost_component_detail d where d.company_id=%s and d.cost_component='material' and d.is_default",
+     (I["co"], I["CE"], I["iC1"], I["co"])),
+    ("insert into cost_estimate_line (company_id, cost_estimate_id, line_number, cost_component, activity_type_id, cost_component_detail_id, quantity, price, company_amount, recorded_at)"
+     " select %s,%s,2,'labor',%s,d.id,5,2000,10000,now() from cost_component_detail d where d.company_id=%s and d.cost_component='labor' and d.is_default",
+     (I["co"], I["CE"], I["machine"], I["co"])),
     ("update cost_estimate set state='released', released_at=now(), company_amount=30000, unit_cost=3000 where id=%s", (I["CE"],)),
     ("insert into activity_rate (company_id, work_center_id, activity_type_id, posting_period_id, rate, recorded_at) values (%s,%s,%s,%s,2000,now())", (I["co"], I["WC1"], I["machine"], I["per"])),
     ("insert into pool_allocation_rule (company_id, cost_center_id, pool_group, driver, activity_type_id, recorded_at) values (%s,%s,'overhead','activity_type',%s,now())", (I["co"], I["cc"], I["machine"])),

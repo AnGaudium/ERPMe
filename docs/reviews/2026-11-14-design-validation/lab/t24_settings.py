@@ -216,7 +216,7 @@ unnamed = sorted(k for k, r in S.items() if not any(f"`{k}`" in adr_text_of(n) f
 check("C11 every setting key ADR-0063 names is in the catalog, and every catalog key is named by an ADR its row's source cites",
       not (named - set(S)) and not unnamed and all(cited_adrs(r) for r in SET), {"missing": sorted(named - set(S)), "unnamed": unnamed})
 m = re.search(r"\[settings\.csv\]\(\.\./catalogs/settings\.csv\), version 0\.1\.0, (\d+) definitions", adr_text)
-added = sum(int(x) for x in re.findall(r"\) adds (\d+) definitions", adr_text))
+added = sum(int(x) for x in re.findall(r"\) adds (\d+) definitions?\b", adr_text))   # ADR-0072 adds 1 definition (singular)
 check("C12 the catalog's row count is rule 29's stated count plus the definitions that later ADRs' notes on rule 29 add",
       m and int(m.group(1)) + added == len(SET), (m and m.group(1), added, len(SET)))
 COUNTRY = re.compile(r"Vietnam|vietnam|l10n_vn|\bTT ?99\b|\btt99\b|\bVND\b|\bVAS\b|Decree|Circular|DS-19")

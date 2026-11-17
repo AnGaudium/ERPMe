@@ -286,3 +286,5 @@ warehouse_keeper,inspection_lot,read,false
 production_planner,inspection_lot,read,false
 shop_floor_lead,shop_floor_execution,post,false
 production_planner,shop_floor_execution,read,false
+chief_accountant,costing_structure,edit,true
+production_planner,costing_structure,edit,false

@@ -1,7 +1,8 @@
 -- DS-43 and DS-51 to DS-55 planning and production: DDL draft for ADR-0024 (planning), ADR-0033 (production master
 -- data), ADR-0034 (production orders and shop floor), ADR-0035 (production costing), ADR-0036 (multi-level MRP) and
 -- ADR-0037 (subcontracting), with the columns ADR-0046 rules 12-14 add to production structures and estimates, the resource
--- groups of ADR-0068 (rules 12-14), the shop-floor execution tables of ADR-0071 (work orders), and the
+-- groups of ADR-0068 (rules 12-14), the shop-floor execution tables of ADR-0071 (work orders), the costing sheet and
+-- cost component structure of ADR-0072 (which drops the interim overhead_surcharge), and the
 -- holistic review decisions of 2026-11-15 (one operation_progress_component table, costing_lot_quantity, the B3
 -- columns as an interim, the forecast, message and exception tables). PostgreSQL 18. Loaded with DS-20, DS-56, DS-15
 -- and DS-06 in the design lab (docs/reviews/2026-11-14-design-validation, t16_planning_production_ddl.py). The ADRs
@@ -614,6 +615,7 @@ CREATE TABLE production_version (                          -- the one explicit w
     is_as_built_required              boolean NOT NULL DEFAULT false,
     production_lead_time_method       text NOT NULL DEFAULT 'routing' CONSTRAINT ck_production_version_lead_time_method CHECK (production_lead_time_method IN ('fixed', 'routing')),
     production_lead_time_days         integer CONSTRAINT ck_production_version_lead_time_days CHECK (production_lead_time_days >= 0),   -- working days of the warehouse calendar
+    costing_sheet_id                  uuid,                    -- [production] ADR-0072 rule 9; overrides the site's costing sheet
     recorded_at                       timestamptz NOT NULL,
     UNIQUE NULLS NOT DISTINCT (company_id, item_id, product_id, production_warehouse_id, code),
     UNIQUE (company_id, id),
@@ -623,6 +625,7 @@ CREATE TABLE production_version (                          -- the one explicit w
     FOREIGN KEY (company_id, production_warehouse_id) REFERENCES warehouse (company_id, id),
     CONSTRAINT fk_production_version_bill FOREIGN KEY (company_id, bill_of_materials_id, bill_of_materials_usage) REFERENCES bill_of_materials (company_id, id, usage),
     FOREIGN KEY (company_id, routing_id) REFERENCES routing (company_id, id),
+    FOREIGN KEY (company_id, costing_sheet_id) REFERENCES costing_sheet (company_id, id),
     CONSTRAINT ck_production_version_target CHECK ((item_id IS NULL) <> (product_id IS NULL)),
     CONSTRAINT ck_production_version_lot_range CHECK (maximum_lot_quantity IS NULL OR maximum_lot_quantity >= minimum_lot_quantity),
     CONSTRAINT ck_production_version_dates CHECK (end_date IS NULL OR end_date >= start_date),
@@ -1350,7 +1353,154 @@ CREATE TABLE operation_progress_component (
 );
 CREATE INDEX ix_operation_progress_component_component ON operation_progress_component (production_order_component_id);
 
--- ===== Costing [production] (ADR-0035) =====
+-- ===== Costing [production] (ADR-0035; costing sheet and cost component structure ADR-0072) =====
+-- Cost component structure (ADR-0072 rules 2-4): detailed components for reports, each rolling up to one posting
+-- component; postings, settlement keys and INV-106 stay on the four posting components.
+CREATE TABLE cost_component_detail (                       -- [production] ADR-0072 rule 2; company data, master_data_change, change-tracked
+    id              uuid PRIMARY KEY,
+    company_id      uuid NOT NULL REFERENCES company (id),
+    code            text NOT NULL,
+    name            text NOT NULL,
+    cost_component  text NOT NULL CONSTRAINT ck_cost_component_detail_component CHECK (cost_component IN ('material', 'labor', 'overhead', 'other')),   -- the posting component it rolls up to; fixed once named (cost_component_detail_in_use)
+    sequence        integer NOT NULL DEFAULT 0,                -- report order; also the tie-break of the job's split (rule 4)
+    is_default      boolean NOT NULL DEFAULT false,            -- CreateCompany seeds one per posting component (INV-850)
+    is_active       boolean NOT NULL DEFAULT true,             -- at most 12 active per company (command check, cost_component_detail_limit)
+    recorded_at     timestamptz NOT NULL,
+    UNIQUE (company_id, code),
+    UNIQUE (company_id, id),
+    UNIQUE (company_id, id, cost_component),                   -- target of the keys that hold a detail to its posting component
+    CONSTRAINT ck_cost_component_detail_default_active CHECK (NOT is_default OR is_active)
+);
+CREATE UNIQUE INDEX ux_cost_component_detail_default ON cost_component_detail (company_id, cost_component) WHERE is_default;
+CREATE TABLE cost_component_detail_mapping (               -- [production] ADR-0072 rule 3; read by production.map_cost_component_detail
+    id                        uuid PRIMARY KEY,
+    company_id                uuid NOT NULL,
+    cost_component_detail_id  uuid NOT NULL,
+    cost_component            text NOT NULL,                   -- the detail's, held by the key below
+    source_kind               text NOT NULL CONSTRAINT ck_cost_component_detail_mapping_kind CHECK (source_kind IN ('activity_type', 'item_group', 'valuation_class', 'account')),
+    activity_type_id          uuid,
+    item_group_id             uuid,
+    valuation_class_id        uuid REFERENCES valuation_class (id),
+    account_id                uuid REFERENCES account (id),    -- an operational account
+    recorded_at               timestamptz NOT NULL,
+    UNIQUE (company_id, id),
+    -- one source maps to at most one detail per posting component, so the mapping is a function (rule 3)
+    CONSTRAINT uq_cost_component_detail_mapping_source UNIQUE NULLS NOT DISTINCT (company_id, cost_component, activity_type_id, item_group_id, valuation_class_id, account_id),
+    CONSTRAINT fk_cost_component_detail_mapping_detail FOREIGN KEY (company_id, cost_component_detail_id, cost_component)
+        REFERENCES cost_component_detail (company_id, id, cost_component),
+    FOREIGN KEY (company_id, activity_type_id) REFERENCES activity_type (company_id, id),
+    FOREIGN KEY (company_id, item_group_id) REFERENCES item_group (company_id, id),
+    CONSTRAINT ck_cost_component_detail_mapping_source CHECK (num_nonnulls(activity_type_id, item_group_id, valuation_class_id, account_id) = 1 AND CASE source_kind
+        WHEN 'activity_type' THEN activity_type_id IS NOT NULL
+        WHEN 'item_group' THEN item_group_id IS NOT NULL
+        WHEN 'valuation_class' THEN valuation_class_id IS NOT NULL
+        ELSE account_id IS NOT NULL END)
+);
+-- Costing sheet (ADR-0072 rules 6-9): planned costing only; it values no stock and posts nothing.
+CREATE TABLE costing_sheet (                               -- [production] ADR-0072 rule 6; company data, master_data_change, change-tracked, proposal-bound
+    id           uuid PRIMARY KEY,
+    company_id   uuid NOT NULL REFERENCES company (id),
+    code         text NOT NULL,
+    name         text NOT NULL,
+    is_active    boolean NOT NULL DEFAULT true,
+    recorded_at  timestamptz NOT NULL,
+    UNIQUE (company_id, code),
+    UNIQUE (company_id, id)
+);
+CREATE TABLE costing_sheet_row (                           -- [production] ADR-0072 rule 6; ordered rows, written as one list by UpdateCostingSheet
+    company_id                uuid NOT NULL,
+    costing_sheet_id          uuid NOT NULL,
+    row_number                integer NOT NULL CONSTRAINT ck_costing_sheet_row_number CHECK (row_number > 0),
+    row_kind                  text NOT NULL CONSTRAINT ck_costing_sheet_row_kind CHECK (row_kind IN ('base', 'surcharge', 'subtotal')),
+    label                     text NOT NULL,
+    usage                     text NOT NULL DEFAULT 'production' CONSTRAINT ck_costing_sheet_row_usage CHECK (usage IN ('production', 'selling')),   -- selling: administration and selling overhead, selling-price costing only (rule 10)
+    is_lower_level_included   boolean NOT NULL DEFAULT false,  -- base rows: also the lines rolled up from made components
+    surcharge_kind            text CONSTRAINT ck_costing_sheet_row_surcharge_kind CHECK (surcharge_kind IN ('percent', 'per_output_unit', 'per_activity_unit')),
+    base_row_number           integer,                         -- percent rows: an earlier base or subtotal row (its kind: command check, costing_sheet_row_invalid)
+    activity_type_id          uuid,                            -- per_activity_unit rows
+    credited_cost_center_id   uuid,                            -- surcharge rows: credited for planned-versus-absorbed reporting only (rule 12); kind administration or selling on selling rows (command check)
+    cost_component_detail_id  uuid,                            -- production surcharge rows: the detail the surcharge lands in
+    cost_component            text,                            -- that detail's posting component, held by the key below; never material
+    from_row_number           integer,                         -- subtotal rows: the range of earlier rows summed
+    to_row_number             integer,
+    recorded_at               timestamptz NOT NULL,
+    PRIMARY KEY (costing_sheet_id, row_number),
+    UNIQUE (company_id, costing_sheet_id, row_number, row_kind),
+    UNIQUE (costing_sheet_id, row_number, surcharge_kind),    -- target of costing_sheet_rate's key: a rate suits its row's kind
+    FOREIGN KEY (company_id, costing_sheet_id) REFERENCES costing_sheet (company_id, id),
+    FOREIGN KEY (company_id, activity_type_id) REFERENCES activity_type (company_id, id),
+    FOREIGN KEY (company_id, credited_cost_center_id) REFERENCES cost_center (company_id, id),
+    CONSTRAINT fk_costing_sheet_row_detail FOREIGN KEY (company_id, cost_component_detail_id, cost_component)
+        REFERENCES cost_component_detail (company_id, id, cost_component),
+    CONSTRAINT ck_costing_sheet_row_shape CHECK (CASE row_kind
+        WHEN 'base' THEN usage = 'production' AND surcharge_kind IS NULL
+            AND num_nonnulls(base_row_number, activity_type_id, credited_cost_center_id, cost_component_detail_id, from_row_number, to_row_number) = 0
+        WHEN 'subtotal' THEN surcharge_kind IS NULL AND NOT is_lower_level_included
+            AND num_nonnulls(base_row_number, activity_type_id, credited_cost_center_id, cost_component_detail_id) = 0
+            AND from_row_number IS NOT NULL AND to_row_number IS NOT NULL AND from_row_number > 0 AND from_row_number <= to_row_number AND to_row_number < row_number
+        ELSE surcharge_kind IS NOT NULL AND credited_cost_center_id IS NOT NULL AND NOT is_lower_level_included
+            AND from_row_number IS NULL AND to_row_number IS NULL
+            AND (surcharge_kind = 'percent') = (base_row_number IS NOT NULL) AND (base_row_number IS NULL OR base_row_number < row_number)
+            AND (surcharge_kind = 'per_activity_unit') = (activity_type_id IS NOT NULL)
+            AND (usage = 'production') = (cost_component_detail_id IS NOT NULL) END),
+    CONSTRAINT ck_costing_sheet_row_component CHECK ((cost_component_detail_id IS NULL) = (cost_component IS NULL)
+        AND (cost_component IS NULL OR cost_component IN ('labor', 'overhead', 'other')))
+);
+CREATE TABLE costing_sheet_base_member (                   -- [production] ADR-0072 rule 6; a posting component or a detail of a base row
+    company_id                uuid NOT NULL,
+    costing_sheet_id          uuid NOT NULL,
+    row_number                integer NOT NULL,
+    row_kind                  text NOT NULL DEFAULT 'base' CONSTRAINT ck_costing_sheet_base_member_row_kind CHECK (row_kind = 'base'),   -- held by the key below
+    cost_component            text CONSTRAINT ck_costing_sheet_base_member_component CHECK (cost_component IN ('material', 'labor', 'overhead', 'other')),
+    cost_component_detail_id  uuid,
+    recorded_at               timestamptz NOT NULL,
+    -- a member appears once per sheet; a detail and its own posting component in two base rows are refused by the command (costing_sheet_row_invalid)
+    CONSTRAINT uq_costing_sheet_base_member UNIQUE NULLS NOT DISTINCT (costing_sheet_id, cost_component, cost_component_detail_id),
+    CONSTRAINT fk_costing_sheet_base_member_row FOREIGN KEY (company_id, costing_sheet_id, row_number, row_kind)
+        REFERENCES costing_sheet_row (company_id, costing_sheet_id, row_number, row_kind),
+    FOREIGN KEY (company_id, cost_component_detail_id) REFERENCES cost_component_detail (company_id, id),
+    CONSTRAINT ck_costing_sheet_base_member_one CHECK (num_nonnulls(cost_component, cost_component_detail_id) = 1)
+);
+CREATE TABLE costing_sheet_rate (                          -- [production] ADR-0072 rule 7; by effective dates, then the most specific condition set
+    id                  uuid PRIMARY KEY,
+    company_id          uuid NOT NULL,
+    costing_sheet_id    uuid NOT NULL,
+    row_number          integer NOT NULL,
+    surcharge_kind      text NOT NULL,                         -- the row's, held by the key below
+    site_id             uuid,                                  -- conditions, each optional; precedence site, item group, valuation class
+    item_group_id       uuid,
+    valuation_class_id  uuid REFERENCES valuation_class (id),
+    valid_from          date NOT NULL,
+    valid_to            date,                                  -- inclusive; null = open
+    rate_percent        types.percent,                         -- percent rows
+    rate_amount         types.unit_price,                      -- per-unit rows: company currency per output or activity unit
+    recorded_at         timestamptz NOT NULL,
+    UNIQUE (company_id, id),
+    FOREIGN KEY (company_id, costing_sheet_id) REFERENCES costing_sheet (company_id, id),
+    CONSTRAINT fk_costing_sheet_rate_row FOREIGN KEY (costing_sheet_id, row_number, surcharge_kind) REFERENCES costing_sheet_row (costing_sheet_id, row_number, surcharge_kind),
+    FOREIGN KEY (company_id, site_id) REFERENCES site (company_id, id),
+    FOREIGN KEY (company_id, item_group_id) REFERENCES item_group (company_id, id),
+    CONSTRAINT ck_costing_sheet_rate_value CHECK (CASE surcharge_kind
+        WHEN 'percent' THEN rate_percent IS NOT NULL AND rate_amount IS NULL AND rate_percent >= 0
+        ELSE rate_amount IS NOT NULL AND rate_percent IS NULL AND rate_amount >= 0 END),
+    CONSTRAINT ck_costing_sheet_rate_dates CHECK (valid_to IS NULL OR valid_to >= valid_from),
+    -- rates of one row and condition set never overlap in dates (costing_rate_overlap), so selection is unique
+    CONSTRAINT ex_costing_sheet_rate_overlap EXCLUDE USING gist (
+        costing_sheet_id WITH =, row_number WITH =,
+        (coalesce(site_id, '00000000-0000-0000-0000-000000000000'::uuid)) WITH =,
+        (coalesce(item_group_id, '00000000-0000-0000-0000-000000000000'::uuid)) WITH =,
+        (coalesce(valuation_class_id, '00000000-0000-0000-0000-000000000000'::uuid)) WITH =,
+        daterange(valid_from, valid_to, '[]') WITH &&)
+);
+CREATE TABLE site_costing_sheet (                          -- [production] ADR-0072 rule 9; master_data_change; production_version.costing_sheet_id overrides it
+    company_id        uuid NOT NULL,
+    site_id           uuid NOT NULL,
+    costing_sheet_id  uuid NOT NULL,
+    recorded_at       timestamptz NOT NULL,
+    PRIMARY KEY (site_id),
+    FOREIGN KEY (company_id, site_id) REFERENCES site (company_id, id),
+    FOREIGN KEY (company_id, costing_sheet_id) REFERENCES costing_sheet (company_id, id)
+);
 CREATE TABLE cost_estimate (                               -- benchmark for target cost and variances; never values stock (rule 14)
     id                             uuid PRIMARY KEY,
     company_id                     uuid NOT NULL,
@@ -1363,7 +1513,8 @@ CREATE TABLE cost_estimate (                               -- benchmark for targ
     bill_of_materials_revision_id  uuid NOT NULL,              -- the revisions it pins (revision_in_use, ADR-0033 rule 4)
     routing_revision_id            uuid,
     previous_cost_estimate_id      uuid,                       -- the estimate the response's delta compares with (ADR-0062 rule 12)
-    company_amount                 types.amount,               -- interim: not stated in ADR-0035 (total for the lot, company currency)
+    costing_sheet_id               uuid,                       -- [production] ADR-0072 rule 8; the sheet used: the version's override, else the site's; null = none
+    company_amount                types.amount,               -- interim: not stated in ADR-0035 (total for the lot, company currency)
     unit_cost                      types.unit_price,           -- interim: not stated in ADR-0035 (company_amount / costing_lot_quantity; the preliminary price fallback, rule 4)
     released_at                    timestamptz,
     recorded_at                    timestamptz NOT NULL,
@@ -1374,6 +1525,7 @@ CREATE TABLE cost_estimate (                               -- benchmark for targ
     FOREIGN KEY (company_id, routing_revision_id) REFERENCES routing_revision (company_id, id),
     CONSTRAINT ck_cost_estimate_released CHECK ((state = 'released') = (released_at IS NOT NULL AND company_amount IS NOT NULL AND unit_cost IS NOT NULL)),
     FOREIGN KEY (company_id, previous_cost_estimate_id) REFERENCES cost_estimate (company_id, id),
+    FOREIGN KEY (company_id, costing_sheet_id) REFERENCES costing_sheet (company_id, id),
     CONSTRAINT ck_cost_estimate_version CHECK (production_version_id IS NOT NULL OR state = 'draft')
 );
 -- One released estimate per version and costing date (holistic review); the lookup of the estimate in force uses it too.
@@ -1385,9 +1537,11 @@ CREATE TABLE cost_estimate_line (                          -- rolled up level by
     cost_component     text NOT NULL CONSTRAINT ck_cost_estimate_line_component CHECK (cost_component IN ('material', 'labor', 'overhead', 'other')),
     component_item_id  uuid,
     activity_type_id   uuid,
-    cost_center_id     uuid,                                   -- interim: not stated in ADR-0035 (the cost center of an overhead surcharge line)
-    quantity           types.quantity NOT NULL,
-    price              types.unit_price NOT NULL,
+    cost_component_detail_id  uuid NOT NULL,                   -- [production] ADR-0072 rule 4; stamped by map_cost_component_detail, or the surcharge row's detail
+    costing_sheet_row_number  integer,                         -- [production] ADR-0072 rule 8; the production surcharge row of cost_estimate.costing_sheet_id
+    credited_cost_center_id   uuid,                            -- [production] ADR-0072 rule 11; the surcharge row's credited cost center, reporting only (was the interim cost_center_id)
+    quantity           types.quantity NOT NULL,                -- surcharge lines: the base amount or the output or activity units
+    price              types.unit_price NOT NULL,              -- surcharge lines: the rate (percent, or amount per unit)
     company_amount     types.amount NOT NULL,
     level              integer NOT NULL DEFAULT 0 CONSTRAINT ck_cost_estimate_line_level CHECK (level >= 0),
     recorded_at        timestamptz NOT NULL,
@@ -1395,22 +1549,53 @@ CREATE TABLE cost_estimate_line (                          -- rolled up level by
     FOREIGN KEY (company_id, cost_estimate_id) REFERENCES cost_estimate (company_id, id),
     FOREIGN KEY (company_id, component_item_id) REFERENCES item (company_id, id),
     FOREIGN KEY (company_id, activity_type_id) REFERENCES activity_type (company_id, id),
-    FOREIGN KEY (company_id, cost_center_id) REFERENCES cost_center (company_id, id),
-    CONSTRAINT ck_cost_estimate_line_source CHECK (num_nonnulls(component_item_id, activity_type_id, cost_center_id) <= 1
+    FOREIGN KEY (company_id, credited_cost_center_id) REFERENCES cost_center (company_id, id),
+    -- the detail rolls up to the line's posting component (INV-850)
+    CONSTRAINT fk_cost_estimate_line_detail FOREIGN KEY (company_id, cost_component_detail_id, cost_component)
+        REFERENCES cost_component_detail (company_id, id, cost_component),
+    CONSTRAINT ck_cost_estimate_line_source CHECK (num_nonnulls(component_item_id, activity_type_id, costing_sheet_row_number) <= 1
+        AND (costing_sheet_row_number IS NULL) = (credited_cost_center_id IS NULL)
+        AND (costing_sheet_row_number IS NULL OR cost_component <> 'material')
         AND (cost_component <> 'material' OR component_item_id IS NOT NULL)
         AND (activity_type_id IS NULL OR cost_component IN ('labor', 'overhead')))
+);
+CREATE TABLE cost_estimate_sheet_row (                     -- [production] ADR-0072 rule 8; the production rows as costed; estimate content, frozen at release
+    company_id                uuid NOT NULL,
+    cost_estimate_id          uuid NOT NULL,
+    row_number                integer NOT NULL CONSTRAINT ck_cost_estimate_sheet_row_number CHECK (row_number > 0),
+    row_kind                  text NOT NULL CONSTRAINT ck_cost_estimate_sheet_row_kind CHECK (row_kind IN ('base', 'surcharge', 'subtotal')),
+    label                     text NOT NULL,
+    surcharge_kind            text CONSTRAINT ck_cost_estimate_sheet_row_surcharge_kind CHECK (surcharge_kind IN ('percent', 'per_output_unit', 'per_activity_unit')),
+    base_amount               types.amount,                    -- percent rows: the base or subtotal row's value
+    base_quantity             types.quantity,                  -- per-unit rows: output or activity units
+    rate                      types.unit_price,                -- the rate selected by rule 7 (percent, or amount per unit)
+    company_amount            types.amount NOT NULL,           -- the row's value
+    credited_cost_center_id   uuid,
+    cost_component_detail_id  uuid,
+    recorded_at               timestamptz NOT NULL,
+    PRIMARY KEY (cost_estimate_id, row_number),
+    FOREIGN KEY (company_id, cost_estimate_id) REFERENCES cost_estimate (company_id, id),
+    FOREIGN KEY (company_id, credited_cost_center_id) REFERENCES cost_center (company_id, id),
+    FOREIGN KEY (company_id, cost_component_detail_id) REFERENCES cost_component_detail (company_id, id),
+    CONSTRAINT ck_cost_estimate_sheet_row_shape CHECK (CASE row_kind
+        WHEN 'surcharge' THEN surcharge_kind IS NOT NULL AND rate IS NOT NULL AND credited_cost_center_id IS NOT NULL AND cost_component_detail_id IS NOT NULL
+            AND (surcharge_kind = 'percent') = (base_amount IS NOT NULL AND base_quantity IS NULL)
+        ELSE num_nonnulls(surcharge_kind, base_amount, base_quantity, rate, credited_cost_center_id, cost_component_detail_id) = 0 END)
 );
 CREATE TABLE cost_estimate_gap (                           -- what a draft estimate could not price: listed, never zero, never released (ADR-0062 rule 12)
     company_id                      uuid NOT NULL,
     cost_estimate_id                uuid NOT NULL,
     gap_number                      integer NOT NULL CONSTRAINT ck_cost_estimate_gap_number CHECK (gap_number > 0),
     gap_kind                        text NOT NULL CONSTRAINT ck_cost_estimate_gap_kind CHECK (gap_kind IN ('material_price_missing', 'activity_rate_missing',
-                                        'activity_quantity_missing', 'component_item_pending', 'setup_duration_unstated', 'run_duration_unstated', 'routing_missing')),
+                                        'activity_quantity_missing', 'component_item_pending', 'setup_duration_unstated', 'run_duration_unstated', 'routing_missing',
+                                        'costing_rate_missing', 'costing_sheet_missing')),   -- the last two: ADR-0072 rules 7, 9
     component_item_id               uuid,
     bill_of_materials_component_id  uuid,
     routing_operation_id            uuid,
     work_center_id                  uuid,
     activity_type_id                uuid,
+    costing_sheet_id                uuid,                      -- [production] ADR-0072 rule 7; with the row whose rate is missing
+    costing_sheet_row_number        integer,
     detail                          jsonb NOT NULL DEFAULT '{}',
     recorded_at                     timestamptz NOT NULL,
     PRIMARY KEY (cost_estimate_id, gap_number),
@@ -1420,7 +1605,9 @@ CREATE TABLE cost_estimate_gap (                           -- what a draft estim
     FOREIGN KEY (company_id, routing_operation_id) REFERENCES routing_operation (company_id, id),
     FOREIGN KEY (company_id, work_center_id) REFERENCES work_center (company_id, id),
     FOREIGN KEY (company_id, activity_type_id) REFERENCES activity_type (company_id, id),
+    FOREIGN KEY (company_id, costing_sheet_id) REFERENCES costing_sheet (company_id, id),
     CONSTRAINT ck_cost_estimate_gap_subject CHECK (CASE gap_kind
+        WHEN 'costing_rate_missing' THEN costing_sheet_id IS NOT NULL AND costing_sheet_row_number IS NOT NULL
         WHEN 'material_price_missing' THEN component_item_id IS NOT NULL
         WHEN 'activity_rate_missing' THEN work_center_id IS NOT NULL AND activity_type_id IS NOT NULL
         WHEN 'activity_quantity_missing' THEN routing_operation_id IS NOT NULL
@@ -1439,15 +1626,8 @@ CREATE TABLE activity_rate (                               -- planned rates (rul
     FOREIGN KEY (company_id, work_center_id) REFERENCES work_center (company_id, id),
     FOREIGN KEY (company_id, activity_type_id) REFERENCES activity_type (company_id, id)
 );
-CREATE TABLE overhead_surcharge (                          -- interim: not stated in ADR-0035 (the table holding "a planned surcharge per cost center", rule 14)
-    company_id         uuid NOT NULL,
-    cost_center_id     uuid NOT NULL,
-    posting_period_id  uuid NOT NULL REFERENCES posting_period (id),
-    surcharge_percent  types.percent NOT NULL CONSTRAINT ck_overhead_surcharge_percent CHECK (surcharge_percent >= 0),
-    recorded_at        timestamptz NOT NULL,
-    PRIMARY KEY (cost_center_id, posting_period_id),
-    FOREIGN KEY (company_id, cost_center_id) REFERENCES cost_center (company_id, id)
-);
+-- overhead_surcharge (the interim table of "a planned surcharge per cost center", ADR-0035 rule 14) is replaced by the
+-- costing sheet: a percent surcharge row crediting that cost center, on a stated base row, with dated rates (ADR-0072 rule 11).
 CREATE TABLE pool_allocation_rule (                        -- one rule per (cost center, group) (rules 7, 17)
     company_id        uuid NOT NULL,
     cost_center_id    uuid NOT NULL,
@@ -1512,6 +1692,27 @@ CREATE TABLE production_order_period_cost (                -- written only by th
     -- pool = opening + incurred; it goes to abnormal, residual, outputs, or stays as WIP (rules 8-11)
     CONSTRAINT ck_production_order_period_cost_balance CHECK (closing_amount = opening_amount + incurred_amount - abnormal_amount - residual_amount - to_output_amount)
 );
+CREATE TABLE production_order_period_cost_detail (         -- [production] ADR-0072 rule 4; read model written by the job with its parent; sums exactly to it (INV-851)
+    company_id                uuid NOT NULL,
+    production_order_id       uuid NOT NULL,
+    posting_period_id         uuid NOT NULL,
+    cost_component            text NOT NULL,                   -- the parent's posting component
+    cost_component_detail_id  uuid NOT NULL,
+    opening_amount            types.amount NOT NULL,           -- the detail's closing of the order's previous period with costs
+    incurred_amount           types.amount NOT NULL,           -- each line mapped by production.map_cost_component_detail
+    abnormal_amount           types.amount NOT NULL,           -- by its component line's item or activity type
+    residual_amount           types.amount NOT NULL DEFAULT 0, -- split by available amount, largest remainder
+    to_output_amount          types.amount NOT NULL,           -- the rest per detail
+    closing_amount            types.amount NOT NULL,           -- split by available amount, largest remainder
+    recorded_at               timestamptz NOT NULL,
+    PRIMARY KEY (production_order_id, posting_period_id, cost_component_detail_id),
+    CONSTRAINT fk_production_order_period_cost_detail_parent FOREIGN KEY (production_order_id, posting_period_id, cost_component)
+        REFERENCES production_order_period_cost (production_order_id, posting_period_id, cost_component) ON DELETE CASCADE,
+    FOREIGN KEY (company_id, production_order_id) REFERENCES production_order (company_id, id),
+    CONSTRAINT fk_production_order_period_cost_detail_detail FOREIGN KEY (company_id, cost_component_detail_id, cost_component)
+        REFERENCES cost_component_detail (company_id, id, cost_component),
+    CONSTRAINT ck_production_order_period_cost_detail_balance CHECK (closing_amount = opening_amount + incurred_amount - abnormal_amount - residual_amount - to_output_amount)
+);
 
 -- production_order_variance (ADR-0060 rule 19; ADR-0035 rule 15 note), DDL to come with the DS-53 costing tables: one row per
 -- production order, period and variance category (input_price, input_quantity, resource_usage, scrap, lot_size,
@@ -1558,6 +1759,8 @@ CREATE TRIGGER trg_routing_operation_activity_guard BEFORE INSERT OR UPDATE OR D
 CREATE TRIGGER trg_cost_estimate_line_guard BEFORE INSERT OR UPDATE OR DELETE ON cost_estimate_line
     FOR EACH ROW EXECUTE FUNCTION production_revision_content_guard('cost_estimate', 'cost_estimate_id');
 CREATE TRIGGER trg_cost_estimate_gap_guard BEFORE INSERT OR UPDATE OR DELETE ON cost_estimate_gap
+    FOR EACH ROW EXECUTE FUNCTION production_revision_content_guard('cost_estimate', 'cost_estimate_id');
+CREATE TRIGGER trg_cost_estimate_sheet_row_guard BEFORE INSERT OR UPDATE OR DELETE ON cost_estimate_sheet_row
     FOR EACH ROW EXECUTE FUNCTION production_revision_content_guard('cost_estimate', 'cost_estimate_id');
 -- Release readiness (ADR-0062 rules 10, 12, 14): a bill of materials revision whose header or a component refers to a
 -- proposal item, a routing revision with an unstated setup or run time, and an estimate with a gap or without a

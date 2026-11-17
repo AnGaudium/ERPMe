@@ -586,8 +586,10 @@ if "--load" in sys.argv:
     def draft_estimate(cx):
         cx.execute("""insert into cost_estimate (id, company_id, production_version_id, costing_date, costing_lot_quantity, bill_of_materials_revision_id, routing_revision_id, recorded_at)
                       values (%s,%s,null,'2026-12-01',10,%s,%s,now())""", (I["CE"], I["co"], I["R"], I["RR"]))
-        cx.execute("""insert into cost_estimate_line (company_id, cost_estimate_id, line_number, cost_component, component_item_id, quantity, price, company_amount, recorded_at)
-                      values (%s,%s,1,'material',%s,40,500,20000,now())""", (I["co"], I["CE"], I["iBolt"]))
+        cx.execute("""insert into cost_component_detail (id, company_id, code, name, cost_component, is_default, recorded_at)
+                      values (%s,%s,'material','Material','material',true,now())""", (I.setdefault("dMat", new()), I["co"]))   # seeded by CreateCompany (ADR-0072 rule 2)
+        cx.execute("""insert into cost_estimate_line (company_id, cost_estimate_id, line_number, cost_component, component_item_id, cost_component_detail_id, quantity, price, company_amount, recorded_at)
+                      values (%s,%s,1,'material',%s,%s,40,500,20000,now())""", (I["co"], I["CE"], I["iBolt"], I["dMat"]))
         for n_, kind_, op_ in ((1, "setup_duration_unstated", "op10"), (2, "run_duration_unstated", "op10"), (3, "setup_duration_unstated", "op20")):
             cx.execute("""insert into cost_estimate_gap (company_id, cost_estimate_id, gap_number, gap_kind, routing_operation_id, recorded_at)
                           values (%s,%s,%s,%s,%s,now())""", (I["co"], I["CE"], n_, kind_, I[op_]))

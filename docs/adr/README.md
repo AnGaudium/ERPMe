@@ -75,3 +75,4 @@ One file per decision, named `NNNN-short-title.md`, using [template.md](template
 | [ADR-0069](0069-business-unit-dimension.md) | Business unit dimension (DS-06, DS-20, DS-22, DS-28, DS-33) | Proposed (2026-11-17) |
 | [ADR-0070](0070-quality-management-core.md) | Quality management core (DS-58) | Proposed (2026-11-17) |
 | [ADR-0071](0071-work-orders-and-shop-floor-execution.md) | Work orders and shop-floor execution (DS-52, DS-31, DS-53) | Proposed (2026-11-17) |
+| [ADR-0072](0072-costing-sheet-and-cost-component-structure.md) | Costing sheet and cost component structure (DS-53, DS-56, DS-26) | Proposed (2026-11-18) |

@@ -181,6 +181,8 @@ Agents read the structures through deterministic queries. They draft revisions f
       - The operation check of rule 8.
 
     A version may name a configurable product (`product_id`, exclusive with `item_id`); it applies to every configured item of the product, after any item-level version ([ADR-0046](0046-product-configuration.md) rule 12).
+
+    Note ([ADR-0072](0072-costing-sheet-and-cost-component-structure.md), proposed 2026-11-18): a version gains `costing_sheet_id`, an optional override of its site's costing sheet (ADR-0072 rule 9).
 14. `item_production_setting` (company, item, production warehouse) holds `is_phantom`.
     - **Explosion.** A phantom is never planned or made on its own. It is exploded through its production version in that warehouse, selected with the exploded quantity and the `explosion_date`, routing ignored. A missing version gives `production_version_missing`.
     - **Planning.** Planning reads the setting through `production.contract` and skips phantoms. A phantom needs no `item_warehouse_planning` row.
