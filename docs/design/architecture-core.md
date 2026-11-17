@@ -48,6 +48,7 @@ Rules: ADR-0022 rules 3, 4, 7, 8, 17, 23 unless named.
 | Views for agents and reports | Schema `query`, owner `nativeflows_query_owner` |
 | Generated files (never edit) | `backend/generated/`, `frontend/src/generated/` |
 | Setting | Settings registry ([ADR-0063](../adr/0063-configurable-policy-settings.md) rule 1); seed `docs/catalogs/settings.csv` |
+| Operating preset | Registry reference data ([ADR-0067](../adr/0067-quickflows-operating-presets.md) rule 2, proposed); seed `docs/catalogs/setting-presets.csv`; applied by ordinary commands; no business code reads a preset code |
 | Work item kind | Registered like a command ([ADR-0042](../adr/0042-work-queue.md) rule 1); seed `docs/catalogs/work-item-kinds.csv` |
 | Work case kind | Registered like a work item kind ([ADR-0066](../adr/0066-work-cases.md) rule 3, proposed); seed `docs/catalogs/work-case-kinds.csv`; turned on per company by `work_case.<kind>.mode` |
 | Country rule | `l10n/l10n_<country>/`, never the core ([ADR-0016](../adr/0016-localization-package-structure.md); [ADR-0053](../adr/0053-core-neutrality.md)) |
@@ -56,7 +57,7 @@ Rules: ADR-0022 rules 3, 4, 7, 8, 17, 23 unless named.
 
 ### Envelope and actor
 
-- Envelope fields: `command_type`, `schema_version`, `company_id`, `idempotency_key`, `mode`, `expected_plan_hash`, `payload` (and `include_canonical_plan`, `as_of_date`). No others (ADR-0008 rule 7 and its note).
+- Envelope fields: `command_type`, `schema_version`, `company_id`, `idempotency_key`, `mode`, `expected_plan_hash`, `payload` (and `include_canonical_plan`, `as_of_date`, `is_review_skipped`). No others (ADR-0008 rule 7 and its notes; `is_review_skipped`: [ADR-0067](../adr/0067-quickflows-operating-presets.md) rule 13, proposed).
 - The actor, `on_behalf_of` and `agent_run_id` come from the credential, never the client. `idempotency_key` is required in both modes, scoped to (actor, command type) (ADR-0008 rules 8, 14).
 - `simulate` runs the real handler and rolls back; `execute` commits only if the plan hash equals `expected_plan_hash`, else `plan_hash_mismatch` (ADR-0008 rules 9, 13).
 - Only consumers and system jobs (internal callers, in process) execute without a simulation and `expected_plan_hash`; every other actor simulates first (ADR-0013 rule 9; ADR-0008 rule 13 note).

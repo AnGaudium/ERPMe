@@ -69,6 +69,8 @@ The migration period is then locked.
 
    Note ([ADR-0063](0063-configurable-policy-settings.md), proposed 2026-11-15): company setup also presents the settings registry grouped by area with each setting's core default, bounds and direction; the company starts on the core defaults, and values set during setup follow the change path (rule 5).
 
+   Note ([ADR-0067](0067-quickflows-operating-presets.md), 2026-11-17 (proposed)): a company is in its setup phase until its first journal entry outside the migration fiscal year, which sets `company.first_operating_posting_at`; the opening documents of phases 3 to 5 do not end it. During the phase the implementer an owner acknowledged sets loosening settings without a second approver, and the setup flow fills the record defaults of an applied operating preset, such as `backflush_at_receipt` for bill-of-materials components loaded in phase 2 where the file states no consumption method ([ADR-0067](0067-quickflows-operating-presets.md) rules 7–9, 18).
+
 **Formats and identities**
 
 4. The template is one workbook, generated from the registry:

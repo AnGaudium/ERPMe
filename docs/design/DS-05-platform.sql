@@ -854,6 +854,7 @@ CREATE TABLE audit_record (                                -- one per executed c
     automation_rule_version_id uuid CONSTRAINT ck_audit_record_automation_depth CHECK (automation_rule_version_id IS NULL OR causation_depth >= 1),   -- an automation action's rule version (INV-670)
     policy_decision_id      uuid,
     delegated_from_user_id  uuid,                          -- ADR-0054 rule 21
+    is_review_skipped       boolean NOT NULL DEFAULT false, -- a person's Post executed without the plan panel under ui.post_review on_exceptions (ADR-0067 rule 13)
     subject_table           text,
     subject_id              uuid,
     document_id             uuid,                          -- no key: a deleted draft keeps its audit rows

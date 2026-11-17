@@ -165,6 +165,8 @@ Policy is a deterministic threshold table per company, as runbook B7 asks.
     Note: who may approve is now stage eligibility. Writers of any version are excluded by default, replacing the interim above (flagged; small companies: [ADR-0054](0054-users-roles-and-authorizations.md) rule 20), and `approval_stage_unsatisfiable` replaces `policy_no_eligible_approver` for stages, on save and at `Submit` ([ADR-0055](0055-approval-pools-and-stages.md) rules 4, 7–9).
 
     Note: `CreatePolicyRule` and `UpdatePolicyRule` no longer return `policy_no_eligible_approver`; the code is retired, and `approval_stage_unsatisfiable` (on pools, procedures and at `Submit`) is the one satisfiability check ([ADR-0055](0055-approval-pools-and-stages.md) rule 4).
+
+    Note ([ADR-0067](0067-quickflows-operating-presets.md), 2026-11-17 (proposed)): in the small-company mode the owner or chief accountant may approve an untainted draft that an agent wrote for them from an event or schedule, as a recorded segregation exception, under the reading of spec 03 rule 5 decided by the author's delegation to the chief architect (2026-11-17) ([ADR-0054](0054-users-roles-and-authorizations.md) rule 20 note; [ADR-0067](0067-quickflows-operating-presets.md) rule 16).
 14. Auto-posts and confirmation:
     - **Scope.** `is_confirmation_required` applies only to `post` and `issue` by `system` or `integration` actors.
     - **Work items.** Each such posting adds evidence to one `auto_post_unconfirmed` work item per rule and period (ADR-0042).
@@ -196,6 +198,8 @@ Policy is a deterministic threshold table per company, as runbook B7 asks.
     Note: the seed migrates to approval pools whose stages are `standard` (minimum rank 10, roles `accountant`, `chief_accountant` and `owner`) and `senior` (minimum rank 20, roles `chief_accountant` and `owner`); rank 20 then needs two people ([ADR-0055](0055-approval-pools-and-stages.md) rules 2, 5).
 
     Note: a rule requiring `standard` approval at `submit` of every document type, for every actor kind, when `is_cost_unknown` is seeded ([ADR-0047](0047-commercial-documents-and-pricing.md) rule 22).
+
+    Note ([ADR-0067](0067-quickflows-operating-presets.md), 2026-11-17 (proposed)): the operating preset `quickflows` seeds, for actor `human` at `submit` and `post` of every document type, rules that require `standard` from an amount the implementer enters (`risk_amount`) and when `is_credit_exceeded`, `is_cost_unknown` or `is_price_below_cost` is true; below the amount and without those flags a person posts from draft (ADR-0009 rule 11). The seeds above stay. A preset never seeds a rule that allows a non-human actor ([ADR-0067](0067-quickflows-operating-presets.md) rules 3, 6, 15).
 
 **Specific points**
 
