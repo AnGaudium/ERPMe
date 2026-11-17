@@ -1,11 +1,11 @@
 # ADR-0070: Quality management core
 
 Status: proposed (2026-11-17) under ADR-0005 (builder Claude Opus 5.5).
-Design items: DS-58 (new: quality management), DS-20 (master data), DS-22 (inventory documents), DS-52 (shop floor), DS-36 (document intake), DS-29 (work queue), DS-15 (access), DS-28 (settings and policy), DS-04 (errors), DS-16 and DS-17. Related decisions: D24 (2026-11-17), D17. Principles 2, 3, 12. ADR-0004, ADR-0006, ADR-0007, ADR-0008, ADR-0009, ADR-0013, ADR-0018, ADR-0020, ADR-0022, ADR-0023, ADR-0027, ADR-0029, ADR-0032, ADR-0033, ADR-0034, ADR-0043, ADR-0047, ADR-0054, ADR-0055, ADR-0057, ADR-0063, ADR-0066, ADR-0068.
+Design items: DS-58 (new: quality management), DS-20 (master data), DS-22 (inventory documents), DS-52 (shop floor), DS-36 (document intake), DS-29 (work queue), DS-15 (access), DS-28 (settings and policy), DS-04 (errors), DS-16 and DS-17. Related decisions: Principles 2, 3, 12. ADR-0004, ADR-0006, ADR-0007, ADR-0008, ADR-0009, ADR-0013, ADR-0018, ADR-0020, ADR-0022, ADR-0023, ADR-0027, ADR-0029, ADR-0032, ADR-0033, ADR-0034, ADR-0043, ADR-0047, ADR-0054, ADR-0055, ADR-0057, ADR-0063, ADR-0066, ADR-0068.
 
 ## Decision
 
-D24 gives Phase 1 a thin but complete quality core. This ADR designs it. Until now the design had only the seam: the stock statuses `quality_inspection` and `blocked`, quality bins, status-change tasks, and rework from inspection stock (ADR-0023, ADR-0034). Nothing recorded what a lot was inspected against, what was found, who released it, or on what evidence.
+The author's decision of 2026-11-17 gives Phase 1 a thin but complete quality core. This ADR designs it. Until now the design had only the seam: the stock statuses `quality_inspection` and `blocked`, quality bins, status-change tasks, and rework from inspection stock (ADR-0023, ADR-0034). Nothing recorded what a lot was inspected against, what was found, who released it, or on what evidence.
 
 **A new layer-4 module that nobody imports.** `quality` sits in layer 4 beside `sales` and `purchasing`, and imports only the contracts of layers 1 to 3. `inventory`, `purchasing` and `production` never import it. It learns about stock through the posting events of those modules, and it changes stock only by dispatching their existing commands. Stock placed in `quality_inspection` at receipt or output stays where it is. The inspection lot names that stock by its key and claims it; it adds no column to the stock key.
 
@@ -191,7 +191,7 @@ D24 gives Phase 1 a thin but complete quality core. This ADR designs it. Until n
 
 ## Context
 
-- **D24** (2026-11-17) decided the scope; this ADR makes the technical choices the author delegated.
+- **The author's decision of 2026-11-17** set the scope; this ADR makes the technical choices the author delegated.
 - **Existing seam.** ADR-0023 has `stock_status` with `quality_inspection` and `blocked`, `quality` bins, status-change tasks for release, and return disposition. ADR-0034 posts output to inspection and reworks from it. ADR-0032 lists "quality inspection on output" in DS-52.
 - **Practice studied, concepts only.**
   - SAP QM: inspection types per material, task lists with characteristics and sampling procedures, inspection lots from goods movements, the usage decision with stock postings from quality inspection stock, quality notifications.

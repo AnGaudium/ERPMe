@@ -1,11 +1,11 @@
 # ADR-0069: Business unit dimension
 
 Status: proposed (2026-11-17) under ADR-0005 (builder Claude Opus 5.5).
-Design items: DS-06 (universal journal), DS-20 (master data), DS-22 (commercial documents), DS-28 (settings), DS-33 (analysis), DS-04 (errors), DS-16 and DS-17. Related decisions: D5, D23 (author, 2026-11-17). Principles 6, 7, 13. ADR-0004, ADR-0005, ADR-0006, ADR-0007, ADR-0010, ADR-0012, ADR-0014, ADR-0015, ADR-0018, ADR-0022, ADR-0027, ADR-0035, ADR-0045, ADR-0047, ADR-0048, ADR-0050, ADR-0060, ADR-0063, ADR-0068.
+Design items: DS-06 (universal journal), DS-20 (master data), DS-22 (commercial documents), DS-28 (settings), DS-33 (analysis), DS-04 (errors), DS-16 and DS-17. Related decisions: D5; the author's request of 2026-11-17. Principles 6, 7, 13. ADR-0004, ADR-0005, ADR-0006, ADR-0007, ADR-0010, ADR-0012, ADR-0014, ADR-0015, ADR-0018, ADR-0022, ADR-0027, ADR-0035, ADR-0045, ADR-0047, ADR-0048, ADR-0050, ADR-0060, ADR-0063, ADR-0068.
 
 ## Decision
 
-The author's decision of 2026-11-17 (D23): a **business unit** splits activity into lines of business. It is an analysis dimension, not a legal or organizational entity: no numbering, currency or books of its own. A company keeps a tree of business units in `master_data`. Every journal line gains a nullable `business_unit_id` (ADR-0014 rule 9: a new dimension is a nullable column added by ADR). At posting, `ledger` fills it on profit-and-loss lines by a fixed order, first match wins: the line's explicit unit, then the defaults of the item's product, the cost center, the project, the document header, the site and the company. The line records which source won, and one derivation trace per entry records every candidate. Two company settings set the fallback unit and whether a P&L line may stay without one. Phase 1 reports P&L and gross margin per unit. A balance sheet per unit (document splitting) and the allocation of shared costs come later, on the column that is already on every line.
+The author's decision of 2026-11-17: a **business unit** splits activity into lines of business. It is an analysis dimension, not a legal or organizational entity: no numbering, currency or books of its own. A company keeps a tree of business units in `master_data`. Every journal line gains a nullable `business_unit_id` (ADR-0014 rule 9: a new dimension is a nullable column added by ADR). At posting, `ledger` fills it on profit-and-loss lines by a fixed order, first match wins: the line's explicit unit, then the defaults of the item's product, the cost center, the project, the document header, the site and the company. The line records which source won, and one derivation trace per entry records every candidate. Two company settings set the fallback unit and whether a P&L line may stay without one. Phase 1 reports P&L and gross margin per unit. A balance sheet per unit (document splitting) and the allocation of shared costs come later, on the column that is already on every line.
 
 ### Rules
 
@@ -74,7 +74,7 @@ The author's decision of 2026-11-17 (D23): a **business unit** splits activity i
     - **Content.** `rule_code` `business_unit_derivation`, `rule_version` `1`. `inputs` holds the header unit, the setting row in force and the master rows read. `steps` holds, per line number, the seven candidates in order, each a unit or null. `result` holds, per line number, the unit and the source.
     - **Link.** It is named by the new nullable `journal_entry.business_unit_trace_id`. `journal_line.derivation_trace_id` stays costing's (ADR-0027 rule 3).
     - **Visible before posting.** The trace is part of the posting plan (ADR-0008 rule 12), so a simulation shows each line's unit and why.
-    - **Scope.** D23 makes this derivation a trace writer under ADR-0027 rule 4. That is the author's scope decision.
+    - **Scope.** The author's 2026-11-17 decision makes this derivation a trace writer under ADR-0027 rule 4. That is the author's scope decision.
 
 **Policy**
 
@@ -120,7 +120,7 @@ The author's decision of 2026-11-17 (D23): a **business unit** splits activity i
 
 - **The ask.** Companies with several lines of business want P&L and margin per line without separate legal entities. Nothing in the design did this: no business unit, profit center or segment. Cost centers answer "who spent", not "which business earned".
 - **Practice.** In SAP S/4HANA the profit center, rolled up to a segment, plays this role. Revenue and cost of goods take it from the material per plant, and expenses from the cost center. A balance sheet per profit center needs document splitting. Dynamics 365 uses a financial dimension "Business unit" with default values on master records.
-- **Constraints.** A dimension, not an entity (D23). A new dimension is a nullable column added by ADR (ADR-0014 rule 9). Accounts are found by ADR-0015 alone. Derived values are explained (Principle 6). Settings live in one registry (ADR-0063). The CRM-only profile must not depend on `ledger` (author, 2026-11-17).
+- **Constraints.** A dimension, not an entity (the author, 2026-11-17). A new dimension is a nullable column added by ADR (ADR-0014 rule 9). Accounts are found by ADR-0015 alone. Derived values are explained (Principle 6). Settings live in one registry (ADR-0063). The CRM-only profile must not depend on `ledger` (author, 2026-11-17).
 
 ## Options considered
 
