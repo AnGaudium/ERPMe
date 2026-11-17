@@ -64,6 +64,8 @@ It adds only what production needs:
    - **Version content.** Content excludes `execution_state` and `is_content_edited` (ADR-0009 rule 9).
 
    An order of a configured item keeps the configuration's ID and the selected, sized lines as its snapshot ([ADR-0046](0046-product-configuration.md) rule 13).
+
+   Note ([ADR-0071](0071-work-orders-and-shop-floor-execution.md), proposed 2026-11-17): people see the order as an MO and each internal operation as a WO; `operation_execution` and `operation_assignment` hold the WO's run state, execution work center and people, outside version content like output serials (ADR-0071 rules 1, 6, 12).
 2. Creating and editing:
    - **Explosion.** `CreateProductionOrder` selects the production version (ADR-0033 rule 13), unless the client names one, under a share lock on `production_structure` (ADR-0027 rule 10, class 3), so a revision cannot be withdrawn meanwhile. It copies the components, outputs and operations of the revisions valid on `planned_start_date`. Components are exploded through phantoms, with quantities by ADR-0033 rule 6. Conversion from a planned order uses the shared planning function ([ADR-0036](0036-multi-level-mrp.md) rule 3).
    - **Backward scheduling.** Select the version and the routing revision valid on `planned_end_date`, schedule backward to obtain `planned_start_date`, then explode at that date. If the routing revision valid there differs, schedule once more with it. The response shows both dates.
@@ -79,10 +81,16 @@ It adds only what production needs:
    For a configured item, the explosion selects and sizes the product-level structures with the item's item-defining values ([ADR-0046](0046-product-configuration.md) rule 13).
 
    Note: backward scheduling selects the version on `planned_end_date` and requires it to be valid on the resulting start, else the next version in order, else `production_version_missing` ([ADR-0033](0033-production-master-data.md) rule 5's note) (holistic review 2026-11-15, item P3).
+
+   Note ([ADR-0071](0071-work-orders-and-shop-floor-execution.md), proposed 2026-11-17): a component not on the order is issued from the shop floor as one command batch of the change order adding its line (required 0 unless stated) and the issue (ADR-0071 rule 3).
 3. Scheduling:
    - **The rule.** Operation dates come from `setup_duration`, `run_duration` × expected quantity / base quantity, `queue_time` and `move_time`, on the work centers' calendars (ADR-0033 rules 10, 11), at infinite capacity. An order without operations uses the version's fixed lead time. External operations use the supplier lead time and route transit of [ADR-0037](0037-subcontracting.md) rule 3.
    - **Load view.** `ListWorkCenterLoad` (work center, day or week buckets) adds up the remaining scheduled hours of draft and approved orders that are not technically complete, against available hours. Real orders only; planned orders are added by planning's `ListCapacityLoad` ([ADR-0036](0036-multi-level-mrp.md) rule 11).
    - **Later.** Finite sequencing and levelling are DS-54's capacity check, proposed by the planning agent, never applied without approval.
+
+   Note ([ADR-0068](0068-sites-and-core-logistics-payment-master-data.md), proposed 2026-11-17): `ListWorkCenterLoad` also accepts a resource group, summing load and available hours over its members.
+
+   Note ([ADR-0071](0071-work-orders-and-shop-floor-execution.md), proposed 2026-11-17): `ListWorkCenterLoad` counts an operation at its execution work center (ADR-0071 rule 16).
 4. Rework and disassembly:
    - **`rework`.** No explosion. The client enters the components, usually the item itself, which may be issued from `quality_inspection` (rule 11), and the operations. The main output is the same item or another named item. The cycle this creates is a production order fact, which the costing solver handles (ADR-0025 rule 6), never a bill of materials.
    - **`disassembly`.**
@@ -91,6 +99,8 @@ It adds only what production needs:
      - **Limits.** Cumulative net issues of the input may not exceed G × (1 + tolerance). The outputs are `co_product` lines; how cost splits over them is DS-53's. Technical completion is manual, and INV-104 does not apply.
 
    Note (catalog review, 2026-11-15): a production order has at most one output of type `main` (a unique index in DS-43-54-planning-production.sql); a disassembly order has none, its outputs being `co_product` lines. A `rework` order may have no production version, since it has no explosion.
+
+   Note ([ADR-0070](0070-quality-management-core.md), proposed 2026-11-17): a rework order may be drafted by `quality`'s usage-decision executor for a lot's `rework` line, issuing from `quality_inspection` (ADR-0070 rules 12, 15).
 
 **Lifecycle and execution state**
 
@@ -142,6 +152,8 @@ It adds only what production needs:
    - **When it takes force.** Reservations and demand and supply lines are adjusted.
 
    Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): "unit" includes the line's conversion snapshot (rule 9).
+
+   Note ([ADR-0068](0068-sites-and-core-logistics-payment-master-data.md), proposed 2026-11-17): an unconfirmed internal operation may move to another active member of its work center's resource group in the order's production warehouse. In a draft this is an edit, and after release it is a change order. Standard values carry over; the target's calendar, capacity and efficiency schedule it, and its cost center and rates cost the confirmation.
 
 **Components: reservation, staging, issue and return**
 
@@ -201,6 +213,8 @@ It adds only what production needs:
 
     Note ([ADR-0064](0064-production-agent.md), proposed 2026-11-15): the capture agent is the agent type `production_capture`: tainted, scope `subject` on one production order resolved from a trusted order number of an extraction of purpose `shop_floor_report`, quantities copied as stated, drafts only, a person posts. Confirmations carry `entry_source` (`person`, `capture_agent`, `production_import`) and get the yield, activity and duplicate checks of rule 22; a deterministic production import may post them as `integration` only behind `production.mes_import.auto_post` and the evidence of ADR-0043 rule 14 (rules 19, 22, 25).
 
+    Note ([ADR-0071](0071-work-orders-and-shop-floor-execution.md), proposed 2026-11-17): a confirmation with yield and scrap 0 records time only; confirmations carry the execution `work_center_id`, link the time logs they take and store each activity's `proposed_quantity`; a final confirmation is refused while a setup or run log is open (`operation_time_log_open`) (ADR-0071 rules 2, 11, 16).
+
 **Output: receipt, inspection and make to order**
 
 13. `production_receipt` is an internal posting document (reversible):
@@ -222,6 +236,10 @@ It adds only what production needs:
     Note: backflush at receipt writes its lines to `operation_progress_component`, keyed by the receipt, not to `production_receipt_component` (rule 12's note) (holistic review 2026-11-15, item P11).
 
     Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): receipt lines carry the line unit block; the tolerance and progress compare inventory quantities (rules 9, 17).
+
+    Note ([ADR-0070](0070-quality-management-core.md), proposed 2026-11-17): "requires inspection" means that the product's `inspection_points` contains `production_output`. In-process lots come from operation confirmations of operations a released `in_process` plan names (ADR-0070 rules 2, 8).
+
+    Note ([ADR-0071](0071-work-orders-and-shop-floor-execution.md), proposed 2026-11-17): on an order without internal operations a receipt may record `scrap_quantity` with a reason, alone or with lines (`receipt_scrap_not_allowed` otherwise); backflush at receipt then uses the share max(R / G, (R + S) / Q), today's rule when S = 0; the output bin is that of the last operation's execution work center (ADR-0071 rules 4, 16).
 14. Make to order:
     - **The rule.** When `for_demand_supply_line_id` is set and that demand is in the same warehouse, `available` output is reserved for it, up to that demand's unreserved open quantity. Output in inspection is reserved when it is released: a `production` consumer of `WarehouseTaskConfirmed` runs the reservation (effect class `other`). Planning nets the line against this order through the supply link ([ADR-0036](0036-multi-level-mrp.md) rule 9).
     - **Status.** Interim, flagged: this automatic reservation is business behavior (open question).
@@ -294,6 +312,8 @@ It adds only what production needs:
     - order splitting;
     - co-product planning items;
     - labor time by clock events.
+
+    Note ([ADR-0071](0071-work-orders-and-shop-floor-execution.md), proposed 2026-11-17): labor time by clock events comes into Phase 1 in a minimal form: time logs that propose confirmation activities; costing still reads only confirmations (ADR-0071 rules 9–11).
 
 ## Context
 

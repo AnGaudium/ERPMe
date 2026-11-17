@@ -84,6 +84,8 @@ Allocation is always explicit. A deterministic query proposes it, and a person o
      The conditions join ADR-0043 rule 3 (a note there).
 
    Note: the settlement rate is optional. Without one, the document converts at the transaction lookup rate (applied rate origin `lookup`, ADR-0011 rule 11), and rule 12's rate check is skipped: there is nothing to compare, so neither `settlement_rate_unusual` nor `settlement_rate_unchecked` is returned, and `is_rate_unusual` is false (holistic review, 2026-11-15).
+
+   Note ([ADR-0068](0068-sites-and-core-logistics-payment-master-data.md), proposed 2026-11-17): the header gains `payment_method_id`, copied from the invoice the payment is drafted from. The default money account comes from `cash`'s `payment_method_money_account`, for the document's branch and currency. The method only suggests `evidence_method`, and rule 18 is unchanged.
 4. Cash counts:
    - **`cash_count`** (non-posting) records a cash money account, the counted amount (optionally by denomination) and the book balance at the time. It is kept as evidence even when nothing differs.
    - **`cash_count_adjustment`.** When a count is approved with a difference, it creates and posts this document:
@@ -225,6 +227,8 @@ Allocation is always explicit. A deterministic query proposes it, and a person o
     - **Expenses without an order** may use a payment's `account` line or a purchase invoice's `expense` line (ADR-0047 rule 12). Both apply the supplier-invoice key.
 
     Note: the approval seed is core segregation-of-duties practice, not a Vietnamese rule ([ADR-0053](0053-core-neutrality.md) rule 14).
+
+    Note ([ADR-0069](0069-business-unit-dimension.md), proposed 2026-11-17): general journal lines and payment `account` lines carry an explicit `business_unit_id`. Posted amounts move between units only by a general journal on the same account.
 16. Reversals (ADR-0009 rules 18–19):
     - **When.** A payment, netting, write-off or settlement document may be reversed while no document that is not reversed or canceled refers to it.
     - **How.** The reversal mirrors its lines exactly, realized differences and evidence methods included (ADR-0026 rule 11; EC-52). A bank statement line matched to the document returns to `unmatched` in the same transaction.

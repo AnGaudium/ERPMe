@@ -77,6 +77,8 @@ Policy is a deterministic threshold table per company, as runbook B7 asks.
 
    Note (simulation review, 2026-11-15): a purchase request carries no price. Its `policy_input` values each line at the supplier's purchase list price (`find_price`), else the item's last purchase price, else zero with `is_cost_unknown` ([ADR-0047](0047-commercial-documents-and-pricing.md) rule 9 note).
 
+   Note ([ADR-0070](0070-quality-management-core.md), proposed 2026-11-17): `inspection_lot`'s policy input is the outcome, item, item group, partner and point, and the held quantity at the preliminary price as amount. It adds the flags `is_all_passed` and `is_quality_deviation` (ADR-0070 rule 13).
+
 **Evaluation**
 
 5. Which actor is evaluated:
@@ -200,6 +202,8 @@ Policy is a deterministic threshold table per company, as runbook B7 asks.
     Note: a rule requiring `standard` approval at `submit` of every document type, for every actor kind, when `is_cost_unknown` is seeded ([ADR-0047](0047-commercial-documents-and-pricing.md) rule 22).
 
     Note ([ADR-0067](0067-quickflows-operating-presets.md), 2026-11-17 (proposed)): the operating preset `quickflows` seeds, for actor `human` at `submit` and `post` of every document type, rules that require `standard` from an amount the implementer enters (`risk_amount`) and when `is_credit_exceeded`, `is_cost_unknown` or `is_price_below_cost` is true; below the amount and without those flags a person posts from draft (ADR-0009 rule 11). The seeds above stay. A preset never seeds a rule that allows a non-human actor ([ADR-0067](0067-quickflows-operating-presets.md) rules 3, 6, 15).
+
+    Note ([ADR-0070](0070-quality-management-core.md), proposed 2026-11-17): the core also seeds `quality.deviation`: `require_approval` with `standard` at `submit` of `inspection_lot`, actor `human`, when `is_quality_deviation`. Auto-acceptance needs a company's own `allow` rule for `system`; no preset seeds one (ADR-0070 rules 13, 14).
 
 **Specific points**
 

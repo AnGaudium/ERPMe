@@ -71,3 +71,7 @@ One file per decision, named `NNNN-short-title.md`, using [template.md](template
 | [ADR-0065](0065-deterministic-auto-post-gateway.md) | Deterministic auto-post gateway (maker-checker) (DS-28, DS-34) | Proposed (2026-11-16) |
 | [ADR-0066](0066-work-cases.md) | Work cases (DS-29, DS-30) | Proposed (2026-11-16) |
 | [ADR-0067](0067-quickflows-operating-presets.md) | QuickFlows mode: operating presets for small teams (DS-28, DS-30) | Proposed (2026-11-17) |
+| [ADR-0068](0068-sites-and-core-logistics-payment-master-data.md) | Sites and core logistics and payment master data (DS-20, DS-09, DS-22, DS-25, DS-51–54) | Proposed (2026-11-17) |
+| [ADR-0069](0069-business-unit-dimension.md) | Business unit dimension (DS-06, DS-20, DS-22, DS-28, DS-33) | Proposed (2026-11-17) |
+| [ADR-0070](0070-quality-management-core.md) | Quality management core (DS-58) | Proposed (2026-11-17) |
+| [ADR-0071](0071-work-orders-and-shop-floor-execution.md) | Work orders and shop-floor execution (DS-52, DS-31, DS-53) | Proposed (2026-11-17) |

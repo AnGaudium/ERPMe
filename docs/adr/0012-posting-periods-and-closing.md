@@ -59,6 +59,8 @@ Each company's fiscal year (ADR-0007) contains regular posting periods and up to
 18. Closing entries are posted by a closing job, actor `system`, on behalf of the human who ran it (07); their journal entries carry `is_closing_entry = true` (DS-06), so period-range reports can exclude them. Whether a regime closes profit and loss by entries (e.g. to 911 and 421) or by computation without documents (as SAP carries profit and loss to retained earnings), which accounts, how often and in which period, are rules of the accounting regime. The Vietnam package closes by entries at the end of every period, regular and special, within that period: income and expense accounts to the account mapped to `income_summary` (911), which has no balance after closing, and its result to `retained_earnings` (421). Source: descriptions of TT99 accounts 911 and 421 by MISA and Kế toán Lê Ánh; flagged until verified against the TT99 text.
 
     Note: Phase 1 registers only `by: entries` as a value of `closing.method`; closing by computation without documents comes after Phase 1 (interim, open question) (holistic review, 2026-11-15).
+
+    Note ([ADR-0069](0069-business-unit-dimension.md), proposed 2026-11-17): closing entries close each profit-and-loss account per business unit, and each closing line takes the unit of the balance it closes (source `closing`).
 19. Balance-sheet balances are cumulative at all times: the balance on any date is the sum of all lines up to that date, across fiscal years, so no opening entry is posted at year start. Stored period-closing balances (07) are a cache rebuilt from journal lines (DS-06).
 
 ## Context

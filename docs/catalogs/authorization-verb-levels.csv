@@ -64,3 +64,5 @@ Export,full,0.1.0,
 Replay,full,0.1.0,
 Approve,approve,0.1.0,Given by the role's approval flag; no level gives it (ADR-0054 rule 9).
 Reject,approve,0.1.0,Given by the role's approval flag; no level gives it (ADR-0054 rule 9).
+Pause,edit,0.1.0,"Stops work on a WO for now, closing its open clock records (PauseOperation, ADR-0071 rule 8)."
+Block,edit,0.1.0,"Declares that a WO cannot go on, with a stop reason (BlockOperation, ADR-0071 rule 8)."

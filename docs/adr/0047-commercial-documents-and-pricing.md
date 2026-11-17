@@ -70,6 +70,10 @@ The commercial documents are a thin layer over the core (B3). They hold what was
 
    Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): receipts, deliveries, invoices, returns and credits may use any allowed unit of the item; every quantity relation compares inventory quantities. `source_lines` quantities are in the source line's unit, and a copied line takes the source line's unit and snapshot, so a part in the source's unit converts by the cumulative rule (rules 10, 11).
 
+   Note ([ADR-0068](0068-sites-and-core-logistics-payment-master-data.md), proposed 2026-11-17): headers gain `payment_method_id` (quotation, sales order, sales invoice, purchase order, purchase invoice), `delivery_method_id` (sales order, purchase order), and `incoterm_code` with `incoterm_place` (quotation, sales order, delivery, sales invoice, purchase order, goods receipt, purchase invoice). Each is copied from the partner profile at creation and then from the source document, and changeable while the document is a draft or by a change order. Deliveries and goods receipts also carry `delivery_method_id`, `carrier_partner_id` (an active supplier), `tracking_number` and `vehicle_registration`. None of these fields enters pricing, posting or policy.
+
+   Note ([ADR-0069](0069-business-unit-dimension.md), proposed 2026-11-17): every commercial document header carries a nullable `business_unit_id`. Copying fills an empty header from the source, and it can be changed until posting.
+
 **Sales**
 
 3. `quotation`:

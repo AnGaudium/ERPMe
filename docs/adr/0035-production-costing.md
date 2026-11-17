@@ -97,6 +97,8 @@ The accounting choices are the author's (ADR-0005 item 1). Each one below is a r
    - **Unconfigured pool.** A pool group with cost but no `pool_allocation_rule` fails the job with `pool_allocation_rule_missing`.
    - **Material on a pool.** A line on `production_cost_material` whose cost object is a pool is rejected (`material_on_cost_pool`). Indirect materials go to `production_cost_overhead`.
    - **Postings.** Allocation lines debit the order and credit the pool on the source line's own account. Such mirror lines carry no transaction key (ADR-0015 rule 5). Pools end the period at zero.
+
+   Note ([ADR-0071](0071-work-orders-and-shop-floor-execution.md), proposed 2026-11-17): an allocation by activity type counts a confirmation at its `work_center_id`, the execution work center; time logs never enter the solve (ADR-0071 rules 11, 16).
 8. Order pools. Per order and cost component (`material`, `labor`, `overhead`, `other`):
    - pool = opening WIP + the period's incurred cost;
    - incurred cost: material issued net of returns at actual prices, allocations, external service costs (`other`), and the ADR-0021 rule 7 consumer-split shares that land on the order's consumption.
@@ -122,6 +124,8 @@ The accounting choices are the author's (ADR-0005 item 1). Each one below is a r
     - **Abnormal cost.** Assessed once, at completion, over the whole order. Per component line, the excess is the net issued quantity minus required × (cumulative received ÷ G) × (1 + tolerance), floored at 0. It is valued at the period's actual price and posted to cost of goods sold (key `production_abnormal_cost`). The same applies to activity quantities against standards. A reopen reverses it, and the next completion assesses it again.
     - **No output in the period.** A completed order whose pool is not zero but which received no output in the period sends that cost to cost of goods sold as a residual (key `production_residual_cost`), flagged. Examples: late allocations, consumer-split shares, late confirmations. A completed order with no good output at all does the same with its whole cost.
     - **A residual may be negative.** In particular, when completion falls in a period without receipts, an abnormal debit can be offset by a negative residual on the same order. Earlier outputs then keep the abnormal cost, and net cost of goods sold is unchanged. This limitation is flagged (rule 18).
+
+    Note ([ADR-0071](0071-work-orders-and-shop-floor-execution.md), proposed 2026-11-17): receipt scrap carries no value and does not change abnormal cost, which reads receipts; the scrap variance (`GetProductionOrderVariance`) counts it with confirmation scrap (ADR-0071 rule 4).
 11. Outputs. The value to outputs is the sum of the component pools, minus WIP, minus abnormal cost, minus the by-product value.
     - **Co-products** share it by `cost_coefficient` × quantity (rule 13).
     - **A negative value** (for example a by-product worth more than the order's cost) sends the shortfall to cost of goods sold as a negative residual, and the outputs get zero, flagged. Like the planned-cost cap, it is applied by solving again, at most once per order (lab L-06).

@@ -11,6 +11,8 @@ Every table has a single-column primary key `id` of type `uuid`, version 7; rows
 **IDs**
 
 1. Every table's primary key is one column, `id uuid` (ADR-0004 rule 12). No table has a composite primary key. Tables of third-party libraries are excluded (ADR-0004 rule 9).
+
+   Note ([ADR-0068](0068-sites-and-core-logistics-payment-master-data.md), proposed 2026-11-17): `incoterm` (the Incoterms codes, also UN/ECE Recommendation 5) keeps its natural `code` key, like `currency`, and profiles and documents carry `incoterm_code`, as they carry `currency` (ADR-0068 rule 18).
 2. IDs are UUID version 7, generated in the command layer with Python's `uuid.uuid7()`. A column default `uuidv7()` covers rows written by database code (e.g. triggers). This requires Python 3.14 or later and PostgreSQL 18 or later (DS-18).
 3. A `Create` command accepts an optional `id`. If given, it must be a UUID version 7, otherwise the command is rejected; if absent, the command layer generates it. This lets one command batch refer to a record that an earlier command in the same batch creates. Idempotency (Principle 9) is unchanged. Rows of tables partitioned by `id` (rule 22) always get server-generated IDs.
 4. Rows of a catalog shipped with the core (system accounts, transaction keys, movement types, and any later core catalog) have `id = uuid5(f244ce09-3c6c-4c82-af14-918bdeca6be3, "<table>:<code>")`, e.g. `uuid5(…, "system_account:inventory")`. Core catalogs are global: they have no `company_id`. The same row has the same `id` in every installation, test and document.

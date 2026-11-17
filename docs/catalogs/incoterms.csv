@@ -1,0 +1,12 @@
+code,version,name,transport_scope,is_carriage_paid_by_seller,is_insurance_paid_by_seller,is_import_cleared_by_seller,risk_transfer_point,is_active,added_in
+EXW,2020,Ex Works,any,false,false,false,"At the seller's premises or another named place, when the goods are placed at the buyer's disposal, not loaded",true,0.1.0
+FCA,2020,Free Carrier,any,false,false,false,"When the goods are handed to the buyer's carrier at the named place, loaded if that place is the seller's premises",true,0.1.0
+CPT,2020,Carriage Paid To,any,true,false,false,"When the goods are handed to the first carrier; the seller still pays carriage to the named destination",true,0.1.0
+CIP,2020,Carriage and Insurance Paid To,any,true,true,false,"When the goods are handed to the first carrier; the seller still pays carriage and insurance to the named destination",true,0.1.0
+DAP,2020,Delivered at Place,any,true,false,false,"At the named destination, on the arriving transport, ready for unloading",true,0.1.0
+DPU,2020,Delivered at Place Unloaded,any,true,false,false,"At the named destination, once unloaded",true,0.1.0
+DDP,2020,Delivered Duty Paid,any,true,false,true,"At the named destination, ready for unloading and cleared for import",true,0.1.0
+FAS,2020,Free Alongside Ship,sea_inland_waterway,false,false,false,"Alongside the vessel at the named port of shipment",true,0.1.0
+FOB,2020,Free On Board,sea_inland_waterway,false,false,false,"On board the vessel at the named port of shipment",true,0.1.0
+CFR,2020,Cost and Freight,sea_inland_waterway,true,false,false,"On board the vessel at the port of shipment; the seller still pays freight to the named port of destination",true,0.1.0
+CIF,2020,"Cost, Insurance and Freight",sea_inland_waterway,true,true,false,"On board the vessel at the port of shipment; the seller still pays freight and insurance to the named port of destination",true,0.1.0

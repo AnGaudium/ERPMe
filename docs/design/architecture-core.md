@@ -16,17 +16,17 @@ Read this before every coding task. It summarizes rules and creates none. If it 
 | --- | --- |
 | 6 Composition | `app` |
 | 5 Interfaces | `api`, `query`, `agents`, `sdk`, `imports`, `automation` |
-| 4 Commercial | `sales`, `purchasing`, `cash`, `reporting`, `crm`, `planning` |
+| 4 Commercial | `sales`, `purchasing`, `cash`, `reporting`, `crm`, `planning`, `quality` |
 | 3 Core business | `ledger`, `inventory`, `master_data`, `tax`, `production`, `assets` (Phase 3) |
 | 2 Platform | `registry`, `documents`, `periods`, `permissions`, `outbox`, `audit`, `localization`, `db`, `agent_runs`, `work`, `attachments`, `policy`, `configuration` |
 | 1 Foundation | `numeric`, `clock`, `ids`, `i18n`, `errors` |
 
 Import rules (ADR-0022 rules 2, 5, 6; [ADR-0027](../adr/0027-cross-cutting-ownership.md) rule 1):
-- Another module is imported only through its `contract.py`, from any layer (rule 3). Foundation modules and `db` publish through `__init__`. Rule 6 keeps modules of layers 3 and 4 independent except their `contract`; rule 2 names one same-layer exception, `tax` to `ledger` (`ledger` never imports `tax`; see the overview's findings). `reporting` imports no other layer-4 module (rule 2 note).
+- Another module is imported only through its `contract.py`, from any layer (rule 3). Foundation modules and `db` publish through `__init__`. Rule 6 keeps modules of layers 3 and 4 independent except their `contract`; rule 2 names one same-layer exception, `tax` to `ledger` (`ledger` never imports `tax`; see the overview's findings). `reporting` imports no other layer-4 module (rule 2 note). `quality` imports the contracts of `inventory`, `production`, `master_data`, `documents`, `work`, `attachments` and `policy`, and no module imports `quality` ([ADR-0070](../adr/0070-quality-management-core.md) rule 1).
 - Layer 2: `registry` imports `work` and `policy`, and the `agent_runs` contract. `documents`, `outbox`, `permissions`, `attachments`, `agent_runs` and `policy` import `work`. `documents` and `permissions` may import the `agent_runs` contract; `documents` may import the `attachments` contract. `configuration` imports the `registry` contract and `work`.
 - Layer 5 modules import no layer-5 peer. `query` imports `db`, `registry`, `agent_runs` and the `work` contract. `agents` imports `registry` and the `agent_runs` and `work` contracts, plus the contracts of the layer 3–4 modules whose subjects its agent types declare ([ADR-0050](../adr/0050-agent-runtime-and-query-layer.md) rule 1). `automation` imports `registry` and the `configuration`, `work` and `permissions` contracts (ADR-0022 rule 2 note).
 - `nativeflows.registry.dispatch` loads `app` through an entry point, never a static import.
-- Sideways or up: use a hook. A module declares it; a module of the same or a higher layer registers it; `app` wires it.
+- Sideways or up: use a hook. A module declares it; a module of the same or a higher layer registers it; `app` wires it. Example: `ledger` declares `business_unit_defaults`, which `master_data` registers ([ADR-0069](../adr/0069-business-unit-dimension.md) rule 9).
 - `nativeflows` imports no tool package and no `l10n_*`. `l10n_*` imports only `nativeflows.sdk`. Only `nativeflows.agents.gateway.adapters` imports an LLM provider library.
 
 The complete list is the import-linter contracts in the root `pyproject.toml` (ADR-0022 rules 1, 6). This section names the exceptions the ADRs state.

@@ -45,6 +45,8 @@ A capability check found multimodal input largely undesigned: business-card phot
    | `product_source` | `production_structure` | `production` |
 
    Note ([ADR-0064](0064-production-agent.md), proposed 2026-11-15): purpose `shop_floor_report` (leaf `operation_confirmation`, consumer `production`): order number, operation number, yield, scrap, scrap reason text, lot and posting date, from spreadsheets, photos or an operator's message; a mailbox may carry it as `document_intake_purpose` (rule 26).
+
+   Note ([ADR-0070](0070-quality-management-core.md), proposed 2026-11-17): purpose `certificate_of_analysis` (leaf `inspection_lot`, consumer `quality`). It reads the supplier lot code, the item code and, per line, the characteristic (`code`), value, unit and stated verdict. Results drafted from it stay unconfirmed until a person confirms them (ADR-0070 rule 11).
 3. Requesting an extraction, `RequestDocumentExtraction` (module `attachments`, effect class `other`, verb Request at `edit` on the purpose's leaf):
    - **Payload:** `attachment_id`, `purpose`, optional `partner_id` (a person's statement of whose document it is).
    - **Who:** a person, or the mailbox route as `system` on behalf of the mailbox owner (rule 25).

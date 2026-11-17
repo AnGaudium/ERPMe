@@ -123,6 +123,8 @@ The customs declaration, supplier cost invoices and invoice price differences to
     A close task (ADR-0012) lists sources still unallocated at period end. `purchase_cost_clearing` is a liability in the system chart but carries a debit while costs wait; its presentation is DS-19's. TT99: 33882, under other payables, a debit balance under other receivables (interim, [ADR-0039](0039-vietnam-package-tt99.md) rule 8; DS-26).
 
     Note: DS-26 defines the report format, and DS-19's report definitions place the lines of 33882, so both statements hold ([ADR-0049](0049-statutory-reporting-and-printing.md) rule 22).
+
+    Note ([ADR-0068](0068-sites-and-core-logistics-payment-master-data.md), proposed 2026-11-17): `ListExpectedLandedCost` lists goods receipts whose purchase Incoterm leaves main carriage or insurance to the buyer and that have no `freight` or `insurance` cost line. The close task shows the list next to the unallocated sources, as information that blocks nothing.
 15. DS-17 edge cases: landed cost after partial sale and after period close (existing); one declaration covering several receipts; customs assessed before the goods receipt.
 16. Open questions for the author:
     - the earlier-unlocked case (rule 6);

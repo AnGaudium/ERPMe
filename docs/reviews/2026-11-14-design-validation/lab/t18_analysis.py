@@ -1326,8 +1326,8 @@ with open(os.path.join(CAT, "analysis-measures.csv"), encoding="utf-8", newline=
     rows_m, rows_d = list(csv.reader(f1)), list(csv.reader(f2))
 check("C01 both catalogs keep their header's field count on every row",
       all(len(r) == len(rows_m[0]) for r in rows_m) and all(len(r) == len(rows_d[0]) for r in rows_d))
-check("C02 codes are unique snake_case and the catalog holds fewer than 40 measures (35) and 22 dimensions",
-      len(MEAS) == len(rows_m) - 1 == 35 and len(DIMS) == len(rows_d) - 1 == 22
+check("C02 codes are unique snake_case and the catalog holds fewer than 40 measures (35) and 25 dimensions (site and payment_method: ADR-0068; business_unit: ADR-0069)",
+      len(MEAS) == len(rows_m) - 1 == 35 and len(DIMS) == len(rows_d) - 1 == 25
       and all(re.fullmatch(r"[a-z][a-z0-9_]*", c) for c in list(MEAS) + list(DIMS)), (len(MEAS), len(DIMS)))
 sa_sel = [(c, v) for c, m in MEAS.items() for col, vals in selectors(m) if col == "system_account" for v in vals]
 check("C03 the neutral core: every system account a selector names is a code of system-accounts.csv; no selector looks like an operational account number",
@@ -1347,9 +1347,9 @@ check("C06 derived measures name measures of their own fact; ratios are non-addi
       all(all(o in MEAS and MEAS[o]["fact"] == m["fact"] for o in split(m["column"])) for m in MEAS.values() if m["aggregation"] in DERIVED)
       and all(m["additivity"] == "non_additive" and m["basis"] == "percent" for m in MEAS.values() if m["aggregation"] == "ratio")
       and all(len({MEAS[o]["basis"] for o in split(m["column"])} | {m["basis"]}) == 1 for m in MEAS.values() if m["aggregation"] == "difference"))
-check("C07 hierarchies close: every parent dimension exists and shares its child's facts; only system_account is a tree; kinds are time, entity, catalog or enum",
+check("C07 hierarchies close: every parent dimension exists and shares its child's facts; only system_account and business_unit (ADR-0069 rule 16) are trees; kinds are time, entity, catalog or enum",
       all(not r["parent_code"] or (r["parent_code"] in DIMS and dim_facts(r["parent_code"]) >= dim_facts(c)) for c, r in DIMS.items())
-      and [c for c, r in DIMS.items() if r["is_tree"] == "true"] == ["system_account"]
+      and [c for c, r in DIMS.items() if r["is_tree"] == "true"] == ["system_account", "business_unit"]
       and {r["kind"] for r in DIMS.values()} == {"time", "entity", "catalog", "enum"} and all(bool(r["values"]) == (r["kind"] == "enum") for r in DIMS.values()))
 check("C08 every semi-additive measure names the one dimension it is not additive over: posting_period for balances, as_of for current snapshots",
       all((m["non_additive_over"] == "posting_period") == (m["fact"] == "system_account_turnover") and m["non_additive_over"] in ("posting_period", "as_of")

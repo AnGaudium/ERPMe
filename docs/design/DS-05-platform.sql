@@ -18,6 +18,8 @@
 -- under the setting value `installation` (ADR-0017 rule 19; ADR-0013 rule 14).
 -- Installation tables, without company_id: event_subject, event_consumer, agent_type, agent_type_version. The lab
 -- checks this list.
+-- payment_method_money_account (ADR-0068 rule 16) refers to payment_method and branch, and payment and payment_line to
+-- payment_method and business_unit, all in DS-20-master-data.sql.
 -- The configuration and artifact tables (ADR-0058, ADR-0059) are in DS-28-34-configuration-artifacts.sql; this file carries
 -- only their causation columns on outbox_event and audit_record and the match parameter columns of bank_statement_line.
 -- Referenced tables defined elsewhere: company, branch, partner, partner_bank_account, warehouse, cost_center, project,
@@ -1078,11 +1080,29 @@ CREATE TABLE money_account (                               -- company data, mast
     UNIQUE (company_id, code),
     UNIQUE (company_id, id),
     UNIQUE (company_id, id, kind, currency),
+    UNIQUE (company_id, id, currency),                  -- target of payment_method_money_account's key (ADR-0068 rule 16)
     CONSTRAINT uq_money_account_account_id UNIQUE (account_id),   -- each operational account serves at most one money account
     CONSTRAINT ck_money_account_bank CHECK (CASE kind
         WHEN 'bank' THEN bank_name IS NOT NULL AND bank_account_number IS NOT NULL
         ELSE bank_name IS NULL AND bank_code IS NULL AND bank_account_number IS NULL AND bank_branch IS NULL AND NOT is_overdraft_allowed END)
 );
+CREATE TABLE payment_method_money_account (                -- [cash] ADR-0068 rule 16; company data, master_data_change, change-tracked
+    id                 uuid PRIMARY KEY,
+    company_id         uuid NOT NULL REFERENCES company (id),
+    payment_method_id  uuid NOT NULL,
+    money_account_id   uuid NOT NULL,
+    currency           text NOT NULL,                       -- the money account's currency, held by the key below
+    branch_id          uuid,                                -- null: every branch without a row of its own
+    recorded_at        timestamptz NOT NULL DEFAULT now(),
+    -- one default per method, branch and currency; selection: the document's branch, else the null branch (rule 16)
+    CONSTRAINT uq_payment_method_money_account_key UNIQUE NULLS NOT DISTINCT (company_id, payment_method_id, branch_id, currency),
+    UNIQUE (company_id, id),
+    FOREIGN KEY (company_id, payment_method_id) REFERENCES payment_method (company_id, id),
+    CONSTRAINT fk_payment_method_money_account_money_account FOREIGN KEY (company_id, money_account_id, currency) REFERENCES money_account (company_id, id, currency),
+    FOREIGN KEY (company_id, branch_id) REFERENCES branch (company_id, id)
+);
+-- Kinds (command check, payment_method_money_account_mismatch): a cash method to a cash money account, every other
+-- method to a bank money account, and no row for an offset method.
 CREATE TABLE bank_statement (
     id                           uuid PRIMARY KEY,
     company_id                   uuid NOT NULL,
@@ -1189,6 +1209,7 @@ CREATE TABLE payment (
     partner_address              jsonb,
     counterparty_name            text,                     -- cash documents: the payer's or payee's name, a snapshot
     settlement_exchange_rate     types.exchange_rate,      -- rate type settlement, for a foreign currency (ADR-0011 rule 12)
+    payment_method_id            uuid,                     -- the method used, copied from the invoice a payment is drafted from; suggests only (ADR-0068 rules 15, 17)
     reference                    text,
     partner_bank_account_id      uuid,                     -- bank_payment to a partner (ADR-0028 rule 15)
     bank_statement_line_id       uuid,                     -- interim: not stated in ADR-0048 (the line it was drafted from, for UnmatchBankLine, rule 9)
@@ -1203,7 +1224,8 @@ CREATE TABLE payment (
     CONSTRAINT ck_payment_value_date CHECK ((money_account_kind = 'bank') = (value_date IS NOT NULL)),
     CONSTRAINT ck_payment_counterparty CHECK (counterparty_name IS NULL OR money_account_kind = 'cash'),
     CONSTRAINT ck_payment_partner_bank_account CHECK (partner_bank_account_id IS NULL
-        OR (document_type = 'bank_payment' AND partner_id IS NOT NULL))
+        OR (document_type = 'bank_payment' AND partner_id IS NOT NULL)),
+    FOREIGN KEY (company_id, payment_method_id) REFERENCES payment_method (company_id, id)
 );
 CREATE INDEX ix_payment_money_account_id ON payment (company_id, money_account_id, posting_date);
 CREATE TABLE payment_line (
@@ -1227,6 +1249,7 @@ CREATE TABLE payment_line (
     supplier_name                text,
     supplier_invoice_key         jsonb,                    -- the regime's supplier-invoice key fields (ADR-0030 rule 10)
     supplier_invoice_date        date,
+    business_unit_id             uuid,                     -- account lines: the explicit unit (ADR-0069 rule 8; command check)
     description                  text,
     recorded_at                  timestamptz NOT NULL,
     UNIQUE (payment_id, line_number),
@@ -1244,7 +1267,8 @@ CREATE TABLE payment_line (
         AND (is_paid_by_third_party = (evidence_method IS NOT DISTINCT FROM 'third_party'))
         AND (NOT is_paid_by_third_party OR line_kind = 'settle')),
     CONSTRAINT ck_payment_line_supplier CHECK ((supplier_partner_id IS NULL AND supplier_tax_id IS NULL AND supplier_invoice_key IS NULL)
-        OR line_kind = 'account')
+        OR line_kind = 'account'),
+    FOREIGN KEY (company_id, business_unit_id) REFERENCES business_unit (company_id, id)
 );
 CREATE INDEX ix_payment_line_open_item_id ON payment_line (open_item_id) WHERE open_item_id IS NOT NULL;
 -- ADR-0048 rule 17 (and its note of the final simulation review): the collection side table of an open item (ADR-0026
@@ -1633,7 +1657,7 @@ BEGIN
         'posting_intent', 'change_proposal', 'change_proposal_item', 'change_proposal_execution', 'change_proposal_execution_item',
         'outbox_event', 'event_delivery', 'audit_record', 'audit_change', 'audit_denial', 'attachment', 'attachment_link',
         'document_line_tax', 'tax_line', 'tax_line_adjustment', 'agent_promotion_evidence', 'money_account', 'bank_statement',
-        'bank_statement_line', 'payment', 'payment_line', 'open_item_collection'] LOOP
+        'bank_statement_line', 'payment', 'payment_line', 'open_item_collection', 'payment_method_money_account'] LOOP
         EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', v_table);
         EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', v_table);
         IF v_table = ANY (v_nullable) THEN

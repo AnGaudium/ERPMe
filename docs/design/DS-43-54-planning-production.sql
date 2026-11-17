@@ -1,6 +1,7 @@
 -- DS-43 and DS-51 to DS-55 planning and production: DDL draft for ADR-0024 (planning), ADR-0033 (production master
 -- data), ADR-0034 (production orders and shop floor), ADR-0035 (production costing), ADR-0036 (multi-level MRP) and
--- ADR-0037 (subcontracting), with the columns ADR-0046 rules 12-14 add to production structures and estimates, and the
+-- ADR-0037 (subcontracting), with the columns ADR-0046 rules 12-14 add to production structures and estimates, the resource
+-- groups of ADR-0068 (rules 12-14), the shop-floor execution tables of ADR-0071 (work orders), and the
 -- holistic review decisions of 2026-11-15 (one operation_progress_component table, costing_lot_quantity, the B3
 -- columns as an interim, the forecast, message and exception tables). PostgreSQL 18. Loaded with DS-20, DS-56, DS-15
 -- and DS-06 in the design lab (docs/reviews/2026-11-14-design-validation, t16_planning_production_ddl.py). The ADRs
@@ -15,7 +16,8 @@
 -- Referenced tables defined elsewhere: company, item, product, partner, warehouse, bin, lot, serial_number, uom,
 -- cost_center, working_calendar, variant_attribute (DS-20); product_configuration (DS-56); user_account and team
 -- (DS-15); cost_object and journal tables (DS-06); document (documents, ADR-0009 rule 1, with UNIQUE (company_id, id)
--- by ADR-0052 rule 18), material_document_line and posting_period (stubs in the lab until their DDL exists).
+-- by ADR-0052 rule 18), material_document_line and posting_period (stubs in the lab until their DDL exists). agent_run
+-- (DS-05-platform.sql) is referenced by ID only, so this file loads without the platform file (as DS-22 does for attachment).
 -- Typed headers of documents (production_order, the three shop-floor documents, production_cost_settlement) share their
 -- id with the document row, as DS-35 does; document state, number, document_date and partner live on that row.
 -- Lines of document types use line_number as identity (ADR-0028 rule 1) and keep a surrogate id for typed references.
@@ -340,6 +342,30 @@ CREATE TABLE activity_type (                               -- e.g. setup, machin
     name         text NOT NULL,
     time_uom_id  uuid NOT NULL REFERENCES uom (id),            -- a unit of kind time (command check)
     is_active    boolean NOT NULL DEFAULT true,
+    time_log_basis text NOT NULL DEFAULT 'none' CONSTRAINT ck_activity_type_time_log_basis CHECK (time_log_basis IN ('none', 'labor', 'machine')),   -- how a confirmation proposes it from time logs (ADR-0071 rule 11)
+    recorded_at  timestamptz NOT NULL,
+    UNIQUE (company_id, code),
+    UNIQUE (company_id, id)
+);
+CREATE TABLE stop_reason (                                 -- [production] ADR-0071 rule 10; company data, master_data_change, leaf production_structure
+    id           uuid PRIMARY KEY,
+    company_id   uuid NOT NULL REFERENCES company (id),
+    code         text NOT NULL,
+    name         text NOT NULL,
+    loss_class   text NOT NULL CONSTRAINT ck_stop_reason_loss_class CHECK (loss_class IN ('availability', 'performance', 'quality')),   -- OEE loss class; OEE reporting is later
+    is_planned   boolean NOT NULL DEFAULT false,            -- a planned stop (break, planned maintenance) that OEE leaves out of availability
+    is_active    boolean NOT NULL DEFAULT true,
+    recorded_at  timestamptz NOT NULL,
+    UNIQUE (company_id, code),
+    UNIQUE (company_id, id),
+    CONSTRAINT ck_stop_reason_planned CHECK (NOT is_planned OR loss_class = 'availability')
+);
+CREATE TABLE resource_group (                              -- [production] ADR-0068 rule 12; work centers of one site that can stand in for each other
+    id           uuid PRIMARY KEY,
+    company_id   uuid NOT NULL REFERENCES company (id),
+    code         text NOT NULL,
+    name         text NOT NULL,
+    is_active    boolean NOT NULL DEFAULT true,             -- false: no new members; members stay until removed
     recorded_at  timestamptz NOT NULL,
     UNIQUE (company_id, code),
     UNIQUE (company_id, id)
@@ -358,6 +384,7 @@ CREATE TABLE work_center (                                 -- ADR-0033 rule 11
     cost_center_id           uuid NOT NULL,                     -- where its overhead is collected (DS-53)
     supply_bin_id            uuid,                              -- bin type production (command check; ADR-0034 rule 10)
     output_bin_id            uuid,
+    resource_group_id        uuid,                              -- members: one site and equal activity type sets (command checks; INV-811); no site_id, the site is derived through production_warehouse_id (ADR-0068 rules 10, 12)
     is_active                boolean NOT NULL DEFAULT true,
     recorded_at              timestamptz NOT NULL,
     UNIQUE (company_id, code),
@@ -367,8 +394,10 @@ CREATE TABLE work_center (                                 -- ADR-0033 rule 11
     FOREIGN KEY (company_id, cost_center_id) REFERENCES cost_center (company_id, id),
     -- the bins lie in the work center's warehouse
     CONSTRAINT fk_work_center_supply_bin FOREIGN KEY (supply_bin_id, production_warehouse_id) REFERENCES bin (id, warehouse_id),
-    CONSTRAINT fk_work_center_output_bin FOREIGN KEY (output_bin_id, production_warehouse_id) REFERENCES bin (id, warehouse_id)
+    CONSTRAINT fk_work_center_output_bin FOREIGN KEY (output_bin_id, production_warehouse_id) REFERENCES bin (id, warehouse_id),
+    FOREIGN KEY (company_id, resource_group_id) REFERENCES resource_group (company_id, id)
 );
+CREATE INDEX ix_work_center_company_id_resource_group_id ON work_center (company_id, resource_group_id) WHERE resource_group_id IS NOT NULL;
 CREATE TABLE work_center_activity (                        -- activity types a work center records, with defaults copied into new operations
     company_id        uuid NOT NULL,
     work_center_id    uuid NOT NULL,
@@ -983,6 +1012,102 @@ CREATE TABLE production_order_operation_activity (         -- activity standards
     FOREIGN KEY (company_id, production_order_operation_id) REFERENCES production_order_operation (company_id, id),
     FOREIGN KEY (company_id, activity_type_id) REFERENCES activity_type (company_id, id)
 );
+-- WO execution (ADR-0071): MO and WO are UI labels of production_order and its internal operations. These tables hold the
+-- execution facts, not version content (ADR-0009 rule 9); waiting, ready and done are derived by
+-- production.derive_operation_state (rule 7), the other states are stored here.
+CREATE TABLE operation_execution (                         -- [production] ADR-0071 rules 6, 16; one row per internal operation of an approved order
+    company_id                     uuid NOT NULL,
+    production_order_operation_id  uuid PRIMARY KEY,
+    production_order_id            uuid NOT NULL,
+    operation_control              text NOT NULL DEFAULT 'internal' CONSTRAINT ck_operation_execution_control CHECK (operation_control = 'internal'),   -- a WO is an internal operation
+    work_center_id                 uuid NOT NULL,             -- the execution work center: the planned one until TransferOperation (rule 16)
+    run_state                      text NOT NULL DEFAULT 'not_started' CONSTRAINT ck_operation_execution_run_state CHECK (run_state IN ('not_started', 'in_progress', 'paused', 'blocked')),   -- waiting, ready and done are derived (rule 7)
+    block_stop_reason_id           uuid,
+    block_note                     text,
+    state_changed_at               timestamptz NOT NULL,      -- the instant of the last Start, Pause or Block
+    recorded_at                    timestamptz NOT NULL,
+    UNIQUE (company_id, production_order_operation_id),
+    UNIQUE (company_id, production_order_operation_id, production_order_id),
+    UNIQUE (company_id, production_order_operation_id, work_center_id),   -- target of the confirmation's key (INV-843)
+    CONSTRAINT fk_operation_execution_operation FOREIGN KEY (company_id, production_order_operation_id, production_order_id, operation_control)
+        REFERENCES production_order_operation (company_id, id, production_order_id, control),
+    FOREIGN KEY (company_id, work_center_id) REFERENCES work_center (company_id, id),
+    FOREIGN KEY (company_id, block_stop_reason_id) REFERENCES stop_reason (company_id, id),
+    CONSTRAINT ck_operation_execution_block CHECK ((run_state = 'blocked') = (block_stop_reason_id IS NOT NULL)
+        AND (block_note IS NULL OR run_state = 'blocked'))
+);
+CREATE INDEX ix_operation_execution_work_center ON operation_execution (company_id, work_center_id);
+CREATE INDEX ix_operation_execution_production_order_id ON operation_execution (production_order_id);
+CREATE TABLE operation_assignment (                        -- [production] ADR-0071 rule 12; AssignOperation replaces the list, ending removed rows
+    id                             uuid PRIMARY KEY,
+    company_id                     uuid NOT NULL,
+    production_order_operation_id  uuid NOT NULL,
+    employee_partner_id            uuid,                      -- an active employee role (command check)
+    team_id                        uuid,
+    assigned_at                    timestamptz NOT NULL,
+    ended_at                       timestamptz,
+    recorded_at                    timestamptz NOT NULL,
+    FOREIGN KEY (company_id, production_order_operation_id) REFERENCES operation_execution (company_id, production_order_operation_id),
+    FOREIGN KEY (company_id, employee_partner_id) REFERENCES partner (company_id, id),
+    FOREIGN KEY (company_id, team_id) REFERENCES team (company_id, id),
+    CONSTRAINT ck_operation_assignment_who CHECK (num_nonnulls(employee_partner_id, team_id) = 1),
+    CONSTRAINT ck_operation_assignment_dates CHECK (ended_at IS NULL OR ended_at >= assigned_at)
+);
+-- One open assignment per operation and person or team.
+CREATE UNIQUE INDEX ux_operation_assignment_open ON operation_assignment (production_order_operation_id, employee_partner_id, team_id) NULLS NOT DISTINCT WHERE ended_at IS NULL;
+CREATE INDEX ix_operation_assignment_employee_partner_id ON operation_assignment (employee_partner_id) WHERE ended_at IS NULL AND employee_partner_id IS NOT NULL;
+CREATE TABLE operation_time_log (                          -- [production] ADR-0071 rule 9; UI label "WO time log"
+    id                             uuid PRIMARY KEY,
+    company_id                     uuid NOT NULL,
+    production_order_id            uuid NOT NULL,
+    production_order_operation_id  uuid NOT NULL,
+    work_center_id                 uuid NOT NULL,             -- the execution work center when the log was opened
+    log_kind                       text NOT NULL CONSTRAINT ck_operation_time_log_kind CHECK (log_kind IN ('setup', 'run', 'stop')),
+    employee_partner_id            uuid,                      -- a person; or
+    team_id                        uuid,                      -- a team with head_count; neither: a machine log
+    head_count                     integer NOT NULL,
+    started_at                     timestamptz NOT NULL,      -- instants (ADR-0007), never business dates
+    ended_at                       timestamptz,               -- null while open; only StartOperation, PauseOperation and BlockOperation open logs
+    stop_reason_id                 uuid,                      -- stop logs only; null: an unclassified stop
+    state                          text NOT NULL CONSTRAINT ck_operation_time_log_state CHECK (state IN ('draft', 'recorded', 'canceled')),
+    entry_source                   text NOT NULL CONSTRAINT ck_operation_time_log_entry_source CHECK (entry_source IN ('person', 'agent', 'integration')),
+    agent_run_id                   uuid,                      -- the run that wrote a draft; agent_run (DS-05-platform) by ID, checked by the command
+    confirmed_by_user_id           uuid REFERENCES user_account (id),   -- ConfirmOperationTimeLog, human_only
+    confirmed_at                   timestamptz,
+    canceled_at                    timestamptz,
+    cancel_reason                  text,
+    note                           text,
+    recorded_at                    timestamptz NOT NULL,
+    UNIQUE (company_id, id),
+    UNIQUE (company_id, id, production_order_operation_id),
+    CONSTRAINT fk_operation_time_log_execution FOREIGN KEY (company_id, production_order_operation_id, production_order_id)
+        REFERENCES operation_execution (company_id, production_order_operation_id, production_order_id),
+    FOREIGN KEY (company_id, work_center_id) REFERENCES work_center (company_id, id),
+    FOREIGN KEY (company_id, employee_partner_id) REFERENCES partner (company_id, id),
+    FOREIGN KEY (company_id, team_id) REFERENCES team (company_id, id),
+    FOREIGN KEY (company_id, stop_reason_id) REFERENCES stop_reason (company_id, id),
+    -- a person counts 1, a team its stated people, a machine 0
+    CONSTRAINT ck_operation_time_log_who CHECK (CASE
+        WHEN employee_partner_id IS NOT NULL THEN team_id IS NULL AND head_count = 1
+        WHEN team_id IS NOT NULL THEN head_count >= 1
+        ELSE head_count = 0 END),
+    CONSTRAINT ck_operation_time_log_interval CHECK (ended_at IS NULL OR ended_at > started_at),
+    CONSTRAINT ck_operation_time_log_stop_reason CHECK (stop_reason_id IS NULL OR log_kind = 'stop'),
+    -- drafts come only from agent runs, are closed, and become recorded only by a human's confirmation (INV-845)
+    CONSTRAINT ck_operation_time_log_agent CHECK ((entry_source = 'agent') = (agent_run_id IS NOT NULL)
+        AND (state <> 'draft' OR (entry_source = 'agent' AND ended_at IS NOT NULL))
+        AND (entry_source <> 'agent' OR state <> 'recorded' OR confirmed_at IS NOT NULL)),
+    CONSTRAINT ck_operation_time_log_confirmed CHECK ((confirmed_at IS NULL) = (confirmed_by_user_id IS NULL)
+        AND (confirmed_at IS NULL OR entry_source = 'agent')),
+    CONSTRAINT ck_operation_time_log_canceled CHECK ((state = 'canceled') = (canceled_at IS NOT NULL)
+        AND (canceled_at IS NULL OR coalesce(length(btrim(cancel_reason)), 0) > 0))
+);
+-- At most one open log per operation and person, team or machine (INV-841).
+CREATE UNIQUE INDEX ux_operation_time_log_open ON operation_time_log (production_order_operation_id, employee_partner_id, team_id) NULLS NOT DISTINCT
+    WHERE ended_at IS NULL AND state <> 'canceled';
+CREATE INDEX ix_operation_time_log_operation_started ON operation_time_log (production_order_operation_id, started_at);
+-- Later OEE reads per work center.
+CREATE INDEX ix_operation_time_log_work_center_started ON operation_time_log (company_id, work_center_id, started_at);
 CREATE TABLE production_order_output_serial (              -- assigned serials; not version content (rules 1, 16)
     company_id                  uuid NOT NULL,
     production_order_id         uuid NOT NULL,
@@ -1038,7 +1163,7 @@ CREATE TABLE production_issue_line (
     stock_status                   text NOT NULL DEFAULT 'available' CONSTRAINT ck_production_issue_line_status CHECK (stock_status IN ('available', 'quality_inspection')),   -- quality_inspection for rework
     is_return                      boolean NOT NULL DEFAULT false,
     output_serial_number_id        uuid,                       -- as built (rule 16)
-    reason_code                    text,                       -- company data, for over-issue
+    reason_code                    text,                       -- company data, for over-issue and component scrap (ADR-0071 rule 2)
     cost_object_id                 uuid NOT NULL,
     material_document_line_id      uuid REFERENCES material_document_line (id),   -- interim: not stated in ADR-0034 (the posted movement)
     recorded_at                    timestamptz NOT NULL,
@@ -1067,6 +1192,7 @@ CREATE TABLE operation_confirmation (                      -- an internal operat
     production_order_id            uuid NOT NULL,
     production_order_operation_id  uuid NOT NULL,
     operation_control              text NOT NULL DEFAULT 'internal' CONSTRAINT ck_operation_confirmation_control CHECK (operation_control = 'internal'),
+    work_center_id                 uuid NOT NULL,              -- the execution work center, copied from operation_execution at Create; pools allocated by activity type count it (ADR-0071 rule 16)
     yield_quantity                 types.quantity NOT NULL CONSTRAINT ck_operation_confirmation_yield CHECK (yield_quantity >= 0),
     scrap_quantity                 types.quantity NOT NULL DEFAULT 0 CONSTRAINT ck_operation_confirmation_scrap CHECK (scrap_quantity >= 0),
     scrap_reason_code              text,
@@ -1088,7 +1214,11 @@ CREATE TABLE operation_confirmation (                      -- an internal operat
     FOREIGN KEY (company_id, employee_partner_id) REFERENCES partner (company_id, id),
     FOREIGN KEY (company_id, team_id) REFERENCES team (company_id, id),
     CONSTRAINT ck_operation_confirmation_scrap_reason CHECK (scrap_reason_code IS NULL OR scrap_quantity > 0),
-    CONSTRAINT ck_operation_confirmation_external_reference CHECK ((entry_source = 'production_import') = (external_reference IS NOT NULL) AND coalesce(btrim(external_reference), 'x') <> '')
+    CONSTRAINT ck_operation_confirmation_external_reference CHECK ((entry_source = 'production_import') = (external_reference IS NOT NULL) AND coalesce(btrim(external_reference), 'x') <> ''),
+    UNIQUE (company_id, id, production_order_operation_id),
+    FOREIGN KEY (company_id, work_center_id) REFERENCES work_center (company_id, id),
+    -- INV-843; it also refuses a transfer once a confirmation exists
+    CONSTRAINT fk_operation_confirmation_execution_work_center FOREIGN KEY (company_id, production_order_operation_id, work_center_id) REFERENCES operation_execution (company_id, production_order_operation_id, work_center_id)
 );
 -- duplicate_external_document: one confirmation per company and import reference (ADR-0064 rule 25).
 CREATE UNIQUE INDEX ux_operation_confirmation_external_reference ON operation_confirmation (company_id, external_reference) WHERE external_reference IS NOT NULL;
@@ -1097,11 +1227,25 @@ CREATE TABLE operation_confirmation_activity (             -- actual activity qu
     operation_confirmation_id  uuid NOT NULL,
     activity_type_id           uuid NOT NULL,
     quantity                   types.quantity NOT NULL CONSTRAINT ck_operation_confirmation_activity_quantity CHECK (quantity >= 0),
+    proposed_quantity          types.quantity CONSTRAINT ck_operation_confirmation_activity_proposed CHECK (proposed_quantity >= 0),   -- from the linked time logs; null when the type's time_log_basis is none or no log applies (ADR-0071 rule 11)
     recorded_at                timestamptz NOT NULL,
     PRIMARY KEY (operation_confirmation_id, activity_type_id),
     FOREIGN KEY (company_id, operation_confirmation_id) REFERENCES operation_confirmation (company_id, id),
     FOREIGN KEY (company_id, activity_type_id) REFERENCES activity_type (company_id, id)
 );
+CREATE TABLE operation_confirmation_time_log (             -- [production] ADR-0071 rule 11; draft content of the confirmation; one posted, not reversed confirmation per log (INV-840)
+    company_id                     uuid NOT NULL,
+    operation_confirmation_id      uuid NOT NULL,
+    operation_time_log_id          uuid NOT NULL,
+    production_order_operation_id  uuid NOT NULL,             -- carried so both keys name the same operation
+    recorded_at                    timestamptz NOT NULL,
+    PRIMARY KEY (operation_confirmation_id, operation_time_log_id),
+    CONSTRAINT fk_operation_confirmation_time_log_confirmation FOREIGN KEY (company_id, operation_confirmation_id, production_order_operation_id)
+        REFERENCES operation_confirmation (company_id, id, production_order_operation_id),
+    CONSTRAINT fk_operation_confirmation_time_log_log FOREIGN KEY (company_id, operation_time_log_id, production_order_operation_id)
+        REFERENCES operation_time_log (company_id, id, production_order_operation_id)
+);
+CREATE INDEX ix_operation_confirmation_time_log_log ON operation_confirmation_time_log (operation_time_log_id);
 CREATE TABLE production_receipt (                          -- rule 13
     id                         uuid PRIMARY KEY,
     company_id                 uuid NOT NULL,
@@ -1109,6 +1253,8 @@ CREATE TABLE production_receipt (                          -- rule 13
     posting_date               date NOT NULL,                  -- interim: not stated in ADR-0034 for the receipt (as for the confirmation)
     operation_confirmation_id  uuid,                           -- interim: not stated in ADR-0034 (the confirmation whose final progress created this automatic receipt; reversed with it)
     service_receipt_id         uuid,                           -- interim: not stated in ADR-0037 (the same, for a service receipt; purchasing's document)
+    scrap_quantity             types.quantity NOT NULL DEFAULT 0 CONSTRAINT ck_production_receipt_scrap CHECK (scrap_quantity >= 0),   -- receipt scrap of the main output, inventory unit, no value; only on an order with a main output and no internal operation (receipt_scrap_not_allowed; ADR-0071 rule 4)
+    scrap_reason_code          text,                           -- company data, as on confirmations; a receipt may hold only scrap and then posts no material document
     recorded_at                timestamptz NOT NULL,
     UNIQUE (company_id, id),
     UNIQUE (company_id, id, production_order_id),
@@ -1116,7 +1262,8 @@ CREATE TABLE production_receipt (                          -- rule 13
     FOREIGN KEY (company_id, production_order_id) REFERENCES production_order (company_id, id),
     CONSTRAINT fk_production_receipt_confirmation FOREIGN KEY (company_id, operation_confirmation_id, production_order_id) REFERENCES operation_confirmation (company_id, id, production_order_id),
     CONSTRAINT fk_production_receipt_service_receipt FOREIGN KEY (company_id, service_receipt_id) REFERENCES document (company_id, id),
-    CONSTRAINT ck_production_receipt_trigger CHECK (num_nonnulls(operation_confirmation_id, service_receipt_id) <= 1)
+    CONSTRAINT ck_production_receipt_trigger CHECK (num_nonnulls(operation_confirmation_id, service_receipt_id) <= 1),
+    CONSTRAINT ck_production_receipt_scrap_reason CHECK (scrap_reason_code IS NULL OR scrap_quantity > 0)
 );
 CREATE TABLE production_receipt_line (
     id                          uuid PRIMARY KEY,

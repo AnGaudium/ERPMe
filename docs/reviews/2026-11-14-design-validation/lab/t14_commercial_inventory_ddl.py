@@ -143,9 +143,11 @@ for k in ("cfg", "cfg2"):
     X("insert into product_configuration (id, company_id, product_id, content_hash, created_at) values (%s,%s,%s,%s,now())",
       (I[k], I["co"], I["pcfg"] if k == "cfg" else I["pstd"], ("a" if k == "cfg" else "b") * 64))
 X("insert into variant_attribute (id, company_id, code, name, variant_mode) values (%s,%s,'engr','Engraving','line_option')", (I["va"], I["co"]))
+I["site"] = new()                                          # the company's default site (ADR-0068 rule 3)
+X("insert into site (id, company_id, code, name, kind) values (%s,%s,'MAIN','Main','factory')", (I["site"], I["co"]))
 with c.transaction():                                     # warehouses with their default zone and bin (deferred keys)
     for w, z, b, code in (("w1", "z1", "b1", "W1"), ("w2", "z2", "b2", "W2")):
-        X("insert into warehouse (id, company_id, code, name, kind, default_bin_id) values (%s,%s,%s,%s,'physical',%s)", (I[w], I["co"], code, code, I[b]))
+        X("insert into warehouse (id, company_id, site_id, code, name, kind, default_bin_id) values (%s,%s,%s,%s,%s,'physical',%s)", (I[w], I["co"], I["site"], code, code, I[b]))
         X("insert into zone (id, company_id, warehouse_id, code, name) values (%s,%s,%s,'DEFAULT','Default')", (I[z], I["co"], I[w]))
         X("insert into bin (id, company_id, warehouse_id, zone_id, code, barcode, bin_type) values (%s,%s,%s,%s,'DEFAULT',%s,'storage')",
           (I[b], I["co"], I[w], I[z], code + "-DEFAULT"))

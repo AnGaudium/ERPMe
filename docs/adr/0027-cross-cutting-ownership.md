@@ -56,6 +56,8 @@ Before step 1 code freezes the platform modules, every entity that several modul
 
    Interim, with the open question on trace scope: prices are explained by the `document_line_price_step` rows on each line, part of its content, and pricing writes no `derivation_trace` rows ([ADR-0047](0047-commercial-documents-and-pricing.md) rule 16).
 
+   Note ([ADR-0069](0069-business-unit-dimension.md), proposed 2026-11-17): by the author's decision of 2026-11-17, the business unit derivation writes traces, one per journal entry (`rule_code` `business_unit_derivation`), named by `journal_entry.business_unit_trace_id`.
+
 **Master records**
 
 5. Master records needed by step 1, owned by `master_data` (DS-20):
@@ -77,6 +79,8 @@ Before step 1 code freezes the platform modules, every entity that several modul
    - **Non-posting demand document:** `transfer_order`.
    - **Order references.** Lines of `goods_receipt`, `delivery` and the return types have nullable order-line reference columns (`purchase_order_line_id`, `sales_order_line_id`), reserved in the step 3 design (typed line references, [ADR-0028](0028-document-lifecycle-hardening.md) rule 2). Commercial documents at step 5 fill them, and the core table does not change (B3). Before step 5, `needs_reference` is satisfied by a free-text reference.
    - **Correction types.** The return stock documents may carry `correction_of_id` to the receipt or delivery they correct (ADR-0009 rule 23); the DS-09 deliverable decides. The commercial correction types `purchase_return` and `sales_return` refer to them.
+
+   Note ([ADR-0070](0070-quality-management-core.md), proposed 2026-11-17): the non-posting document type `inspection_lot` is owned by `quality` (ADR-0070 rule 7).
 8. Owners of entities that had none:
 
    | Entity | Owner |

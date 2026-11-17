@@ -143,10 +143,11 @@ for k, code in (("S1", "SUP1"), ("P1", "PROC1"), ("E1", "EMP1")):
 X("insert into working_calendar (id, company_id, code, name, working_weekdays) values (%s,%s,'STD','Std','{1,2,3,4,5}')", (I["cal"], I["co"]))
 X("insert into cost_center (id, company_id, code, name, kind) values (%s,%s,'ASM','Assembly','production')", (I["cc"], I["co"]))
 X("insert into cost_center (id, company_id, code, name, kind) values (%s,%s,'ASM','Assembly','production')", (I["cc2"], I["co2"]))
+X("insert into site (id, company_id, code, name, kind) values (%s,%s,'MAIN','Main','factory')", (I.setdefault("site", new()), I["co"]))   # the default site (ADR-0068 rule 3)
 def warehouse(wk, zk, bk, code, processor=None, co="co"):
     with c.transaction():
-        X("insert into warehouse (id, company_id, code, name, kind, processor_partner_id, working_calendar_id, default_bin_id) values (%s,%s,%s,%s,'physical',%s,%s,%s)",
-          (I[wk], I[co], code, code, I[processor] if processor else None, I["cal"] if co == "co" else None, I[bk]))
+        X("insert into warehouse (id, company_id, site_id, code, name, kind, processor_partner_id, working_calendar_id, default_bin_id) values (%s,%s,%s,%s,%s,'physical',%s,%s,%s)",
+          (I[wk], I[co], I["site"], code, code, I[processor] if processor else None, I["cal"] if co == "co" else None, I[bk]))
         X("insert into zone (id, company_id, warehouse_id, code, name) values (%s,%s,%s,'Z','Zone')", (I[zk], I[co], I[wk]))
         X("insert into bin (id, company_id, warehouse_id, zone_id, code, barcode, bin_type) values (%s,%s,%s,%s,'DEF',%s,'storage')", (I[bk], I[co], I[wk], I[zk], code + "-DEF"))
 warehouse("WP", "zP", "bP", "WP"); warehouse("WD", "zD", "bD", "WD"); warehouse("WX", "zX", "bX", "WX", processor="P1")
@@ -275,6 +276,8 @@ step("P08 the production planned order converts into a draft production order wi
         values (%s,%s,%s,1,10,%s,'internal',1,0.5,10,'2026-12-01','2026-12-02',now())""", (I["OP10"], I["co"], I["doc"], I["WC1"])),
     ("""insert into production_order_operation (id, company_id, production_order_id, line_number, operation_number, control, supplier_partner_id, service_item_id, expected_quantity, scheduled_start_date, scheduled_end_date, recorded_at)
         values (%s,%s,%s,2,20,'external',%s,%s,10,'2026-12-03','2026-12-10',now())""", (I["OP20"], I["co"], I["doc"], I["P1"], I["iSV"])),
+    ("insert into operation_execution (company_id, production_order_operation_id, production_order_id, work_center_id, state_changed_at, recorded_at) values (%s,%s,%s,%s,now(),now())",
+     (I["co"], I["OP10"], I["doc"], I["WC1"])),                    # the WO's execution row (ADR-0071 rule 6)
     ("insert into production_order_operation_activity (company_id, production_order_operation_id, activity_type_id, quantity, basis, recorded_at) values (%s,%s,%s,0.5,'per_base_quantity',now())",
      (I["co"], I["OP10"], I["machine"])),
     ("""insert into demand_supply_line (id, company_id, item_id, warehouse_id, direction, open_quantity, requested_date, source_kind, production_order_component_id, recorded_at)
@@ -306,8 +309,8 @@ step("P10 a production issue of the manual lot-tracked component, carrying the o
     ("update production_order set execution_state='in_progress' where id=%s", (I["doc"],)),
 ])
 step("P11 a confirmation of internal operation 10 with actual activities, and its backflush line in operation_progress_component", posting_doc("doc_c", "md_c", "mdl_c", "operation_confirmation") + [
-    ("""insert into operation_confirmation (id, company_id, production_order_id, production_order_operation_id, yield_quantity, scrap_quantity, is_final, employee_partner_id, posting_date, recorded_at)
-        values (%s,%s,%s,%s,10,0,true,%s,'2026-12-02',now())""", (I["doc_c"], I["co"], I["doc"], I["OP10"], I["E1"])),
+    ("""insert into operation_confirmation (id, company_id, production_order_id, production_order_operation_id, work_center_id, yield_quantity, scrap_quantity, is_final, employee_partner_id, posting_date, recorded_at)
+        values (%s,%s,%s,%s,%s,10,0,true,%s,'2026-12-02',now())""", (I["doc_c"], I["co"], I["doc"], I["OP10"], I["WC1"], I["E1"])),
     ("insert into operation_confirmation_activity (company_id, operation_confirmation_id, activity_type_id, quantity, recorded_at) values (%s,%s,%s,5,now())", (I["co"], I["doc_c"], I["machine"])),
     ("""insert into operation_progress_component (id, company_id, production_order_id, operation_confirmation_id, production_order_component_id, item_id, warehouse_id, quantity, uom_id, uom_numerator, uom_denominator, uom_factor_source, inventory_quantity, bin_id, cost_object_id,
         material_document_line_id, recorded_at) values (%s,%s,%s,%s,%s,%s,%s,20,%s,1,1,'identity',20,%s,%s,%s,now())""",
@@ -498,10 +501,10 @@ bad("N49 an issue line takes stock from a bin of its warehouse", "fk_production_
 bad("N50 a serial issue line moves exactly one unit", "ck_production_issue_line_tracking", iline(serial_number_id=I["SER2"], quantity=2))
 bad("N51 only an internal operation is confirmed (operation_not_confirmable)", "fk_operation_confirmation_operation",
     ("insert into document (id, company_id, document_type) values (%s,%s,'operation_confirmation')", (doc2, I["co"])),
-    ins("operation_confirmation", id=doc2, production_order_id=I["doc"], production_order_operation_id=I["OP20"], yield_quantity=1, posting_date="2026-12-02"))
+    ins("operation_confirmation", id=doc2, production_order_id=I["doc"], production_order_operation_id=I["OP20"], work_center_id=I["WC1"], yield_quantity=1, posting_date="2026-12-02"))
 bad("N52 a scrap reason needs scrap", "ck_operation_confirmation_scrap_reason",
     ("insert into document (id, company_id, document_type) values (%s,%s,'operation_confirmation')", (doc2, I["co"])),
-    ins("operation_confirmation", id=doc2, production_order_id=I["doc"], production_order_operation_id=I["OP10"], yield_quantity=1, scrap_reason_code="damaged", posting_date="2026-12-02"))
+    ins("operation_confirmation", id=doc2, production_order_id=I["doc"], production_order_operation_id=I["OP10"], work_center_id=I["WC1"], yield_quantity=1, scrap_reason_code="damaged", posting_date="2026-12-02"))
 bad("N53 a generated progress line has exactly one calling document", "ck_operation_progress_component_caller",
     ins("operation_progress_component", id=new(), production_order_id=I["doc"], operation_confirmation_id=I["doc_c"], production_receipt_id=I["doc_r"], production_order_component_id=I["L1"],
         item_id=I["iC1"], warehouse_id=I["WP"], quantity=1, bin_id=I["SB"], cost_object_id=I["CO"], material_document_line_id=I["mdl_c"]))

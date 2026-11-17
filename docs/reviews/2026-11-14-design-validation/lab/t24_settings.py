@@ -71,7 +71,7 @@ SET = read_dicts("settings.csv")
 S = {r["key"]: r for r in SET}
 SCOPES = {"installation", "regime", "company", "product_category", "money_account", "scanner_profile", "agent_type", "rule_version"}
 STORAGE = {"setting_value", "regime_setting", "agent_type_setting", "data_processing_permission", "rule_version", "deployment"}
-TYPES = {"boolean", "integer", "decimal", "percent", "amount", "enum", "code_list", "field_list", "object"}
+TYPES = {"boolean", "integer", "decimal", "percent", "amount", "enum", "code", "code_list", "field_list", "object"}   # code: ADR-0069 rule 13
 NUMERIC = {"integer", "decimal", "percent", "amount"}
 DIRS = {"higher_tighter", "lower_tighter", "true_tighter", "false_tighter", "subset_tighter", "superset_tighter", "neutral"}
 LEAVES = {r["code"] for r in read_dicts("authorization-areas.csv")}
@@ -91,6 +91,8 @@ def bounds_of(r):
         return {"values": vals}
     if t == "code_list" and b == "codes" or t == "field_list" and b == "fields" or t == "object" and b == "schema":
         return {}
+    if t == "code" and re.fullmatch(r"[a-z][a-z0-9_]*", b):   # one code of the table the bounds name (ADR-0069 rule 13)
+        return {"table": b}
     raise ValueError(f"bounds {b!r} for {t}")
 
 
@@ -133,6 +135,8 @@ def in_bounds(r, v):
         return isinstance(v, str) and v in b["values"]
     if t in ("code_list", "field_list"):
         return isinstance(v, list) and all(isinstance(x, str) and x for x in v) and (t != "field_list" or all(re.fullmatch(r"[a-z_]+\.[a-z_]+", x) for x in v))
+    if t == "code":                                     # the command checks the code against active rows of the company
+        return isinstance(v, str) and bool(v)
     return isinstance(v, dict)
 
 
@@ -432,7 +436,7 @@ def other_value(r):
         if not isinstance(dv, (int, Dec)):  # unset default (ADR-0066 work_case.<kind>.due_days): any in-bounds value differs
             return b["min"]
         return dv + 1 if b["max"] is None or dv + 1 <= b["max"] else dv - 1
-    return ["C9"]
+    return "C9" if t == "code" else ["C9"]
 
 
 EDITOR = {lf: "edit" for lf in LEAVES}

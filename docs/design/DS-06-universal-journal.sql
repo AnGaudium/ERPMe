@@ -75,6 +75,7 @@ CREATE TABLE journal_entry (
     close_task_id                uuid        REFERENCES close_task (id),
     database_transaction_number  xid8        NOT NULL,
     line_count                   integer     NOT NULL CHECK (line_count >= 2),
+    business_unit_trace_id       uuid        REFERENCES derivation_trace (id),   -- ADR-0069 rule 12: the entry's business unit derivation (rule_code business_unit_derivation); journal_line.derivation_trace_id stays costing's
     recorded_at                  timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT uq_journal_entry_document_id UNIQUE (document_id)
 );
@@ -184,12 +185,15 @@ CREATE TABLE journal_line (
     purchase_order_line_id     uuid,         -- ADR-0030 rule 3: GR/IR per order line; FK to purchase_order_line added at step 5
     evidence_method            text          CONSTRAINT ck_journal_line_evidence_method CHECK (evidence_method IS NULL OR (open_item_id IS NOT NULL AND evidence_method IN ('cash', 'bank_transfer', 'card', 'offset', 'third_party', 'none'))),   -- lines of ADR-0048 rule 18; how a settlement was paid, in any regime (ADR-0053 rule 11)
     derivation_trace_id        uuid          REFERENCES derivation_trace (id),
+    business_unit_id           uuid          REFERENCES business_unit (id),   -- ADR-0069 rule 4; profit-and-loss lines only in Phase 1 (rule 5, posting logic)
+    business_unit_source       text          CONSTRAINT ck_journal_line_business_unit_source CHECK (business_unit_source IN ('line', 'item', 'cost_center', 'project', 'document', 'site', 'company_default', 'reversal', 'closing')),   -- the derivation step that set it (ADR-0069 rules 9, 11)
     description                text,
     recorded_at                timestamptz   NOT NULL DEFAULT now(),
     CONSTRAINT uq_journal_line_journal_entry_id_line_number UNIQUE (journal_entry_id, line_number),
     CONSTRAINT ck_journal_line_line_number_positive CHECK (line_number > 0),
     CONSTRAINT ck_journal_line_side CHECK (side IN ('debit', 'credit')),
     CONSTRAINT ck_journal_line_group_pair CHECK ((group_currency IS NULL) = (group_amount IS NULL)),
+    CONSTRAINT ck_journal_line_business_unit_pair CHECK ((business_unit_id IS NULL) = (business_unit_source IS NULL)),
     CONSTRAINT ck_journal_line_not_all_zero
         CHECK (transaction_amount <> 0 OR company_amount <> 0 OR COALESCE(group_amount, 0) <> 0),
     -- Rule 6: transaction and company amounts never have opposite signs.
@@ -210,6 +214,9 @@ CREATE INDEX ix_journal_line_material_document_line_id
     ON journal_line (material_document_line_id) WHERE material_document_line_id IS NOT NULL;
 CREATE INDEX ix_journal_line_purchase_order_line_id
     ON journal_line (purchase_order_line_id) WHERE purchase_order_line_id IS NOT NULL;
+-- ADR-0069 rule 4: profit and loss per business unit.
+CREATE INDEX ix_journal_line_company_id_business_unit_id_posting_period_id
+    ON journal_line (company_id, business_unit_id, posting_period_id) WHERE business_unit_id IS NOT NULL;
 
 -- Rule 13: append-only.
 CREATE FUNCTION journal_reject_change() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -246,6 +253,8 @@ CREATE TRIGGER trg_journal_entry_set_transaction
     FOR EACH ROW EXECUTE FUNCTION journal_entry_set_transaction();
 
 -- Rule 12: checks on every line insert.
+-- ADR-0069 rules 5 and 14 (a business unit on profit-and-loss lines only; ledger.business_unit.required_on_profit_and_loss)
+-- are posting logic, not this trigger, like the control-account setting.
 CREATE FUNCTION journal_line_check_insert() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE
     v_entry          journal_entry%ROWTYPE;

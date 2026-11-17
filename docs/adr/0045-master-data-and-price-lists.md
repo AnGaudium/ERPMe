@@ -39,6 +39,8 @@ It loads together with the DS-06 journal in the design lab, and the earlier jour
    - **Moved tables.** Company, branch, cost center and project are defined there; DS-06 keeps a note.
    - **Deferred to other items.** `partner_email_domain` (DS-35), `supplier_item` (ADR-0024 rule 2, planning) and `preliminary_price` (ADR-0020 rule 11, inventory) are defined with their owners, not here. `partner_email_domain` is in [DS-35-crm.sql](../design/DS-35-crm.sql). `contact` gains the composite keys, the e-mail and phone indexes, the lowercase e-mail check and `is_accounts_contact`; the contact commands normalize e-mail and phone; `CreatePartner` takes `email_domains` through `crm`'s hook ([ADR-0052](0052-minimal-crm.md) rules 3–5).
 
+   Note ([ADR-0068](0068-sites-and-core-logistics-payment-master-data.md), proposed 2026-11-17): `incoterm` is a fifth global catalog without `company_id` or row-level security.
+
 **Price lists**
 
 2. `price_list`:
@@ -101,6 +103,8 @@ It loads together with the DS-06 journal in the design lab, and the earlier jour
 9. Cost centers and projects:
    - **Cost centers** have `kind` (`production`, `production_service`, `selling`, `administration`, `other`), an optional parent and branch of the same company, and `is_active`. The kind tells production cost pools (ADR-0035 rule 7) from service centers, and gives the expense-function question (641 or 642) a place to land.
    - **Projects** have an optional customer, dates and `state` (`open`, `closed`). A posting to a closed project is rejected with `project_closed` (flagged); drafts may still name it, so a document started before closing is corrected rather than lost. Projects are dimensions only in Phase 1 (spec 09).
+
+   Note ([ADR-0069](0069-business-unit-dimension.md), proposed 2026-11-17): cost centers and projects gain a default `business_unit_id`. Business units themselves are company data of `master_data` under the leaf `organization`.
 10. Working calendars:
     - **Structure:** working weekdays and dated holidays (ADR-0024 rule 4).
     - **Who uses them:** warehouses and suppliers name theirs. Holidays come from a package template entry with its basis, or are added by the company with basis `company_decision`; every holiday row carries its basis.
@@ -142,6 +146,8 @@ It loads together with the DS-06 journal in the design lab, and the earlier jour
     - **Constraints:** forty-one scenarios, each matched to the constraint that must refuse it, and a check that every DS-20 table outside the four global catalogs has `company_id`.
     - **The lookup:** twenty cases on real rows, with exact fractions: breaks and dates; a carton from the each price; the entered unit's entry winning; fallback when no break qualifies; a 7/3 product unit with rounding; a unit through `uom_conversion`; a unit that is not allowed; option extras, with a product-specific extra winning, an expired extra, an extra on a 7/3 unit, and a negative total.
     - **Earlier tests.** The journal, subledger, cost object and opening tests pass on the real master data tables in place of the old stubs (L-13).
+
+    Note ([ADR-0068](0068-sites-and-core-logistics-payment-master-data.md), proposed 2026-11-17): the lab's list of tables without `company_id` gains `incoterm`.
 
 **Attributes that do not create variants**
 

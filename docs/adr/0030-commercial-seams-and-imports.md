@@ -84,6 +84,8 @@ Accounting and business choices stay with the author, as flagged interims: close
    - **Phase 1** creates no non-owned stock. The columns cost nothing before step 3; adding them after go-live would migrate append-only tables. `owner_partner_id` is also reserved on production order components and outputs and on `demand_supply_line` ([ADR-0037](0037-subcontracting.md) rule 7).
    - **Accounting is the author's** (open question): goods sold but held, and whether delivery and invoice must share a date in Vietnam.
 
+   Note ([ADR-0068](0068-sites-and-core-logistics-payment-master-data.md), proposed 2026-11-17): the owner axis has no ownership-transfer default, so nothing reads a document's Incoterm here. When ownership of goods in transit from the shipping point is designed, the Incoterm is its input.
+
 **Imports** (F14)
 
 9. An import is still posted only through simulated command batches, never by an SQL script (spec 15).

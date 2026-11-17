@@ -89,7 +89,7 @@ uom_alias,product_unit,master_data,master_data,Unit aliases,0.1.0,"CreateUomAlia
 configuration_model,master_data,master_data,production,Configuration models,0.1.0,ADR-0046.
 price_list,master_data,master_data,master_data,Price lists,0.1.0,ADR-0045 rules 2-7.
 warehouse,master_data,master_data,master_data,Warehouses and bins,0.1.0,"Warehouses, zones, bins, lots and serials (ADR-0023; ADR-0045)."
-organization,master_data,master_data,master_data,Organization,0.1.0,"Branches, cost centers, projects, working calendars, departments and teams (ADR-0045); the department, team and UpdateEmployeeOrganization commands need full (ADR-0054 rule 6)."
+organization,master_data,master_data,master_data,Organization,0.1.0,"Branches, cost centers, projects, business units (ADR-0069), working calendars, departments and teams (ADR-0045); the department, team and UpdateEmployeeOrganization commands need full (ADR-0054 rule 6)."
 master_data_group,master_data,master_data,master_data,Groups,0.1.0,"Partner, tax, item and valuation groups and product categories (ADR-0045 rule 12)."
 print_profile,master_data,master_data,master_data,Print profiles,0.1.0,"Company and branch print profiles, seals and signatures; none in every template except owner (ADR-0049 rule 26; ADR-0054 rule 11)."
 production_structure,master_data,master_data,production,Production structures,0.1.0,"Bills of materials, routings, work centers, production versions and settings (ADR-0033)."
@@ -144,3 +144,15 @@ agent_production,agent,function,agents,Production agent,0.1.0,Capability start_a
 agent_production_capture,agent,function,agents,Production capture agent,0.1.0,Capability start_agent:production_capture at edit (ADR-0064 rule 1; ADR-0054 rule 24).
 agent_production_variance,agent,function,agents,Production variance agent,0.1.0,Capability start_agent:production_variance at edit (ADR-0064 rule 1; ADR-0054 rule 24).
 agent_auto_post_advisor,agent,function,agents,Auto-post advisor agent,0.1.0,Capability start_agent:auto_post_advisor at edit (ADR-0065 rule 18; ADR-0054 rule 24).
+site,organization,master_data,master_data,Sites,0.1.0,"Sites between company and warehouse; the default site of each company and the site of a warehouse (ADR-0068 rules 1-3)."
+payment_method,master_data,master_data,master_data,Payment methods,0.1.0,ADR-0068 rule 15.
+delivery_method,master_data,master_data,master_data,Delivery methods,0.1.0,"Delivery methods with their carriers and tracking link templates (ADR-0068 rule 21)."
+payment_method_money_account,money_account,master_data,cash,Payment method money accounts,0.1.0,"The default money account per payment method, branch and currency (ADR-0068 rule 16)."
+resource_group,production_structure,master_data,production,Resource groups,0.1.0,"Resource groups; membership is set on the work center by UpdateWorkCenter (ADR-0068 rules 12-14)."
+quality,,area,,Quality,0.1.0,"Inspection lots, results, usage decisions and nonconformances (ADR-0070)."
+inspection_plan,master_data,master_data,quality,Inspection plans,0.1.0,"Inspection plans and revisions, characteristics, sampling procedures and defect codes (ADR-0070 rules 3-6)."
+inspection_lot,quality,document_type,quality,Inspection lot,0.1.0,"ADR-0070 rules 7-11; recording and confirming results is post; Submit needs usage_decision."
+usage_decision,quality,function,quality,Usage decisions,0.1.0,"SubmitInspectionLot at post: puts a lot's decision in force (ADR-0070 rule 13)."
+nonconformance,quality,function,quality,Nonconformances,0.1.0,"Supplier, internal and customer nonconformances and their actions (ADR-0070 rule 16)."
+report_quality,reports,report,query,Quality reports,0.1.0,"Inspection lots, results and the supplier reject rate (ADR-0070 rule 19)."
+shop_floor_execution,production,function,production,Shop-floor execution,0.1.0,"Start, pause and block WOs, assign them, and create, update and cancel time logs need edit; TransferOperation and ConfirmOperationTimeLog need post (ADR-0071 rules 8, 9, 12, 16)."

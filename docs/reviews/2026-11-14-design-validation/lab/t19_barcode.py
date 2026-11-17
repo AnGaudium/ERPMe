@@ -1125,7 +1125,8 @@ if "--load" in sys.argv:
     X("insert into product_uom (id, company_id, product_id, inventory_uom_id, uom_id, numerator, denominator, is_exact) values (%s,%s,%s,%s,%s,24,1,true)",
       (I["pu_ct"], I["co"], I["p_pcs"], U["H87"], U["x-carton"]))
     with c.transaction():
-        X("insert into warehouse (id, company_id, code, name, kind, default_bin_id) values (%s,%s,'W1','W1','physical',%s)", (I["w"], I["co"], I["b"]))
+        X("insert into site (id, company_id, code, name, kind) values (%s,%s,'MAIN','Main','factory')", (I.setdefault("site", new()), I["co"]))   # the default site (ADR-0068 rule 3)
+        X("insert into warehouse (id, company_id, site_id, code, name, kind, default_bin_id) values (%s,%s,%s,'W1','W1','physical',%s)", (I["w"], I["co"], I["site"], I["b"]))
         X("insert into zone (id, company_id, warehouse_id, code, name) values (%s,%s,%s,'DEFAULT','Default')", (I["z"], I["co"], I["w"]))
         X("insert into bin (id, company_id, warehouse_id, zone_id, code, barcode, bin_type) values (%s,%s,%s,%s,'DEFAULT','W1-DEFAULT','storage')", (I["b"], I["co"], I["w"], I["z"]))
     X("insert into partner (id, company_id, code, name, partner_kind, country) values (%s,%s,'SUPP','Supplier (sample)','organization','XX')", (I["supp"], I["co"]))
