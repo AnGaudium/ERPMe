@@ -21,7 +21,7 @@ Tables per owner module, from the DDL drafts in `docs/design/*.sql` and the owne
 | `inventory` | 3 | 28 |
 | `ledger` | 3 | 4 |
 | `master_data` | 3 | 70 |
-| `production` | 3 | 44 |
+| `production` | 3 | 52 |
 | `tax` | 3 | 3 |
 | `cash` | 4 | 7 |
 | `crm` | 4 | 24 |
@@ -31,7 +31,7 @@ Tables per owner module, from the DDL drafts in `docs/design/*.sql` and the owne
 | `sales` | 4 | 14 |
 | `query` | 5 | 4 |
 | `(no owner stated)` | — | 16 |
-| **total** | | **345** |
+| **total** | | **353** |
 
 ## `agent_runs`
 
@@ -178,7 +178,7 @@ Tables per owner module, from the DDL drafts in `docs/design/*.sql` and the owne
 | `bin` |  | Warehouses and bins | `warehouse`, `zone` | docs/design/DS-20-master-data.sql:792 |
 | `delivery` |  | Stock documents | `business_unit`, `delivery_method`, `document`, `incoterm`, `partner` | docs/design/DS-22-09-42-commercial-inventory.sql:601 |
 | `delivery_line` |  | Stock documents | `delivery`, `item`, `product_configuration`, `sales_order_line`, `uom`, `warehouse` | docs/design/DS-22-09-42-commercial-inventory.sql:632 |
-| `demand_supply_line` |  | Demand and supply read model | `demand_supply_line`, `item`, `partner`, `planned_order`, `production_order_component`, `production_order_output`, `warehouse` | docs/design/DS-43-54-planning-production.sql:277 |
+| `demand_supply_line` |  | Demand and supply read model | `demand_supply_line`, `item`, `partner`, `planned_order`, `production_order_component`, `production_order_output`, `warehouse` | docs/design/DS-43-54-planning-production.sql:278 |
 | `goods_receipt` | Order line references are reserved at step 3 and filled from step 5 (ADR-0027 rule 7). | Stock documents | `business_unit`, `delivery_method`, `document`, `incoterm`, `partner` | docs/design/DS-22-09-42-commercial-inventory.sql:478 |
 | `goods_receipt_line` | A receipt of an order line is rejected while its supply row is unreleased (demand_supply_not_released, holistic review B2) and when received net would exceed the ordered inventory quantity times the … | Stock documents | `bin`, `goods_receipt`, `item`, `lot`, `purchase_order_line`, `uom`, `warehouse` | docs/design/DS-22-09-42-commercial-inventory.sql:508 |
 | `handling_unit` |  | Stock: handling units | `bin`, `handling_unit`, `handling_unit_type`, `warehouse` | docs/design/DS-22-09-42-commercial-inventory.sql:453 |
@@ -190,8 +190,8 @@ Tables per owner module, from the DDL drafts in `docs/design/*.sql` and the owne
 | `preliminary_price` |  | Preliminary price | `derivation_trace`, `item`, `posting_period`, `site`, `user_account`, `warehouse` | docs/design/DS-22-09-42-commercial-inventory.sql:1388 |
 | `purchase_order_line_gr_ir_layer` | Layers (from, to, price): each position is priced once, when a receipt or an invoice first reaches it, at the line's GR/IR price then in force, an exact rational in the order's currency … | GR/IR by unit positions | `purchase_order_line` | docs/design/DS-22-09-42-commercial-inventory.sql:1548 |
 | `purchase_order_line_gr_ir_posting` | One row per GR/IR posting on a line: postings are differences of rounded cumulative values (rule 13), so the line's balance, the sum of gr_ir_amount (debit positive), is round(V(I)) - round(V(R)) … | GR/IR by unit positions | `document`, `purchase_order_line`, `purchase_order_line_gr_ir_posting` | docs/design/DS-22-09-42-commercial-inventory.sql:1570 |
-| `replenishment_request` | Written by inventory.contract.request_replenishment, one line per converted purchase or transfer planned order | Replenishment hand-over | `user_account` | docs/design/DS-43-54-planning-production.sql:839 |
-| `replenishment_request_line` |  | Replenishment hand-over | `item`, `partner`, `planned_order`, `replenishment_request`, `transfer_route`, `uom`, `warehouse` | docs/design/DS-43-54-planning-production.sql:846 |
+| `replenishment_request` | Written by inventory.contract.request_replenishment, one line per converted purchase or transfer planned order | Replenishment hand-over | `user_account` | docs/design/DS-43-54-planning-production.sql:842 |
+| `replenishment_request_line` |  | Replenishment hand-over | `item`, `partner`, `planned_order`, `replenishment_request`, `transfer_route`, `uom`, `warehouse` | docs/design/DS-43-54-planning-production.sql:849 |
 | `return_from_customer` |  | Stock documents | `business_unit`, `document`, `partner` | docs/design/DS-22-09-42-commercial-inventory.sql:665 |
 | `return_from_customer_line` | correction_of_id on the document row is the delivery | Stock documents | `bin`, `delivery_line`, `item`, `product_configuration`, `return_from_customer`, `uom`, `warehouse` | docs/design/DS-22-09-42-commercial-inventory.sql:684 |
 | `return_to_supplier` |  | Stock documents | `business_unit`, `document`, `partner` | docs/design/DS-22-09-42-commercial-inventory.sql:545 |
@@ -292,50 +292,58 @@ Tables per owner module, from the DDL drafts in `docs/design/*.sql` and the owne
 
 | Table | Purpose | Section | Key references | Source |
 | --- | --- | --- | --- | --- |
-| `activity_rate` | planned rates (rule 14) | Costing | `activity_type`, `posting_period`, `work_center` | docs/design/DS-43-54-planning-production.sql:1431 |
-| `activity_type` | e.g. setup, machine, labor (ADR-0033 rule 12) | Production master data | `uom` | docs/design/DS-43-54-planning-production.sql:338 |
-| `bill_of_materials` | ADR-0033 rule 3; product_id for a configurable product (ADR-0046 rule 12) | Production master data | `change_proposal_item`, `item`, `product` | docs/design/DS-43-54-planning-production.sql:412 |
-| `bill_of_materials_component` | ADR-0033 rule 6; selection and sizing: ADR-0046 rule 12 | Production master data | `bill_of_materials_revision`, `change_proposal_item`, `item`, `uom`, `variant_attribute` | docs/design/DS-43-54-planning-production.sql:453 |
-| `bill_of_materials_output` | co-products and by-products besides the main output (ADR-0033 rule 7) | Production master data | `bill_of_materials_revision`, `item`, `uom` | docs/design/DS-43-54-planning-production.sql:493 |
-| `bill_of_materials_revision` | immutable once released (ADR-0033 rules 3-4) | Production master data | `bill_of_materials`, `bill_of_materials_revision` | docs/design/DS-43-54-planning-production.sql:431 |
-| `cost_estimate` | benchmark for target cost and variances; never values stock (rule 14) | Costing | `bill_of_materials_revision`, `cost_estimate`, `item`, `production_version`, `routing_revision` | docs/design/DS-43-54-planning-production.sql:1354 |
-| `cost_estimate_gap` | what a draft estimate could not price: listed, never zero, never released (ADR-0062 rule 12) | Costing | `activity_type`, `bill_of_materials_component`, `cost_estimate`, `item`, `routing_operation`, `work_center` | docs/design/DS-43-54-planning-production.sql:1403 |
-| `cost_estimate_line` | rolled up level by level from released estimates of made components (rule 14) | Costing | `activity_type`, `cost_center`, `cost_estimate`, `item` | docs/design/DS-43-54-planning-production.sql:1381 |
+| `activity_rate` | planned rates (rule 14) | Costing | `activity_type`, `posting_period`, `work_center` | docs/design/DS-43-54-planning-production.sql:1618 |
+| `activity_type` | e.g. setup, machine, labor (ADR-0033 rule 12) | Production master data | `uom` | docs/design/DS-43-54-planning-production.sql:339 |
+| `bill_of_materials` | ADR-0033 rule 3; product_id for a configurable product (ADR-0046 rule 12) | Production master data | `change_proposal_item`, `item`, `product` | docs/design/DS-43-54-planning-production.sql:413 |
+| `bill_of_materials_component` | ADR-0033 rule 6; selection and sizing: ADR-0046 rule 12 | Production master data | `bill_of_materials_revision`, `change_proposal_item`, `item`, `uom`, `variant_attribute` | docs/design/DS-43-54-planning-production.sql:454 |
+| `bill_of_materials_output` | co-products and by-products besides the main output (ADR-0033 rule 7) | Production master data | `bill_of_materials_revision`, `item`, `uom` | docs/design/DS-43-54-planning-production.sql:494 |
+| `bill_of_materials_revision` | immutable once released (ADR-0033 rules 3-4) | Production master data | `bill_of_materials`, `bill_of_materials_revision` | docs/design/DS-43-54-planning-production.sql:432 |
+| `cost_component_detail` | ADR-0072 rule 2; company data, master_data_change, change-tracked | Costing |  | docs/design/DS-43-54-planning-production.sql:1359 |
+| `cost_component_detail_mapping` | ADR-0072 rule 3; read by production.map_cost_component_detail | Costing | `account`, `activity_type`, `item_group`, `valuation_class` | docs/design/DS-43-54-planning-production.sql:1375 |
+| `cost_estimate` | benchmark for target cost and variances; never values stock (rule 14) | Costing | `bill_of_materials_revision`, `cost_estimate`, `costing_sheet`, `item`, `production_version`, `routing_revision` | docs/design/DS-43-54-planning-production.sql:1504 |
+| `cost_estimate_gap` | what a draft estimate could not price: listed, never zero, never released (ADR-0062 rule 12) | Costing | `activity_type`, `bill_of_materials_component`, `cost_estimate`, `costing_sheet`, `item`, `routing_operation`, `work_center` | docs/design/DS-43-54-planning-production.sql:1585 |
+| `cost_estimate_line` | rolled up level by level from released estimates of made components (rule 14) | Costing | `activity_type`, `cost_center`, `cost_estimate`, `item` | docs/design/DS-43-54-planning-production.sql:1533 |
+| `cost_estimate_sheet_row` | ADR-0072 rule 8; the production rows as costed; estimate content, frozen at release | Costing | `cost_center`, `cost_component_detail`, `cost_estimate` | docs/design/DS-43-54-planning-production.sql:1562 |
 | `cost_object` | cost_object is owned by production (ADR-0032; ADR-0034 rule 15) with kinds per ADR-0035 rule 1 |  | `cost_center`, `production_order` | docs/design/DS-06-universal-journal.sql:29 |
-| `item_low_level_code` | read model owned by production, recomputed at release (ADR-0033 rule 8) | Production master data | `item`, `product` | docs/design/DS-43-54-planning-production.sql:641 |
-| `item_production_setting` | ADR-0033 rule 14 | Production master data | `item`, `warehouse` | docs/design/DS-43-54-planning-production.sql:631 |
-| `normal_capacity` | per (cost center, driver, period) in the driver's unit (rule 7) | Costing | `activity_type`, `cost_center`, `posting_period` | docs/design/DS-43-54-planning-production.sql:1463 |
-| `operation_assignment` | ADR-0071 rule 12; AssignOperation replaces the list, ending removed rows | Production orders | `operation_execution`, `partner`, `team` | docs/design/DS-43-54-planning-production.sql:1041 |
-| `operation_confirmation` | an internal operation of the order (rule 12) | Shop-floor posting documents | `document`, `lot`, `operation_execution`, `partner`, `production_order`, `team`, `work_center` | docs/design/DS-43-54-planning-production.sql:1189 |
-| `operation_confirmation_activity` | actual activity quantities, defaulting to the standards (rule 12) | Shop-floor posting documents | `activity_type`, `operation_confirmation` | docs/design/DS-43-54-planning-production.sql:1225 |
-| `operation_confirmation_time_log` | ADR-0071 rule 11; draft content of the confirmation; one posted, not reversed confirmation per log (INV-840) | Shop-floor posting documents |  | docs/design/DS-43-54-planning-production.sql:1236 |
-| `operation_execution` | ADR-0071 rules 6, 16; one row per internal operation of an approved order | Production orders | `stop_reason`, `work_center` | docs/design/DS-43-54-planning-production.sql:1018 |
-| `operation_progress_component` | Backflushed and processor-consumed component lines, generated at Post by production.contract.record_operation_progress or the receipt's backflush, keyed by the calling posting document. | Shop-floor posting documents | `bin`, `document`, `lot`, `material_document_line`, `operation_confirmation`, `production_order`, `production_receipt`, `uom` | docs/design/DS-43-54-planning-production.sql:1312 |
-| `operation_time_log` | ADR-0071 rule 9; UI label "WO time log" | Production orders | `partner`, `stop_reason`, `team`, `user_account`, `work_center` | docs/design/DS-43-54-planning-production.sql:1059 |
-| `overhead_surcharge` | interim: not stated in ADR-0035 (the table holding "a planned surcharge per cost center", rule 14) | Costing | `cost_center`, `posting_period` | docs/design/DS-43-54-planning-production.sql:1442 |
-| `pool_allocation_rule` | one rule per (cost center, group) (rules 7, 17) | Costing | `activity_type`, `cost_center` | docs/design/DS-43-54-planning-production.sql:1451 |
-| `production_cost_settlement` | one internal document per run of the period-end job (rule 5) | Costing | `document`, `posting_period` | docs/design/DS-43-54-planning-production.sql:1476 |
-| `production_cost_settlement_line` | keyed by (cost object, cost component, step); reruns post differences per key (rule 5) | Costing | `cost_object`, `production_cost_settlement` | docs/design/DS-43-54-planning-production.sql:1484 |
-| `production_issue` | Approval pools (ADR-0055 rule 2, holistic decision 12): production_issue maps to pool consumption | Shop-floor posting documents | `document`, `production_order` | docs/design/DS-43-54-planning-production.sql:1133 |
-| `production_issue_line` |  | Shop-floor posting documents | `bin`, `lot`, `material_document_line`, `production_issue`, `production_order`, `production_order_output_serial`, `serial_number`, `uom` | docs/design/DS-43-54-planning-production.sql:1144 |
-| `production_order` | typed header of a non-posting document type with change orders (rule 1) | Production orders | `bill_of_materials_revision`, `cost_object`, `demand_supply_line`, `document`, `item`, `planned_order`, `product_configuration`, `production_version` … | docs/design/DS-43-54-planning-production.sql:884 |
-| `production_order_component` | rule 1; external-operation components at the processor location (ADR-0037 rule 2) | Production orders | `item`, `partner`, `production_order`, `warehouse` | docs/design/DS-43-54-planning-production.sql:922 |
-| `production_order_operation` | copied from the routing revision (rule 1); external: chosen supplier (ADR-0037 rule 2) | Production orders | `item`, `partner`, `production_order`, `work_center` | docs/design/DS-43-54-planning-production.sql:970 |
-| `production_order_operation_activity` | activity standards copied with the operation (rule 1) | Production orders | `activity_type`, `production_order_operation` | docs/design/DS-43-54-planning-production.sql:1004 |
-| `production_order_output` | main output (planned quantity G), co-products and by-products (rule 1) | Production orders | `item`, `partner`, `production_order` | docs/design/DS-43-54-planning-production.sql:947 |
-| `production_order_output_serial` | assigned serials; not version content (rules 1, 16) | Production orders | `production_order_output`, `serial_number` | docs/design/DS-43-54-planning-production.sql:1111 |
-| `production_order_period_cost` | written only by the job; row source of the cost sheet (rules 12, 16) | Costing | `posting_period`, `production_cost_settlement`, `production_order` | docs/design/DS-43-54-planning-production.sql:1496 |
-| `production_receipt` | rule 13 | Shop-floor posting documents | `document`, `operation_confirmation`, `production_order` | docs/design/DS-43-54-planning-production.sql:1249 |
-| `production_receipt_line` |  | Shop-floor posting documents | `bin`, `lot`, `material_document_line`, `production_order`, `production_order_output_serial`, `production_receipt`, `uom` | docs/design/DS-43-54-planning-production.sql:1268 |
-| `production_version` | the one explicit way to make an item in a production warehouse (ADR-0033 rule 13) | Production master data | `bill_of_materials`, `item`, `product`, `routing`, `warehouse` | docs/design/DS-43-54-planning-production.sql:595 |
-| `resource_group` | ADR-0068 rule 12; work centers of one site that can stand in for each other | Production master data |  | docs/design/DS-43-54-planning-production.sql:363 |
-| `routing` | may serve several items; with conditions, one configurable product (ADR-0033 rule 9; ADR-0046 rule 12) | Production master data |  | docs/design/DS-43-54-planning-production.sql:514 |
-| `routing_operation` | one linear sequence (ADR-0033 rule 10); external operations: ADR-0037 rule 2 | Production master data | `item`, `partner`, `routing_revision`, `variant_attribute`, `work_center` | docs/design/DS-43-54-planning-production.sql:543 |
-| `routing_operation_activity` | standard activity quantities, inside the revision and its hash (rule 10) | Production master data | `activity_type`, `routing_operation` | docs/design/DS-43-54-planning-production.sql:583 |
-| `routing_revision` | rules 3 and 4 apply as to bill of materials revisions | Production master data | `routing`, `routing_revision` | docs/design/DS-43-54-planning-production.sql:524 |
-| `stop_reason` | ADR-0071 rule 10; company data, master_data_change, leaf production_structure | Production master data |  | docs/design/DS-43-54-planning-production.sql:350 |
-| `work_center` | ADR-0033 rule 11 | Production master data | `bin`, `cost_center`, `resource_group`, `warehouse`, `working_calendar` | docs/design/DS-43-54-planning-production.sql:373 |
-| `work_center_activity` | activity types a work center records, with defaults copied into new operations | Production master data | `activity_type`, `work_center` | docs/design/DS-43-54-planning-production.sql:401 |
+| `costing_sheet` | ADR-0072 rule 6; company data, master_data_change, change-tracked, proposal-bound | Costing |  | docs/design/DS-43-54-planning-production.sql:1400 |
+| `costing_sheet_base_member` | ADR-0072 rule 6; a posting component or a detail of a base row | Costing | `cost_component_detail` | docs/design/DS-43-54-planning-production.sql:1449 |
+| `costing_sheet_rate` | ADR-0072 rule 7; by effective dates, then the most specific condition set | Costing | `costing_sheet`, `costing_sheet_row`, `item_group`, `site`, `valuation_class` | docs/design/DS-43-54-planning-production.sql:1464 |
+| `costing_sheet_row` | ADR-0072 rule 6; ordered rows, written as one list by UpdateCostingSheet | Costing | `activity_type`, `cost_center`, `costing_sheet` | docs/design/DS-43-54-planning-production.sql:1410 |
+| `item_low_level_code` | read model owned by production, recomputed at release (ADR-0033 rule 8) | Production master data | `item`, `product` | docs/design/DS-43-54-planning-production.sql:644 |
+| `item_production_setting` | ADR-0033 rule 14 | Production master data | `item`, `warehouse` | docs/design/DS-43-54-planning-production.sql:634 |
+| `normal_capacity` | per (cost center, driver, period) in the driver's unit (rule 7) | Costing | `activity_type`, `cost_center`, `posting_period` | docs/design/DS-43-54-planning-production.sql:1643 |
+| `operation_assignment` | ADR-0071 rule 12; AssignOperation replaces the list, ending removed rows | Production orders | `operation_execution`, `partner`, `team` | docs/design/DS-43-54-planning-production.sql:1044 |
+| `operation_confirmation` | an internal operation of the order (rule 12) | Shop-floor posting documents | `document`, `lot`, `operation_execution`, `partner`, `production_order`, `team`, `work_center` | docs/design/DS-43-54-planning-production.sql:1192 |
+| `operation_confirmation_activity` | actual activity quantities, defaulting to the standards (rule 12) | Shop-floor posting documents | `activity_type`, `operation_confirmation` | docs/design/DS-43-54-planning-production.sql:1228 |
+| `operation_confirmation_time_log` | ADR-0071 rule 11; draft content of the confirmation; one posted, not reversed confirmation per log (INV-840) | Shop-floor posting documents |  | docs/design/DS-43-54-planning-production.sql:1239 |
+| `operation_execution` | ADR-0071 rules 6, 16; one row per internal operation of an approved order | Production orders | `stop_reason`, `work_center` | docs/design/DS-43-54-planning-production.sql:1021 |
+| `operation_progress_component` | Backflushed and processor-consumed component lines, generated at Post by production.contract.record_operation_progress or the receipt's backflush, keyed by the calling posting document. | Shop-floor posting documents | `bin`, `document`, `lot`, `material_document_line`, `operation_confirmation`, `production_order`, `production_receipt`, `uom` | docs/design/DS-43-54-planning-production.sql:1315 |
+| `operation_time_log` | ADR-0071 rule 9; UI label "WO time log" | Production orders | `partner`, `stop_reason`, `team`, `user_account`, `work_center` | docs/design/DS-43-54-planning-production.sql:1062 |
+| `pool_allocation_rule` | one rule per (cost center, group) (rules 7, 17) | Costing | `activity_type`, `cost_center` | docs/design/DS-43-54-planning-production.sql:1631 |
+| `production_cost_settlement` | one internal document per run of the period-end job (rule 5) | Costing | `document`, `posting_period` | docs/design/DS-43-54-planning-production.sql:1656 |
+| `production_cost_settlement_line` | keyed by (cost object, cost component, step); reruns post differences per key (rule 5) | Costing | `cost_object`, `production_cost_settlement` | docs/design/DS-43-54-planning-production.sql:1664 |
+| `production_issue` | Approval pools (ADR-0055 rule 2, holistic decision 12): production_issue maps to pool consumption | Shop-floor posting documents | `document`, `production_order` | docs/design/DS-43-54-planning-production.sql:1136 |
+| `production_issue_line` |  | Shop-floor posting documents | `bin`, `lot`, `material_document_line`, `production_issue`, `production_order`, `production_order_output_serial`, `serial_number`, `uom` | docs/design/DS-43-54-planning-production.sql:1147 |
+| `production_order` | typed header of a non-posting document type with change orders (rule 1) | Production orders | `bill_of_materials_revision`, `cost_object`, `demand_supply_line`, `document`, `item`, `planned_order`, `product_configuration`, `production_version` … | docs/design/DS-43-54-planning-production.sql:887 |
+| `production_order_component` | rule 1; external-operation components at the processor location (ADR-0037 rule 2) | Production orders | `item`, `partner`, `production_order`, `warehouse` | docs/design/DS-43-54-planning-production.sql:925 |
+| `production_order_operation` | copied from the routing revision (rule 1); external: chosen supplier (ADR-0037 rule 2) | Production orders | `item`, `partner`, `production_order`, `work_center` | docs/design/DS-43-54-planning-production.sql:973 |
+| `production_order_operation_activity` | activity standards copied with the operation (rule 1) | Production orders | `activity_type`, `production_order_operation` | docs/design/DS-43-54-planning-production.sql:1007 |
+| `production_order_output` | main output (planned quantity G), co-products and by-products (rule 1) | Production orders | `item`, `partner`, `production_order` | docs/design/DS-43-54-planning-production.sql:950 |
+| `production_order_output_serial` | assigned serials; not version content (rules 1, 16) | Production orders | `production_order_output`, `serial_number` | docs/design/DS-43-54-planning-production.sql:1114 |
+| `production_order_period_cost` | written only by the job; row source of the cost sheet (rules 12, 16) | Costing | `posting_period`, `production_cost_settlement`, `production_order` | docs/design/DS-43-54-planning-production.sql:1676 |
+| `production_order_period_cost_detail` | ADR-0072 rule 4; read model written by the job with its parent; sums exactly to it (INV-851) | Costing | `production_order` | docs/design/DS-43-54-planning-production.sql:1695 |
+| `production_receipt` | rule 13 | Shop-floor posting documents | `document`, `operation_confirmation`, `production_order` | docs/design/DS-43-54-planning-production.sql:1252 |
+| `production_receipt_line` |  | Shop-floor posting documents | `bin`, `lot`, `material_document_line`, `production_order`, `production_order_output_serial`, `production_receipt`, `uom` | docs/design/DS-43-54-planning-production.sql:1271 |
+| `production_version` | the one explicit way to make an item in a production warehouse (ADR-0033 rule 13) | Production master data | `bill_of_materials`, `costing_sheet`, `item`, `product`, `routing`, `warehouse` | docs/design/DS-43-54-planning-production.sql:596 |
+| `resource_group` | ADR-0068 rule 12; work centers of one site that can stand in for each other | Production master data |  | docs/design/DS-43-54-planning-production.sql:364 |
+| `routing` | may serve several items; with conditions, one configurable product (ADR-0033 rule 9; ADR-0046 rule 12) | Production master data |  | docs/design/DS-43-54-planning-production.sql:515 |
+| `routing_operation` | one linear sequence (ADR-0033 rule 10); external operations: ADR-0037 rule 2 | Production master data | `item`, `partner`, `routing_revision`, `variant_attribute`, `work_center` | docs/design/DS-43-54-planning-production.sql:544 |
+| `routing_operation_activity` | standard activity quantities, inside the revision and its hash (rule 10) | Production master data | `activity_type`, `routing_operation` | docs/design/DS-43-54-planning-production.sql:584 |
+| `routing_revision` | rules 3 and 4 apply as to bill of materials revisions | Production master data | `routing`, `routing_revision` | docs/design/DS-43-54-planning-production.sql:525 |
+| `site_costing_sheet` | ADR-0072 rule 9; master_data_change; production_version.costing_sheet_id overrides it | Costing | `costing_sheet`, `site` | docs/design/DS-43-54-planning-production.sql:1495 |
+| `stop_reason` | ADR-0071 rule 10; company data, master_data_change, leaf production_structure | Production master data |  | docs/design/DS-43-54-planning-production.sql:351 |
+| `work_center` | ADR-0033 rule 11 | Production master data | `bin`, `cost_center`, `resource_group`, `warehouse`, `working_calendar` | docs/design/DS-43-54-planning-production.sql:374 |
+| `work_center_activity` | activity types a work center records, with defaults copied into new operations | Production master data | `activity_type`, `work_center` | docs/design/DS-43-54-planning-production.sql:402 |
 
 ## `tax`
 
@@ -390,23 +398,23 @@ Tables per owner module, from the DDL drafts in `docs/design/*.sql` and the owne
 
 | Table | Purpose | Section | Key references | Source |
 | --- | --- | --- | --- | --- |
-| `demand_event` | e.g. tet; company data (rule 10) | Demand history and forecast |  | docs/design/DS-43-54-planning-production.sql:197 |
-| `demand_event_window` | the event's window of dates per year, so a moving holiday stays aligned | Demand history and forecast | `demand_event` | docs/design/DS-43-54-planning-production.sql:206 |
-| `forecast_adjustment` | CreateForecastAdjustment, CancelForecastAdjustment; agent proposals are change proposals (rule 12) | Demand history and forecast | `item`, `user_account`, `warehouse` | docs/design/DS-43-54-planning-production.sql:250 |
-| `forecast_line` | statistical forecast per day after the weekday spread; never overwritten by adjustments (rules 10-12) | Demand history and forecast | `demand_event`, `forecast_run`, `item`, `warehouse` | docs/design/DS-43-54-planning-production.sql:229 |
-| `forecast_run` | RunForecast, a long job (rules 11, 17); table named by the holistic review (ADR-0024 rule 21 note) | Demand history and forecast | `user_account` | docs/design/DS-43-54-planning-production.sql:217 |
-| `item_warehouse_planning` | an item without a row in a warehouse is not planned there (ADR-0024 rule 1) | Planning master data | `item`, `transfer_route`, `warehouse` | docs/design/DS-43-54-planning-production.sql:92 |
-| `planned_order` |  | Planned orders, pegging, messages and exceptions | `demand_supply_line`, `item`, `partner`, `planning_run`, `production_version`, `transfer_route`, `uom`, `warehouse` | docs/design/DS-43-54-planning-production.sql:655 |
-| `planned_order_component` | dependent demand, rewritten by each run and by UpdatePlannedOrder (ADR-0036 rule 5) | Planned orders, pegging, messages and exceptions | `item`, `planned_order`, `warehouse` | docs/design/DS-43-54-planning-production.sql:712 |
-| `planned_order_operation` | the operation schedule of rule 3's function (ADR-0036 rule 4) | Planned orders, pegging, messages and exceptions | `planned_order`, `work_center` | docs/design/DS-43-54-planning-production.sql:730 |
-| `planned_order_pegging` | a planned order's pegging sums exactly to its quantity (INV-60, a run check); rules 20 and ADR-0036 rule 5 | Planned orders, pegging, messages and exceptions | `demand_supply_line`, `planned_order`, `planned_order_component` | docs/design/DS-43-54-planning-production.sql:746 |
-| `planning_action_message` | on existing supply, with its projected effect (rule 21); table named by the holistic review | Planned orders, pegging, messages and exceptions | `demand_supply_line`, `planning_run` | docs/design/DS-43-54-planning-production.sql:770 |
-| `planning_exception` | one work item per open exception, closed when a run no longer raises it (rule 21; ADR-0031 rule 17) | Planned orders, pegging, messages and exceptions | `demand_supply_line`, `item`, `partner`, `planned_order`, `planning_run`, `production_order`, `warehouse`, `work_center` | docs/design/DS-43-54-planning-production.sql:789 |
-| `sales_history` | weeks before the first posting, written by ImportSalesHistory (rule 10) | Demand history and forecast | `item`, `warehouse` | docs/design/DS-43-54-planning-production.sql:186 |
-| `supplier_item` | the only home of supplier minimums, multiples and preference (ADR-0024 rule 2) | Planning master data | `item`, `partner`, `partner_item`, `uom` | docs/design/DS-43-54-planning-production.sql:130 |
-| `supplier_item_lead_time` | measured, refreshed by the forecast job, never applied without approval (ADR-0024 rule 2) | Planning master data | `forecast_run`, `item`, `partner` | docs/design/DS-43-54-planning-production.sql:170 |
-| `supplier_purchasing_term` | one row per supplier partner (ADR-0024 rule 2) | Planning master data | `currency`, `partner`, `uom` | docs/design/DS-43-54-planning-production.sql:153 |
-| `transfer_route` | ADR-0024 rule 3; also the return route from a processor location (ADR-0037 rule 3) | Planning master data | `warehouse` | docs/design/DS-43-54-planning-production.sql:75 |
+| `demand_event` | e.g. tet; company data (rule 10) | Demand history and forecast |  | docs/design/DS-43-54-planning-production.sql:198 |
+| `demand_event_window` | the event's window of dates per year, so a moving holiday stays aligned | Demand history and forecast | `demand_event` | docs/design/DS-43-54-planning-production.sql:207 |
+| `forecast_adjustment` | CreateForecastAdjustment, CancelForecastAdjustment; agent proposals are change proposals (rule 12) | Demand history and forecast | `item`, `user_account`, `warehouse` | docs/design/DS-43-54-planning-production.sql:251 |
+| `forecast_line` | statistical forecast per day after the weekday spread; never overwritten by adjustments (rules 10-12) | Demand history and forecast | `demand_event`, `forecast_run`, `item`, `warehouse` | docs/design/DS-43-54-planning-production.sql:230 |
+| `forecast_run` | RunForecast, a long job (rules 11, 17); table named by the holistic review (ADR-0024 rule 21 note) | Demand history and forecast | `user_account` | docs/design/DS-43-54-planning-production.sql:218 |
+| `item_warehouse_planning` | an item without a row in a warehouse is not planned there (ADR-0024 rule 1) | Planning master data | `item`, `transfer_route`, `warehouse` | docs/design/DS-43-54-planning-production.sql:93 |
+| `planned_order` |  | Planned orders, pegging, messages and exceptions | `demand_supply_line`, `item`, `partner`, `planning_run`, `production_version`, `transfer_route`, `uom`, `warehouse` | docs/design/DS-43-54-planning-production.sql:658 |
+| `planned_order_component` | dependent demand, rewritten by each run and by UpdatePlannedOrder (ADR-0036 rule 5) | Planned orders, pegging, messages and exceptions | `item`, `planned_order`, `warehouse` | docs/design/DS-43-54-planning-production.sql:715 |
+| `planned_order_operation` | the operation schedule of rule 3's function (ADR-0036 rule 4) | Planned orders, pegging, messages and exceptions | `planned_order`, `work_center` | docs/design/DS-43-54-planning-production.sql:733 |
+| `planned_order_pegging` | a planned order's pegging sums exactly to its quantity (INV-60, a run check); rules 20 and ADR-0036 rule 5 | Planned orders, pegging, messages and exceptions | `demand_supply_line`, `planned_order`, `planned_order_component` | docs/design/DS-43-54-planning-production.sql:749 |
+| `planning_action_message` | on existing supply, with its projected effect (rule 21); table named by the holistic review | Planned orders, pegging, messages and exceptions | `demand_supply_line`, `planning_run` | docs/design/DS-43-54-planning-production.sql:773 |
+| `planning_exception` | one work item per open exception, closed when a run no longer raises it (rule 21; ADR-0031 rule 17) | Planned orders, pegging, messages and exceptions | `demand_supply_line`, `item`, `partner`, `planned_order`, `planning_run`, `production_order`, `warehouse`, `work_center` | docs/design/DS-43-54-planning-production.sql:792 |
+| `sales_history` | weeks before the first posting, written by ImportSalesHistory (rule 10) | Demand history and forecast | `item`, `warehouse` | docs/design/DS-43-54-planning-production.sql:187 |
+| `supplier_item` | the only home of supplier minimums, multiples and preference (ADR-0024 rule 2) | Planning master data | `item`, `partner`, `partner_item`, `uom` | docs/design/DS-43-54-planning-production.sql:131 |
+| `supplier_item_lead_time` | measured, refreshed by the forecast job, never applied without approval (ADR-0024 rule 2) | Planning master data | `forecast_run`, `item`, `partner` | docs/design/DS-43-54-planning-production.sql:171 |
+| `supplier_purchasing_term` | one row per supplier partner (ADR-0024 rule 2) | Planning master data | `currency`, `partner`, `uom` | docs/design/DS-43-54-planning-production.sql:154 |
+| `transfer_route` | ADR-0024 rule 3; also the return route from a processor location (ADR-0037 rule 3) | Planning master data | `warehouse` | docs/design/DS-43-54-planning-production.sql:76 |
 
 ## `purchasing`
 
@@ -486,11 +494,11 @@ Tables per owner module, from the DDL drafts in `docs/design/*.sql` and the owne
 | `open_item` |  |  | `account`, `currency`, `document`, `open_item`, `partner`, `payment_term` | docs/design/DS-06-universal-journal.sql:110 |
 | `payment_term_line` |  |  | `payment_term` | docs/design/DS-06-universal-journal.sql:98 |
 | `period_unlock_request` | typed header of a non-posting document type (ADR-0043 rule 16) | Policy decisions and approvals | `document`, `posting_period` | docs/design/DS-05-platform.sql:676 |
-| `planning_run` | RunPlanning, a long job (ADR-0024 rule 17) | Company rows that serialize changes | `forecast_run`, `user_account` | docs/design/DS-43-54-planning-production.sql:44 |
-| `planning_setting` | one per company (ADR-0024 rule 7; ADR-0036 rules 4, 11) | Company rows that serialize changes | `user_account` | docs/design/DS-43-54-planning-production.sql:33 |
-| `planning_state` | the company's planning state row; RunPlanning locks it, so a second run gets planning_run_in_progress (ADR-0024 rule 17) | Company rows that serialize changes | `planning_run` | docs/design/DS-43-54-planning-production.sql:63 |
+| `planning_run` | RunPlanning, a long job (ADR-0024 rule 17) | Company rows that serialize changes | `forecast_run`, `user_account` | docs/design/DS-43-54-planning-production.sql:45 |
+| `planning_setting` | one per company (ADR-0024 rule 7; ADR-0036 rules 4, 11) | Company rows that serialize changes | `user_account` | docs/design/DS-43-54-planning-production.sql:34 |
+| `planning_state` | the company's planning state row; RunPlanning locks it, so a second run gets planning_run_in_progress (ADR-0024 rule 17) | Company rows that serialize changes | `planning_run` | docs/design/DS-43-54-planning-production.sql:64 |
 | `policy_decision` | never updated or deleted (ADR-0009 rule 14) | Policy decisions and approvals | `approval_pool`, `approval_procedure`, `document_version`, `policy_decision`, `policy_rule`, `policy_rule_version`, `user_account` | docs/design/DS-05-platform.sql:565 |
-| `production_structure` | created with the company; releases, version and setting saves lock it at class 3 (ADR-0033 rule 8; ADR-0027 rule 10) | Company rows that serialize changes |  | docs/design/DS-43-54-planning-production.sql:69 |
+| `production_structure` | created with the company; releases, version and setting saves lock it at class 3 (ADR-0033 rule 8; ADR-0027 rule 10) | Company rows that serialize changes |  | docs/design/DS-43-54-planning-production.sql:70 |
 | `subledger_activation` | ADR-0025 rule 4: activation of a gated control kind, read by journal_line_check_insert (lab finding L-03). |  | `document` | docs/design/DS-06-universal-journal.sql:55 |
 
 ## Cross-module foreign keys (report)
@@ -607,12 +615,12 @@ Foreign keys whose source and target tables have different stated owners. Foreig
 | `delivery_line` (inventory, 3) | `company_id,sales_order_line_id` | `sales_order_line` (sales, 4) | up | docs/design/DS-22-09-42-commercial-inventory.sql:652 |
 | `delivery_line` (inventory, 3) | `company_id,warehouse_id` | `warehouse` (master_data, 3) | same layer | docs/design/DS-22-09-42-commercial-inventory.sql:655 |
 | `delivery_line` (inventory, 3) | `uom_id` | `uom` (master_data, 3) | same layer | docs/design/DS-22-09-42-commercial-inventory.sql:641 |
-| `demand_supply_line` (inventory, 3) | `company_id,item_id` | `item` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:306 |
-| `demand_supply_line` (inventory, 3) | `company_id,origin_planned_order_id` | `planned_order` (planning, 4) | up | docs/design/DS-43-54-planning-production.sql:711 |
-| `demand_supply_line` (inventory, 3) | `company_id,owner_partner_id` | `partner` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:308 |
-| `demand_supply_line` (inventory, 3) | `company_id,production_order_component_id` | `production_order_component` (production, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1126 |
-| `demand_supply_line` (inventory, 3) | `company_id,production_order_output_id` | `production_order_output` (production, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1127 |
-| `demand_supply_line` (inventory, 3) | `company_id,warehouse_id` | `warehouse` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:307 |
+| `demand_supply_line` (inventory, 3) | `company_id,item_id` | `item` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:307 |
+| `demand_supply_line` (inventory, 3) | `company_id,origin_planned_order_id` | `planned_order` (planning, 4) | up | docs/design/DS-43-54-planning-production.sql:714 |
+| `demand_supply_line` (inventory, 3) | `company_id,owner_partner_id` | `partner` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:309 |
+| `demand_supply_line` (inventory, 3) | `company_id,production_order_component_id` | `production_order_component` (production, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1129 |
+| `demand_supply_line` (inventory, 3) | `company_id,production_order_output_id` | `production_order_output` (production, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1130 |
+| `demand_supply_line` (inventory, 3) | `company_id,warehouse_id` | `warehouse` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:308 |
 | `goods_receipt` (inventory, 3) | `company_id,business_unit_id` | `business_unit` (master_data, 3) | same layer | docs/design/DS-22-09-42-commercial-inventory.sql:503 |
 | `goods_receipt` (inventory, 3) | `company_id,carrier_partner_id` | `partner` (master_data, 3) | same layer | docs/design/DS-22-09-42-commercial-inventory.sql:501 |
 | `goods_receipt` (inventory, 3) | `company_id,delivery_method_id` | `delivery_method` (master_data, 3) | same layer | docs/design/DS-22-09-42-commercial-inventory.sql:500 |
@@ -644,13 +652,13 @@ Foreign keys whose source and target tables have different stated owners. Foreig
 | `purchase_order_line_gr_ir_layer` (inventory, 3) | `company_id,purchase_order_line_id` | `purchase_order_line` (purchasing, 4) | up | docs/design/DS-22-09-42-commercial-inventory.sql:1557 |
 | `purchase_order_line_gr_ir_posting` (inventory, 3) | `company_id,document_id` | `document` (documents, 2) | down | docs/design/DS-22-09-42-commercial-inventory.sql:1584 |
 | `purchase_order_line_gr_ir_posting` (inventory, 3) | `company_id,purchase_order_line_id` | `purchase_order_line` (purchasing, 4) | up | docs/design/DS-22-09-42-commercial-inventory.sql:1583 |
-| `replenishment_request` (inventory, 3) | `requested_by_user_id` | `user_account` (permissions, 2) | down | docs/design/DS-43-54-planning-production.sql:842 |
-| `replenishment_request_line` (inventory, 3) | `company_id,item_id` | `item` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:869 |
-| `replenishment_request_line` (inventory, 3) | `company_id,origin_planned_order_id` | `planned_order` (planning, 4) | up | docs/design/DS-43-54-planning-production.sql:868 |
-| `replenishment_request_line` (inventory, 3) | `company_id,supplier_partner_id` | `partner` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:871 |
-| `replenishment_request_line` (inventory, 3) | `company_id,transfer_route_id,warehouse_id` | `transfer_route` (planning, 4) | up | docs/design/DS-43-54-planning-production.sql:872 |
-| `replenishment_request_line` (inventory, 3) | `company_id,warehouse_id` | `warehouse` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:870 |
-| `replenishment_request_line` (inventory, 3) | `uom_id` | `uom` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:858 |
+| `replenishment_request` (inventory, 3) | `requested_by_user_id` | `user_account` (permissions, 2) | down | docs/design/DS-43-54-planning-production.sql:845 |
+| `replenishment_request_line` (inventory, 3) | `company_id,item_id` | `item` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:872 |
+| `replenishment_request_line` (inventory, 3) | `company_id,origin_planned_order_id` | `planned_order` (planning, 4) | up | docs/design/DS-43-54-planning-production.sql:871 |
+| `replenishment_request_line` (inventory, 3) | `company_id,supplier_partner_id` | `partner` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:874 |
+| `replenishment_request_line` (inventory, 3) | `company_id,transfer_route_id,warehouse_id` | `transfer_route` (planning, 4) | up | docs/design/DS-43-54-planning-production.sql:875 |
+| `replenishment_request_line` (inventory, 3) | `company_id,warehouse_id` | `warehouse` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:873 |
+| `replenishment_request_line` (inventory, 3) | `uom_id` | `uom` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:861 |
 | `return_from_customer` (inventory, 3) | `company_id,business_unit_id` | `business_unit` (master_data, 3) | same layer | docs/design/DS-22-09-42-commercial-inventory.sql:680 |
 | `return_from_customer` (inventory, 3) | `company_id,id` | `document` (documents, 2) | down | docs/design/DS-22-09-42-commercial-inventory.sql:678 |
 | `return_from_customer` (inventory, 3) | `company_id,partner_id` | `partner` (master_data, 3) | same layer | docs/design/DS-22-09-42-commercial-inventory.sql:679 |
@@ -694,123 +702,130 @@ Foreign keys whose source and target tables have different stated owners. Foreig
 | `role_assignment_scope` (permissions, 2) | `company_id,warehouse_id` | `warehouse` (master_data, 3) | up | docs/design/DS-15-access.sql:266 |
 | `segregation_exception` (permissions, 2) | `audit_record_id` | `audit_record` (audit, 2) | same layer | docs/design/DS-05-platform.sql:1318 |
 | `segregation_exception` (permissions, 2) | `company_id,document_id` | `document` (documents, 2) | same layer | docs/design/DS-05-platform.sql:1317 |
-| `forecast_adjustment` (planning, 4) | `company_id,item_id` | `item` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:265 |
-| `forecast_adjustment` (planning, 4) | `company_id,warehouse_id` | `warehouse` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:266 |
-| `forecast_adjustment` (planning, 4) | `created_by_user_id` | `user_account` (permissions, 2) | down | docs/design/DS-43-54-planning-production.sql:259 |
-| `forecast_line` (planning, 4) | `company_id,item_id` | `item` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:245 |
-| `forecast_line` (planning, 4) | `company_id,warehouse_id` | `warehouse` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:246 |
-| `forecast_run` (planning, 4) | `requested_by_user_id` | `user_account` (permissions, 2) | down | docs/design/DS-43-54-planning-production.sql:222 |
-| `item_warehouse_planning` (planning, 4) | `company_id,item_id` | `item` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:115 |
-| `item_warehouse_planning` (planning, 4) | `company_id,warehouse_id` | `warehouse` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:116 |
-| `planned_order` (planning, 4) | `company_id,for_demand_supply_line_id` | `demand_supply_line` (inventory, 3) | down | docs/design/DS-43-54-planning-production.sql:690 |
-| `planned_order` (planning, 4) | `company_id,item_id` | `item` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:686 |
-| `planned_order` (planning, 4) | `company_id,production_version_id,warehouse_id` | `production_version` (production, 3) | down | docs/design/DS-43-54-planning-production.sql:692 |
-| `planned_order` (planning, 4) | `company_id,supplier_partner_id` | `partner` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:688 |
-| `planned_order` (planning, 4) | `company_id,warehouse_id` | `warehouse` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:687 |
-| `planned_order` (planning, 4) | `order_uom_id` | `uom` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:670 |
-| `planned_order_component` (planning, 4) | `company_id,component_item_id` | `item` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:727 |
-| `planned_order_component` (planning, 4) | `company_id,warehouse_id` | `warehouse` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:728 |
-| `planned_order_operation` (planning, 4) | `company_id,work_center_id` | `work_center` (production, 3) | down | docs/design/DS-43-54-planning-production.sql:742 |
-| `planned_order_pegging` (planning, 4) | `company_id,demand_supply_line_id` | `demand_supply_line` (inventory, 3) | down | docs/design/DS-43-54-planning-production.sql:759 |
-| `planning_action_message` (planning, 4) | `company_id,demand_supply_line_id` | `demand_supply_line` (inventory, 3) | down | docs/design/DS-43-54-planning-production.sql:782 |
-| `planning_exception` (planning, 4) | `company_id,demand_supply_line_id` | `demand_supply_line` (inventory, 3) | down | docs/design/DS-43-54-planning-production.sql:824 |
-| `planning_exception` (planning, 4) | `company_id,item_id` | `item` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:818 |
-| `planning_exception` (planning, 4) | `company_id,production_order_id` | `production_order` (production, 3) | down | docs/design/DS-43-54-planning-production.sql:823 |
-| `planning_exception` (planning, 4) | `company_id,supplier_partner_id` | `partner` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:820 |
-| `planning_exception` (planning, 4) | `company_id,warehouse_id` | `warehouse` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:819 |
-| `planning_exception` (planning, 4) | `company_id,work_center_id` | `work_center` (production, 3) | down | docs/design/DS-43-54-planning-production.sql:821 |
-| `sales_history` (planning, 4) | `company_id,item_id` | `item` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:194 |
-| `sales_history` (planning, 4) | `company_id,warehouse_id` | `warehouse` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:195 |
-| `supplier_item` (planning, 4) | `company_id,item_id` | `item` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:147 |
-| `supplier_item` (planning, 4) | `company_id,supplier_partner_id` | `partner` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:146 |
-| `supplier_item` (planning, 4) | `order_uom_id` | `uom` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:135 |
-| `supplier_item` (planning, 4) | `partner_item_id` | `partner_item` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:136 |
-| `supplier_item_lead_time` (planning, 4) | `company_id,item_id` | `item` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:181 |
-| `supplier_item_lead_time` (planning, 4) | `company_id,supplier_partner_id` | `partner` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:180 |
-| `supplier_purchasing_term` (planning, 4) | `company_id,supplier_partner_id` | `partner` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:165 |
-| `supplier_purchasing_term` (planning, 4) | `currency` | `currency` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:157 |
-| `supplier_purchasing_term` (planning, 4) | `volume_uom_id` | `uom` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:159 |
-| `supplier_purchasing_term` (planning, 4) | `weight_uom_id` | `uom` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:161 |
-| `transfer_route` (planning, 4) | `company_id,destination_warehouse_id` | `warehouse` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:88 |
-| `transfer_route` (planning, 4) | `company_id,source_warehouse_id` | `warehouse` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:87 |
+| `forecast_adjustment` (planning, 4) | `company_id,item_id` | `item` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:266 |
+| `forecast_adjustment` (planning, 4) | `company_id,warehouse_id` | `warehouse` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:267 |
+| `forecast_adjustment` (planning, 4) | `created_by_user_id` | `user_account` (permissions, 2) | down | docs/design/DS-43-54-planning-production.sql:260 |
+| `forecast_line` (planning, 4) | `company_id,item_id` | `item` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:246 |
+| `forecast_line` (planning, 4) | `company_id,warehouse_id` | `warehouse` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:247 |
+| `forecast_run` (planning, 4) | `requested_by_user_id` | `user_account` (permissions, 2) | down | docs/design/DS-43-54-planning-production.sql:223 |
+| `item_warehouse_planning` (planning, 4) | `company_id,item_id` | `item` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:116 |
+| `item_warehouse_planning` (planning, 4) | `company_id,warehouse_id` | `warehouse` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:117 |
+| `planned_order` (planning, 4) | `company_id,for_demand_supply_line_id` | `demand_supply_line` (inventory, 3) | down | docs/design/DS-43-54-planning-production.sql:693 |
+| `planned_order` (planning, 4) | `company_id,item_id` | `item` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:689 |
+| `planned_order` (planning, 4) | `company_id,production_version_id,warehouse_id` | `production_version` (production, 3) | down | docs/design/DS-43-54-planning-production.sql:695 |
+| `planned_order` (planning, 4) | `company_id,supplier_partner_id` | `partner` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:691 |
+| `planned_order` (planning, 4) | `company_id,warehouse_id` | `warehouse` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:690 |
+| `planned_order` (planning, 4) | `order_uom_id` | `uom` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:673 |
+| `planned_order_component` (planning, 4) | `company_id,component_item_id` | `item` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:730 |
+| `planned_order_component` (planning, 4) | `company_id,warehouse_id` | `warehouse` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:731 |
+| `planned_order_operation` (planning, 4) | `company_id,work_center_id` | `work_center` (production, 3) | down | docs/design/DS-43-54-planning-production.sql:745 |
+| `planned_order_pegging` (planning, 4) | `company_id,demand_supply_line_id` | `demand_supply_line` (inventory, 3) | down | docs/design/DS-43-54-planning-production.sql:762 |
+| `planning_action_message` (planning, 4) | `company_id,demand_supply_line_id` | `demand_supply_line` (inventory, 3) | down | docs/design/DS-43-54-planning-production.sql:785 |
+| `planning_exception` (planning, 4) | `company_id,demand_supply_line_id` | `demand_supply_line` (inventory, 3) | down | docs/design/DS-43-54-planning-production.sql:827 |
+| `planning_exception` (planning, 4) | `company_id,item_id` | `item` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:821 |
+| `planning_exception` (planning, 4) | `company_id,production_order_id` | `production_order` (production, 3) | down | docs/design/DS-43-54-planning-production.sql:826 |
+| `planning_exception` (planning, 4) | `company_id,supplier_partner_id` | `partner` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:823 |
+| `planning_exception` (planning, 4) | `company_id,warehouse_id` | `warehouse` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:822 |
+| `planning_exception` (planning, 4) | `company_id,work_center_id` | `work_center` (production, 3) | down | docs/design/DS-43-54-planning-production.sql:824 |
+| `sales_history` (planning, 4) | `company_id,item_id` | `item` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:195 |
+| `sales_history` (planning, 4) | `company_id,warehouse_id` | `warehouse` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:196 |
+| `supplier_item` (planning, 4) | `company_id,item_id` | `item` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:148 |
+| `supplier_item` (planning, 4) | `company_id,supplier_partner_id` | `partner` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:147 |
+| `supplier_item` (planning, 4) | `order_uom_id` | `uom` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:136 |
+| `supplier_item` (planning, 4) | `partner_item_id` | `partner_item` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:137 |
+| `supplier_item_lead_time` (planning, 4) | `company_id,item_id` | `item` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:182 |
+| `supplier_item_lead_time` (planning, 4) | `company_id,supplier_partner_id` | `partner` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:181 |
+| `supplier_purchasing_term` (planning, 4) | `company_id,supplier_partner_id` | `partner` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:166 |
+| `supplier_purchasing_term` (planning, 4) | `currency` | `currency` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:158 |
+| `supplier_purchasing_term` (planning, 4) | `volume_uom_id` | `uom` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:160 |
+| `supplier_purchasing_term` (planning, 4) | `weight_uom_id` | `uom` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:162 |
+| `transfer_route` (planning, 4) | `company_id,destination_warehouse_id` | `warehouse` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:89 |
+| `transfer_route` (planning, 4) | `company_id,source_warehouse_id` | `warehouse` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:88 |
 | `approval_stage` (policy, 2) | `company_id,escalation_role_id` | `role` (permissions, 2) | same layer | docs/design/DS-15-access.sql:370 |
 | `approval_stage_member` (policy, 2) | `company_id,role_id` | `role` (permissions, 2) | same layer | docs/design/DS-15-access.sql:379 |
 | `approval_stage_member` (policy, 2) | `user_account_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-15-access.sql:376 |
 | `policy_rule_version` (policy, 2) | `owner_user_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-05-platform.sql:416 |
-| `activity_type` (production, 3) | `time_uom_id` | `uom` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:343 |
-| `bill_of_materials` (production, 3) | `company_id,item_id` | `item` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:426 |
-| `bill_of_materials` (production, 3) | `company_id,product_id` | `product` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:427 |
+| `activity_type` (production, 3) | `time_uom_id` | `uom` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:344 |
+| `bill_of_materials` (production, 3) | `company_id,item_id` | `item` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:427 |
+| `bill_of_materials` (production, 3) | `company_id,product_id` | `product` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:428 |
 | `bill_of_materials` (production, 3) | `company_id,proposed_change_proposal_item_id` | `change_proposal_item` (documents, 2) | down | docs/design/DS-36-document-intake.sql:266 |
-| `bill_of_materials_component` (production, 3) | `company_id,component_item_id` | `item` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:480 |
+| `bill_of_materials_component` (production, 3) | `company_id,component_item_id` | `item` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:481 |
 | `bill_of_materials_component` (production, 3) | `company_id,proposed_change_proposal_item_id` | `change_proposal_item` (documents, 2) | down | docs/design/DS-36-document-intake.sql:267 |
-| `bill_of_materials_component` (production, 3) | `company_id,sizing_attribute_id,sizing_value_type` | `variant_attribute` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:481 |
-| `bill_of_materials_component` (production, 3) | `uom_id` | `uom` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:461 |
-| `bill_of_materials_output` (production, 3) | `company_id,output_item_id` | `item` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:509 |
-| `bill_of_materials_output` (production, 3) | `uom_id` | `uom` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:500 |
-| `cost_estimate` (production, 3) | `company_id,item_id` | `item` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1372 |
-| `cost_estimate_gap` (production, 3) | `company_id,component_item_id` | `item` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1418 |
-| `cost_estimate_line` (production, 3) | `company_id,component_item_id` | `item` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1396 |
-| `cost_estimate_line` (production, 3) | `company_id,cost_center_id` | `cost_center` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1398 |
+| `bill_of_materials_component` (production, 3) | `company_id,sizing_attribute_id,sizing_value_type` | `variant_attribute` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:482 |
+| `bill_of_materials_component` (production, 3) | `uom_id` | `uom` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:462 |
+| `bill_of_materials_output` (production, 3) | `company_id,output_item_id` | `item` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:510 |
+| `bill_of_materials_output` (production, 3) | `uom_id` | `uom` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:501 |
+| `cost_component_detail_mapping` (production, 3) | `company_id,item_group_id` | `item_group` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1392 |
+| `cost_component_detail_mapping` (production, 3) | `valuation_class_id` | `valuation_class` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1383 |
+| `cost_estimate` (production, 3) | `company_id,item_id` | `item` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1523 |
+| `cost_estimate_gap` (production, 3) | `company_id,component_item_id` | `item` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1603 |
+| `cost_estimate_line` (production, 3) | `company_id,component_item_id` | `item` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1550 |
+| `cost_estimate_line` (production, 3) | `company_id,credited_cost_center_id` | `cost_center` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1552 |
+| `cost_estimate_sheet_row` (production, 3) | `company_id,credited_cost_center_id` | `cost_center` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1578 |
 | `cost_object` (production, 3) | `cost_center_id` | `cost_center` (master_data, 3) | same layer | docs/design/DS-06-universal-journal.sql:36 |
-| `item_low_level_code` (production, 3) | `company_id,item_id` | `item` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:647 |
-| `item_low_level_code` (production, 3) | `company_id,product_id` | `product` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:648 |
-| `item_production_setting` (production, 3) | `company_id,item_id` | `item` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:638 |
-| `item_production_setting` (production, 3) | `company_id,production_warehouse_id` | `warehouse` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:639 |
-| `normal_capacity` (production, 3) | `company_id,cost_center_id` | `cost_center` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1472 |
-| `operation_assignment` (production, 3) | `company_id,employee_partner_id` | `partner` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1051 |
-| `operation_assignment` (production, 3) | `company_id,team_id` | `team` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1052 |
-| `operation_confirmation` (production, 3) | `company_id,employee_partner_id` | `partner` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1214 |
-| `operation_confirmation` (production, 3) | `company_id,id` | `document` (documents, 2) | down | docs/design/DS-43-54-planning-production.sql:1209 |
-| `operation_confirmation` (production, 3) | `company_id,team_id` | `team` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1215 |
-| `operation_confirmation` (production, 3) | `lot_id` | `lot` (inventory, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1200 |
-| `operation_progress_component` (production, 3) | `bin_id,warehouse_id` | `bin` (inventory, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1338 |
-| `operation_progress_component` (production, 3) | `company_id,service_receipt_id` | `document` (documents, 2) | down | docs/design/DS-43-54-planning-production.sql:1335 |
-| `operation_progress_component` (production, 3) | `lot_id` | `lot` (inventory, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1328 |
-| `operation_progress_component` (production, 3) | `material_document_line_id` | `material_document_line` (inventory, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1331 |
-| `operation_progress_component` (production, 3) | `uom_id` | `uom` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1323 |
-| `operation_time_log` (production, 3) | `company_id,employee_partner_id` | `partner` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1086 |
-| `operation_time_log` (production, 3) | `company_id,team_id` | `team` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1087 |
-| `operation_time_log` (production, 3) | `confirmed_by_user_id` | `user_account` (permissions, 2) | down | docs/design/DS-43-54-planning-production.sql:1075 |
-| `overhead_surcharge` (production, 3) | `company_id,cost_center_id` | `cost_center` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1449 |
-| `pool_allocation_rule` (production, 3) | `company_id,cost_center_id` | `cost_center` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1459 |
-| `production_cost_settlement` (production, 3) | `company_id,id` | `document` (documents, 2) | down | docs/design/DS-43-54-planning-production.sql:1482 |
-| `production_issue` (production, 3) | `company_id,id` | `document` (documents, 2) | down | docs/design/DS-43-54-planning-production.sql:1141 |
-| `production_issue_line` (production, 3) | `bin_id,warehouse_id` | `bin` (inventory, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1175 |
-| `production_issue_line` (production, 3) | `lot_id` | `lot` (inventory, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1159 |
-| `production_issue_line` (production, 3) | `material_document_line_id` | `material_document_line` (inventory, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1168 |
-| `production_issue_line` (production, 3) | `serial_number_id` | `serial_number` (inventory, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1160 |
-| `production_issue_line` (production, 3) | `uom_id` | `uom` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1154 |
-| `production_order` (production, 3) | `company_id,for_demand_supply_line_id` | `demand_supply_line` (inventory, 3) | same layer | docs/design/DS-43-54-planning-production.sql:915 |
-| `production_order` (production, 3) | `company_id,id` | `document` (documents, 2) | down | docs/design/DS-43-54-planning-production.sql:908 |
-| `production_order` (production, 3) | `company_id,item_id` | `item` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:909 |
-| `production_order` (production, 3) | `company_id,origin_planned_order_id` | `planned_order` (planning, 4) | up | docs/design/DS-43-54-planning-production.sql:914 |
-| `production_order` (production, 3) | `company_id,product_configuration_id` | `product_configuration` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:916 |
-| `production_order` (production, 3) | `company_id,production_warehouse_id` | `warehouse` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:910 |
-| `production_order_component` (production, 3) | `company_id,component_item_id` | `item` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:943 |
-| `production_order_component` (production, 3) | `company_id,issue_warehouse_id` | `warehouse` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:944 |
-| `production_order_component` (production, 3) | `company_id,owner_partner_id` | `partner` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:945 |
-| `production_order_operation` (production, 3) | `company_id,service_item_id` | `item` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:998 |
-| `production_order_operation` (production, 3) | `company_id,supplier_partner_id` | `partner` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:997 |
-| `production_order_output` (production, 3) | `company_id,output_item_id` | `item` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:964 |
-| `production_order_output` (production, 3) | `company_id,owner_partner_id` | `partner` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:965 |
-| `production_order_output_serial` (production, 3) | `serial_number_id` | `serial_number` (inventory, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1115 |
-| `production_receipt` (production, 3) | `company_id,id` | `document` (documents, 2) | down | docs/design/DS-43-54-planning-production.sql:1261 |
-| `production_receipt` (production, 3) | `company_id,service_receipt_id` | `document` (documents, 2) | down | docs/design/DS-43-54-planning-production.sql:1264 |
-| `production_receipt_line` (production, 3) | `bin_id,warehouse_id` | `bin` (inventory, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1296 |
-| `production_receipt_line` (production, 3) | `lot_id` | `lot` (inventory, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1283 |
-| `production_receipt_line` (production, 3) | `material_document_line_id` | `material_document_line` (inventory, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1290 |
-| `production_receipt_line` (production, 3) | `uom_id` | `uom` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1278 |
-| `production_version` (production, 3) | `company_id,item_id` | `item` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:621 |
-| `production_version` (production, 3) | `company_id,product_id` | `product` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:622 |
-| `production_version` (production, 3) | `company_id,production_warehouse_id` | `warehouse` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:623 |
-| `routing_operation` (production, 3) | `company_id,default_supplier_id` | `partner` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:574 |
-| `routing_operation` (production, 3) | `company_id,service_item_id` | `item` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:573 |
-| `routing_operation` (production, 3) | `company_id,sizing_attribute_id,sizing_value_type` | `variant_attribute` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:575 |
-| `work_center` (production, 3) | `company_id,cost_center_id` | `cost_center` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:394 |
-| `work_center` (production, 3) | `company_id,production_warehouse_id` | `warehouse` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:392 |
-| `work_center` (production, 3) | `company_id,working_calendar_id` | `working_calendar` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:393 |
-| `work_center` (production, 3) | `output_bin_id,production_warehouse_id` | `bin` (inventory, 3) | same layer | docs/design/DS-43-54-planning-production.sql:397 |
-| `work_center` (production, 3) | `supply_bin_id,production_warehouse_id` | `bin` (inventory, 3) | same layer | docs/design/DS-43-54-planning-production.sql:396 |
+| `costing_sheet_rate` (production, 3) | `company_id,item_group_id` | `item_group` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1482 |
+| `costing_sheet_rate` (production, 3) | `company_id,site_id` | `site` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1481 |
+| `costing_sheet_rate` (production, 3) | `valuation_class_id` | `valuation_class` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1472 |
+| `costing_sheet_row` (production, 3) | `company_id,credited_cost_center_id` | `cost_center` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1432 |
+| `item_low_level_code` (production, 3) | `company_id,item_id` | `item` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:650 |
+| `item_low_level_code` (production, 3) | `company_id,product_id` | `product` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:651 |
+| `item_production_setting` (production, 3) | `company_id,item_id` | `item` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:641 |
+| `item_production_setting` (production, 3) | `company_id,production_warehouse_id` | `warehouse` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:642 |
+| `normal_capacity` (production, 3) | `company_id,cost_center_id` | `cost_center` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1652 |
+| `operation_assignment` (production, 3) | `company_id,employee_partner_id` | `partner` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1054 |
+| `operation_assignment` (production, 3) | `company_id,team_id` | `team` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1055 |
+| `operation_confirmation` (production, 3) | `company_id,employee_partner_id` | `partner` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1217 |
+| `operation_confirmation` (production, 3) | `company_id,id` | `document` (documents, 2) | down | docs/design/DS-43-54-planning-production.sql:1212 |
+| `operation_confirmation` (production, 3) | `company_id,team_id` | `team` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1218 |
+| `operation_confirmation` (production, 3) | `lot_id` | `lot` (inventory, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1203 |
+| `operation_progress_component` (production, 3) | `bin_id,warehouse_id` | `bin` (inventory, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1341 |
+| `operation_progress_component` (production, 3) | `company_id,service_receipt_id` | `document` (documents, 2) | down | docs/design/DS-43-54-planning-production.sql:1338 |
+| `operation_progress_component` (production, 3) | `lot_id` | `lot` (inventory, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1331 |
+| `operation_progress_component` (production, 3) | `material_document_line_id` | `material_document_line` (inventory, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1334 |
+| `operation_progress_component` (production, 3) | `uom_id` | `uom` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1326 |
+| `operation_time_log` (production, 3) | `company_id,employee_partner_id` | `partner` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1089 |
+| `operation_time_log` (production, 3) | `company_id,team_id` | `team` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1090 |
+| `operation_time_log` (production, 3) | `confirmed_by_user_id` | `user_account` (permissions, 2) | down | docs/design/DS-43-54-planning-production.sql:1078 |
+| `pool_allocation_rule` (production, 3) | `company_id,cost_center_id` | `cost_center` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1639 |
+| `production_cost_settlement` (production, 3) | `company_id,id` | `document` (documents, 2) | down | docs/design/DS-43-54-planning-production.sql:1662 |
+| `production_issue` (production, 3) | `company_id,id` | `document` (documents, 2) | down | docs/design/DS-43-54-planning-production.sql:1144 |
+| `production_issue_line` (production, 3) | `bin_id,warehouse_id` | `bin` (inventory, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1178 |
+| `production_issue_line` (production, 3) | `lot_id` | `lot` (inventory, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1162 |
+| `production_issue_line` (production, 3) | `material_document_line_id` | `material_document_line` (inventory, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1171 |
+| `production_issue_line` (production, 3) | `serial_number_id` | `serial_number` (inventory, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1163 |
+| `production_issue_line` (production, 3) | `uom_id` | `uom` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1157 |
+| `production_order` (production, 3) | `company_id,for_demand_supply_line_id` | `demand_supply_line` (inventory, 3) | same layer | docs/design/DS-43-54-planning-production.sql:918 |
+| `production_order` (production, 3) | `company_id,id` | `document` (documents, 2) | down | docs/design/DS-43-54-planning-production.sql:911 |
+| `production_order` (production, 3) | `company_id,item_id` | `item` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:912 |
+| `production_order` (production, 3) | `company_id,origin_planned_order_id` | `planned_order` (planning, 4) | up | docs/design/DS-43-54-planning-production.sql:917 |
+| `production_order` (production, 3) | `company_id,product_configuration_id` | `product_configuration` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:919 |
+| `production_order` (production, 3) | `company_id,production_warehouse_id` | `warehouse` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:913 |
+| `production_order_component` (production, 3) | `company_id,component_item_id` | `item` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:946 |
+| `production_order_component` (production, 3) | `company_id,issue_warehouse_id` | `warehouse` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:947 |
+| `production_order_component` (production, 3) | `company_id,owner_partner_id` | `partner` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:948 |
+| `production_order_operation` (production, 3) | `company_id,service_item_id` | `item` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1001 |
+| `production_order_operation` (production, 3) | `company_id,supplier_partner_id` | `partner` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1000 |
+| `production_order_output` (production, 3) | `company_id,output_item_id` | `item` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:967 |
+| `production_order_output` (production, 3) | `company_id,owner_partner_id` | `partner` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:968 |
+| `production_order_output_serial` (production, 3) | `serial_number_id` | `serial_number` (inventory, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1118 |
+| `production_receipt` (production, 3) | `company_id,id` | `document` (documents, 2) | down | docs/design/DS-43-54-planning-production.sql:1264 |
+| `production_receipt` (production, 3) | `company_id,service_receipt_id` | `document` (documents, 2) | down | docs/design/DS-43-54-planning-production.sql:1267 |
+| `production_receipt_line` (production, 3) | `bin_id,warehouse_id` | `bin` (inventory, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1299 |
+| `production_receipt_line` (production, 3) | `lot_id` | `lot` (inventory, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1286 |
+| `production_receipt_line` (production, 3) | `material_document_line_id` | `material_document_line` (inventory, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1293 |
+| `production_receipt_line` (production, 3) | `uom_id` | `uom` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1281 |
+| `production_version` (production, 3) | `company_id,item_id` | `item` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:623 |
+| `production_version` (production, 3) | `company_id,product_id` | `product` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:624 |
+| `production_version` (production, 3) | `company_id,production_warehouse_id` | `warehouse` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:625 |
+| `routing_operation` (production, 3) | `company_id,default_supplier_id` | `partner` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:575 |
+| `routing_operation` (production, 3) | `company_id,service_item_id` | `item` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:574 |
+| `routing_operation` (production, 3) | `company_id,sizing_attribute_id,sizing_value_type` | `variant_attribute` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:576 |
+| `site_costing_sheet` (production, 3) | `company_id,site_id` | `site` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1501 |
+| `work_center` (production, 3) | `company_id,cost_center_id` | `cost_center` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:395 |
+| `work_center` (production, 3) | `company_id,production_warehouse_id` | `warehouse` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:393 |
+| `work_center` (production, 3) | `company_id,working_calendar_id` | `working_calendar` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:394 |
+| `work_center` (production, 3) | `output_bin_id,production_warehouse_id` | `bin` (inventory, 3) | same layer | docs/design/DS-43-54-planning-production.sql:398 |
+| `work_center` (production, 3) | `supply_bin_id,production_warehouse_id` | `bin` (inventory, 3) | same layer | docs/design/DS-43-54-planning-production.sql:397 |
 | `gr_ir_write_off` (purchasing, 4) | `company_id,id` | `document` (documents, 2) | down | docs/design/DS-22-09-42-commercial-inventory.sql:1221 |
 | `purchase_credit_note` (purchasing, 4) | `company_id,business_unit_id` | `business_unit` (master_data, 3) | down | docs/design/DS-22-09-42-commercial-inventory.sql:1145 |
 | `purchase_credit_note` (purchasing, 4) | `company_id,id` | `document` (documents, 2) | down | docs/design/DS-22-09-42-commercial-inventory.sql:1143 |
@@ -996,7 +1011,7 @@ Foreign keys whose source and target tables have different stated owners. Foreig
 | `work_item` (work, 2) | `company_id,warehouse_id` | `warehouse` (master_data, 3) | up | docs/design/DS-05-platform.sql:89 |
 | `work_item` (work, 2) | `owner_user_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-05-platform.sql:67 |
 
-496 cross-module foreign keys.
+503 cross-module foreign keys.
 
 ## Foreign keys to tables without a stated owner or without DDL
 
@@ -1004,11 +1019,12 @@ Foreign keys whose source and target tables have different stated owners. Foreig
 | --- | --- | --- | --- | --- |
 | `account_period_balance` | `account_id` | `account` | lab stub | docs/design/DS-06-universal-journal.sql:426 |
 | `account_period_balance` | `posting_period_id` | `posting_period` | lab stub | docs/design/DS-06-universal-journal.sql:427 |
-| `activity_rate` | `posting_period_id` | `posting_period` | lab stub | docs/design/DS-43-54-planning-production.sql:1435 |
+| `activity_rate` | `posting_period_id` | `posting_period` | lab stub | docs/design/DS-43-54-planning-production.sql:1622 |
 | `approval` | `company_id,policy_decision_id,approval_pool_id` | `policy_decision` | no owner stated | docs/design/DS-05-platform.sql:657 |
 | `approval` | `company_id,policy_decision_id,document_version_id` | `policy_decision` | no owner stated | docs/design/DS-05-platform.sql:656 |
 | `audit_record` | `company_id,policy_decision_id` | `policy_decision` | no owner stated | docs/design/DS-05-platform.sql:1312 |
 | `auto_post_confirmation` | `company_id,policy_decision_id` | `policy_decision` | no owner stated | docs/design/DS-05-platform.sql:674 |
+| `cost_component_detail_mapping` | `account_id` | `account` | lab stub | docs/design/DS-43-54-planning-production.sql:1384 |
 | `customer_profile` | `receivable_account_id` | `account` | lab stub | docs/design/DS-20-master-data.sql:335 |
 | `document_line_tax` | `tax_code_id` | `tax_code` | lab stub | docs/design/DS-05-platform.sql:980 |
 | `employee_profile` | `receivable_account_id` | `account` | lab stub | docs/design/DS-20-master-data.sql:384 |
@@ -1025,26 +1041,25 @@ Foreign keys whose source and target tables have different stated owners. Foreig
 | `journal_line` | `tax_code_id` | `tax_code` | lab stub | docs/design/DS-06-universal-journal.sql:182 |
 | `journal_line` | `transaction_key_id` | `transaction_key` | lab stub | docs/design/DS-06-universal-journal.sql:162 |
 | `money_account` | `account_id` | `account` | lab stub | docs/design/DS-05-platform.sql:1072 |
-| `normal_capacity` | `posting_period_id` | `posting_period` | lab stub | docs/design/DS-43-54-planning-production.sql:1468 |
+| `normal_capacity` | `posting_period_id` | `posting_period` | lab stub | docs/design/DS-43-54-planning-production.sql:1648 |
 | `numbering_series` | `fiscal_year_id` | `fiscal_year` | lab stub | docs/design/DS-05-platform.sql:465 |
 | `open_item` | `account_id` | `account` | lab stub | docs/design/DS-06-universal-journal.sql:114 |
 | `open_item` | `predecessor_open_item_id` | `open_item` | no owner stated | docs/design/DS-06-universal-journal.sql:141 |
 | `open_item_collection` | `company_id,open_item_id` | `open_item` | no owner stated | docs/design/DS-05-platform.sql:1324 |
 | `opening_turnover` | `account_id` | `account` | lab stub | docs/design/DS-06-universal-journal.sql:452 |
-| `overhead_surcharge` | `posting_period_id` | `posting_period` | lab stub | docs/design/DS-43-54-planning-production.sql:1445 |
 | `payment_line` | `account_id` | `account` | lab stub | docs/design/DS-05-platform.sql:1244 |
 | `payment_line` | `open_item_id` | `open_item` | no owner stated | docs/design/DS-05-platform.sql:1238 |
 | `pending_receipt_adjustment` | `clearing_journal_line_id` | `journal_line` | no owner stated | docs/design/DS-22-09-42-commercial-inventory.sql:1601 |
 | `period_unlock_request` | `posting_period_id` | `posting_period` | lab stub | docs/design/DS-05-platform.sql:679 |
-| `planned_order` | `company_id,planning_run_id` | `planning_run` | no owner stated | docs/design/DS-43-54-planning-production.sql:693 |
-| `planning_action_message` | `company_id,planning_run_id` | `planning_run` | no owner stated | docs/design/DS-43-54-planning-production.sql:781 |
-| `planning_exception` | `company_id,planning_run_id` | `planning_run` | no owner stated | docs/design/DS-43-54-planning-production.sql:817 |
-| `planning_state` | `company_id,last_planning_run_id` | `planning_run` | no owner stated | docs/design/DS-43-54-planning-production.sql:67 |
+| `planned_order` | `company_id,planning_run_id` | `planning_run` | no owner stated | docs/design/DS-43-54-planning-production.sql:696 |
+| `planning_action_message` | `company_id,planning_run_id` | `planning_run` | no owner stated | docs/design/DS-43-54-planning-production.sql:784 |
+| `planning_exception` | `company_id,planning_run_id` | `planning_run` | no owner stated | docs/design/DS-43-54-planning-production.sql:820 |
+| `planning_state` | `company_id,last_planning_run_id` | `planning_run` | no owner stated | docs/design/DS-43-54-planning-production.sql:68 |
 | `policy_decision` | `company_id,continues_policy_decision_id` | `policy_decision` | no owner stated | docs/design/DS-05-platform.sql:607 |
 | `posting_intent` | `company_id,policy_decision_id` | `policy_decision` | no owner stated | docs/design/DS-05-platform.sql:706 |
 | `preliminary_price` | `posting_period_id` | `posting_period` | lab stub | docs/design/DS-22-09-42-commercial-inventory.sql:1394 |
-| `production_cost_settlement` | `posting_period_id` | `posting_period` | lab stub | docs/design/DS-43-54-planning-production.sql:1479 |
-| `production_order_period_cost` | `posting_period_id` | `posting_period` | lab stub | docs/design/DS-43-54-planning-production.sql:1499 |
+| `production_cost_settlement` | `posting_period_id` | `posting_period` | lab stub | docs/design/DS-43-54-planning-production.sql:1659 |
+| `production_order_period_cost` | `posting_period_id` | `posting_period` | lab stub | docs/design/DS-43-54-planning-production.sql:1679 |
 | `purchase_invoice_line` | `account_id` | `account` | lab stub | docs/design/DS-22-09-42-commercial-inventory.sql:1036 |
 | `segregation_review` | `posting_period_id` | `posting_period` | lab stub | docs/design/DS-15-access.sql:321 |
 | `supplier_profile` | `payable_account_id` | `account` | lab stub | docs/design/DS-20-master-data.sql:360 |
@@ -1100,13 +1115,13 @@ Listed for the review; no owner is invented. Each needs an owner stated in its D
 | `open_item` | DS-06 states no owner module for this table in its comments (ADR-0022 rule 7 needs exactly one). | docs/design/DS-06-universal-journal.sql:110 |
 | `payment_term_line` | DS-06 states no owner module for this table in its comments (ADR-0022 rule 7 needs exactly one). | docs/design/DS-06-universal-journal.sql:98 |
 | `period_unlock_request` | its DDL section names two owner modules and the table names none (ADR-0022 rule 7 needs exactly one). Section owners: policy, documents. | docs/design/DS-05-platform.sql:676 |
-| `planning_run` | its DDL section names two owner modules and the table names none (ADR-0022 rule 7 needs exactly one). Section owners: planning, production. | docs/design/DS-43-54-planning-production.sql:44 |
-| `planning_setting` | its DDL section names two owner modules and the table names none (ADR-0022 rule 7 needs exactly one). Section owners: planning, production. | docs/design/DS-43-54-planning-production.sql:33 |
-| `planning_state` | its DDL section names two owner modules and the table names none (ADR-0022 rule 7 needs exactly one). Section owners: planning, production. | docs/design/DS-43-54-planning-production.sql:63 |
+| `planning_run` | its DDL section names two owner modules and the table names none (ADR-0022 rule 7 needs exactly one). Section owners: planning, production. | docs/design/DS-43-54-planning-production.sql:45 |
+| `planning_setting` | its DDL section names two owner modules and the table names none (ADR-0022 rule 7 needs exactly one). Section owners: planning, production. | docs/design/DS-43-54-planning-production.sql:34 |
+| `planning_state` | its DDL section names two owner modules and the table names none (ADR-0022 rule 7 needs exactly one). Section owners: planning, production. | docs/design/DS-43-54-planning-production.sql:64 |
 | `policy_decision` | its DDL section names two owner modules and the table names none (ADR-0022 rule 7 needs exactly one). Section owners: policy, documents. | docs/design/DS-05-platform.sql:565 |
 | `posting_period` | lab stub only: no design DDL defines it yet (DS-05-platform.sql header; lab 00_stubs.sql). | docs/reviews/2026-11-14-design-validation/lab/00_stubs.sql |
 | `posting_period_area_state` | lab stub only: no design DDL defines it yet (DS-05-platform.sql header; lab 00_stubs.sql). | docs/reviews/2026-11-14-design-validation/lab/00_stubs.sql |
-| `production_structure` | its DDL section names two owner modules and the table names none (ADR-0022 rule 7 needs exactly one). Section owners: planning, production. | docs/design/DS-43-54-planning-production.sql:69 |
+| `production_structure` | its DDL section names two owner modules and the table names none (ADR-0022 rule 7 needs exactly one). Section owners: planning, production. | docs/design/DS-43-54-planning-production.sql:70 |
 | `subledger_activation` | DS-06 states no owner module for this table in its comments (ADR-0022 rule 7 needs exactly one). | docs/design/DS-06-universal-journal.sql:55 |
 | `system_account` | lab stub only: no design DDL defines it yet (DS-05-platform.sql header; lab 00_stubs.sql). | docs/reviews/2026-11-14-design-validation/lab/00_stubs.sql |
 | `tax_code` | lab stub only: no design DDL defines it yet (DS-05-platform.sql header; lab 00_stubs.sql). | docs/reviews/2026-11-14-design-validation/lab/00_stubs.sql |

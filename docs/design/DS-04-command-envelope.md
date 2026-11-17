@@ -542,6 +542,10 @@ Outcome and violation enumerations are not error codes and are not catalogued he
 | `time_log_already_confirmed` | precondition | 422 | no | A time log is linked to another posted, not reversed confirmation, or is updated or canceled while so linked ([ADR-0071](../adr/0071-work-orders-and-shop-floor-execution.md) rules 9, 11) |
 | `stop_reason_required` | validation | 422 | no | `BlockOperation` without a stop reason, or `PauseOperation` without one while `production.operation.stop_reason_on_pause` is true ([ADR-0071](../adr/0071-work-orders-and-shop-floor-execution.md) rule 8) |
 | `receipt_scrap_not_allowed` | validation | 422 | no | Receipt scrap on an order with an internal operation, or with no main output ([ADR-0071](../adr/0071-work-orders-and-shop-floor-execution.md) rule 4) |
+| `costing_sheet_row_invalid` | validation | 422 | no | A costing sheet row the rules forbid: a percent base that is not an earlier base or subtotal row, base members that overlap (a detail and its own posting component), a surcharge landing in material, a production row referring to a selling row, or a selling surcharge crediting a cost center not of kind `administration` or `selling` ([ADR-0072](../adr/0072-costing-sheet-and-cost-component-structure.md) rule 6) |
+| `costing_rate_overlap` | validation | 422 | no | Two rates of one costing sheet row and condition set overlap in dates ([ADR-0072](../adr/0072-costing-sheet-and-cost-component-structure.md) rule 7) |
+| `cost_component_detail_limit` | precondition | 422 | no | A thirteenth active detailed cost component in the company ([ADR-0072](../adr/0072-costing-sheet-and-cost-component-structure.md) rule 2) |
+| `cost_component_detail_in_use` | precondition | 422 | no | A change of the posting component of a detailed cost component that an estimate line or period cost detail names, or the deactivation of a default ([ADR-0072](../adr/0072-costing-sheet-and-cost-component-structure.md) rule 2) |
 
 ### Check results
 

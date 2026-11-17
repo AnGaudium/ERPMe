@@ -156,3 +156,4 @@ usage_decision,quality,function,quality,Usage decisions,0.1.0,"SubmitInspectionL
 nonconformance,quality,function,quality,Nonconformances,0.1.0,"Supplier, internal and customer nonconformances and their actions (ADR-0070 rule 16)."
 report_quality,reports,report,query,Quality reports,0.1.0,"Inspection lots, results and the supplier reject rate (ADR-0070 rule 19)."
 shop_floor_execution,production,function,production,Shop-floor execution,0.1.0,"Start, pause and block WOs, assign them, and create, update and cancel time logs need edit; TransferOperation and ConfirmOperationTimeLog need post (ADR-0071 rules 8, 9, 12, 16)."
+costing_structure,master_data,master_data,production,Costing structure,0.1.0,"Costing sheets, their rates and site assignments, detailed cost components and their mappings, and activity rates; master_data_change and proposal-bound (ADR-0072 rule 17)."

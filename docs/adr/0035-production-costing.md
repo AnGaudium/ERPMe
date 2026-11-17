@@ -161,6 +161,8 @@ The accounting choices are the author's (ADR-0005 item 1). Each one below is a r
     Note (UoM simulation review, 2026-11-15): under price basis `preliminary_price`, a purchased component that has no receipt yet is priced at the preliminary price of [ADR-0020](0020-inventory-and-costing-model.md) rule 11 and its note: the supplier purchase list price (`find_price` in the inventory unit), else the last purchase invoice price, else a manual preliminary price; without any, the estimate cannot price the component and returns `preliminary_price_missing` naming it. Made components keep their chain: the estimate rolls up their released estimates (above), and their preliminary price stays rule 4's (receipts with costing role `production_output`, else the released estimate's unit cost, else `preliminary_price_missing`).
 
     Note ([ADR-0062](0062-product-engineering-workflow.md), proposed 2026-11-15): `CreateCostEstimate` is also registered `is_draft_only` and computes on draft revisions: a draft estimate may have no production version. What it cannot price (a missing purchase price, activity rate or activity quantity, a pending item, an unstated setup or run time, a missing routing) is a `cost_estimate_gap` row, left out of the total and never zero; an estimate with a gap or without a version is never released (`cost_estimate_incomplete`). `previous_cost_estimate_id` names the estimate a delta compares with ([ADR-0062](0062-product-engineering-workflow.md) rule 12).
+
+    Note ([ADR-0072](0072-costing-sheet-and-cost-component-structure.md), proposed 2026-11-18): overhead in an estimate comes from the costing sheet of the production version, else of its site (rules 6–9). It replaces the interim `overhead_surcharge` and "a planned surcharge per cost center" (rule 11). `cost_estimate_line` gains `cost_component_detail_id`, and on surcharge lines only `costing_sheet_row_number` and `credited_cost_center_id`, the settled `cost_center_id`; `cost_estimate_sheet_row` keeps the sheet as costed. A missing rate is the gap `costing_rate_missing`, never zero. Administration and selling rows never enter an estimate (rule 10).
 15. Variance analysis:
     - **Target cost.** The released estimate valid on the order's explosion date, scaled to the received quantity.
     - **Query.** `GetProductionOrderVariance` splits actual minus target into input price, input quantity, resource usage, scrap, lot size and remaining.
@@ -172,6 +174,8 @@ The accounting choices are the author's (ADR-0005 item 1). Each one below is a r
     Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), proposed 2026-11-15): the split is also written per order, period and variance category, with the order's output item, warehouse and branch, to `production`'s read model `production_order_variance` when the costing run settles the order's period cost; its DDL comes with the costing tables of DS-53 (a note in DS-43-54-planning-production.sql). The analysis fact `production_variance_overview` reads those rows only, so the variance agent and the analysis layer read one figure (rule 19).
 
     Note ([ADR-0064](0064-production-agent.md), proposed 2026-11-15): the variance agent is `production_variance` on the analysis layer; `GetProductionOrderUsageVariance` gives in-period quantity variances before settlement and `ListProductionOrderVarianceDriver` the document lines per category and cost component, which sum to `production_order_variance` (rules 9–11, 20).
+
+    Note ([ADR-0072](0072-costing-sheet-and-cost-component-structure.md), proposed 2026-11-18): the order cost report and `GetProductionOrderVariance` may group by detailed cost component, read from `production_order_period_cost_detail`, a read model the job writes beside `production_order_period_cost` without changing its key, INV-106 or the settlement keys (rules 4, 5). Receipts keep the item's preliminary price (rule 4 of this ADR); `GetProductionReceiptValuation` shows planned against preliminary value per receipt, and `GetProductionOrderProjectedCost` a provisional projected final cost at completion (ADR-0072 rules 13, 14).
 
 **Vietnamese costing methods**
 
@@ -197,6 +201,8 @@ The accounting choices are the author's (ADR-0005 item 1). Each one below is a r
     - `activity_rate`;
     - `by_product_price`, which is the company's price list of kind `by_product` ([ADR-0045](0045-master-data-and-price-lists.md) rule 2);
     - `production_order_period_cost`, written only by the job.
+
+    Note ([ADR-0072](0072-costing-sheet-and-cost-component-structure.md), proposed 2026-11-18): the costing sheets with their rates and site assignments, and the detailed cost components with their mappings, are `master_data_change` too, for the same reason: a released estimate reaches valuation through rules 4, 9 and 13. Their commands and `activity_rate`'s use the leaf `costing_structure` (ADR-0072 rule 17).
 18. Settings. These are seeded `unverified` and flagged (ADR-0016 rule 12), and the regime makes them binding, as questions to the author:
     - `wip_method`;
     - `wip_completion_percent`;
