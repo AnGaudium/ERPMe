@@ -42,6 +42,17 @@ A work package is done when it is merged, the documents it affects are updated, 
 
 This six-stage flow is the project's policy for reviewing AI-written code required by [18-license-governance.md](../spec/18-license-governance.md) ([ADR-0003](../adr/0003-build-operating-rules.md) R5).
 
+Note ([ADR-0073](../adr/0073-coding-pipeline-and-mechanical-assurance.md), proposed 2026-11-18; the author's decision of 2026-11-18): for code, the stages run as follows.
+
+- **Stage 1** adds the declarations. Claude Sonnet 5.5 drafts them chunk by chunk, with each package's manifest (allowlist and context pack), and Claude Opus 5.5 or Claude Fable 5.2 reviews them.
+- **Stage 2** adds property tests and SQL tests, written by a seat other than the coder. They are read-only to it.
+- **Stage 3.** `nativeflows-dev work-package <id> --start` scaffolds the package. Claude Haiku 5.5 then writes only the `services/` body and the new tests in its allowlist, fenced by a hook. Platform code and the first package of each kind are assigned up front to Claude Opus 5.5. After two red attempts the coder stops, and the package is never rescued by a stronger model.
+- **Stage 4** adds `mutation` and `scope-guard`.
+- **Stage 5.** The author no longer reviews code. Two model reviews on different models, `model-review-a` and `model-review-b`, are required check runs. On paths of money, books, stock posting, idempotency, outbox, triggers and RLS, both reviews and mutation testing apply.
+- **Stage 6.** Branch protection blocks the merge until every required check is green, with no override. The author merges, and reviews behavior at each gate from a plain-Vietnamese acceptance report and a demo on the test server. His stage 5 time moves there.
+
+In "Who does what" below, the Builder row's pointer to spec 17's Builder seat is model guidance only. That seat is the product's runtime customization seat, not the development coder; the development seats are ADR-0073 rule 4.
+
 ### Branches, commits and pull requests
 
 - `main` is always green on CI. Nobody commits to `main` directly; every change arrives by a pull request merged by the author.

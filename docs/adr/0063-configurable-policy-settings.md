@@ -80,6 +80,8 @@ The author's direction of 2026-11-15: survey best practice and follow it, keep h
 
    Note ([ADR-0065](0065-deterministic-auto-post-gateway.md), 2026-11-16 (proposed)): the auto-post gateway is an evidence-gated deterministic path in the sense of the third row. Its own hard locks (no LLM in the checker, fail closed, read-only evaluation, system execution, the plan check and confirmation) join this table, and a confirmed wrong auto-post suspends the whole document type. The fourth row stands: a tainted run still writes drafts only; a checked tainted draft may be posted by `system` only under [ADR-0065](0065-deterministic-auto-post-gateway.md) rule 10 ([ADR-0065](0065-deterministic-auto-post-gateway.md) rules 7, 10, 16).
 
+   Note ([ADR-0073](0073-coding-pipeline-and-mechanical-assurance.md), proposed 2026-11-18): the lock "No AI-written code runs without a human review of its source" predates the author's decision of 2026-11-18 that he does not read code. For the repository, ADR-0073's mechanical layers and two model reviews take that place. A model still cannot ship code: only the author merges, and only when every required check is green (ADR-0073 rule 16). The extension approval of rule 19, by a person with a technical role, is unchanged. The lock's wording is a question for the author.
+
 **Autonomy**
 
 7. Extraction value trust (ADR-0057 rule 17):

@@ -38,6 +38,8 @@ The fourteen operating questions raised while writing the [runbook](../runbook/R
 
 Note ([ADR-0057](0057-document-intake-and-extraction.md), proposed 2026-11-15): the step 7 item "Decree 70/2025" is stale: Vietnam's e-invoice rules are now Decree 254/2026/NĐ-CP and Circular 91/2026/TT-BTC, effective 1 July 2026. They are the basis of `l10n_vn`'s e-invoice reader, a package concern; the format annex is an open question (DS-40). The VAT deduction item is unchanged.
 
+Note ([ADR-0073](0073-coding-pipeline-and-mechanical-assurance.md), proposed 2026-11-18): R5's policy is still the six-stage unit of work, with stage 5 changed by the author's decision of 2026-11-18. The author no longer reviews code line by line. Changes to money, books, stock posting, idempotency, outbox, triggers and RLS pass the mechanical layers and two independent model reviews, recorded as required check runs, behind branch protection with no override. The author reviews behavior at each gate, from a plain-Vietnamese acceptance report and a demo ([ADR-0073](0073-coding-pipeline-and-mechanical-assurance.md) rules 11–21). R4's threshold and packages and R5's DCO rule are unchanged.
+
 ## Context
 
 The runbook needs these answers to be executable; the specification left them open ([open-questions.md](../open-questions.md)). The project has one author, so each rule is judged by the work it adds per week, not only by what it protects.
