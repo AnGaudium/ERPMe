@@ -218,6 +218,7 @@ The pipeline:
       - A pull request is required, and the branch must be up to date.
       - Protection is enforced for administrators, with no bypass actors and no force-push or deletion.
       - There is no admin merge, and no label turns a check off.
+      - **Agent credentials** (the author, 2026-11-18): agent sessions authenticate to GitHub with a fine-grained token limited to this repository, with Contents, Pull requests and Issues write and **without** the Administration and Workflows permissions, so no agent can change branch protection, rulesets or CI workflows. Changes to `.github/workflows/` and `.github/assurance.toml` go through a session the author starts with a separate token, and are merged under the same required checks. The author creates both tokens; agents never handle their values.
     - **Assurance paths:**
       - `.github/` (workflows, `assurance.toml`) and `.claude/`;
       - the tool sections of `pyproject.toml` and `tools/nativeflows_dev/`;
@@ -303,7 +304,7 @@ The pipeline:
 - The coder seat changes only its allowlist. Every guard reads the manifest from the base branch.
 - Every required check always reports a result. Branch protection has no bypass, and a loosening of `.github/assurance.toml` cites an ADR.
 - Model reviews never replace a mechanical layer. A defect they miss is fixed by adding a check or a test.
-- Agents act on GitHub through the author's own account today, so "no override" also needs credentials without the Administration permission for agent sessions. That is an open question for the author.
+- Agents act on GitHub through the author's own account today, so "no override" also needs credentials without the Administration permission for agent sessions. The author decided this on 2026-11-18 (rule 16).
 
 ## Revisit when
 
