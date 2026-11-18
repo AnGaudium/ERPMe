@@ -88,6 +88,8 @@ Checks:
      - `AGENTS.md`, at most 40 lines;
      - tests in `backend/tests/<module>/`.
    - Foundation modules and `db` publish through their `__init__`.
+
+   Note ([ADR-0073](0073-coding-pipeline-and-mechanical-assurance.md), proposed 2026-11-18): a module that owns commands or queries also has `declarations/`, one file per command or query (ADR-0008 rule 1 note). `contract.py` re-exports the payload and result models that other modules use. `handlers/<name>.py` is the thin handler that `nativeflows-dev scaffold` writes once. The logic is in `services/<name>.py`, which together with new tests is all that a coder work package writes (ADR-0073 rules 2, 6).
 4. A module's `contract.py` holds three things:
    - its command, query and event schemas;
    - its **posting interfaces**: plain functions that take the caller's `context`, such as `ledger.contract.write_journal_entry`, `inventory.contract.move_stock`, `documents.contract.assign_number` and `periods.contract.check_posting`;
@@ -228,6 +230,17 @@ Checks:
     - **Two speeds.** `nativeflows-dev check --fast` (ruff, format, import-linter and the rule 13 checks on changed files) for pre-commit and agents' inner loop; the full `check` (adds pyright and generated-file drift through `generate --check`) on pre-push and CI.
     - **Agents read the rules in one place:** the root `AGENTS.md` points to this note and to `docs/design/architecture-core.md` section A5; every failure prints `file:line`, the rule ID and a one-line fix (rule 13).
 
+    Note ([ADR-0073](0073-coding-pipeline-and-mechanical-assurance.md), proposed 2026-11-18): new checks.
+    - **Declaration validator:** ADR-0073 rule 2.
+    - **Floats:** extended to `float(` calls and to float literals in arithmetic in sensitive paths.
+    - **Raw SQL:** only in migrations, `db` and a module's private `tables.py`, its data-access file.
+    - **Helper-owned tables:** a table declared with `written_by=<helper>` is written only from that helper's module.
+    - **Scaffold leftovers:** no scaffold marker or `NotImplementedError` in merged code.
+    - **Manifests:** the work package manifest check (allowlist shape).
+    - **Mutation marks:** `# pragma: no mutate` only with `# equivalent: <reason>`, counted like suppressions.
+
+    Thresholds and lists move into the ratchet file `.github/assurance.toml`, which may be tightened freely and loosened only with an ADR (ADR-0073 rules 12, 14, 16).
+
 **One command for agents and CI**
 
 14. `nativeflows-dev` subcommands. Each prints a JSON summary as its last line with `--json`; at `build_step` 0 a subcommand whose inputs do not exist yet reports `skipped` with the reason:
@@ -247,6 +260,15 @@ Checks:
     | `nightly` | The nightly run (rule 18) | — |
     | `ci` | Every CI job's subcommands, in order | — |
 
+    Note ([ADR-0073](0073-coding-pipeline-and-mechanical-assurance.md), proposed 2026-11-18): new subcommands.
+    - **`scaffold <declaration> [--check]`:** one-time handler, service stub and test skeleton; `--check` verifies the handler is unchanged.
+    - **`work-package <id> --start|--context|--allows <path>|--check`:** start a package, print its context pack, answer the hook, guard a pull request.
+    - **`mutation [--diff <base>|--package <name>]`:** job `mutation`.
+    - **`review --seat a|b`:** jobs `model-review-a` and `model-review-b`, run from the base branch.
+    - **`acceptance --step <n>`:** the plain-Vietnamese acceptance report, on the test server.
+
+    `scope-guard` runs `work-package --check` and the ratchet comparison (ADR-0073 rules 2, 6–8, 14–17).
+
 **CI**
 
 15. DCO, per ADR-0003 R5:
@@ -260,6 +282,12 @@ Checks:
     - **Coverage.** Coverage comes from the `test` job only. 90% branch coverage is enforced per package by `nativeflows-dev test --cov` from `build_step` 1 on `ledger`, `inventory`, `registry`, `documents` (where posting and numbering live), `tax` and `localization`. This maps ADR-0003 R4's list; R4 itself is the author's.
     - **Labels.** A separate `pull_request_target` workflow, whose only permission is `pull-requests: write`, reads only the changed-file list, never checks out the head, and applies the labels `reserved-review` and `author-review`. `author-review` marks paths of money, stock posting, idempotency, outbox, triggers and RLS (runbook stage 5).
     - **Branch protection.** The author sets branch protection and the required jobs, and the setting "require approval for all external contributors".
+
+    Note ([ADR-0073](0073-coding-pipeline-and-mechanical-assurance.md), proposed 2026-11-18): by the author's decision of 2026-11-18, `author-review` no longer means that the author reviews code. It marks a sensitive path, on which `mutation` and `model-review-b` apply and the reviewers use the area's checklist.
+    - **New jobs.** `mutation` in `ci.yml`. `scope-guard`, `model-review-a` and `model-review-b` in a base-side `pull_request_target` workflow that never checks out or runs head code.
+    - **Required checks.** `dco`, `check`, `test`, `dataset`, `scenarios`, `guards`, `frontend`, `mutation`, `scope-guard`, `model-review-a` and `model-review-b`. Each always runs and reports `skipped: <reason>` when it does not apply.
+    - **Branch protection.** A pull request is required and must be up to date. Protection is enforced for administrators, with no bypass actors and no override.
+    - **Coverage** is unchanged (ADR-0073 rules 14–20).
 17. Generated files:
     - `nativeflows-dev generate` writes into `backend/generated/`:
       - the JSON Schemas of commands, queries and events, with each field's field class (ADR-0017 rule 10; DS-16 rule 16);
@@ -269,6 +297,8 @@ Checks:
     - It writes the TypeScript types, the annotated JSON Schemas (`x-nativeflows-*`, [ADR-0040](0040-ui-architecture.md) rule 4) and the i18n catalogs into `frontend/src/generated/`, and the business-event schema and example log into `docs/catalogs/` (DS-17 rule 2).
     - Output is sorted and stable. A merge conflict in it is resolved by rerunning the command.
     - The files are committed, and CI fails on any difference, so every public API change shows in review (ADR-0008).
+
+    Note ([ADR-0073](0073-coding-pipeline-and-mechanical-assurance.md), proposed 2026-11-18): `generate` derives the registry outputs from the declarations of ADR-0008 rule 1's note, for declarations that have a handler. It also writes, from the catalogs, the `Literal` types that declarations use: authorization leaves, error and check codes, event types, lock names, and tables with their states. `nativeflows-dev scaffold <declaration>` is separate and runs once. It writes the handler, the service stub and the test skeleton, refuses to overwrite, and is never rerun (ADR-0073 rule 2).
 
 **Test server and nightly**
 

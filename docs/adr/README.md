@@ -76,3 +76,4 @@ One file per decision, named `NNNN-short-title.md`, using [template.md](template
 | [ADR-0070](0070-quality-management-core.md) | Quality management core (DS-58) | Proposed (2026-11-17) |
 | [ADR-0071](0071-work-orders-and-shop-floor-execution.md) | Work orders and shop-floor execution (DS-52, DS-31, DS-53) | Proposed (2026-11-17) |
 | [ADR-0072](0072-costing-sheet-and-cost-component-structure.md) | Costing sheet and cost component structure (DS-53, DS-56, DS-26) | Proposed (2026-11-18) |
+| [ADR-0073](0073-coding-pipeline-and-mechanical-assurance.md) | Coding pipeline and mechanical assurance (DS-18, DS-04, DS-16) | Proposed (2026-11-18) |

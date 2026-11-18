@@ -80,6 +80,7 @@ Title, status and design item come from each ADR's first lines. **Declared** ADR
 | [ADR-0070](../../adr/0070-quality-management-core.md) | Quality management core | proposed 2026-11-17 |  | `quality` | 4 | `quality`, `inventory`, `production`, `master_data` |
 | [ADR-0071](../../adr/0071-work-orders-and-shop-floor-execution.md) | Work orders and shop-floor execution | proposed 2026-11-17 |  | `production` | 3 | `production` |
 | [ADR-0072](../../adr/0072-costing-sheet-and-cost-component-structure.md) | Costing sheet and cost component structure | proposed 2026-11-18 |  | `production` | 3 | `production`, `master_data` |
+| [ADR-0073](../../adr/0073-coding-pipeline-and-mechanical-assurance.md) | Coding pipeline and mechanical assurance | proposed 2026-11-18 |  | — | — | `outbox`, `numeric` |
 
 ## By module
 
@@ -112,7 +113,7 @@ Title, status and design item come from each ADR's first lines. **Declared** ADR
 | 2 | `db` | — | — |
 | 2 | `documents` | ADR-0004, ADR-0008, ADR-0009, ADR-0028, ADR-0029, ADR-0030, ADR-0043, ADR-0052, ADR-0054, ADR-0055 | ADR-0009, ADR-0020, ADR-0028, ADR-0029, ADR-0038, ADR-0043, ADR-0052, ADR-0054, ADR-0055, ADR-0061, ADR-0062, ADR-0066 |
 | 2 | `localization` | — | — |
-| 2 | `outbox` | ADR-0013 | ADR-0013 |
+| 2 | `outbox` | ADR-0013 | ADR-0013, ADR-0073 |
 | 2 | `periods` | — | — |
 | 2 | `permissions` | ADR-0017, ADR-0040, ADR-0054 | ADR-0017, ADR-0042, ADR-0054, ADR-0055, ADR-0067 |
 | 2 | `policy` | ADR-0043, ADR-0055 | ADR-0042, ADR-0043, ADR-0055, ADR-0059, ADR-0065, ADR-0067 |
@@ -122,7 +123,7 @@ Title, status and design item come from each ADR's first lines. **Declared** ADR
 | 1 | `errors` | — | — |
 | 1 | `i18n` | — | — |
 | 1 | `ids` | — | — |
-| 1 | `numeric` | ADR-0006 | — |
+| 1 | `numeric` | ADR-0006 | ADR-0073 |
 
 ## By layer (declared)
 
@@ -135,4 +136,4 @@ Title, status and design item come from each ADR's first lines. **Declared** ADR
 | 2 | ADR-0004, ADR-0008, ADR-0009, ADR-0013, ADR-0017, ADR-0019, ADR-0022, ADR-0027, ADR-0028, ADR-0029, ADR-0030, ADR-0038, ADR-0040, ADR-0042, ADR-0043, ADR-0049, ADR-0050, ADR-0052, ADR-0054, ADR-0055, ADR-0057, ADR-0058, ADR-0059, ADR-0063, ADR-0066, ADR-0067 |
 | 1 | ADR-0006, ADR-0007 |
 
-ADRs declared for no module (platform-wide, process or not yet in the DDL): ADR-0001, ADR-0002, ADR-0003, ADR-0005, ADR-0010, ADR-0012, ADR-0014, ADR-0015, ADR-0016, ADR-0021, ADR-0039, ADR-0051, ADR-0064, ADR-0065.
+ADRs declared for no module (platform-wide, process or not yet in the DDL): ADR-0001, ADR-0002, ADR-0003, ADR-0005, ADR-0010, ADR-0012, ADR-0014, ADR-0015, ADR-0016, ADR-0021, ADR-0039, ADR-0051, ADR-0064, ADR-0065, ADR-0073.
