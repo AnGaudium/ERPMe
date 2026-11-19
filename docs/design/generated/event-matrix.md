@@ -42,12 +42,12 @@ Event types named in backticks in the ADRs, recognised by the event forms of the
 | `MailboxIntakeCompleted` | `mailbox` | crm | — | ADR-0052:125, ADR-0052:358 |
 | `MailboxIntakeOutcomeRecorded` | `mailbox` | crm | — | ADR-0052:358 |
 | `MailboxUpdated` | `mailbox` | crm | — | ADR-0052:358 |
-| `MessageCreated` | `message` | work | `messaging_fanout` | ADR-0040:197, ADR-0076:48, ADR-0076:67 (+2) |
+| `MessageCreated` | `message` | work | `messaging_fanout` | ADR-0040:199, ADR-0076:48, ADR-0076:67 (+2) |
 | `NonconformanceCanceled` | `nonconformance` | quality | — | ADR-0070:178 |
 | `NonconformanceClosed` | `nonconformance` | quality | — | ADR-0070:178 |
 | `NonconformanceCreated` | `nonconformance` | quality | — | ADR-0070:178 |
 | `NonconformanceUpdated` | `nonconformance` | quality | — | ADR-0070:178 |
-| `NotificationCreated` | `notification` | work | — | ADR-0040:197, ADR-0076:67, ADR-0076:87 |
+| `NotificationCreated` | `notification` | work | — | ADR-0040:199, ADR-0076:67, ADR-0076:87 |
 | `NotificationEmailCreated` | `notification_email` | work | `messaging_mailer` | ADR-0076:60, ADR-0076:61, ADR-0076:87 (+1) |
 | `NotificationMailCompleted` | `notification` | work | `messaging_mailer` | ADR-0076:61, ADR-0076:87 |
 | `OperationAssigned` | — | — | — | ADR-0071:113 |

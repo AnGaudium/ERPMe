@@ -12,7 +12,7 @@ Six agent types are designed now, each as a code-orchestrated workflow on the ru
 - `planning`: explains planning exceptions and drafts the deterministic actions as change proposals;
 - `data_migration`: maps columns and old accounts in draft import batches and proposes duplicate merges.
 
-Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): a further agent type `assistant` serves the UI's assist panel and command bar. It reads through its tool list and writes only through `is_draft_only` commands, within the user's permission intersection and the `agents.assistant.*` budgets. Its DDL, catalog rows, leaf, seed and per-run ceilings are drafted before it is built, after the large synthetic-data test (ADR-0077 rules 13, 14, 23).
+Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): a further agent type `assistant` serves the UI's assist panel and command bar. It reads through its tool list and writes only through `is_draft_only` commands, within the user's permission intersection and the `agents.assistant.*` budgets. Its DDL, catalog rows, leaf, seed and cost cap are in DS-30-ui.sql and the catalogs; it arrives at step 5, and its evaluation set of about 50 tasks is a step 5 gate item (ADR-0077 rules 13, 14, 23).
 
 **Deterministic first.** Each step tries stored rules and mappings, then lookups, then fuzzy matching with a deterministic score, and only then an LLM. The LLM never computes a price, tax, quantity, account, match or score. It reads, chooses among candidates that code gave it, and writes text. Code checks every output. A resolution the LLM contributes is proposed as a stored mapping or rule, so the next case is deterministic.
 

@@ -16,7 +16,7 @@ Tables per owner module, from the DDL drafts in `docs/design/*.sql` and the owne
 | `outbox` | 2 | 4 |
 | `permissions` | 2 | 17 |
 | `policy` | 2 | 7 |
-| `registry` | 2 | 6 |
+| `registry` | 2 | 7 |
 | `work` | 2 | 12 |
 | `inventory` | 3 | 44 |
 | `ledger` | 3 | 4 |
@@ -29,9 +29,10 @@ Tables per owner module, from the DDL drafts in `docs/design/*.sql` and the owne
 | `purchasing` | 4 | 16 |
 | `quality` | 4 | 10 |
 | `sales` | 4 | 14 |
+| `agents` | 5 | 1 |
 | `query` | 5 | 4 |
 | `(no owner stated)` | — | 16 |
-| **total** | | **379** |
+| **total** | | **381** |
 
 ## `agent_runs`
 
@@ -155,6 +156,7 @@ Tables per owner module, from the DDL drafts in `docs/design/*.sql` and the owne
 | --- | --- | --- | --- | --- |
 | `company_setup_acknowledgement` | company data | Operating presets and setup acknowledgements | `user_account` | docs/design/DS-28-settings.sql:118 |
 | `extension_point` | installation data; declared by a module, written at startup; no runtime in Phase 1 | Extension points |  | docs/design/DS-28-settings.sql:213 |
+| `list_variant` | a saved view of one List<Noun> query, personal or shared with a role | List variants | `role`, `user_account` | docs/design/DS-30-ui.sql:47 |
 | `setting_definition` | installation data; one row per registered key, written at startup | Setting definitions |  | docs/design/DS-28-settings.sql:23 |
 | `setting_preset` | installation data; one row per preset version, written at startup | Operating presets and setup acknowledgements |  | docs/design/DS-28-settings.sql:85 |
 | `setting_preset_item` | installation data; one row per preset version, kind and key | Operating presets and setup acknowledgements | `setting_preset` | docs/design/DS-28-settings.sql:92 |
@@ -497,6 +499,12 @@ Tables per owner module, from the DDL drafts in `docs/design/*.sql` and the owne
 | `sales_return` | correction_of_id on the document row is the sales invoice, or empty with external_original for an original from before the migration cut-over (ADR-0047 rule 8; ADR-0044 rule 13): number, date, net … | Sales: invoice and its corrections | `business_unit`, `currency`, `document`, `partner`, `partner_address` | docs/design/DS-22-09-42-commercial-inventory.sql:942 |
 | `sales_return_line` |  | Sales: invoice and its corrections | `item`, `reason`, `return_from_customer_line`, `sales_invoice_line`, `sales_return`, `uom` | docs/design/DS-22-09-42-commercial-inventory.sql:974 |
 
+## `agents`
+
+| Table | Purpose | Section | Key references | Source |
+| --- | --- | --- | --- | --- |
+| `assist_request` | the subject of an assistant run (scope kind subject); an act run starts tainted (ADR-0077 rule 13) | Assist requests | `agent_run`, `assist_request`, `user_account` | docs/design/DS-30-ui.sql:11 |
+
 ## `query`
 
 | Table | Purpose | Section | Key references | Source |
@@ -541,6 +549,8 @@ Foreign keys whose source and target tables have different stated owners. Foreig
 | `agent_type_setting` (agent_runs, 2) | `workflow_owner_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-05-platform.sql:201 |
 | `data_processing_permission` (agent_runs, 2) | `approved_by_user_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-36-document-intake.sql:238 |
 | `data_processing_permission` (agent_runs, 2) | `company_id,assessment_attachment_id` | `attachment` (attachments, 2) | same layer | docs/design/DS-36-document-intake.sql:252 |
+| `assist_request` (agents, 5) | `company_id,agent_run_id` | `agent_run` (agent_runs, 2) | down | docs/design/DS-30-ui.sql:35 |
+| `assist_request` (agents, 5) | `requested_by_user_id` | `user_account` (permissions, 2) | down | docs/design/DS-30-ui.sql:14 |
 | `attachment` (attachments, 2) | `company_id,generated_subject_document_id` | `document` (documents, 2) | same layer | docs/design/DS-05-platform.sql:960 |
 | `document_extraction` (attachments, 2) | `company_id,inbound_message_id` | `inbound_message` (crm, 4) | up | docs/design/DS-36-document-intake.sql:69 |
 | `document_extraction` (attachments, 2) | `company_id,partner_id` | `partner` (master_data, 3) | up | docs/design/DS-36-document-intake.sql:68 |
@@ -1020,6 +1030,8 @@ Foreign keys whose source and target tables have different stated owners. Foreig
 | `company_setup_acknowledgement` (registry, 2) | `implementer_user_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-28-settings.sql:122 |
 | `company_setup_acknowledgement` (registry, 2) | `owner_user_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-28-settings.sql:121 |
 | `company_setup_acknowledgement` (registry, 2) | `revoked_by_user_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-28-settings.sql:126 |
+| `list_variant` (registry, 2) | `company_id,shared_role_id` | `role` (permissions, 2) | same layer | docs/design/DS-30-ui.sql:62 |
+| `list_variant` (registry, 2) | `owner_user_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-30-ui.sql:52 |
 | `setting_value` (registry, 2) | `approved_by_user_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-28-settings.sql:176 |
 | `setting_value` (registry, 2) | `changed_by_user_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-28-settings.sql:174 |
 | `setting_value` (registry, 2) | `company_id,change_proposal_id` | `change_proposal` (documents, 2) | same layer | docs/design/DS-28-settings.sql:183 |
@@ -1143,7 +1155,7 @@ Foreign keys whose source and target tables have different stated owners. Foreig
 | `work_item` (work, 2) | `company_id,warehouse_id` | `warehouse` (master_data, 3) | up | docs/design/DS-05-platform.sql:89 |
 | `work_item` (work, 2) | `owner_user_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-05-platform.sql:67 |
 
-609 cross-module foreign keys.
+613 cross-module foreign keys.
 
 ## Foreign keys to tables without a stated owner or without DDL
 
@@ -1208,6 +1220,7 @@ Column pairs `<x>_table` + `<x>_id` that point at any table. An FK scan cannot s
 | `agent_run` | agent_runs | `subject_table`, `subject_id` | docs/design/DS-05-platform.sql:216 |
 | `agent_run` | agent_runs | `taint_source_table`, `taint_source_id` | docs/design/DS-05-platform.sql:216 |
 | `artifact_shadow_outcome` | configuration | `case_table`, `case_id` | docs/design/DS-28-34-configuration-artifacts.sql:380 |
+| `assist_request` | agents | `context_subject_table`, `context_subject_id` | docs/design/DS-30-ui.sql:11 |
 | `attachment_link` | attachments | `target_table`, `target_id` | docs/design/DS-05-platform.sql:967 |
 | `audit_denial` | audit | `subject_table`, `subject_id` | docs/design/DS-05-platform.sql:906 |
 | `audit_record` | audit | `subject_table`, `subject_id` | docs/design/DS-05-platform.sql:841 |

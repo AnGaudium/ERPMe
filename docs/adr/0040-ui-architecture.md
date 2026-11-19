@@ -94,6 +94,8 @@ The web UI is one more client of the command and query layer. It writes data onl
    Note ([ADR-0071](0071-work-orders-and-shop-floor-execution.md), proposed 2026-11-17): the WO tablet is a further hand-built PWA screen over `ListWorkCenterQueue` and `GetOperationWorkspace` (ADR-0071 rules 13, 14).
 
    Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): the screen kinds map onto seven floorplans: list report, object page, create and edit form (with a wizard variant), worklist, overview, plan panel and approval view. A route renders exactly one of them, or a registered custom component (ADR-0077 rules 1–3, 22).
+
+   Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): user-saved list variants are in Phase 1: personal or shared with a role, storing filters, columns, sort and grouping server-side in `list_variant`; `ListListVariant`, `CreateListVariant`, `UpdateListVariant`, `DeleteListVariant`; sharing needs `share_list_variant` (ADR-0077 rule 10a). Column choice is saved in variants; the browser keeps only the viewer's last choice.
 7. Navigation:
    - **The menu** is generated from the registry. Modules are grouped by area: accounting, inventory, sales, purchasing, production, warehouse, planning, work, settings. The user sees only nouns they may list, from `GetSessionContext`.
    - **The command palette** (`Ctrl/Cmd+K`) finds any permitted command, query, list or record by English or translated name.
@@ -221,6 +223,8 @@ The web UI is one more client of the command and query layer. It writes data onl
     Note ([ADR-0061](0061-barcodes.md), proposed 2026-11-15): a keyboard-wedge scan into a focused code field ends with the scanner's Enter suffix, which moves to the next field as above. Every code field on desktop screens accepts wedge scans and resolves them with `EvaluateBarcode` for the field's expected type; a scan is told from typing by the AIM prefix, the suffix and its speed (rule 22).
 
     Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): each floorplan adds its own keys to this map (`/` search and `Space` select in lists, `Alt+1`–`Alt+9` sections on object pages, `j`/`k` and `c` in worklists, `Alt+Y`/`Alt+R` in the approval view, `Ctrl+/` the assist panel); `check` keeps the map free of conflicts (ADR-0077 rules 4, 19).
+
+    Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): grids keep this model in `line_grid`, the repository's TanStack Table grid, which replaces AG Grid (ADR-0077 rule 5).
 17. Display and targets:
     - **Untrusted fields.** Shown as plain text in a marked "external content" style, never rendered as HTML, with links not clickable.
     - **Taint.** A badge on tainted versions and proposals, with the clearance record.
@@ -236,7 +240,7 @@ The web UI is one more client of the command and query layer. It writes data onl
 
     Note (author's delegation, 2026-11-19): the size targets are set, interim: the initial route at most 250 KB of JavaScript gzipped, each further route chunk at most 150 KB gzipped, and the generated schema bundle loaded per area, not all at once. They are revisited when the Center framework is built. Accessibility and browser targets stay as written.
 
-    Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): the size targets apply to generated routes; the densities `compact` (desktop) and `touch` (PWA, coarse pointers) and the theme are design tokens; targets are at least 24 px at `compact` and 44 px at `touch`; axe-core runs on every floorplan in the generated tests (ADR-0077 rules 7, 19, 21) AG Grid loads on the generated entry forms with an editable line grid from step 9, no longer only on hand-built screens; renderer v1 keeps the plain keyboard line table (ADR-0077 rules 5, 20).
+    Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): the size targets apply to generated routes; the densities `compact` (desktop) and `touch` (PWA, coarse pointers) and the theme are design tokens; targets are at least 24 px at `compact` and 44 px at `touch`; axe-core runs on every floorplan in the generated tests (ADR-0077 rules 7, 19, 21) AG Grid leaves the stack: line entry uses `line_grid`, an editable grid on TanStack Table written in the repository, keyboard first, with barcode-capable cells and within the route budget (ADR-0077 rules 5, 20).
 
 **Structure, tests and scope**
 

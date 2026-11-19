@@ -207,6 +207,8 @@ ADR-0017 fixed the envelope: permissions are the names of registered commands, q
 
     Note (author's delegation, 2026-11-19): `it_administrator` no longer holds `start_agent` for any agent type: an IT administrator configures and operates the system but starts no business agent. [role-template-levels.csv](../catalogs/role-template-levels.csv) sets each agent type leaf to `none` for the template; `owner` keeps every agent type, and the rest of the interim seed is confirmed. Lab check `t12_access.py` C28.
 
+    Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): the leaf `agent_assistant` holds `start_agent:assistant` at `edit`; the seed gives it to every template with UI access except `it_administrator` and `auditor` (which stays `read` everywhere and nothing else, as this rule says), and a company may withdraw it. The leaf `list_variant` under Administration holds `share_list_variant` at `edit`; `owner` and `it_administrator` hold it through Administration `full` (ADR-0077 rules 10a, 13; lab check `t12_access.py` C28).
+
 **Assignments, record scope and owner scope**
 
 12. `role_assignment` (company data, change-tracked):

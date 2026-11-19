@@ -81,11 +81,12 @@ The UI is generated from metadata, not hand-built. Every screen is one of seven 
    All shortcuts go into the one shortcut map of ADR-0040 rule 16, which a check keeps free of conflicts (rule 19).
 
 5. Fast data entry is part of the create and edit form, not of hand-built screens:
-   - **The line grid.** A line array with `line-columns` editor `grid` renders as an editable grid with the AG Grid keyboard model of ADR-0040 rule 16:
+   - **The line grid.** A line array with `line-columns` editor `grid` renders as `line_grid`, an editable grid component written in the repository on TanStack Table, keyboard first, with barcode-capable cells and within the 150 KB route budget (rule 20). Its keyboard model is ADR-0040 rule 16's:
      - `Enter` goes down the column and `Tab` across;
      - `Alt+N` adds a line and `Alt+Delete` removes one;
      - typing in a reference cell opens value help;
-     - pasting a block of cells is parsed by the grid's paste handler, which NativeFlows writes, since AG Grid Community has no clipboard paste.
+     - a cell of a field annotated `scan` takes wedge and camera scans as a scan input does;
+     - pasting a block of cells is parsed by the grid's own paste handler.
 
      Totals and line amounts come from simulation only (ADR-0040 rule 2).
    - **Barcode input.** A field annotated `scan` takes wedge scans on desktop and camera scans in the PWA, and resolves them with `EvaluateBarcode` for the field's expected type ([ADR-0061](0061-barcodes.md) rules 12, 17, 22). The annotation also carries the GS1 Application Identifier to field mapping that ADR-0061 rule 17 left unnamed.
@@ -132,7 +133,7 @@ The UI is generated from metadata, not hand-built. Every screen is one of seven 
    | `x-nativeflows-importance` | new | `high`, `medium` (default) or `low`; drives the responsive display of rule 6 |
    | `x-nativeflows-default-from` | new | A context path the form fills before the user types, such as `subject.partner_id` when a form opens from an object page. It never invents a value (ADR-0040 rule 3): server defaults keep coming from the server |
    | `x-nativeflows-scan` | new | The field accepts scans: expected barcode type, and the GS1 Application Identifier mapping (rule 5) |
-   | `x-nativeflows-ai-fillable` | new | `true` lets the assist panel and document intake propose a value for this field into a draft; default `false`. A UI and intake hint: the dispatcher does not enforce it (open question) |
+   | `x-nativeflows-ai-fillable` | new | `true` lets the assist panel and document intake propose a value for this field into a draft; default `false`. A UI and intake hint, checked by `check` (rule 19); the dispatcher adds no floor for it, because taint, drafts only, human confirmation and the permission intersection already bound agent writes |
 
    How provenance is shown is not an annotation: it comes from the data (rule 15).
 
@@ -140,7 +141,7 @@ The UI is generated from metadata, not hand-built. Every screen is one of seven 
 
     | Key | Status | On | Meaning |
     | --- | --- | --- | --- |
-    | `x-nativeflows-list-defaults` | hint; extended | `List<Noun>` result | Default columns (at most 8, rule 19), sort and filters, plus named `variants` declared in code. User-saved views stay after Phase 1 (ADR-0040 rule 6) |
+    | `x-nativeflows-list-defaults` | hint; extended | `List<Noun>` result | Default columns (at most 8, rule 19), sort and filters, plus named `variants` declared in code. Users also save variants (rule 10a) |
     | `x-nativeflows-line-columns` | hint; extended | line array | Line-item table: columns, and `editor` `grid` or `table` |
     | `x-nativeflows-floorplan` | new | declaration | Floorplan code where derivation (rule 2) is not enough; `custom:<name>`; `wizard: true` |
     | `x-nativeflows-title` | new | `Get<Noun>`, `List<Noun>` result | The title field and the description field |
@@ -153,6 +154,13 @@ The UI is generated from metadata, not hand-built. Every screen is one of seven 
     | `x-nativeflows-custom-values` | kept (ADR-0074) | `Get<Noun>`, `List<Noun>` result, command payload | The table whose company-defined fields the renderer reads through `ListCustomFieldDefinitions` |
 
     **The vocabulary totals 24 keys:** the 13 of ADR-0040 and ADR-0074, six of them extended (`widget`, `hidden-when`, `read-only-when`, `lookup`, `list-defaults`, `line-columns`) and `scale-from` made required, plus 11 new.
+
+10a. User-saved variants are in Phase 1, because the list report has a variant switch:
+    - **Kinds.** A variant is personal, or shared with a role.
+    - **Contents.** It stores filters, columns, sort and grouping for one `List<Noun>` query, server-side in `list_variant` ([DS-30-ui.sql](../design/DS-30-ui.sql), owner `registry`). A variant may be the default of its owner or of its role.
+    - **Commands.** `CreateListVariant`, `UpdateListVariant` and `DeleteListVariant`. A personal variant is checked on `general_access`. A shared one needs the capability `share_list_variant` at `edit` on the leaf `list_variant` under Administration, which `owner` and `it_administrator` hold through Administration `full`; a company may grant it to other roles.
+    - **Reading.** `ListListVariant` returns the caller's personal variants and those shared with the caller's roles. A variant never widens what the query returns: its filters run inside the caller's permission and record scope.
+    - **Declared variants** of `list-defaults` stay; they show beside the saved ones. Column choice is no longer only a browser-storage convenience (ADR-0040 rule 6 note).
 
 11. What is not annotated, because the registry already declares it:
     - **Actions per state.** An action's availability comes from the command's `subject_table` and `allowed_states` and from `ListAllowedCommand` (ADR-0040 rule 8). `actions` orders them but never adds one.
@@ -172,11 +180,12 @@ The UI is generated from metadata, not hand-built. Every screen is one of seven 
 13. One agent type, `assistant`, serves the UI. It is declared like the agent types of [ADR-0051](0051-agent-workflows.md):
     - **Rights.** Its effective rights are the intersection of its declared permissions and the user's, rechecked on every call ([ADR-0054](0054-users-roles-and-authorizations.md) rule 16; [ADR-0050](0050-agent-runtime-and-query-layer.md) rule 31).
     - **Tool list.** Read queries that ADR-0050 rule 30 does not exclude, commands registered `is_draft_only`, and `UpdateAssistAnswer` for workflow code only (rule 14).
-    - **Starting a run.** A run is started by `StartAgentRun` with the user's `start_agent:assistant`, so it acts for that person.
-    - **Budgets.** Its budgets are the `agents.<agent_type>.*` settings within the company cap ([ADR-0063](0063-configurable-policy-settings.md); ADR-0050 rule 22).
+    - **Starting a run.** A run is started by `StartAgentRun` with the user's `start_agent:assistant`, held at `edit` on the leaf `agent_assistant`, so it acts for that person in that person's own context. The seed gives the leaf to every role template with UI access except `it_administrator`, in line with the decision on `start_agent` of 2026-11-19 ([ADR-0054](0054-users-roles-and-authorizations.md) rule 11 note), and except `auditor`, which ADR-0054 rule 11 keeps at `read` everywhere and nothing else, while starting a run is a command; a company may withdraw the leaf from any role.
+    - **Budgets.** Its budgets are the `agents.<agent_type>.*` settings within the company cap ([ADR-0063](0063-configurable-policy-settings.md); ADR-0050 rule 22). The company setting `assist.max_cost_per_run` (default USD 0.20, bounds 0.01 to 2, lower is tighter) caps one run inside them.
     - **Scope.** The run's scope is its `assist_request` plus the context subject and the selected rows, each checked against the user's record scope.
-    - **Taint at start.** The run starts tainted when the context subject or any selected row is outside content (ADR-0050 rule 15) or effectively tainted (ADR-0029 rule 8), and always for `purpose` `act`. A person may paste a customer's e-mail into the text, so text that leads to drafts counts as outside content. For `ask`, `resolve_command` and `resolve_filter`, whose outputs are an answer to the asking person or a proposal that person reviews, the text counts as that person's own input, as an `analysis_question` does (ADR-0060 rule 20). A tainted run may run only `is_draft_only` commands and reads only the tainted read scope (ADR-0050 rules 26, 27). Open question, because taint rules are the author's (ADR-0005 item 7).
-    - **Modes.** `ask`, `resolve_command` and `resolve_filter` follow the stated exception of the analysis agent (ADR-0050 rule 14 note): they answer only the asking person and are evaluated on verified examples instead of a shadow comparison. `act` follows the ordinary path `off`, `shadow`, `assisted`, and the assistant is never promoted to `active` (ADR-0065).
+    - **Taint.** A run of `purpose` `act` always starts tainted, because the user may have pasted untrusted content into the text. A run of `ask`, `resolve_command` or `resolve_filter` starts untainted, and taint propagates as usual when it reads untrusted data (ADR-0050 rule 25). A tainted run may run only `is_draft_only` commands and reads only the tainted read scope (ADR-0050 rules 26, 27).
+    - **Modes.** `ask`, `resolve_command` and `resolve_filter` follow the stated exception of the analysis agent (ADR-0050 rule 14 note): they answer only the asking person. `act` follows the ordinary path `off`, `shadow`, `assisted`, and the assistant is never promoted to `active` (ADR-0065), so its drafts always need a person to confirm them.
+    - **Evaluation.** Spec 17 requires every pair of seat and model to pass an evaluation. The assistant seat's set has about 50 tasks across the three modes: read answers with correct citations, drafts with correct field diffs, refusals outside its scope, and taint handling, pasted untrusted text included. It is built with the assistant and is a step 5 gate item.
 
 14. Typed text reaches the agent through one row, as `analysis_question` does for the analysis agent (ADR-0060). `CreateAssistRequest` is `human_only` and writes an `assist_request` with these columns:
     - `purpose`: `ask`, `act`, `resolve_command` or `resolve_filter`;
@@ -188,7 +197,7 @@ The UI is generated from metadata, not hand-built. Every screen is one of seven 
 
     Runs are asynchronous, and there is no multi-turn dialogue. A follow-up is a new request that names the previous one.
 
-    The table's DDL, its catalog rows, the `agent_assistant` leaf and the per-run ceilings are drafted before the assistant is built (rule 24; open question).
+    The DDL is in [DS-30-ui.sql](../design/DS-30-ui.sql) (owner `agents`). The leaf `agent_assistant`, its seed and `assist.max_cost_per_run` are in the catalogs.
 
 15. Trust. Every value an agent or document intake wrote shows where it came from. All of this is read from stored data, not from annotations:
     - **Source:** the actor kind and the agent run of the version that wrote it (ADR-0029 rule 8), or the extraction method of [ADR-0057](0057-document-intake-and-extraction.md) rule 8 (`parsed`, `ocr`, `vision_aligned`, and the others).
@@ -218,7 +227,7 @@ The UI is generated from metadata, not hand-built. Every screen is one of seven 
     - **Fill from document.** Dropping a PDF or photo on a form uploads an attachment and calls `RequestDocumentExtraction` with the form's purpose. The intake ladder of ADR-0057 produces the extraction, and its verification follows ADR-0057 rule 22. Once verified, the resulting draft opens in the form. Fields filled from the document show their provenance (rule 15), and only `ai-fillable` fields are filled.
     - **AI suggestions in value help.** Value help may list candidates that an agent or intake already stored on the draft, such as matching candidates. They are marked AI and never selected automatically. No language model is called per keystroke.
     - **Natural-language filters.** A request with `purpose` `resolve_filter` returns a structured filter for the list's query, validated against its filter schema. The list shows it as editable chips before it runs, so the query itself stays deterministic.
-    - **Mobile capture.** A photo goes through the capture agent of [ADR-0064](0064-production-agent.md) when the source `photo` is enabled, and it produces drafts. Voice is not in Phase 1 (ADR-0064; open question).
+    - **Mobile capture.** Phase 1 mobile capture is photo and text: a photo goes through the capture agent of [ADR-0064](0064-production-agent.md) when the source `photo` is enabled, and it produces drafts. Voice stays after Phase 1, as ADR-0064 says. The seam is kept: the capture intake can accept an audio attachment later without a new path.
     - **The command bar.** `Ctrl/Cmd+K` extends the palette of ADR-0040 rule 7:
       - Typed names match commands, queries, lists and records as before.
       - Other text becomes a request with `purpose` `resolve_command`. Its answer is a proposed invocation: a registered command or query type, with a payload validated against its schema.
@@ -250,13 +259,12 @@ The UI is generated from metadata, not hand-built. Every screen is one of seven 
     The nightly Playwright flows of ADR-0040 rule 18 stay.
 
 20. The component library is shadcn/ui with Tailwind CSS on Base UI, version pinned. Around it:
-    - TanStack Table for lists and the plain keyboard line table of renderer v1;
-    - AG Grid Community for the editable line grid of the generated entry forms, from step 9;
+    - TanStack Table for lists and for `line_grid`, the editable line grid written in the repository (rule 5);
     - react-hook-form under the renderer's own form builder;
     - i18next (ADR-0040 rule 15);
     - `@axe-core/playwright` for tests.
 
-    Tailwind CSS and Base UI are shadcn/ui's own foundations, and TanStack Table joins the TanStack family of ADR-0002, so neither opens a new category. `@axe-core/playwright` opens the accessibility-testing category, by this ADR (ADR-0005).
+    Tailwind CSS and Base UI are shadcn/ui's own foundations, and TanStack Table joins the TanStack family of ADR-0002, so neither opens a new category. AG Grid leaves the stack (ADR-0002 note; the tool choice is delegated, 2026-11-19); it comes back only through an ADR, if a measured need appears. `@axe-core/playwright` opens the accessibility-testing category, by this ADR (ADR-0005).
 
     **Reasons** (from the UI library research of 2026-11-15):
     - the component source sits in the repository, where small models can read it;
@@ -266,8 +274,6 @@ The UI is generated from metadata, not hand-built. Every screen is one of seven 
     **Rejected:** MUI, Ant Design, Fluent, PrimeReact, SAP UI5 Web Components, Carbon, react-admin, RJSF and Formily. They bring their own data models, add bundle weight (UI5 is about 105 KB gzipped against the 250 KB budget), or have paid tiers.
 
     **The generator** composes only from this library and the renderer's domain components (amount, quantity, reference, state badge, provenance mark, scan input, line grid, plan panel, assist panel). A component outside them fails the `frontend` lint.
-
-    **AG Grid stays an ADR-0002 tool.** Whether its chunk fits the 150 KB route budget is measured at step 1 work package 7 (open question).
 
 21. Design tokens are CSS variables, which Tailwind reads:
     - color roles: surface, text, primary, danger, warning, success, focus, plus `provenance-ai`, `provenance-document` and `taint`;
@@ -301,19 +307,11 @@ The UI is generated from metadata, not hand-built. Every screen is one of seven 
 
 23. Sequence:
     - **Declaration format.** The annotation slots of rules 9 and 10 become fields of the declaration format defined next (ADR-0073, Fable's step 2 work), so that Sonnet drafts them with every declaration.
-    - **Renderer v1** (ADR-0040 rule 19, step 1) renders the list report, object page, create and edit form and plan panel. It is the test harness during the headless steps 0–5.
+    - **Renderer v1** (ADR-0040 rule 19, step 1) renders the list report (with variants), object page, create and edit form (with `line_grid`) and plan panel. It is the test harness during the headless steps 0–5.
     - **Later floorplans.** The worklist and approval view follow with the work queue at step 5. The overview follows with the Centers.
-    - **The `assistant` agent**, the assist panel, natural-language filters and the command bar's `resolve_command` come after the large synthetic-data test, with the Centers ADR.
+    - **The `assistant` agent**, the assist panel, natural-language filters and the command bar's `resolve_command` arrive at step 5, with the work queue; the evaluation set of rule 13 is a step 5 gate item ([steps-5-9.md](../runbook/steps-5-9.md)).
 
-24. Not decided here, each in the open questions:
-    - which role templates hold `start_agent:assistant`;
-    - the taint rule of the assistant's typed text (rule 13);
-    - whether the dispatcher enforces `ai-fillable` on agent writes;
-    - the assistant's per-run ceilings and its DDL;
-    - voice capture;
-    - whether AG Grid fits the route budget;
-    - user-saved variants;
-    - the assistant's evaluation set.
+24. The eight open questions of this ADR were decided by the chief architect on the author's delegation of 2026-11-19 and are applied above: the start leaf (rule 13), the taint of typed text (rule 13), `ai-fillable` as a hint (rule 9), the cost cap and DDL (rules 13, 14), voice (rule 18), the line grid without AG Grid (rules 5, 20), user-saved variants (rule 10a) and the evaluation set (rule 13).
 
 ## Context
 
@@ -347,10 +345,12 @@ SAP Fiori Elements (list report, object page, worklist, overview page, analytica
   - ADR-0050 rules 15, 30 and ADR-0051: the `assistant` agent type, `assist_request` and the never-list.
   - ADR-0057 rule 22: the verification screen as a custom component.
   - ADR-0061 rule 17: the `scan` key.
-  - ADR-0064: voice stays later.
+  - ADR-0064: voice stays after Phase 1, with an audio-attachment seam.
+  - ADR-0002: AG Grid leaves the stack.
   - ADR-0067: the plan panel floorplan.
-- **Glossary rows:** floorplan, value help, assist panel, custom component.
-- **Before the assistant is built:** the DDL of `assist_request`, its catalog rows, the `agent_assistant` leaf with its seed, and the `CreateAssistRequest`, `UpdateAssistAnswer` and `GetAgentBudgetStatus` declarations. `CreateAssistRequest` and `GetAgentBudgetStatus` join the never-list of ADR-0050 rule 30.
+- **Glossary rows:** floorplan, value help, assist panel, custom component, list variant.
+- **DDL and catalogs:** [DS-30-ui.sql](../design/DS-30-ui.sql) (`assist_request`, `list_variant`); the leaves `agent_assistant` and `list_variant` and the seed in the authorization catalogs; `assist.max_cost_per_run` in `settings.csv`. `CreateAssistRequest` and `GetAgentBudgetStatus` join the never-list of ADR-0050 rule 30.
+- **Runbook:** the assistant's evaluation set is a step 5 gate item.
 - **Frontend dependencies:** Tailwind CSS, Base UI and TanStack Table within existing categories; `@axe-core/playwright` (accessibility testing, by this ADR).
 
 ## Revisit when

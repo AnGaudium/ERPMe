@@ -238,6 +238,7 @@ it_administrator,agent_production,none,false
 it_administrator,agent_production_capture,none,false
 it_administrator,agent_production_variance,none,false
 it_administrator,agent_auto_post_advisor,none,false
+it_administrator,agent_assistant,none,false
 production_planner,production_order,post,true
 buyer,service_receipt,post,false
 warehouse_keeper,service_receipt,post,false
@@ -317,3 +318,14 @@ it_administrator,messaging,full,false
 quality_inspector,messaging,edit,false
 owner,messaging_administration,full,false
 it_administrator,messaging_administration,full,false
+chief_accountant,agent_assistant,edit,false
+accountant,agent_assistant,edit,false
+cashier,agent_assistant,edit,false
+sales_clerk,agent_assistant,edit,false
+sales_manager,agent_assistant,edit,false
+buyer,agent_assistant,edit,false
+purchasing_manager,agent_assistant,edit,false
+warehouse_keeper,agent_assistant,edit,false
+production_planner,agent_assistant,edit,false
+shop_floor_lead,agent_assistant,edit,false
+quality_inspector,agent_assistant,edit,false

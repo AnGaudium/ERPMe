@@ -19,14 +19,14 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 ## `agents` (layer 5)
 
 - **Note in ADR-0022 rule 2:** after step 4
-- **Owned tables (0):** none stated
+- **Owned tables (1):** `assist_request`
 - **Events produced (0):** none found
-- **Commands and queries named in ADRs (0):** none found
-- **Settings (17):** `agents.<agent_type>.daily_max_cost`, `agents.<agent_type>.daily_max_runs`, `agents.<agent_type>.drift_action`, `agents.<agent_type>.run_max_cost`, `agents.<agent_type>.run_max_input_tokens`, `agents.<agent_type>.run_max_llm_calls`, `agents.<agent_type>.run_max_output_tokens`, `agents.<agent_type>.run_max_rows_read`, `agents.<agent_type>.run_max_seconds`, `agents.<agent_type>.run_max_tool_calls`, `agents.<agent_type>.wake_up_mode.<kind>`, `agents.company_daily_max_cost` …
+- **Commands and queries named in ADRs (1):** `CreateAssistRequest`
+- **Settings (18):** `agents.<agent_type>.daily_max_cost`, `agents.<agent_type>.daily_max_runs`, `agents.<agent_type>.drift_action`, `agents.<agent_type>.run_max_cost`, `agents.<agent_type>.run_max_input_tokens`, `agents.<agent_type>.run_max_llm_calls`, `agents.<agent_type>.run_max_output_tokens`, `agents.<agent_type>.run_max_rows_read`, `agents.<agent_type>.run_max_seconds`, `agents.<agent_type>.run_max_tool_calls`, `agents.<agent_type>.wake_up_mode.<kind>`, `agents.company_daily_max_cost` …
 - **Work item kinds (7):** `agent_budget_exhausted`, `agent_denials_repeated`, `agent_mode_degraded`, `agent_quality_below_threshold`, `agent_run_stopped`, `agent_task`, `data_processing_permission_suspended`
-- **Authorization areas (15):** `agent`, `agent_analysis`, `agent_auto_post_advisor`, `agent_bank_matching`, `agent_customer_onboarding`, `agent_data_migration`, `agent_document_reader`, `agent_planning`, `agent_product_engineering`, `agent_production`, `agent_production_capture`, `agent_production_variance`, `agent_purchase_invoice`, `agent_quotation`, `data_processing`
-- **ADRs (declared):** none declared
-- **ADRs that name this module most (mentions; not complete):** [ADR-0050](../../adr/0050-agent-runtime-and-query-layer.md), [ADR-0063](../../adr/0063-configurable-policy-settings.md)
+- **Authorization areas (16):** `agent`, `agent_analysis`, `agent_assistant`, `agent_auto_post_advisor`, `agent_bank_matching`, `agent_customer_onboarding`, `agent_data_migration`, `agent_document_reader`, `agent_planning`, `agent_product_engineering`, `agent_production`, `agent_production_capture`, `agent_production_variance`, `agent_purchase_invoice`, `agent_quotation`, `data_processing`
+- **ADRs (declared):** [ADR-0077](../../adr/0077-ui-floorplans-annotations-and-embedded-agent.md)
+- **ADRs that name this module most (mentions; not complete):** [ADR-0050](../../adr/0050-agent-runtime-and-query-layer.md), [ADR-0063](../../adr/0063-configurable-policy-settings.md), [ADR-0077](../../adr/0077-ui-floorplans-annotations-and-embedded-agent.md)
 
 ## `api` (layer 5)
 
@@ -74,7 +74,7 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Work item kinds (2):** `analysis_answer_disputed`, `analysis_catalog_request`
 - **Authorization areas (10):** `analysis_debug`, `analysis_question`, `report_finance`, `report_inventory`, `report_production`, `report_purchasing`, `report_quality`, `report_sales`, `report_tax`, `saved_analysis`
 - **ADRs (declared):** [ADR-0060](../../adr/0060-agent-assisted-reporting-and-analysis.md)
-- **ADRs that name this module most (mentions; not complete):** [ADR-0022](../../adr/0022-repository-and-engineering-conventions.md), [ADR-0050](../../adr/0050-agent-runtime-and-query-layer.md), [ADR-0060](../../adr/0060-agent-assisted-reporting-and-analysis.md), [ADR-0077](../../adr/0077-ui-floorplans-annotations-and-embedded-agent.md)
+- **ADRs that name this module most (mentions; not complete):** [ADR-0022](../../adr/0022-repository-and-engineering-conventions.md), [ADR-0050](../../adr/0050-agent-runtime-and-query-layer.md), [ADR-0060](../../adr/0060-agent-assisted-reporting-and-analysis.md)
 
 ## `sdk` (layer 5)
 
@@ -386,14 +386,14 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 ## `registry` (layer 2)
 
 - **Note in ADR-0022 rule 2:** command registry, dispatcher, envelope, idempotency; its public entry point `nativeflows.registry.dispatch`
-- **Owned tables (6):** `company_setup_acknowledgement`, `extension_point`, `setting_definition`, `setting_preset`, `setting_preset_item`, `setting_value`
+- **Owned tables (7):** `company_setup_acknowledgement`, `extension_point`, `list_variant`, `setting_definition`, `setting_preset`, `setting_preset_item`, `setting_value`
 - **Events produced (0):** none found
-- **Commands and queries named in ADRs (5):** `EvaluateSettingPreset`, `ListSettingDefinition`, `ListSettingPresetDrift`, `ListSettingPresetItem`, `ListSettingValue`
+- **Commands and queries named in ADRs (9):** `CreateListVariant`, `DeleteListVariant`, `EvaluateSettingPreset`, `ListListVariant`, `ListSettingDefinition`, `ListSettingPresetDrift`, `ListSettingPresetItem`, `ListSettingValue`, `UpdateListVariant`
 - **Settings (0):** none in settings.csv
 - **Work item kinds (2):** `setting_review_required`, `setup_loosening_review`
-- **Authorization areas (2):** `company_setting`, `general_access`
-- **ADRs (declared):** [ADR-0063](../../adr/0063-configurable-policy-settings.md), [ADR-0067](../../adr/0067-quickflows-operating-presets.md)
-- **ADRs that name this module most (mentions; not complete):** [ADR-0063](../../adr/0063-configurable-policy-settings.md), [ADR-0067](../../adr/0067-quickflows-operating-presets.md), [ADR-0076](../../adr/0076-internal-messaging-and-notifications.md)
+- **Authorization areas (3):** `company_setting`, `general_access`, `list_variant`
+- **ADRs (declared):** [ADR-0063](../../adr/0063-configurable-policy-settings.md), [ADR-0067](../../adr/0067-quickflows-operating-presets.md), [ADR-0077](../../adr/0077-ui-floorplans-annotations-and-embedded-agent.md)
+- **ADRs that name this module most (mentions; not complete):** [ADR-0063](../../adr/0063-configurable-policy-settings.md), [ADR-0067](../../adr/0067-quickflows-operating-presets.md), [ADR-0076](../../adr/0076-internal-messaging-and-notifications.md), [ADR-0077](../../adr/0077-ui-floorplans-annotations-and-embedded-agent.md)
 
 ## `work` (layer 2)
 

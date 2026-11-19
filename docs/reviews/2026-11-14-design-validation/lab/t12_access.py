@@ -286,7 +286,7 @@ for n, spec in BARCODES.items():
 for n, leaf in BARCODE_QUERIES.items():
     REG.append((n, leaf, "query", verb_of(n), None))
 # Agent and platform commands of ADR-0054 rule 24's table note (holistic platform review).
-AGENT_TYPES = ("customer_onboarding", "quotation", "bank_matching", "purchase_invoice", "planning", "data_migration", "analysis")   # analysis: ADR-0060
+AGENT_TYPES = ("customer_onboarding", "quotation", "bank_matching", "purchase_invoice", "planning", "data_migration", "analysis", "assistant")   # analysis: ADR-0060; assistant: ADR-0077 rule 13
 REG += [(f"start_agent:{a}", f"agent_{a}", "capability", None, "edit") for a in AGENT_TYPES]
 # Agent-assisted analysis (ADR-0060 rules 14, 21, 26, 28, 36).
 ANALYSIS = {"CreateAnalysisQuestion": ("analysis_question", "other"), "UpdateAnalysisFeedback": ("analysis_question", "other"),
@@ -526,6 +526,9 @@ starts = lambda t: {p.split(":", 1)[1] for p in EXP[t] if p.startswith("start_ag
 SEED = {"sales_clerk": {"quotation", "customer_onboarding"}, "accountant": {"bank_matching", "purchase_invoice", "analysis"},
         "production_planner": {"planning", "analysis"}, "owner": set(AGENT_TYPES), "it_administrator": set(),   # author's delegation 2026-11-19: no start_agent for it_administrator (ADR-0054 rule 11 note)
         "chief_accountant": {"analysis"}, "sales_manager": {"analysis"}, "purchasing_manager": {"analysis"}}   # analysis seed: ADR-0060 rule 36
+for _t in TEMPLATES:   # ADR-0077 rule 13: every template with UI access may start the assistant, except it_administrator and the read-only auditor (ADR-0054 rule 11)
+    if _t not in ("it_administrator", "auditor"):
+        SEED[_t] = SEED.get(_t, set()) | {"assistant"}
 check("C28 start_agent follows the interim seed per agent type leaf; UpdateAgentTypeSetting and cancel_agent_runs need full on agent",
       all(starts(t) == SEED.get(t, set()) for t in TEMPLATES) and all(f"agent_{a}" in PARENT and PARENT[f"agent_{a}"] == "agent" for a in AGENT_TYPES)
       and {t for t in TEMPLATES if "UpdateAgentTypeSetting" in EXP[t]} == {"owner", "it_administrator"}
