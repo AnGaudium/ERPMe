@@ -73,6 +73,8 @@ Every document has one row in a shared `document` table (type, company, state, v
 
     Note ([ADR-0061](0061-barcodes.md), proposed 2026-11-15): a printable document type may be registered `is_barcoded` (Phase 1: purchase orders, goods receipts, sales orders, deliveries, transfer orders, production orders). Its number format must start with `{prefix}` and a separator (`/`, `-` or `.`), and that string (`PO/`) is reserved: no other barcoded type's reserved string may start it or be started by it, and no barcode of another type may start with it (`barcode_prefix_reserved`). Creating or changing such a configuration, or a branch or fiscal year code it uses, checks that every number it can produce is an internal code of at most 48 characters (`numbering_barcode_invalid`). `document.is_barcoded` is set at Create and never changes, and the number is registered in the barcode registry when it is set (rule 9).
 16. The default format, whether numbers must follow posting dates when documents are backdated, and whether reversals use the original type's series are user-visible rules and open questions for the author. Interim, flagged rules: format `{prefix}/{fiscal_year_code}/{counter:6}`, or `{prefix}/{branch_code}/{fiscal_year_code}/{counter:6}` for branch series; numbers follow posting order; reversals use their type's series.
+
+    Note (author's delegation, 2026-11-19): the interim is confirmed: `{prefix}/{fiscal_year_code}/{counter:6}` (with `{branch_code}` for branch series), numbers assigned at posting in posting order, reversals in their own type's series.
 17. Drafts are referred to by `id`. Numbers of e-invoices are assigned by the e-invoice process (DS-24) and stored by it (rule 14).
 
 **Reversal**
@@ -92,6 +94,8 @@ Every document has one row in a shared `document` table (type, company, state, v
     Note: "never reversible" for sales invoices and e-invoiced documents rests on the author's core decision of 2026-11-14 (correction documents, rule 23), not on Vietnamese law. The adjustment and replacement invoice forms are `l10n_vn`'s and the e-invoice add-on's (DS-24) ([ADR-0053](0053-core-neutrality.md) rule 14).
 20. Whether the reversal posts negative amounts (storno) or swapped debit and credit, which posting date it defaults to when the original period is locked, and the value of a reversed material document are accounting rules: configuration of the localization package, flagged until the author decides (existing open questions). The core provides both reversal methods.
 21. A reversal document cannot itself be reversed; to restore a transaction, a new document is created. Interim rule, listed as an open question for the author.
+
+    Note (author's delegation, 2026-11-19): confirmed: a reversal cannot itself be reversed; to restore a transaction, a new document is posted.
 
 **Events**
 

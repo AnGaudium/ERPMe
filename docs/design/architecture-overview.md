@@ -606,9 +606,9 @@ A daily job creates partitions 3 months ahead (ADR-0022 rule 12). ADR-0002's sen
 | CI jobs | 15 min each; nightly 6 h | ADR-0022 rule 16; ADR-0003:16 |
 | Dataset sizes | About 10,000 documents a year (medium), 100,000 (large) | [12-testing](../spec/12-testing.md):45–46 |
 
-The frontend size budgets (250 KB gzipped shell, 150 KB PWA route) are listed under "Targets (open question)" in ADR-0040 rule 17 (:209–212), so they are not yet decided.
+The frontend size budgets are set, interim, in the 2026-11-19 note on ADR-0040 rule 17: initial route 250 KB of JavaScript gzipped, each further route chunk 150 KB, the schema bundle loaded per area.
 
-**Need the author** (not found in any document; the systems review asks for them before step 10): companies and users per installation, documents per day, p95 latency of a posting, delivery-lag objective, RPO and RTO.
+**Non-functional targets** (interim, 2026-11-19): companies and users per installation, document volume, p95 latencies, batch times, RPO and RTO are in [go-live.md](../runbook/go-live.md) step 10, revisited at that gate. A delivery-lag objective is still not set.
 
 ## B15. Frontend overview
 
@@ -702,7 +702,7 @@ Disagreements between documents, recorded and not resolved.
 7. **Platform tables without DDL.** `idempotency_record` (ADR-0008 rule 16), `business_date_override` (ADR-0007 rule 15) and `regime_setting` (ADR-0016:49) have no CREATE TABLE in any design DDL or lab stub.
 8. **Restore point for the object store.** Addressed by the [ADR-0038](../adr/0038-audit-and-observability.md) rule 15 note (design hardening, 2026-11-16): write-once objects keyed by SHA-256, physical deletion only after a grace period at least the database recovery window, an orphan sweep, and the restore procedure. The store's product and the recovery window stay with DS-37.
 9. **CRM separability.** Spec 01 (:15), spec 18 (:16) and D3 (decisions.md:9) say one edition. ADR-0052 (:25, :192) limits only `crm`'s layer-4 imports. `customer_profile` and `supplier_profile` hold `NOT NULL` single-column foreign keys to `account` (DS-20:252, :270), which is a lab stub. Whether a CRM-only deployment is a goal is undecided (B17).
-10. **Frontend budgets.** The outline treated the size budgets as decided; ADR-0040 lists them as "Targets (open question)" in rule 17 (:209–212).
+10. **Frontend budgets.** The outline treated the size budgets as decided; ADR-0040 lists them as "Targets (open question)" in rule 17 (:209–212). Resolved by the author's delegation of 2026-11-19 (ADR-0040 rule 17 note).
 11. **Spec 09 and spec 11 versus ADR-0032.** Spec 09 (:12, :15) still shows production and planning as later; spec 11 has no production core step (open-questions.md:64, :122, :212).
 12. **Same-layer contract imports.** ADR-0022 rule 2 (:47) says a module imports only from lower layers and names `tax` to `ledger` as the exception within layer 3. Rule 6 (:109) allows the `contract` between modules of layers 3 and 4, and rule 4 (:87) has `inventory` handlers call `ledger.contract.write_journal_entry`.
 13. **No folder for consumers or queries.** ADR-0022 rule 3 (:76–84) names `contract.py`, `handlers/`, `tables.py`, `services/`. Rule 5 (:94) has `app` register handlers, consumers and queries. No document says where consumer and query code lives.

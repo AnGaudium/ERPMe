@@ -30,6 +30,8 @@ One developer, most code written by AI. Popular libraries help AI write correct 
 | LLM | Anthropic SDK behind a thin self-written gateway interface | Workflows are code-orchestrated, so no agent framework is needed |
 | Logging, observability | structlog, OpenTelemetry |  |
 
+Note (author's delegation, 2026-11-19): Procrastinate is dropped (OPT-08, [ADR-0031](0031-design-simplifications.md) rule 15 note). System jobs, scheduled jobs and the PDF worker run on the outbox workers and queues of ADR-0013 and ADR-0022 rule 12. A spike at step 0 confirms it; if the spike needs more than one small module, Procrastinate stays.
+
 Note ([ADR-0061](0061-barcodes.md), proposed 2026-11-15): the PDF worker draws barcodes as SVG with Zint's command-line program (GS1 mode, SVG to standard output), run in the worker's sandbox, so no Python binding is needed; libzint is BSD-3-Clause and the command-line program GPL-3.0, both compatible with the core's AGPL-3.0 (spec 18), to verify at build. GS1 data is parsed and built by the core's own `nativeflows.gs1`, whose Application Identifier table is generated from the GS1 Barcode Syntax Dictionary (rules 1, 21).
 
 **Testing:** pytest on real PostgreSQL via testcontainers, never SQLite; Hypothesis stateful testing generates random business sequences and checks invariants after each step; golden scenarios read from hand-built spreadsheets; concurrency tests for stock posting.

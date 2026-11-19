@@ -15,18 +15,19 @@ Pilot selection criteria (select and commit only after the platform is complete)
 
 ## Lean scope for Phases 0 and 1
 
-Phases 0 and 1 build only what a trading business, including importers with foreign-currency transactions, needs to operate for real. Month estimates below are estimates; gates are the conditions. Within 18 months, the Phase 1 gate lands around months 15–18. The schema still leaves room for later parts (catch weight, multi-level approval, user-defined fields); only features and UI are deferred.
+Phases 0 and 1 build only what a trading business, including importers with foreign-currency transactions, needs to operate for real. The build carries no calendar dates and no dated plan: the build order and the gates are the only schedule, with no deadline and no customer commitment (author, 2026-11-19). The schema still leaves room for later parts (catch weight, multi-level approval, user-defined fields); only features and UI are deferred.
 
-| Month (estimate) | Work |
+| Order | Work |
 | --- | --- |
-| 1 | Step 0: ADRs, repo, CI, test server, small synthetic dataset |
-| 1–3 | Steps 1–2: universal journal, two-tier chart and Vietnam package, master data, currencies and rates |
-| 3–5 | Steps 3–4: inventory, costing, landed cost; sequential replay of the medium synthetic dataset. Data migration agent |
-| 5–8 | Steps 5–7: commercial documents including imports, cash and AR/AP including foreign currency, tax and e-invoicing. Quotation, bank matching and purchase invoice agents |
-| 8–10 | Steps 8–9: period close, FX revaluation, reports, print templates, hand-built screens, warehouse app |
-| 10–12 | Step 10: platform completion on the large synthetic dataset, TT133 regime, localization skill and basic US package |
+| Step 0 | ADRs, repo, CI, test server, small synthetic dataset |
+| Steps 1–2 | Universal journal, two-tier chart and Vietnam package, master data, currencies and rates |
+| Steps 3–4 | Inventory, costing, landed cost; sequential replay of the medium synthetic dataset. Data migration agent |
+| Step 4b | Production core (Phase 1, [ADR-0032](../adr/0032-phase-1-scope-with-production.md)): starts after step 4's gate and may run beside step 5; its gate check is the independent naive recomputation |
+| Steps 5–7 | Commercial documents including imports, cash and AR/AP including foreign currency, tax and e-invoicing. Quotation, bank matching and purchase invoice agents |
+| Steps 8–9 | Period close, FX revaluation, reports, print templates, hand-built screens, warehouse app |
+| Step 10 | Platform completion on the large synthetic dataset, TT133 regime, localization skill and basic US package |
 | After platform completion | Step 11: select pilot, rehearsal, go-live at the start of an accounting period, preferably a quarter |
-| 3–4 months after go-live | Close 3 monthly periods and one tax period, pass the Phase 1 gate |
+| After go-live | Close 3 monthly periods and one tax period, pass the Phase 1 gate |
 
 **Built in full from the start** (cheap now, very expensive later):
 

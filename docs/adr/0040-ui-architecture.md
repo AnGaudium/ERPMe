@@ -226,6 +226,8 @@ The web UI is one more client of the command and query layer. It writes data onl
 
     Note: the untrusted-field rule holds in printed files too: untrusted fields are escaped and never rendered as HTML ([ADR-0049](0049-statutory-reporting-and-printing.md) rule 29).
 
+    Note (author's delegation, 2026-11-19): the size targets are set, interim: the initial route at most 250 KB of JavaScript gzipped, each further route chunk at most 150 KB gzipped, and the generated schema bundle loaded per area, not all at once. They are revisited when the Center framework is built. Accessibility and browser targets stay as written.
+
 **Structure, tests and scope**
 
 18. `frontend/src/` holds:

@@ -321,6 +321,8 @@ The commercial documents are a thin layer over the core (B3). They hold what was
 
     Note (flow review, 2026-11-15): quotations have no credit condition. `is_credit_exceeded` belongs to the sales order's policy input only (rules 4, 18): a quotation creates no demand, reservation or exposure (rule 3). The quotation agent's `GetCreditExposure` finding is information in its note ([ADR-0051](0051-agent-workflows.md) rule 15 note); credit is checked when the order is submitted.
 
+    Note (author's delegation, 2026-11-19): rules 18, 20 and 22 are confirmed as written: EC-20 raises a sales return work item for the invoiced share; EC-21 and EC-63 need approval at Submit, with the other unreleased orders held; EC-22 follows the company's policy rules on `is_price_below_cost`.
+
 **Catalogs**
 
 23. Catalog rows:

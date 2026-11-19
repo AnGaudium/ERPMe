@@ -276,6 +276,8 @@ Checks:
     - **The rule.** Every other commit carries `Signed-off-by:` matching its author. An agent appears only as `Co-Authored-By:`, recognized by the agent e-mail patterns in `.github/dco.toml` (e.g. `noreply@anthropic.com`). Bot identities are listed there only with the author's approval.
     - **Agent sign-offs (interim).** Who may type the author's sign-off is governance (ADR-0005 item 9), beside ADR-0003 R5's "only a person can make the DCO certification". By the author's instruction of 2026-11-14 in the design session, agents in his sessions add his sign-off on his behalf; he confirms this when merging. Whether this continues, or agents never pass `-s` and the author signs off with `git rebase --signoff` before pushing, is an open question.
     - **Dependabot.** It stays off until the author approves its bot identity.
+
+    Note (author's delegation, 2026-11-19): the current practice is kept: agents add the author's `Signed-off-by` under his standing instruction of 2026-11-14, and he confirms it by approving each merge. No commit is made without a sign-off; Dependabot stays off. Revisit when a co-maintainer joins (ADR-0003 R3, R5).
 16. `ci.yml`:
     - **Triggers and runners.** Runs on `pull_request` and on `push` to `main`, on GitHub-hosted `ubuntu-24.04` runners, with top-level `permissions: contents: read` and actions pinned by commit SHA.
     - **Jobs.** `dco`, `check`, `test`, `dataset`, `scenarios`, `guards` and `frontend` run in parallel, each with `timeout-minutes: 15` (ADR-0003 R6). DS-16 rule 21's part budgets apply in the job that runs each part.
@@ -310,6 +312,8 @@ Checks:
     - **Credentials.** The run reports through a fine-grained token limited to this repository's issues, opening or updating `defect` issues titled with the dedupe key (ADR-0003 R7). The test-scenario model's key stays on the server. No GitHub event can start code there.
     - **Reports.** `nativeflows-dev nightly` writes the full report to a dated directory in the server's report storage (`/srv/nativeflows-test/reports/<date>/`, configured in `deploy/test-server/`), and posts its summary (run ID, invariants, reference differences, coverage, timings, spend, new defects) as a comment on one pinned `nightly` issue through the same token.
     - **Cache.** Dataset runs are cached by triple and never edited in place.
+
+    Note (author's delegation, 2026-11-19): the test server is a dedicated Linux user on GB10 with rootless Docker, isolated from other projects and from the author's account, the pattern of [ADR-0073](0073-coding-pipeline-and-mechanical-assurance.md)'s coder user. Its setup needs the author's `sudo`; the commands are prepared for him. Revisit when the replays need more than GB10 gives.
 19. Dependencies and releases:
     - **Vulnerability audit.** The nightly run audits `uv.lock` and the npm lock.
     - **New runtime dependencies.** A pull request that adds one says why the ADR-0002 tools do not cover it.
@@ -354,6 +358,8 @@ Checks:
     - `backend/generated/` (command schemas) and `tools/nativeflows_client` carry Apache-2.0, declared per path in `pyproject.toml` and a `LICENSE` file;
     - the licence of `nativeflows.sdk`, which re-exports interfaces of AGPL modules for in-process packages, is the author's (open question); interim AGPL-3.0;
     - the rest is AGPL-3.0; the dataset is CC0.
+
+    Note (author's delegation, 2026-11-19): confirmed: `nativeflows.sdk` is AGPL-3.0, because it runs in the same process; the command schemas and `nativeflows_client` are Apache-2.0. Spec 18 now reads "client library and command schemas" instead of "SDK".
 
 ## Context
 

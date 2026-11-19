@@ -205,6 +205,8 @@ Every exception, pending approval and other piece of business work is one `work_
 
     The interim of ADR-0023 rule 21 (warehouse exceptions as tasks without assignee) and the per-buyer item of ADR-0024 rule 21 end when their kinds are registered. Moving this work in the runbook is the author's (open question).
 
+    Note (author's delegation, 2026-11-19): aligned with the runbook: the work queue is step 5, item 1 ([steps-5-9.md](../runbook/steps-5-9.md)), and the first agent comes after it, not before step 5. The runbook is not moved.
+
 ## Context
 
 Principle 8 makes exceptions, approvals, unmatched bank lines and low stock into work items that a person or an agent takes, never both at once. ADR-0031 rule 16 made every exception one work item. About fifteen earlier rules raise work items without a defined model.

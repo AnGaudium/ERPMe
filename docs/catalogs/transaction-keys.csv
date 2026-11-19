@@ -34,7 +34,7 @@ payment_discount_given,Payment discount given,,payment_discount_given,,false,0.1
 payment_discount_received,Payment discount received,,payment_discount_received,,false,0.1.0,Discount granted by a supplier for early payment.
 income_summary_transfer,Income summary transfer,,income_summary,,false,0.1.0,Closing transfer of income and expenses to the income summary (ADR-0012 rule 18).
 retained_earnings_transfer,Retained earnings transfer,,retained_earnings,,false,0.1.0,Closing transfer of the period result to retained earnings.
-other_receipt_offset,Other receipt offset,valuation_class;warehouse,non_operating_income;income_other;liability_other;expense_other,,true,0.1.0,Offset of goods received without a purchase order; the regime or company chooses the account (ADR-0020).
+other_receipt_offset,Other receipt offset,valuation_class;warehouse,non_operating_income;income_other;liability_other;expense_other;owner_capital,,true,0.1.0,"Offset of goods received without a purchase order; the regime or company chooses the account (ADR-0020); owner_capital for goods an owner contributes in kind (author's delegation, 2026-11-19)."
 other_issue_offset,Other issue offset,valuation_class;warehouse;item_group,expense,,false,0.1.0,Offset of goods issued for a purpose no other movement type covers.
 scrap,Scrap,valuation_class;warehouse,expense,,false,0.1.0,Value of goods destroyed or written off.
 production_consumption,Production consumption,,production_cost_material,cost_object,false,0.1.0,Materials issued to a production order (ADR-0035).

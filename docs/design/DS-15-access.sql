@@ -274,7 +274,7 @@ CREATE TABLE delegation (
     company_id          uuid NOT NULL REFERENCES company (id),
     delegator_user_id   uuid NOT NULL REFERENCES user_account (id),
     substitute_user_id  uuid NOT NULL REFERENCES user_account (id),   -- a user account, so never an agent
-    kind                text NOT NULL CONSTRAINT ck_delegation_kind CHECK (kind IN ('approval', 'role_assignments')),
+    kind                text NOT NULL CONSTRAINT ck_delegation_kind CHECK (kind IN ('approval')),   -- role_assignments dropped (ADR-0054 rule 21 note, 2026-11-19)
     start_date          date NOT NULL,
     end_date            date NOT NULL,                                -- inclusive; always time-bound
     reason              text NOT NULL,
@@ -285,14 +285,6 @@ CREATE TABLE delegation (
     CONSTRAINT ck_delegation_dates CHECK (end_date >= start_date AND end_date - start_date <= 365)
 );
 CREATE INDEX ix_delegation_substitute_user_id ON delegation (substitute_user_id);
-CREATE TABLE delegation_role_assignment (                  -- kind role_assignments only; the delegator's own assignments (command check)
-    company_id          uuid NOT NULL,
-    delegation_id       uuid NOT NULL,
-    role_assignment_id  uuid NOT NULL,
-    PRIMARY KEY (delegation_id, role_assignment_id),
-    FOREIGN KEY (company_id, delegation_id) REFERENCES delegation (company_id, id),
-    FOREIGN KEY (company_id, role_assignment_id) REFERENCES role_assignment (company_id, id)
-);
 
 -- ===== Segregation of duties [permissions] (ADR-0054 rules 17-20) =====
 CREATE TABLE company_segregation_rule (                    -- enablement of segregation-rules.csv rows

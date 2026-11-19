@@ -938,10 +938,11 @@ if any(k in srows for k in SET):
 else:
     check("C14 the settings catalog does not hold rule 23's rows yet, so rule 23 holds them and names the dependency on ADR-0063", "Dependency on ADR-0063" in ADR_TEXT)
 oq = open(os.path.join(DOCS, "open-questions.md"), encoding="utf-8").read()
-oql = {k: [l for l in oq.splitlines() if l.startswith(k)] for k in ("- [ ] (DS-32, DS-34, DS-47) Readings", "- [ ] (DS-32, DS-34) Agent values", "- [ ] (DS-42, DS-22) Reservations", "- [ ] (DS-52) Production execution")}
-check("C15 B1: four existing open questions name ADR-0064 (readings p-r, budgets and import evidence, reservation priority, a partial note on DS-52 that stays open); none is added",
+# author's delegation 2026-11-19: Reservations and Production execution are now answered ("- [x]"), so the state is not part of the key
+oql = {k: [l for l in oq.splitlines() if l[6:].startswith(k[6:]) and l[:6] in ("- [ ] ", "- [x] ")] for k in ("- [ ] (DS-32, DS-34, DS-47) Readings", "- [ ] (DS-32, DS-34) Agent values", "- [ ] (DS-42, DS-22) Reservations", "- [ ] (DS-52) Production execution")}
+check("C15 B1: four existing open questions name ADR-0064 (readings p-r, budgets and import evidence, reservation priority, a partial note on DS-52; the last two answered on 2026-11-19); none is added",
       all(len(v) == 1 and "ADR-0064" in v[0] for v in oql.values()) and "(p)" in oql["- [ ] (DS-32, DS-34, DS-47) Readings"][0]
-      and oql["- [ ] (DS-52) Production execution"][0].startswith("- [ ] ") and oq.count("ADR-0064") == 4)
+      and oq.count("ADR-0064") == 4)
 ds17 = open(os.path.join(DOCS, "design/DS-17-synthetic-dataset.md"), encoding="utf-8").read()
 n_ec = sum(1 for x in rows("edge-cases.csv")[1:] if x and x[0].startswith("EC-"))
 check("C16 N11: DS-17 states the catalog's true edge case count", f"Version 0.1.0 has {n_ec} edge cases." in ds17, n_ec)

@@ -101,6 +101,8 @@ The migration period is then locked.
    - **Excluded accounts.** Receivables, payables and inventory are rejected with `opening_control_account`; they come from rules 8 and 9.
    - **Work in process, fixed assets and loans.** They post as plain balances before their subledgers are activated. Open production orders at cut-over are created as orders, and their detail comes with the activation's reclassification (ADR-0025 rule 4; ADR-0034 rule 15; flagged).
    - **The source.** The old trial balance is taken after the old system's closing. Income and expense accounts are not loaded. For a regime that closes only at year end, the migration closes profit and loss into retained earnings in the trial balance before loading (flagged).
+
+   Note (author's delegation, 2026-11-19): ADR-0044's interim choices are confirmed: balances after closing with year-to-date figures as non-posting statistics, a one-day migration fiscal year, no transaction history, and the other interims of this ADR.
 8. `opening_open_item_entry`, one document per currency: one line per old invoice, credit, advance or payment on account, each creating an open item at its open amount with a book carrying amount.
    - **Line content:** partner, account (the partner's reconciliation account unless given), kind, `natural_side`, `reference` (old number), `partner_reference`, `document_date`, `due_date`.
    - **Dates.** The item's `posting_date` is `opening_date`, as its origin line's (ADR-0026 rule 3). The old posting date is kept in `original_posting_date` (a note on ADR-0026 rule 1).

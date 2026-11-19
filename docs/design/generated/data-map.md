@@ -14,7 +14,7 @@ Tables per owner module, from the DDL drafts in `docs/design/*.sql` and the owne
 | `configuration` | 2 | 16 |
 | `documents` | 2 | 11 |
 | `outbox` | 2 | 4 |
-| `permissions` | 2 | 18 |
+| `permissions` | 2 | 17 |
 | `policy` | 2 | 7 |
 | `registry` | 2 | 6 |
 | `work` | 2 | 12 |
@@ -31,7 +31,7 @@ Tables per owner module, from the DDL drafts in `docs/design/*.sql` and the owne
 | `sales` | 4 | 14 |
 | `query` | 5 | 4 |
 | `(no owner stated)` | — | 16 |
-| **total** | | **380** |
+| **total** | | **379** |
 
 ## `agent_runs`
 
@@ -119,10 +119,9 @@ Tables per owner module, from the DDL drafts in `docs/design/*.sql` and the owne
 
 | Table | Purpose | Section | Key references | Source |
 | --- | --- | --- | --- | --- |
-| `company_segregation_rule` | enablement of segregation-rules.csv rows | Segregation of duties |  | docs/design/DS-15-access.sql:298 |
+| `company_segregation_rule` | enablement of segregation-rules.csv rows | Segregation of duties |  | docs/design/DS-15-access.sql:290 |
 | `credential_reset` | one-time password reset token (ADR-0054 rule 4) | Users and credentials | `user_account` | docs/design/DS-15-access.sql:58 |
 | `delegation` |  | Delegation | `user_account` | docs/design/DS-15-access.sql:272 |
-| `delegation_role_assignment` | kind role_assignments only; the delegator's own assignments (command check) | Delegation | `delegation`, `role_assignment` | docs/design/DS-15-access.sql:288 |
 | `installation_role_assignment` | ADR-0017 rule 7 | Users and credentials | `user_account` | docs/design/DS-15-access.sql:87 |
 | `integration_client` | ADR-0017 rules 1, 3, 13 | Users and credentials | `user_account` | docs/design/DS-15-access.sql:71 |
 | `integration_token` | stored only as a hash, at most one year (ADR-0017 rule 3) | Users and credentials | `integration_client` | docs/design/DS-15-access.sql:78 |
@@ -132,8 +131,8 @@ Tables per owner module, from the DDL drafts in `docs/design/*.sql` and the owne
 | `role_level` | one level per node of the area tree; inherited downward | Roles and levels | `role` | docs/design/DS-15-access.sql:152 |
 | `role_permission` | the expansion minus holds in force, read by the dispatcher (ADR-0054 rule 9) | Roles and levels | `role` | docs/design/DS-15-access.sql:162 |
 | `role_permission_hold` |  | Roles and levels | `role`, `user_account` | docs/design/DS-15-access.sql:172 |
-| `segregation_exception` | small-company mode only; immutable (ADR-0054 rule 20) | Segregation of duties | `audit_record`, `document`, `user_account` | docs/design/DS-15-access.sql:305 |
-| `segregation_review` | one per posting period with exceptions, by ConfirmSegregationReview | Segregation of duties | `posting_period`, `user_account` | docs/design/DS-15-access.sql:319 |
+| `segregation_exception` | small-company mode only; immutable (ADR-0054 rule 20) | Segregation of duties | `audit_record`, `document`, `user_account` | docs/design/DS-15-access.sql:297 |
+| `segregation_review` | one per posting period with exceptions, by ConfirmSegregationReview | Segregation of duties | `posting_period`, `user_account` | docs/design/DS-15-access.sql:311 |
 | `user_account` | personal data (spec 17); installation data | Users and credentials |  | docs/design/DS-15-access.sql:19 |
 | `user_invitation` | CreateUserAccount writes one per call. | Invitations | `user_account` | docs/design/DS-15-access.sql:200 |
 | `user_session` | server-side sessions (ADR-0017 rule 2; ADR-0040 rule 12) | Users and credentials | `user_account` | docs/design/DS-15-access.sql:46 |
@@ -142,11 +141,11 @@ Tables per owner module, from the DDL drafts in `docs/design/*.sql` and the owne
 
 | Table | Purpose | Section | Key references | Source |
 | --- | --- | --- | --- | --- |
-| `approval_pool` |  | Approval pools and stages |  | docs/design/DS-15-access.sql:331 |
-| `approval_pool_document_type` | Selector: position 0 is the one default row per document type | Approval pools and stages | `approval_pool` | docs/design/DS-15-access.sql:343 |
+| `approval_pool` |  | Approval pools and stages |  | docs/design/DS-15-access.sql:323 |
+| `approval_pool_document_type` | Selector: position 0 is the one default row per document type | Approval pools and stages | `approval_pool` | docs/design/DS-15-access.sql:335 |
 | `approval_procedure` | named ranks; approver role and scope binding moved to stages (ADR-0055 rule 5) | Policy rules and procedures |  | docs/design/DS-05-platform.sql:367 |
-| `approval_stage` |  | Approval pools and stages | `approval_pool`, `role` | docs/design/DS-15-access.sql:353 |
-| `approval_stage_member` |  | Approval pools and stages | `approval_stage`, `role`, `user_account` | docs/design/DS-15-access.sql:372 |
+| `approval_stage` |  | Approval pools and stages | `approval_pool`, `role` | docs/design/DS-15-access.sql:345 |
+| `approval_stage_member` |  | Approval pools and stages | `approval_stage`, `role`, `user_account` | docs/design/DS-15-access.sql:364 |
 | `policy_rule` | the identity of a versioned rule; ties go to the lowest ID (rule 7) | Policy rules and procedures |  | docs/design/DS-05-platform.sql:380 |
 | `policy_rule_version` | Rule 3: a change writes a new version with effective_from | Policy rules and procedures | `approval_procedure`, `policy_rule`, `user_account` | docs/design/DS-05-platform.sql:390 |
 
@@ -824,9 +823,9 @@ Foreign keys whose source and target tables have different stated owners. Foreig
 | `supplier_purchasing_term` (planning, 4) | `weight_uom_id` | `uom` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:162 |
 | `transfer_route` (planning, 4) | `company_id,destination_warehouse_id` | `warehouse` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:89 |
 | `transfer_route` (planning, 4) | `company_id,source_warehouse_id` | `warehouse` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:88 |
-| `approval_stage` (policy, 2) | `company_id,escalation_role_id` | `role` (permissions, 2) | same layer | docs/design/DS-15-access.sql:370 |
-| `approval_stage_member` (policy, 2) | `company_id,role_id` | `role` (permissions, 2) | same layer | docs/design/DS-15-access.sql:380 |
-| `approval_stage_member` (policy, 2) | `user_account_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-15-access.sql:376 |
+| `approval_stage` (policy, 2) | `company_id,escalation_role_id` | `role` (permissions, 2) | same layer | docs/design/DS-15-access.sql:362 |
+| `approval_stage_member` (policy, 2) | `company_id,role_id` | `role` (permissions, 2) | same layer | docs/design/DS-15-access.sql:372 |
+| `approval_stage_member` (policy, 2) | `user_account_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-15-access.sql:368 |
 | `policy_rule_version` (policy, 2) | `owner_user_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-05-platform.sql:416 |
 | `activity_type` (production, 3) | `time_uom_id` | `uom` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:344 |
 | `bill_of_materials` (production, 3) | `company_id,item_id` | `item` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:427 |
@@ -1194,7 +1193,7 @@ Foreign keys whose source and target tables have different stated owners. Foreig
 | `production_cost_settlement` | `posting_period_id` | `posting_period` | lab stub | docs/design/DS-43-54-planning-production.sql:1666 |
 | `production_order_period_cost` | `posting_period_id` | `posting_period` | lab stub | docs/design/DS-43-54-planning-production.sql:1686 |
 | `purchase_invoice_line` | `account_id` | `account` | lab stub | docs/design/DS-22-09-42-commercial-inventory.sql:1181 |
-| `segregation_review` | `posting_period_id` | `posting_period` | lab stub | docs/design/DS-15-access.sql:321 |
+| `segregation_review` | `posting_period_id` | `posting_period` | lab stub | docs/design/DS-15-access.sql:313 |
 | `supplier_profile` | `payable_account_id` | `account` | lab stub | docs/design/DS-20-master-data.sql:362 |
 | `tax_line` | `journal_entry_id` | `journal_entry` | no owner stated | docs/design/DS-05-platform.sql:1007 |
 | `tax_line` | `tax_code_id` | `tax_code` | lab stub | docs/design/DS-05-platform.sql:1009 |

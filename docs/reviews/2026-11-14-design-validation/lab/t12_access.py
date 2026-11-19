@@ -524,7 +524,7 @@ check("C27 is_internal_only commands are in no template's expansion, owner inclu
 starts = lambda t: {p.split(":", 1)[1] for p in EXP[t] if p.startswith("start_agent:")}
 # simulation review 2026-11-15: workflow owners are not the planned approvers (ADR-0054 rule 11 note)
 SEED = {"sales_clerk": {"quotation", "customer_onboarding"}, "accountant": {"bank_matching", "purchase_invoice", "analysis"},
-        "production_planner": {"planning", "analysis"}, "owner": set(AGENT_TYPES), "it_administrator": set(AGENT_TYPES),
+        "production_planner": {"planning", "analysis"}, "owner": set(AGENT_TYPES), "it_administrator": set(),   # author's delegation 2026-11-19: no start_agent for it_administrator (ADR-0054 rule 11 note)
         "chief_accountant": {"analysis"}, "sales_manager": {"analysis"}, "purchasing_manager": {"analysis"}}   # analysis seed: ADR-0060 rule 36
 check("C28 start_agent follows the interim seed per agent type leaf; UpdateAgentTypeSetting and cancel_agent_runs need full on agent",
       all(starts(t) == SEED.get(t, set()) for t in TEMPLATES) and all(f"agent_{a}" in PARENT and PARENT[f"agent_{a}"] == "agent" for a in AGENT_TYPES)

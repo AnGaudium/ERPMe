@@ -205,6 +205,8 @@ ADR-0017 fixed the envelope: permissions are the names of registered commands, q
 
     Note ([ADR-0070](0070-quality-management-core.md), proposed 2026-11-17): a fourteenth template, `quality_inspector` (branch / branch): quality `post` with approval, inspection plans `edit`, inventory, products and production orders `read`, delegation of its own approvals `edit` (ADR-0070 rule 13).
 
+    Note (author's delegation, 2026-11-19): `it_administrator` no longer holds `start_agent` for any agent type: an IT administrator configures and operates the system but starts no business agent. [role-template-levels.csv](../catalogs/role-template-levels.csv) sets each agent type leaf to `none` for the template; `owner` keeps every agent type, and the rest of the interim seed is confirmed. Lab check `t12_access.py` C28.
+
 **Assignments, record scope and owner scope**
 
 12. `role_assignment` (company data, change-tracked):
@@ -327,6 +329,8 @@ ADR-0017 fixed the envelope: permissions are the names of registered commands, q
 
     Note ([ADR-0067](0067-quickflows-operating-presets.md), 2026-11-17 (proposed)): decided by the author's delegation to the chief architect (2026-11-17): while the mode is on, the human for whom a tainted run acted may clear that run's versions, one `ClearTaint` per version with a reason, never in bulk; each clearance writes a `segregation_exception` of kind `own_run_taint_clearance` for `ConfirmSegregationReview` at period close. A self-cleared version never counts as cleared for the auto-post gateway's tainted-draft eligibility or for promotion evidence ([ADR-0067](0067-quickflows-operating-presets.md) rule 17).
 
+    Note (author's delegation, 2026-11-19): the bank-account rule is not lifted in the small-company mode; it is a policy floor ([ADR-0043](0043-policy-and-approval.md) rule 9 note).
+
 **Delegation**
 
 21. `delegation` (company data, change-tracked):
@@ -340,6 +344,8 @@ ADR-0017 fixed the envelope: permissions are the names of registered commands, q
     - **Commands.** `CreateDelegation` by the delegator, which every approving template allows (rule 11); for an absent user, by a holder of `delegate_for_others` who also holds what is delegated (no escalation). `CancelDelegation` ends it early. Both are `human_only`.
     - **Audit.** A command executed under a delegation records `delegated_from_user_id` in its audit record (a note on ADR-0038 rule 2) and, for approvals, in the approval row (ADR-0055 rule 9).
     - **The delegator** keeps their own rights during the window.
+
+    Note (author's delegation, 2026-11-19): the kind `role_assignments` is dropped until a company needs it; only approval delegation remains. DS-15 keeps the `kind` column with the single value `approval` and drops `delegation_role_assignment`. The glossary row in spec 00 is left for the next spec pass.
 
 **UI**
 
