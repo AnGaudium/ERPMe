@@ -284,7 +284,7 @@ Tables per owner module, from the DDL drafts in `docs/design/*.sql` and the owne
 | `product_uom` | other units of one product, or of one item: the item master's conversions (ADR-0018 rule 10; ADR-0056 rules 4-5, 15) | Products and items | `item`, `product`, `uom` | docs/design/DS-20-master-data.sql:524 |
 | `product_variant_attribute` | the attributes of a product, of either mode | Products and items | `product`, `variant_attribute` | docs/design/DS-20-master-data.sql:598 |
 | `project` |  | Partners | `business_unit`, `partner` | docs/design/DS-20-master-data.sql:244 |
-| `reason` | ADR-0074 rules 13, 14; company data, change-tracked | Partner relationships, external IDs, custom fields and reasons |  | docs/design/DS-20-master-data.sql:1084 |
+| `reason` | ADR-0074 rules 13, 14; company data, change-tracked | Partner relationships, external IDs, custom fields and reasons |  | docs/design/DS-20-master-data.sql:1085 |
 | `site` | ADR-0068 rule 1; SAP plant, Dynamics 365 site | Organization | `branch`, `business_unit`, `working_calendar` | docs/design/DS-20-master-data.sql:167 |
 | `storage_condition` | ADR-0023 rule 3 | Products and items |  | docs/design/DS-20-master-data.sql:463 |
 | `supplier_profile` |  | Price lists | `account`, `currency`, `delivery_method`, `incoterm`, `partner`, `payment_method`, `payment_term`, `price_list` … | docs/design/DS-20-master-data.sql:359 |
