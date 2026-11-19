@@ -87,6 +87,8 @@ The migration period is then locked.
      - an opening document must first be reversed (rule 14).
 
      Abandoning keeps the key map.
+
+    Note ([ADR-0074](0074-core-data-structure-additions.md), proposed 2026-11-19): `import_key_map` is `external_id_map` (company, source system, table, external key, entity ID), with the functions `external_id_resolve` and `external_key_of`. A batch names its source system (a field of `CreateImportBatch` when DS-21 is written) and keeps its provisional map in the batch; `RunImport` writes the rows with the records (ADR-0074 rule 7).
 6. Old accounts. `old_account_map` maps each old account to one operational account, or splits it by detail given in the file or by a fixed share (flagged). Every account of the old trial balance must be mapped before reconciliation can pass.
 
 **Opening documents** (internal, reversible while the migration is open, `is_approval_hold_allowed: false`; import chunks are consequence postings, ADR-0043 rule 5)

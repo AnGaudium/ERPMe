@@ -38,6 +38,8 @@ The author's decision of 2026-11-17: production execution should feel like Odoo'
    - **Receipts** (ADR-0034 rule 13) and **issues and returns** (rule 11): unchanged.
    - **Time.** A confirmation with yield and scrap 0 and only activity quantities is valid (a time-only confirmation, for setup or a shift without finished parts). Rule 12 never forbade it; this rule states it. ADR-0064 rule 22's duplicate check treats two time-only confirmations as duplicates only when their activity quantities are equal too.
    - **Scrap.** A confirmation with yield 0 and scrap above 0 records scrap alone. Component scrap is an issue line with a scrap `reason_code` (rule 11's column). Receipt scrap: rule 4.
+
+    Note ([ADR-0074](0074-core-data-structure-additions.md), proposed 2026-11-19): the component-scrap and over-issue reason of an issue line and the confirmation's scrap reason are `scrap_reason_id` references to a reason of kind `scrap`, in place of the text codes (ADR-0074 rule 14).
 3. Issuing a component that is not on the MO, from the tablet's "issue extra component":
    - **On the order.** An issue above the open requirement keeps `issue_above_requirement` (ADR-0034 rule 11).
    - **Not on the order.** The client sends one command batch (ADR-0008 rule 20): the change order that adds the component line (ADR-0028 rule 4; ADR-0034 rule 8), then `CreateProductionIssue` and `PostProductionIssue`. The line's required quantity is 0 unless the person states one, so ADR-0035 rule 10 treats the consumption as above norms. When policy requires approval of the change, the batch fails as a whole and the issue waits for it.
@@ -46,6 +48,8 @@ The author's decision of 2026-11-17: production execution should feel like Odoo'
    - **Scope.** Refused with `receipt_scrap_not_allowed` when the MO has an internal operation (scrap belongs on the WO's confirmation, so it is never counted twice) or has no main output (disassembly).
    - **Backflush at receipt.** The progress share becomes max(R / G, (R + S) / Q), where R is cumulative net receipts of the main output and S cumulative net receipt scrap. With S = 0 this equals today's rule; planned assembly scrap is never consumed twice.
    - **Value.** Receipt scrap carries no value. Tolerance, completion and abnormal cost read receipts only, as today; the scrap variance reads it (ADR-0035; ADR-0064 rule 10).
+
+    Note ([ADR-0074](0074-core-data-structure-additions.md), proposed 2026-11-19): the receipt scrap reason is `production_receipt.scrap_reason_id`, a reason of kind `scrap`, in place of the text `scrap_reason_code` (ADR-0074 rule 14).
 
 **Orders without operations**
 

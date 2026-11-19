@@ -507,9 +507,11 @@ bad("N50 a serial issue line moves exactly one unit", "ck_production_issue_line_
 bad("N51 only an internal operation is confirmed (operation_not_confirmable)", "fk_operation_confirmation_operation",
     ("insert into document (id, company_id, document_type) values (%s,%s,'operation_confirmation')", (doc2, I["co"])),
     ins("operation_confirmation", id=doc2, production_order_id=I["doc"], production_order_operation_id=I["OP20"], work_center_id=I["WC1"], yield_quantity=1, posting_date="2026-12-02"))
+rsn52 = new()
 bad("N52 a scrap reason needs scrap", "ck_operation_confirmation_scrap_reason",
+    ("insert into reason (id, company_id, kind, code, name) values (%s,%s,'scrap','damaged','Damaged')", (rsn52, I["co"])),
     ("insert into document (id, company_id, document_type) values (%s,%s,'operation_confirmation')", (doc2, I["co"])),
-    ins("operation_confirmation", id=doc2, production_order_id=I["doc"], production_order_operation_id=I["OP10"], work_center_id=I["WC1"], yield_quantity=1, scrap_reason_code="damaged", posting_date="2026-12-02"))
+    ins("operation_confirmation", id=doc2, production_order_id=I["doc"], production_order_operation_id=I["OP10"], work_center_id=I["WC1"], yield_quantity=1, scrap_reason_id=rsn52, posting_date="2026-12-02"))
 bad("N53 a generated progress line has exactly one calling document", "ck_operation_progress_component_caller",
     ins("operation_progress_component", id=new(), production_order_id=I["doc"], operation_confirmation_id=I["doc_c"], production_receipt_id=I["doc_r"], production_order_component_id=I["L1"],
         item_id=I["iC1"], warehouse_id=I["WP"], quantity=1, bin_id=I["SB"], cost_object_id=I["CO"], material_document_line_id=I["mdl_c"]))

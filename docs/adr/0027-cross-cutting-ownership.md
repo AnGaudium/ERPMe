@@ -81,6 +81,8 @@ Before step 1 code freezes the platform modules, every entity that several modul
    - **Correction types.** The return stock documents may carry `correction_of_id` to the receipt or delivery they correct (ADR-0009 rule 23); the DS-09 deliverable decides. The commercial correction types `purchase_return` and `sales_return` refer to them.
 
    Note ([ADR-0070](0070-quality-management-core.md), proposed 2026-11-17): the non-posting document type `inspection_lot` is owned by `quality` (ADR-0070 rule 7).
+
+    Note ([ADR-0075](0075-stock-documents.md), proposed 2026-11-19): the fields and reversibility flags of `stock_transfer`, `stock_count`, `scrap` and `internal_consumption` are written (ADR-0075); `other_receipt`, `other_issue`, `opening_balance` and `transfer_order` remain for the same deliverable.
 8. Owners of entities that had none:
 
    | Entity | Owner |

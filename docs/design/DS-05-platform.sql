@@ -494,6 +494,11 @@ CREATE TABLE document (
     change_state          text NOT NULL DEFAULT 'none' CONSTRAINT ck_document_change_state CHECK (change_state IN ('none', 'drafting', 'pending_approval')),
     posted_at             timestamptz,                     -- rule 13
     closed_reason         text CONSTRAINT ck_document_closed_reason CHECK (closed_reason IN ('fulfilled', 'manual')),   -- ADR-0047 rule 2; interim: value manual not stated in ADR-0047
+    canceled_reason_id    uuid,                            -- reason, kind cancel; a person's reason for a canceled draft or pending document (ADR-0074 rules 13, 14)
+    canceled_reason_kind  text NOT NULL DEFAULT 'cancel' CONSTRAINT ck_document_canceled_reason_kind CHECK (canceled_reason_kind = 'cancel'),
+    canceled_note         text,
+    FOREIGN KEY (company_id, canceled_reason_id, canceled_reason_kind) REFERENCES reason (company_id, id, kind),
+    CONSTRAINT ck_document_canceled CHECK ((canceled_reason_id IS NULL AND canceled_note IS NULL) OR state = 'canceled'),
     recorded_at           timestamptz NOT NULL,
     UNIQUE (company_id, id),
     UNIQUE (company_id, id, document_type),
@@ -650,6 +655,10 @@ CREATE TABLE approval (                                    -- owned by documents
     delegated_from_user_id  uuid REFERENCES user_account (id),
     is_escalated            boolean NOT NULL DEFAULT false,
     decided_at              timestamptz NOT NULL,
+    reject_reason_id        uuid,                          -- reason, kind reject; the comment above stays required (ADR-0074 rules 13, 14)
+    reject_reason_kind      text NOT NULL DEFAULT 'reject' CONSTRAINT ck_approval_reject_reason_kind CHECK (reject_reason_kind = 'reject'),
+    FOREIGN KEY (company_id, reject_reason_id, reject_reason_kind) REFERENCES reason (company_id, id, kind),
+    CONSTRAINT ck_approval_reject_reason CHECK (reject_reason_id IS NULL OR decision = 'rejected'),
     recorded_at             timestamptz NOT NULL,
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, document_id, document_version_id) REFERENCES document_version (company_id, document_id, id),

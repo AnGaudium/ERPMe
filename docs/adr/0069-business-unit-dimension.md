@@ -45,6 +45,8 @@ The author's decision of 2026-11-17: a **business unit** splits activity into li
    - **Lines.** The lines on which a person assigns an account carry an explicit `business_unit_id`: purchase invoice lines, payment `account` lines and general journal lines (ADR-0048 rule 15).
    - **Sales lines** have no line unit in Phase 1: the product and the header decide. A generic service product left without a unit lets the header decide.
 
+    Note ([ADR-0075](0075-stock-documents.md), proposed 2026-11-19): the headers of `stock_count`, `scrap` and `internal_consumption` (ADR-0075) may name a business unit like the other document headers, set by a person or an agent; `stock_transfer` has none, because it posts no profit-and-loss line.
+
 **The derivation**
 
 9. `ledger` derives the unit at posting, inside the posting transaction, for every P&L line of the entry. First match wins:

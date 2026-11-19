@@ -76,6 +76,7 @@ CREATE TABLE journal_entry (
     database_transaction_number  xid8        NOT NULL,
     line_count                   integer     NOT NULL CHECK (line_count >= 2),
     business_unit_trace_id       uuid        REFERENCES derivation_trace (id),   -- ADR-0069 rule 12: the entry's business unit derivation (rule_code business_unit_derivation); journal_line.derivation_trace_id stays costing's
+    note                         text CONSTRAINT ck_journal_entry_note CHECK (note IS NULL OR char_length(note) <= 4000),   -- copied from the document's header note at posting (ADR-0074 rule 17)
     recorded_at                  timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT uq_journal_entry_document_id UNIQUE (document_id)
 );

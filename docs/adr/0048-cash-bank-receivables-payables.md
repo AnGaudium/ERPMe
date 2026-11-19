@@ -126,6 +126,8 @@ Allocation is always explicit. A deterministic query proposes it, and a person o
    `BankLineSuggestionRecorded` carries IDs only; the suggested tokens stay on the line as untrusted fields ([ADR-0051](0051-agent-workflows.md) rule 17).
 
    Note: `match_state` gains `proposed`. A proposed line names its document in `proposed_document_id`, with the cascade's `score` and `match_basis` (`already_posted`, `reference`, `company_rule`, `account_amount`, `account_subset`, `llm_suggestion` or `manual`); a matched line names its document as before. `GetBankReconciliation` counts proposed lines as unmatched, so neither the reconciliation nor its close task treats a draft as booked. INV-95 is unchanged (holistic review, 2026-11-15).
+
+    Note ([ADR-0074](0074-core-data-structure-additions.md), proposed 2026-11-19): within one partner means the payer of a receivable and the invoicing party of a payable; a payment goes to its payee and that party's bank account (ADR-0074 rule 4).
 9. Matching:
    - **The cascade:** `match_bank_line`, a pure function, checked by the lab on shuffled inputs. It first puts open items and documents in a canonical order (due date, then ID). An inflow considers only items on the debit side, an outflow only items on the credit side, and only items in the money account's currency. Then it applies, in order:
      1. **Already posted:** an unmatched posted document of this money account in the same direction and amount, dated within 5 days, whose reference is a token of the description or whose partner owns the counterparty's account. The closest date wins, then the earliest, then the lowest ID (score 95). Nothing new is drafted.
@@ -259,6 +261,8 @@ Allocation is always explicit. A deterministic query proposes it, and a person o
 19. Credit exposure:
     - **Settlements lower it.** `OpenItemSettled` (ledger) reaches the `sales` consumer that clears credit holds ([ADR-0047](0047-commercial-documents-and-pricing.md) rule 18).
     - **The tax evidence consumer** reads the same event (ADR-0041 rule 15).
+
+    Note ([ADR-0074](0074-core-data-structure-additions.md), proposed 2026-11-19): the exposure and the holds cleared by `OpenItemSettled` are those of the payer, as ADR-0030 rule 6 now reads (ADR-0074 rule 4).
 
 **Catalogs**
 

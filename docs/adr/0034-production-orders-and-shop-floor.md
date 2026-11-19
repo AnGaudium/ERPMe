@@ -187,6 +187,8 @@ It adds only what production needs:
 
     Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): issue lines carry the line unit block: `quantity` as entered in any allowed unit of the component, `uom_id`, the snapshot and `inventory_quantity`, which the stock movement and the order line's progress use (rules 9, 17).
 
+    Note ([ADR-0074](0074-core-data-structure-additions.md), proposed 2026-11-19): the over-issue and component-scrap reason of a `production_issue_line` is `scrap_reason_id`, a reason of kind `scrap`, in place of the text `reason_code` (ADR-0074 rules 13, 14).
+
 **Operations: confirmation and backflush**
 
 12. `operation_confirmation` is an internal posting document (reversible):
@@ -214,6 +216,8 @@ It adds only what production needs:
     Note ([ADR-0064](0064-production-agent.md), proposed 2026-11-15): the capture agent is the agent type `production_capture`: tainted, scope `subject` on one production order resolved from a trusted order number of an extraction of purpose `shop_floor_report`, quantities copied as stated, drafts only, a person posts. Confirmations carry `entry_source` (`person`, `capture_agent`, `production_import`) and get the yield, activity and duplicate checks of rule 22; a deterministic production import may post them as `integration` only behind `production.mes_import.auto_post` and the evidence of ADR-0043 rule 14 (rules 19, 22, 25).
 
     Note ([ADR-0071](0071-work-orders-and-shop-floor-execution.md), proposed 2026-11-17): a confirmation with yield and scrap 0 records time only; confirmations carry the execution `work_center_id`, link the time logs they take and store each activity's `proposed_quantity`; a final confirmation is refused while a setup or run log is open (`operation_time_log_open`) (ADR-0071 rules 2, 11, 16).
+
+    Note ([ADR-0074](0074-core-data-structure-additions.md), proposed 2026-11-19): `scrap_reason_id` (kind `scrap`) replaces the text `scrap_reason_code` of `operation_confirmation` and `production_receipt`; a reason still needs a scrap quantity (ADR-0074 rule 14).
 
 **Output: receipt, inspection and make to order**
 

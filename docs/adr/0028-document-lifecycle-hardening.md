@@ -127,6 +127,8 @@ This ADR amends the document lifecycle (ADR-0009) in five places, before step 3 
     - At `Post` or `Issue`, a snapshot that differs from the partner's master returns the check result `partner_snapshot_stale`.
     - Whether that warns or blocks is business behavior. Interim, flagged: it warns, and for the tax ID on e-invoiced types `Issue` is rejected with `e_invoice_invalid`.
 
+    Note ([ADR-0074](0074-core-data-structure-additions.md), proposed 2026-11-19): the snapshot covers every named party of a document (ship-to, bill-to, payer, invoicing party, payee), copied by `Create` and `Update`; `partner_snapshot_stale` is evaluated per named party (ADR-0074 rules 1, 5).
+
 **Checks**
 
 17. Invariants, one statement each:

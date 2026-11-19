@@ -143,6 +143,8 @@ A small shop and a managed distribution warehouse run on the same model.
    Dispatch to a customer may be a `sales_issue`, or a `transfer_out` to a `goods_sent` warehouse (ADR-0020 rule 4).
 
    Note ([ADR-0070](0070-quality-management-core.md), proposed 2026-11-17): `purchase_receipt` and `other_receipt` lines post to `quality_inspection` when the product's `inspection_points` contains `goods_receipt`. Issuing documents name the status they issue from: `return_to_supplier_line` gains `stock_status`, and scrap and internal-consumption lines carry it too (ADR-0070 rules 2, 15).
+
+    Note ([ADR-0075](0075-stock-documents.md), proposed 2026-11-19): a transfer moves `available` stock only, so a transfer line has no status; it is one document (`direct`) or two through a transit warehouse (`dispatch`, `receive`, ADR-0075 rules 1, 2). Scrap and internal-consumption lines carry the status they leave (ADR-0075 rules 4, 5).
 8. Warehouse movements:
    - **Lines.** `warehouse_movement` lines are written by confirmed tasks and by the pack and unpack commands. Each line holds item, lot or serial, quantity in the inventory unit, from and to bin, status and handling unit (inside one warehouse), `business_date` (`clock.today`, for history only), and its source: `warehouse_task_id`, or the pack, unpack or count-correction command that wrote it. They also carry the reserved `owner_partner_id` ([ADR-0030](0030-commercial-seams-and-imports.md) rule 8).
    - **Properties.** They are append-only and post no journal. Per (item, warehouse, lot or serial) their quantities net to zero (DS-16).
@@ -259,6 +261,8 @@ A small shop and a managed distribution warehouse run on the same model.
     - **Plans.** Cycle-count plans (second slice) are company data; an agent proposes them.
 
     Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): counted quantities may be entered in the product's counting units, several lines per key, each converted and summed in the inventory unit (rule 15).
+
+    Note ([ADR-0075](0075-stock-documents.md), proposed 2026-11-19): the draft count that a confirmed task creates is a `stock_count` with one line per counted entry; the book quantity is stored on each line of a key and a key with no line posts nothing (ADR-0075 rule 3).
 19. Returns:
     - Returns arrive in a `returns` bin as `blocked` (rule 7).
     - A disposition creates a `status_change` task to restock (then putaway) or to quality, or a draft scrap document.

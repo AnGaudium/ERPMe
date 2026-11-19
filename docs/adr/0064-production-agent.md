@@ -187,6 +187,8 @@ ADR-0051 rule 29 left the production agents to their own ADR. The production rul
 
     Note ([ADR-0071](0071-work-orders-and-shop-floor-execution.md), proposed 2026-11-17): the capture agent may also draft time logs (`CreateOperationTimeLog`, `is_draft_only`; state `draft`) for its order; a person confirms them with `ConfirmOperationTimeLog`; it never starts, pauses or blocks a WO (ADR-0071 rules 9, 17).
 
+    Note ([ADR-0074](0074-core-data-structure-additions.md), proposed 2026-11-19): the company's scrap reason codes passed as the closed list of the mapping step are the active reasons of kind `scrap` (ADR-0074 rule 14).
+
 **Variance agent and standards feedback**
 
 20. C7 `production_variance`, a workflow on the analysis layer (ADR-0060 rules 18, 19, 23):

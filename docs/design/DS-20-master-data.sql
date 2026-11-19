@@ -232,6 +232,7 @@ CREATE TABLE partner (
     preferred_language        text,
     superseded_by_partner_id  uuid,                               -- ADR-0019 rule 19 (interim)
     is_active                 boolean NOT NULL DEFAULT true,
+    custom_values    jsonb NOT NULL DEFAULT '{}'::jsonb CONSTRAINT ck_partner_custom_values CHECK (jsonb_typeof(custom_values) = 'object'),   -- ADR-0074 rules 8, 9
     UNIQUE (company_id, code),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, parent_partner_id) REFERENCES partner (company_id, id),
@@ -251,6 +252,7 @@ CREATE TABLE project (
     state                text NOT NULL DEFAULT 'open' CONSTRAINT ck_project_state CHECK (state IN ('open', 'closed')),
     business_unit_id     uuid,                           -- default unit of its profit-and-loss lines (ADR-0069 rule 7)
     UNIQUE (company_id, code),
+    UNIQUE (company_id, id),                         -- stock document lines name a project by company key (ADR-0075 rules 4, 5)
     FOREIGN KEY (company_id, customer_partner_id) REFERENCES partner (company_id, id),
     CONSTRAINT ck_project_dates CHECK (end_date IS NULL OR start_date IS NULL OR end_date >= start_date),
     FOREIGN KEY (company_id, business_unit_id) REFERENCES business_unit (company_id, id)
@@ -404,6 +406,7 @@ CREATE TABLE partner_address (
     postal_code       text,
     country           text NOT NULL CONSTRAINT ck_partner_address_country CHECK (country ~ '^[A-Z]{2}$'),
     is_active         boolean NOT NULL DEFAULT true,
+    UNIQUE (company_id, partner_id, id),                             -- a document names its ship-to or bill-to address with its partner (ADR-0074 rules 1-3)
     FOREIGN KEY (company_id, partner_id) REFERENCES partner (company_id, id)
 );
 CREATE INDEX ix_partner_address_partner_id ON partner_address (partner_id);
@@ -508,6 +511,7 @@ CREATE TABLE product (
     country_of_origin              text CONSTRAINT ck_product_country_of_origin CHECK (country_of_origin ~ '^[A-Z]{2}$'),
     business_unit_id               uuid,                            -- default unit of its items' profit-and-loss lines, read through the item (ADR-0069 rule 7)
     is_active                      boolean NOT NULL DEFAULT true,
+    custom_values jsonb NOT NULL DEFAULT '{}'::jsonb CONSTRAINT ck_product_custom_values CHECK (jsonb_typeof(custom_values) = 'object'),   -- ADR-0074 rules 8, 9
     UNIQUE (company_id, code),
     UNIQUE (company_id, id),
     UNIQUE (company_id, id, inventory_uom_id),             -- product_uom holds the inventory unit through it (ADR-0056 rule 4)
@@ -626,6 +630,7 @@ CREATE TABLE item (
     gross_weight      types.quantity,
     weight_uom_id     uuid REFERENCES uom (id),
     is_active         boolean NOT NULL DEFAULT true,
+    custom_values jsonb NOT NULL DEFAULT '{}'::jsonb CONSTRAINT ck_item_custom_values CHECK (jsonb_typeof(custom_values) = 'object'),   -- ADR-0074 rules 8, 9
     CONSTRAINT fk_item_product FOREIGN KEY (company_id, product_id) REFERENCES product (company_id, id),
     UNIQUE (company_id, code),
     UNIQUE (company_id, id),
@@ -1012,3 +1017,79 @@ CREATE TRIGGER trg_lot_register AFTER INSERT OR UPDATE OF barcode OR DELETE ON l
     FOR EACH ROW EXECUTE FUNCTION barcode_register('lot', 'barcode', 'id');
 CREATE TRIGGER trg_serial_number_register AFTER INSERT OR UPDATE OF barcode OR DELETE ON serial_number
     FOR EACH ROW EXECUTE FUNCTION barcode_register('serial', 'barcode', 'id');
+
+-- ===== Partner relationships, external IDs, custom fields and reasons [master_data] (ADR-0074) =====
+-- Four small company tables that the commercial documents, the stock documents and the integrations read. They depend only
+-- on company, partner and partner_address, so master data and crm stay independent of the ledger, tax, inventory, cash and
+-- production (the CRM-only profile).
+CREATE TABLE partner_relationship (                        -- [master_data] ADR-0074 rules 1-3; company data, change-tracked
+    id                 uuid PRIMARY KEY,
+    company_id         uuid NOT NULL,
+    partner_id         uuid NOT NULL,                      -- the sold-to party (customers) or the ordered-from party (suppliers)
+    related_partner_id uuid NOT NULL,                      -- the ship-to, bill-to, payer, invoicing party or payee
+    role               text NOT NULL CONSTRAINT ck_partner_relationship_role CHECK (role IN ('ship_to', 'bill_to', 'payer', 'invoicing_party', 'payee')),
+    address_id         uuid,                               -- the related partner's address to copy by default (ship_to, bill_to, invoicing_party)
+    is_default         boolean NOT NULL DEFAULT false,     -- at most one active default per partner and role
+    is_active          boolean NOT NULL DEFAULT true,
+    recorded_at        timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (company_id, id),
+    UNIQUE (company_id, partner_id, related_partner_id, role),
+    FOREIGN KEY (company_id, partner_id) REFERENCES partner (company_id, id),
+    FOREIGN KEY (company_id, related_partner_id) REFERENCES partner (company_id, id),
+    FOREIGN KEY (company_id, related_partner_id, address_id) REFERENCES partner_address (company_id, partner_id, id),
+    CONSTRAINT ck_partner_relationship_not_self CHECK (partner_id <> related_partner_id),
+    CONSTRAINT ck_partner_relationship_address CHECK (address_id IS NULL OR role IN ('ship_to', 'bill_to', 'invoicing_party')),
+    CONSTRAINT ck_partner_relationship_default CHECK (NOT is_default OR is_active)
+);
+CREATE UNIQUE INDEX ux_partner_relationship_default ON partner_relationship (company_id, partner_id, role) WHERE is_default;
+CREATE INDEX ix_partner_relationship_related_partner_id ON partner_relationship (company_id, related_partner_id);
+
+CREATE TABLE external_id_map (                             -- [master_data] ADR-0074 rule 7; replaces the undefined import_key_map of ADR-0044 rule 5
+    company_id    uuid NOT NULL REFERENCES company (id),
+    source_system text NOT NULL CONSTRAINT ck_external_id_map_source_system CHECK (source_system ~ '^[a-z][a-z0-9_.-]{0,39}$'),
+    table_name    text NOT NULL CONSTRAINT ck_external_id_map_table_name CHECK (table_name ~ '^[a-z][a-z0-9_]*$'),
+    external_key  text NOT NULL CONSTRAINT ck_external_id_map_external_key CHECK (length(btrim(external_key)) > 0 AND length(external_key) <= 200),
+    entity_id     uuid NOT NULL,                           -- polymorphic: the row of table_name; checked by INV-860
+    recorded_at   timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (company_id, source_system, table_name, external_key),
+    CONSTRAINT uq_external_id_map_entity UNIQUE (company_id, source_system, table_name, entity_id)
+);
+CREATE INDEX ix_external_id_map_entity_id ON external_id_map (company_id, entity_id);
+-- The lookup of ADR-0074 rule 7: the entity of an external key, and the external key of an entity, within one source system.
+CREATE FUNCTION external_id_resolve(p_company_id uuid, p_source_system text, p_table_name text, p_external_key text) RETURNS uuid LANGUAGE sql STABLE AS $$
+    SELECT entity_id FROM external_id_map WHERE company_id = p_company_id AND source_system = p_source_system AND table_name = p_table_name AND external_key = p_external_key
+$$;
+CREATE FUNCTION external_key_of(p_company_id uuid, p_source_system text, p_table_name text, p_entity_id uuid) RETURNS text LANGUAGE sql STABLE AS $$
+    SELECT external_key FROM external_id_map WHERE company_id = p_company_id AND source_system = p_source_system AND table_name = p_table_name AND entity_id = p_entity_id
+$$;
+
+CREATE TABLE custom_field_definition (                     -- [master_data] ADR-0074 rules 8, 9; company data, change-tracked
+    id            uuid PRIMARY KEY,
+    company_id    uuid NOT NULL REFERENCES company (id),
+    target_table  text NOT NULL CONSTRAINT ck_custom_field_definition_target_table CHECK (target_table IN (
+                      'partner', 'product', 'item', 'quotation', 'sales_order', 'delivery', 'sales_invoice',
+                      'purchase_order', 'goods_receipt', 'purchase_invoice', 'production_order')),   -- the tables with a custom_values column
+    code          text NOT NULL CONSTRAINT ck_custom_field_definition_code CHECK (code ~ '^[a-z][a-z0-9_]{0,39}$'),   -- the key in custom_values; never changed
+    label         text NOT NULL,                           -- in the company's language; others in data_translation (ADR-0018 rule 17)
+    data_type     text NOT NULL CONSTRAINT ck_custom_field_definition_data_type CHECK (data_type IN ('text', 'integer', 'decimal', 'boolean', 'date', 'choice')),
+    validation    jsonb NOT NULL DEFAULT '{}'::jsonb CONSTRAINT ck_custom_field_definition_validation CHECK (jsonb_typeof(validation) = 'object'),   -- the data type's bounds, pattern or choices
+    is_required   boolean NOT NULL DEFAULT false,
+    field_class   text CONSTRAINT ck_custom_field_definition_field_class CHECK (field_class IN ('cost', 'margin')),   -- ADR-0017 rule 10
+    is_active     boolean NOT NULL DEFAULT true,           -- a retired field keeps its values and is never deleted
+    recorded_at   timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (company_id, target_table, code),
+    UNIQUE (company_id, id)
+);
+
+CREATE TABLE reason (                                      -- [master_data] ADR-0074 rules 13, 14; company data, change-tracked
+    id          uuid PRIMARY KEY,
+    company_id  uuid NOT NULL REFERENCES company (id),
+    kind        text NOT NULL CONSTRAINT ck_reason_kind CHECK (kind IN ('cancel', 'reject', 'return', 'scrap', 'count_difference', 'block')),
+    code        text NOT NULL CONSTRAINT ck_reason_code CHECK (code ~ '^[a-z][a-z0-9_]*$'),
+    name        text NOT NULL,                             -- in the company's language; others in data_translation (ADR-0018 rule 17)
+    is_active   boolean NOT NULL DEFAULT true,
+    recorded_at timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (company_id, kind, code),
+    UNIQUE (company_id, id),
+    UNIQUE (company_id, id, kind)                          -- a column that takes one kind names it, so the key holds the kind
+);

@@ -111,8 +111,8 @@ no_ln = [t for t in lines_ if not has_col(t, "line_number")]
 check(f"M4 all {len(lines_)} line tables carry line_number (ADR-0028 rule 1)", no_ln, [])
 hdr_doc = [t for t in tables if X("""select 1 from pg_constraint k join pg_class r on r.oid = k.conrelid join pg_class f on f.oid = k.confrelid
     where r.relname=%s and f.relname='document' and k.contype='f'""", (t,)).fetchone()]
-check("M5 every header of the 18 document types refers to the shared document row", len([t for t in hdr_doc if not t.startswith("document_") and t not in (
-      "material_document", "warehouse_task", "purchase_order_line_gr_ir_posting")]), 18)
+check("M5 every header of the 22 document types (the 18 of ADR-0047 and the four stock documents of ADR-0075) refers to the shared document row", len([t for t in hdr_doc if not t.startswith("document_") and t not in (
+      "material_document", "warehouse_task", "purchase_order_line_gr_ir_posting")]), 22)
 
 # ======================================================================= fixture
 I = {k: new() for k in ["user", "co", "co2", "ea", "ig", "vc", "itg", "pstd", "istd", "pcfg", "icfg", "cfg", "cfg2", "va", "pc2", "ic2",

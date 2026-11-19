@@ -905,6 +905,7 @@ CREATE TABLE production_order (                            -- typed header of a 
     overdelivery_tolerance_percent  types.percent NOT NULL DEFAULT 0 CONSTRAINT ck_production_order_tolerance CHECK (overdelivery_tolerance_percent >= 0),
     execution_state                 text NOT NULL DEFAULT 'not_started' CONSTRAINT ck_production_order_execution_state CHECK (execution_state IN ('not_started', 'in_progress', 'technically_complete')),
     is_content_edited               boolean NOT NULL DEFAULT false,   -- lines edited by hand: re-explosion scales instead (rule 2)
+    custom_values jsonb NOT NULL DEFAULT '{}'::jsonb CONSTRAINT ck_production_order_custom_values CHECK (jsonb_typeof(custom_values) = 'object'),   -- ADR-0074 rules 8, 9
     recorded_at                     timestamptz NOT NULL,
     UNIQUE (company_id, id),
     UNIQUE (company_id, id, cost_object_id),
@@ -1166,7 +1167,9 @@ CREATE TABLE production_issue_line (
     stock_status                   text NOT NULL DEFAULT 'available' CONSTRAINT ck_production_issue_line_status CHECK (stock_status IN ('available', 'quality_inspection')),   -- quality_inspection for rework
     is_return                      boolean NOT NULL DEFAULT false,
     output_serial_number_id        uuid,                       -- as built (rule 16)
-    reason_code                    text,                       -- company data, for over-issue and component scrap (ADR-0071 rule 2)
+    scrap_reason_id                uuid,                       -- company data (reason, kind scrap), for over-issue and component scrap (ADR-0071 rule 2; ADR-0074 rules 13, 14)
+    scrap_reason_kind              text NOT NULL DEFAULT 'scrap' CONSTRAINT ck_production_issue_line_scrap_reason_kind CHECK (scrap_reason_kind = 'scrap'),
+    FOREIGN KEY (company_id, scrap_reason_id, scrap_reason_kind) REFERENCES reason (company_id, id, kind),
     cost_object_id                 uuid NOT NULL,
     material_document_line_id      uuid REFERENCES material_document_line (id),   -- interim: not stated in ADR-0034 (the posted movement)
     recorded_at                    timestamptz NOT NULL,
@@ -1198,7 +1201,9 @@ CREATE TABLE operation_confirmation (                      -- an internal operat
     work_center_id                 uuid NOT NULL,              -- the execution work center, copied from operation_execution at Create; pools allocated by activity type count it (ADR-0071 rule 16)
     yield_quantity                 types.quantity NOT NULL CONSTRAINT ck_operation_confirmation_yield CHECK (yield_quantity >= 0),
     scrap_quantity                 types.quantity NOT NULL DEFAULT 0 CONSTRAINT ck_operation_confirmation_scrap CHECK (scrap_quantity >= 0),
-    scrap_reason_code              text,
+    scrap_reason_id                uuid,                       -- reason, kind scrap (ADR-0074 rules 13, 14)
+    scrap_reason_kind              text NOT NULL DEFAULT 'scrap' CONSTRAINT ck_operation_confirmation_scrap_reason_kind CHECK (scrap_reason_kind = 'scrap'),
+    FOREIGN KEY (company_id, scrap_reason_id, scrap_reason_kind) REFERENCES reason (company_id, id, kind),
     is_final                       boolean NOT NULL DEFAULT false,
     lot_id                         uuid REFERENCES lot (id),   -- names the output lot for an automatic receipt (rule 13)
     employee_partner_id            uuid,                       -- interim: not stated in ADR-0034 ("optional people or teams": column names)
@@ -1216,7 +1221,7 @@ CREATE TABLE operation_confirmation (                      -- an internal operat
         REFERENCES production_order_operation (company_id, id, production_order_id, control),
     FOREIGN KEY (company_id, employee_partner_id) REFERENCES partner (company_id, id),
     FOREIGN KEY (company_id, team_id) REFERENCES team (company_id, id),
-    CONSTRAINT ck_operation_confirmation_scrap_reason CHECK (scrap_reason_code IS NULL OR scrap_quantity > 0),
+    CONSTRAINT ck_operation_confirmation_scrap_reason CHECK (scrap_reason_id IS NULL OR scrap_quantity > 0),
     CONSTRAINT ck_operation_confirmation_external_reference CHECK ((entry_source = 'production_import') = (external_reference IS NOT NULL) AND coalesce(btrim(external_reference), 'x') <> ''),
     UNIQUE (company_id, id, production_order_operation_id),
     FOREIGN KEY (company_id, work_center_id) REFERENCES work_center (company_id, id),
@@ -1257,7 +1262,9 @@ CREATE TABLE production_receipt (                          -- rule 13
     operation_confirmation_id  uuid,                           -- interim: not stated in ADR-0034 (the confirmation whose final progress created this automatic receipt; reversed with it)
     service_receipt_id         uuid,                           -- interim: not stated in ADR-0037 (the same, for a service receipt; purchasing's document)
     scrap_quantity             types.quantity NOT NULL DEFAULT 0 CONSTRAINT ck_production_receipt_scrap CHECK (scrap_quantity >= 0),   -- receipt scrap of the main output, inventory unit, no value; only on an order with a main output and no internal operation (receipt_scrap_not_allowed; ADR-0071 rule 4)
-    scrap_reason_code          text,                           -- company data, as on confirmations; a receipt may hold only scrap and then posts no material document
+    scrap_reason_id            uuid,                           -- reason, kind scrap, as on confirmations; a receipt may hold only scrap and then posts no material document (ADR-0074 rules 13, 14)
+    scrap_reason_kind          text NOT NULL DEFAULT 'scrap' CONSTRAINT ck_production_receipt_scrap_reason_kind CHECK (scrap_reason_kind = 'scrap'),
+    FOREIGN KEY (company_id, scrap_reason_id, scrap_reason_kind) REFERENCES reason (company_id, id, kind),
     recorded_at                timestamptz NOT NULL,
     UNIQUE (company_id, id),
     UNIQUE (company_id, id, production_order_id),
@@ -1266,7 +1273,7 @@ CREATE TABLE production_receipt (                          -- rule 13
     CONSTRAINT fk_production_receipt_confirmation FOREIGN KEY (company_id, operation_confirmation_id, production_order_id) REFERENCES operation_confirmation (company_id, id, production_order_id),
     CONSTRAINT fk_production_receipt_service_receipt FOREIGN KEY (company_id, service_receipt_id) REFERENCES document (company_id, id),
     CONSTRAINT ck_production_receipt_trigger CHECK (num_nonnulls(operation_confirmation_id, service_receipt_id) <= 1),
-    CONSTRAINT ck_production_receipt_scrap_reason CHECK (scrap_reason_code IS NULL OR scrap_quantity > 0)
+    CONSTRAINT ck_production_receipt_scrap_reason CHECK (scrap_reason_id IS NULL OR scrap_quantity > 0)
 );
 CREATE TABLE production_receipt_line (
     id                          uuid PRIMARY KEY,
