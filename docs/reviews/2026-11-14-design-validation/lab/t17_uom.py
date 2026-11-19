@@ -789,7 +789,9 @@ if "--load" in sys.argv:
     BLOCK = ("quantity", "uom_id", "uom_numerator", "uom_denominator", "uom_factor_source", "inventory_quantity")
     REQUIRED = ["quotation_line", "sales_order_line", "delivery_line", "return_from_customer_line", "sales_invoice_line", "sales_return_line",
                 "purchase_request_line", "purchase_order_line", "goods_receipt_line", "return_to_supplier_line", "service_receipt_line",
-                "purchase_return_line", "production_issue_line", "production_receipt_line", "operation_progress_component", "replenishment_request_line"]
+                "purchase_return_line", "production_issue_line", "production_receipt_line", "operation_progress_component", "replenishment_request_line",
+                "stock_transfer_line", "stock_count_line", "scrap_line", "internal_consumption_line",   # ADR-0075
+                "other_receipt_line", "other_issue_line", "opening_balance_line", "transfer_order_line"]   # ADR-0075 rules 11 to 14
     OPTIONAL = ["purchase_invoice_line", "credit_note_line", "purchase_credit_note_line"]
     miss = [(t_, b) for t_ in REQUIRED + OPTIONAL for b in BLOCK if b not in cols.get(t_, {})]
     nulls = [(t_, b) for t_ in REQUIRED for b in BLOCK if cols.get(t_, {}).get(b) != "NO"]

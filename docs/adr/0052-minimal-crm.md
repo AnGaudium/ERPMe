@@ -202,6 +202,8 @@ Leads, opportunities, marketing automation, appointments, chat connectors and se
 
     Note: a document entry also needs the document inside the actor's read owner scope; otherwise it is left out and `is_scope_filtered` is true ([ADR-0054](0054-users-roles-and-authorizations.md) rule 15).
 
+    Note ([ADR-0074](0074-core-data-structure-additions.md), proposed 2026-11-19): `document.partner_id` and INV-49 stay the sold-to partner (the ordered-from partner on purchases); the other parties of ADR-0074 rule 1 are not CRM links.
+
 **Follow-up tasks**
 
 19. A follow-up is an interaction of kind `task`, with `due_date`, `assignee_user_id` and text, usually linked to a document ("call back about the quotation"):

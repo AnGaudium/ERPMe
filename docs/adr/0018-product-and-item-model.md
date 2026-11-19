@@ -70,6 +70,8 @@ Goods and services are modeled at two levels: a `product` holds everything that 
 17. Names that users enter for company data in more than one language — product names and descriptions, variant attribute values, company units, classification values — are rows of `data_translation` (`table_name`, `row_id`, `field`, `language`, `text`), one mechanism for all. Printed documents use the partner's language and fall back to the company's language (ADR-0016 rule 19). These are user data, entered, not translated by the system.
 
     Note: the full order for prints: the render request, the document's `print_language`, the partner, then the company ([ADR-0049](0049-statutory-reporting-and-printing.md) rule 27).
+
+    Note ([ADR-0074](0074-core-data-structure-additions.md), proposed 2026-11-19): `reason.name` and `custom_field_definition.label` are entered and translated through `data_translation` like the other company data (ADR-0074 rules 8, 13).
 18. Fields that change how stock or books are kept (`product_type`, `tracking`, `valuation_class_id`, `price_control`) cannot be changed once the product has stock postings (the inventory unit follows rule 13); a change is made by creating a new product and moving stock by documents. Other fields can be updated at any time; posted documents keep what they recorded. A later ADR may allow a dated change of `price_control` at a period start after close; this rule is amended then ([ADR-0025](0025-later-phase-seams.md) rule 7).
 
 **Deliberately elsewhere**

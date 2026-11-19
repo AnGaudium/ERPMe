@@ -32,6 +32,8 @@ This ADR amends the document lifecycle (ADR-0009) in five places, before step 3 
    Note: interim for the simulation and the DDL drafts, until the author decides under B3: the columns `production_order_component_id`, `production_order_output_id`, `for_demand_supply_line_id` and `owner_partner_id` on `demand_supply_line`, and `production_order_operation_id` on purchase lines, are assumed to exist. The flag and its open question stay, flagged for the author; dropping them later is a DDL change before step 3 (holistic review 2026-11-15, item P10).
 
    Note (catalog review, 2026-11-15): `correction_of_line_id` may name a line of another line table where the correction is a document of another type (DS-22-09-42-commercial-inventory.sql); [ADR-0047](0047-commercial-documents-and-pricing.md) rule 2 wins over "a line of the same table".
+
+    Note ([ADR-0075](0075-stock-documents.md), proposed 2026-11-19): `transfer_order_line_id` on `demand_supply_line` gets its key with `transfer_order_line`, and `stock_transfer_line` names the order line it fulfils by the same typed key (ADR-0075 rule 14).
 3. Once another document refers to a line:
    - the line cannot be deleted (`document_line_referenced`);
    - its item, unit and warehouse cannot change (`referenced_line_immutable`);
@@ -126,6 +128,8 @@ This ADR amends the document lifecycle (ADR-0009) in five places, before step 3 
 16. Partner name, address and tax ID (ADR-0019 rule 5) are copied by `Create` and `Update` and are part of the content. Posting never changes them.
     - At `Post` or `Issue`, a snapshot that differs from the partner's master returns the check result `partner_snapshot_stale`.
     - Whether that warns or blocks is business behavior. Interim, flagged: it warns, and for the tax ID on e-invoiced types `Issue` is rejected with `e_invoice_invalid`.
+
+    Note ([ADR-0074](0074-core-data-structure-additions.md), proposed 2026-11-19): the snapshot covers every named party of a document (ship-to, bill-to, payer, invoicing party, payee), copied by `Create` and `Update`; `partner_snapshot_stale` is evaluated per named party (ADR-0074 rules 1, 5).
 
 **Checks**
 

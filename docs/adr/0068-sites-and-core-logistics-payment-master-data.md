@@ -143,6 +143,8 @@ The CRM-only deployment profile holds: the four `master_data` tables reference n
     - **The tracking link** is computed by putting the URL-encoded number into the template, and is never stored.
     - **Freight.** Freight charged to the customer stays a service-item line. There is no rate shopping and no carrier API in Phase 1. Carrier integration is a later item on the `integrations` queue (backlog).
 
+    Note ([ADR-0074](0074-core-data-structure-additions.md), proposed 2026-11-19): the delivery's address is its ship-to party (`ship_to_partner_id`, `ship_to_name`, `ship_to_address_id`, `ship_to_address`), which replaces the interim `delivery_address` and defaults from the customer's `partner_relationship` rows (ADR-0074 rules 1 to 3).
+
 **Commands, catalogs and checks**
 
 23. Commands and queries (all `master_data_change`; agents reach them through change proposals):

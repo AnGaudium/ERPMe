@@ -55,6 +55,8 @@ The web UI is one more client of the command and query layer. It writes data onl
      - `x-nativeflows-list-defaults` on a `List<Noun>` result model (default columns, sort and filters).
    - **Labels and help** come from i18n keys (rule 14), not from the schema.
    - **Not per screen.** Nothing is maintained per screen in the frontend. User-defined fields (after Phase 1) appear through the same schemas, so the renderer never hard-codes field lists.
+
+    Note ([ADR-0074](0074-core-data-structure-additions.md), proposed 2026-11-19): the annotation `x-nativeflows-custom-values` names the table whose company-defined fields the renderer reads through `ListCustomFieldDefinitions`; user-defined fields (without tables) appear in the same schemas as that rule says (ADR-0074 rules 8 to 11).
 5. CI checks the hints:
    - every hint names an existing field;
    - every `Ref` has a lookup query the registry knows;

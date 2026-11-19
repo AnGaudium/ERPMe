@@ -101,6 +101,8 @@ Planning answers, per item and warehouse: what to buy or move, how much, and by 
    Supply rows of draft purchase lines without `origin_planned_order_id` or pegging are deleted with the line; all others are closed, never deleted ([ADR-0047](0047-commercial-documents-and-pricing.md) rule 10).
 
    Note (catalog review, 2026-11-15): the rows of a production order's components and outputs carry the hold reason `not_approved` until the order is approved (released), like sales and purchase rows ([ADR-0047](0047-commercial-documents-and-pricing.md) rule 18 note). Make-to-order netting and planning count only released rows as demand; supply rows count once planned, held or not.
+
+    Note ([ADR-0075](0075-stock-documents.md), proposed 2026-11-19): transfer order lines exist (`transfer_order_line`), so `demand_supply_line.transfer_order_line_id` has its foreign key; a line is demand at the source and supply at the destination, and stock transfers fulfil it (ADR-0075 rule 14).
 9. Stock on hand:
    - **Counted:** stock in status `available` in the warehouse, in any bin. `quality_inspection` and `blocked` stock do not count (interim, flagged).
    - **Never counted:** stock in `goods_sent` warehouses.

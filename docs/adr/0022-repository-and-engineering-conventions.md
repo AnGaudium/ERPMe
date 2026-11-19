@@ -300,6 +300,8 @@ Checks:
 
     Note ([ADR-0073](0073-coding-pipeline-and-mechanical-assurance.md), proposed 2026-11-18): `generate` derives the registry outputs from the declarations of ADR-0008 rule 1's note, for declarations that have a handler. It also writes, from the catalogs, the `Literal` types that declarations use: authorization leaves, error and check codes, event types, lock names, and tables with their states. `nativeflows-dev scaffold <declaration>` is separate and runs once. It writes the handler, the service stub and the test skeleton, refuses to overwrite, and is never rerun (ADR-0073 rule 2).
 
+    Note ([ADR-0074](0074-core-data-structure-additions.md), proposed 2026-11-19): the schema of a command or query that names a table with `custom_values` carries it as an object annotated `x-nativeflows-custom-values`; the company's own keys are read at run time, so no generated file depends on a company (ADR-0074 rule 11).
+
 **Test server and nightly**
 
 18. The test server:

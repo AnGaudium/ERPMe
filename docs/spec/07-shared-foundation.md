@@ -77,7 +77,7 @@ No full event sourcing. Use state tables, an append-only journal and a transacti
 
 A partner's first question is "how do I customize for a customer without forking and still upgrade?"
 
-- (After Phase 1) **User-defined fields and tables**, in the style of Business One UDF/UDT, declared as metadata. They appear automatically in command schemas, MCP and the self-describing layer.
+- (Phase 1, minimal) **User-defined fields**: a minimal custom-field seam, definitions plus `custom_values` on the listed masters and document headers ([ADR-0074](../adr/0074-core-data-structure-additions.md)), declared as metadata; they appear automatically in command schemas, MCP and the self-describing layer. Form builders and custom tables stay after Phase 1.
 - **Module boundaries:** modules call each other only through commands and events, checked automatically by import-linter. Plugins (after Phase 1) register before/after-command hooks and never write tables directly.
 - **Command schemas are a public API:** versioned (semver) with a deprecation policy.
 - **Upgrades for self-hosters:** automatic DB migrations, upgrade tests from version N-2, LTS releases, a Docker Compose deployment kit with backup and restore.

@@ -129,6 +129,8 @@ check("A01b the six files refer to no table outside themselves except the remain
 X0 = conn()
 X0.autocommit = True
 X = X0.execute
+from load_all import drop_in_batches  # noqa: E402
+drop_in_batches(X0)   # the combined load of A00 left about 390 tables; one DROP SCHEMA of all of them exceeds max_locks_per_transaction (as load_all.py)
 X(stubs)
 X(p.stdout)
 check("A02 the stubs keep no document or user_account table of their own, and the loaded document is the platform one",

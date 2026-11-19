@@ -147,6 +147,8 @@ The author's decision of 2026-11-17 gives Phase 1 a thin but complete quality co
       - When every line is done, it runs `CloseInspectionLot`.
     - **Make to order.** Released output still reaches its sales demand through ADR-0034 rule 14's consumer of `WarehouseTaskConfirmed`.
 
+    Note ([ADR-0075](0075-stock-documents.md), proposed 2026-11-19): the tables `scrap`, `scrap_line`, `internal_consumption` and `internal_consumption_line` exist; their lines carry the held `stock_status`, a quality sample is a line with `consumption_kind` `quality_sample`, and `inspection_lot_execution.target_table` names these rows (ADR-0075 rules 4, 5).
+
 **Nonconformance**
 
 16. `nonconformance` (company data; not a document type, like `complaint`, ADR-0052 rule 20):

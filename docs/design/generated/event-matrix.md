@@ -11,91 +11,91 @@ Event types named in backticks in the ADRs, recognised by the event forms of the
 | `AttachmentCreated` | `attachment` | attachments | — | ADR-0038:136, ADR-0038:144 |
 | `BankLineSuggestionRecorded` | — | — | a consumer in `cash` | ADR-0048:126, ADR-0051:184, ADR-0051:188 |
 | `ChangeProposalApproved` | `change_proposal` | documents | — | ADR-0029:48 |
-| `ComplaintClosed` | `complaint` | crm | a consumer in `cash` | ADR-0048:241, ADR-0052:224, ADR-0052:354 |
-| `ComplaintCreated` | `complaint` | crm | a consumer in `cash` | ADR-0048:241, ADR-0052:224, ADR-0052:354 |
-| `ComplaintOpened` | `complaint` | crm | — | ADR-0052:224 |
-| `ComplaintReopened` | `complaint` | crm | a consumer in `cash` | ADR-0048:241, ADR-0052:224, ADR-0052:354 |
-| `ComplaintUpdated` | `complaint` | crm | a consumer in `cash` | ADR-0048:241, ADR-0052:224, ADR-0052:354 |
+| `ComplaintClosed` | `complaint` | crm | a consumer in `cash` | ADR-0048:243, ADR-0052:226, ADR-0052:356 |
+| `ComplaintCreated` | `complaint` | crm | a consumer in `cash` | ADR-0048:243, ADR-0052:226, ADR-0052:356 |
+| `ComplaintOpened` | `complaint` | crm | — | ADR-0052:226 |
+| `ComplaintReopened` | `complaint` | crm | a consumer in `cash` | ADR-0048:243, ADR-0052:226, ADR-0052:356 |
+| `ComplaintUpdated` | `complaint` | crm | a consumer in `cash` | ADR-0048:243, ADR-0052:226, ADR-0052:356 |
 | `ConfigurationModelRevisionReleased` | `configuration_model_revision` | master_data | — | ADR-0046:211 |
 | `ConfiguredItemCreated` | — | — | — | ADR-0046:136, ADR-0046:137, ADR-0046:174 (+1) |
 | `ContactCreated` | `contact` | master_data | a consumer in `crm` | ADR-0052:183 |
 | `ContactUpdated` | `contact` | master_data | a consumer in `crm` | ADR-0052:183 |
-| `DataSubjectErased` | — | — | a consumer in `cash`, `imports_data_subject_erasure` | ADR-0052:256, ADR-0052:354 |
+| `DataSubjectErased` | — | — | a consumer in `cash`, `imports_data_subject_erasure` | ADR-0052:258, ADR-0052:356 |
 | `DocumentExtractionCanceled` | `document_extraction` | attachments | — | ADR-0057:239, ADR-0057:307 |
 | `DocumentExtractionRecorded` | `document_extraction` | attachments | `certificate_result_drafter`, a consumer in `crm`, a consumer in `tax` | ADR-0057:75, ADR-0057:251, ADR-0057:255 (+2) |
 | `DocumentExtractionRequested` | `document_extraction` | attachments | `document_extraction_runner` | ADR-0057:54, ADR-0057:59, ADR-0057:307 |
 | `DocumentExtractionVerified` | `document_extraction` | attachments | `certificate_result_drafter`, a consumer in `purchasing` | ADR-0057:238, ADR-0057:266, ADR-0057:307 (+1) |
 | `ExtractionFieldCorrected` | `extraction_field` | attachments | — | ADR-0057:237, ADR-0057:244, ADR-0057:307 |
-| `ForecastCompleted` | — | — | — | ADR-0024:282 |
-| `GoodsReceiptPosted` | `goods_receipt` | inventory | `inspection_lot_creator` | ADR-0004:7, ADR-0004:61, ADR-0009:96 (+4) |
-| `InboundMessageRecorded` | `inbound_message` | crm | a consumer in `crm` | ADR-0052:354, ADR-0057:251 |
+| `ForecastCompleted` | — | — | — | ADR-0024:284 |
+| `GoodsReceiptPosted` | `goods_receipt` | inventory | `inspection_lot_creator` | ADR-0004:7, ADR-0004:61, ADR-0009:98 (+4) |
+| `InboundMessageRecorded` | `inbound_message` | crm | a consumer in `crm` | ADR-0052:356, ADR-0057:251 |
 | `InspectionLotApproved` | `inspection_lot` | quality | `usage_decision_executor` | ADR-0070:140 |
-| `InspectionLotExecutionRecorded` | `inspection_lot_execution` | quality | — | ADR-0070:176 |
-| `InspectionPlanRevisionReleased` | `inspection_plan_revision` | quality | — | ADR-0070:176 |
-| `InspectionResultConfirmed` | `inspection_result` | quality | `usage_decision_auto_drafter` | ADR-0070:138, ADR-0070:176 |
-| `InspectionResultRecorded` | `inspection_result` | quality | `usage_decision_auto_drafter` | ADR-0070:138, ADR-0070:176 |
-| `InteractionCreated` | `interaction` | crm | — | ADR-0052:105, ADR-0052:354 |
-| `InteractionMatched` | `interaction` | crm | — | ADR-0052:105, ADR-0052:354 |
-| `InteractionUnmatched` | `interaction` | crm | — | ADR-0052:105, ADR-0052:354 |
-| `MailboxAuthenticationCheckRecorded` | `mailbox` | crm | — | ADR-0052:354 |
-| `MailboxCreated` | `mailbox` | crm | — | ADR-0052:354 |
-| `MailboxIntakeCompleted` | `mailbox` | crm | — | ADR-0052:125, ADR-0052:354 |
-| `MailboxIntakeOutcomeRecorded` | `mailbox` | crm | — | ADR-0052:354 |
-| `MailboxUpdated` | `mailbox` | crm | — | ADR-0052:354 |
-| `NonconformanceCanceled` | `nonconformance` | quality | — | ADR-0070:176 |
-| `NonconformanceClosed` | `nonconformance` | quality | — | ADR-0070:176 |
-| `NonconformanceCreated` | `nonconformance` | quality | — | ADR-0070:176 |
-| `NonconformanceUpdated` | `nonconformance` | quality | — | ADR-0070:176 |
-| `OperationAssigned` | — | — | — | ADR-0071:109 |
-| `OperationBlocked` | — | — | — | ADR-0071:88 |
+| `InspectionLotExecutionRecorded` | `inspection_lot_execution` | quality | — | ADR-0070:178 |
+| `InspectionPlanRevisionReleased` | `inspection_plan_revision` | quality | — | ADR-0070:178 |
+| `InspectionResultConfirmed` | `inspection_result` | quality | `usage_decision_auto_drafter` | ADR-0070:138, ADR-0070:178 |
+| `InspectionResultRecorded` | `inspection_result` | quality | `usage_decision_auto_drafter` | ADR-0070:138, ADR-0070:178 |
+| `InteractionCreated` | `interaction` | crm | — | ADR-0052:105, ADR-0052:356 |
+| `InteractionMatched` | `interaction` | crm | — | ADR-0052:105, ADR-0052:356 |
+| `InteractionUnmatched` | `interaction` | crm | — | ADR-0052:105, ADR-0052:356 |
+| `MailboxAuthenticationCheckRecorded` | `mailbox` | crm | — | ADR-0052:356 |
+| `MailboxCreated` | `mailbox` | crm | — | ADR-0052:356 |
+| `MailboxIntakeCompleted` | `mailbox` | crm | — | ADR-0052:125, ADR-0052:356 |
+| `MailboxIntakeOutcomeRecorded` | `mailbox` | crm | — | ADR-0052:356 |
+| `MailboxUpdated` | `mailbox` | crm | — | ADR-0052:356 |
+| `NonconformanceCanceled` | `nonconformance` | quality | — | ADR-0070:178 |
+| `NonconformanceClosed` | `nonconformance` | quality | — | ADR-0070:178 |
+| `NonconformanceCreated` | `nonconformance` | quality | — | ADR-0070:178 |
+| `NonconformanceUpdated` | `nonconformance` | quality | — | ADR-0070:178 |
+| `OperationAssigned` | — | — | — | ADR-0071:113 |
+| `OperationBlocked` | — | — | — | ADR-0071:92 |
 | `OperationConfirmationPosted` | `operation_confirmation` | production | `inspection_lot_creator` | ADR-0070:77 |
 | `OperationConfirmationReversed` | `operation_confirmation` | production | — | ADR-0070:83 |
-| `OperationPaused` | — | — | — | ADR-0071:88 |
-| `OperationStarted` | — | — | — | ADR-0071:88 |
-| `OperationTransferred` | — | — | — | ADR-0071:134 |
-| `OtherReceiptPosted` | — | — | `inspection_lot_creator` | ADR-0070:77 |
-| `OutboundMessageOutcomeRecorded` | `outbound_message` | crm | — | ADR-0052:354 |
-| `OutboundMessageSendRequested` | `outbound_message` | crm | — | ADR-0052:282, ADR-0052:354 |
+| `OperationPaused` | — | — | — | ADR-0071:92 |
+| `OperationStarted` | — | — | — | ADR-0071:92 |
+| `OperationTransferred` | — | — | — | ADR-0071:138 |
+| `OtherReceiptPosted` | `other_receipt` | inventory | `inspection_lot_creator` | ADR-0070:77 |
+| `OutboundMessageOutcomeRecorded` | `outbound_message` | crm | — | ADR-0052:356 |
+| `OutboundMessageSendRequested` | `outbound_message` | crm | — | ADR-0052:284, ADR-0052:356 |
 | `PartnerCreated` | `partner` | master_data | a consumer in `crm` | ADR-0052:177, ADR-0052:183 |
-| `PartnerDuplicateScanCompleted` | `partner` | master_data | — | ADR-0052:184, ADR-0052:354 |
-| `PartnerEmailDomainCreated` | `partner_email_domain` | crm | — | ADR-0052:354 |
-| `PartnerEmailDomainUpdated` | `partner_email_domain` | crm | — | ADR-0052:354 |
-| `PartnerInsightComputationCompleted` | `partner_insight` | crm | — | ADR-0052:323, ADR-0052:354 |
+| `PartnerDuplicateScanCompleted` | `partner` | master_data | — | ADR-0052:184, ADR-0052:356 |
+| `PartnerEmailDomainCreated` | `partner_email_domain` | crm | — | ADR-0052:356 |
+| `PartnerEmailDomainUpdated` | `partner_email_domain` | crm | — | ADR-0052:356 |
+| `PartnerInsightComputationCompleted` | `partner_insight` | crm | — | ADR-0052:325, ADR-0052:356 |
 | `PartnerUpdated` | `partner` | master_data | a consumer in `crm` | ADR-0052:183, ADR-0058:119 |
-| `PlannedOrderConverted` | `planned_order` | planning | — | ADR-0024:282 |
-| `PlannedOrderFirmed` | `planned_order` | planning | — | ADR-0024:282 |
-| `PlanningCompleted` | — | — | `planning_work_items` | ADR-0024:224, ADR-0024:282 |
+| `PlannedOrderConverted` | `planned_order` | planning | — | ADR-0024:284 |
+| `PlannedOrderFirmed` | `planned_order` | planning | — | ADR-0024:284 |
+| `PlanningCompleted` | — | — | `planning_work_items` | ADR-0024:226, ADR-0024:284 |
 | `PostingPeriodLocked` | `posting_period` | — (lab stub) | — | ADR-0012:38 |
 | `PostingPeriodOpened` | `posting_period` | — (lab stub) | — | ADR-0012:38 |
 | `PostingPeriodRestricted` | `posting_period` | — (lab stub) | — | ADR-0012:38 |
 | `PostingPeriodUnlocked` | `posting_period` | — (lab stub) | — | ADR-0012:38 |
 | `PriceListEntriesSet` | `price_list` | master_data | — | ADR-0045:90 |
 | `PrintRenderRequested` | — | — | — | ADR-0049:196 |
-| `ProcessingBasisClosed` | `processing_basis` | crm | — | ADR-0052:354 |
-| `ProcessingBasisCreated` | `processing_basis` | crm | — | ADR-0052:354 |
-| `ProductionCostSettlementPosted` | `production_cost_settlement` | production | — | ADR-0064:193 |
+| `ProcessingBasisClosed` | `processing_basis` | crm | — | ADR-0052:356 |
+| `ProcessingBasisCreated` | `processing_basis` | crm | — | ADR-0052:356 |
+| `ProductionCostSettlementPosted` | `production_cost_settlement` | production | — | ADR-0064:195 |
 | `ProductionOrderApproved` | `production_order` | production | — | ADR-0064:126, ADR-0070:145 |
 | `ProductionOrderCanceled` | `production_order` | production | — | ADR-0070:145 |
-| `ProductionOrderCompleted` | `production_order` | production | — | ADR-0034:275, ADR-0064:126 |
-| `ProductionOrderReopened` | `production_order` | production | — | ADR-0034:275 |
+| `ProductionOrderCompleted` | `production_order` | production | — | ADR-0034:279, ADR-0064:126 |
+| `ProductionOrderReopened` | `production_order` | production | — | ADR-0034:279 |
 | `ProductionOrderSubmitted` | `production_order` | production | — | ADR-0064:120 |
 | `ProductionReceiptPosted` | `production_receipt` | production | `inspection_lot_creator` | ADR-0070:77 |
 | `ProductionReceiptReversed` | `production_receipt` | production | — | ADR-0070:83 |
-| `PurchaseOrderCreated` | `purchase_order` | purchasing | — | ADR-0058:251 |
-| `PurchaseRequestCreated` | `purchase_request` | purchasing | — | ADR-0058:249, ADR-0058:251 |
-| `ReplenishmentRequested` | — | — | a consumer in `purchasing` | ADR-0024:260, ADR-0024:261, ADR-0024:282 (+2) |
+| `PurchaseOrderCreated` | `purchase_order` | purchasing | — | ADR-0058:253 |
+| `PurchaseRequestCreated` | `purchase_request` | purchasing | — | ADR-0058:251, ADR-0058:253 |
+| `ReplenishmentRequested` | — | — | a consumer in `purchasing` | ADR-0024:262, ADR-0024:263, ADR-0024:284 (+2) |
 | `ReportRenderRequested` | — | — | — | ADR-0049:196 |
 | `ReturnFromCustomerPosted` | `return_from_customer` | inventory | `inspection_lot_creator` | ADR-0070:77 |
-| `SalesOrderApproved` | `sales_order` | sales | — | ADR-0058:118, ADR-0058:243, ADR-0058:251 (+1) |
+| `SalesOrderApproved` | `sales_order` | sales | — | ADR-0058:118, ADR-0058:245, ADR-0058:253 (+1) |
 | `SalesOrderChanged` | `sales_order` | sales | — | ADR-0058:119 |
-| `SalesOrderClosed` | `sales_order` | sales | — | ADR-0009:96 |
-| `StockReservationCanceled` | `stock_reservation` | inventory | — | ADR-0023:276, ADR-0064:126 |
-| `StockReservationCreated` | `stock_reservation` | inventory | — | ADR-0023:276 |
-| `StockReservationTransferred` | `stock_reservation` | inventory | — | ADR-0064:252 |
+| `SalesOrderClosed` | `sales_order` | sales | — | ADR-0009:98 |
+| `StockReservationCanceled` | `stock_reservation` | inventory | — | ADR-0023:284, ADR-0064:126 |
+| `StockReservationCreated` | `stock_reservation` | inventory | — | ADR-0023:284 |
+| `StockReservationTransferred` | `stock_reservation` | inventory | — | ADR-0064:254 |
 | `TaxReturnRenderRequested` | — | — | — | ADR-0049:196 |
-| `WarehouseTaskCanceled` | `warehouse_task` | inventory | — | ADR-0023:276, ADR-0070:145 |
-| `WarehouseTaskConfirmed` | `warehouse_task` | inventory | a consumer in `production` | ADR-0023:276, ADR-0034:244, ADR-0070:145 (+1) |
-| `WarehouseTaskCreated` | `warehouse_task` | inventory | — | ADR-0023:276 |
+| `WarehouseTaskCanceled` | `warehouse_task` | inventory | — | ADR-0023:284, ADR-0070:145 |
+| `WarehouseTaskConfirmed` | `warehouse_task` | inventory | a consumer in `production` | ADR-0023:284, ADR-0034:248, ADR-0070:145 (+1) |
+| `WarehouseTaskCreated` | `warehouse_task` | inventory | — | ADR-0023:284 |
 | `WorkCaseAssigned` | `work_case` | work | — | ADR-0066:136 |
 | `WorkCaseCanceled` | `work_case` | work | — | ADR-0066:136 |
 | `WorkCaseOpened` | `work_case` | work | — | ADR-0066:93, ADR-0066:136 |
@@ -119,22 +119,22 @@ A module name here means the ADR speaks of a consumer of that module without nam
 | `agent_runner` | 3 | ADR-0013:30, ADR-0013:56, ADR-0013:64 |
 | `agent_wake_up` | 3 | ADR-0013:56, ADR-0050:151, ADR-0050:162 |
 | `automation_dispatch` | 3 | ADR-0013:36, ADR-0058:27, ADR-0058:95 |
-| a consumer in `cash` | 7 | ADR-0048:219, ADR-0048:241, ADR-0051:188 |
+| a consumer in `cash` | 7 | ADR-0048:221, ADR-0048:243, ADR-0051:188 |
 | `certificate_result_drafter` | 1 | ADR-0070:103 |
-| a consumer in `crm` | 7 | ADR-0048:243, ADR-0052:122, ADR-0052:177 |
-| `crm_mail_sender` | 1 | ADR-0052:284 |
+| a consumer in `crm` | 7 | ADR-0048:245, ADR-0052:122, ADR-0052:177 |
+| `crm_mail_sender` | 1 | ADR-0052:286 |
 | `crm_mailbox_probe` | 1 | ADR-0052:113 |
 | `document_extraction_runner` | 1 | ADR-0057:59 |
-| `imports_data_subject_erasure` | 1 | ADR-0052:256 |
+| `imports_data_subject_erasure` | 1 | ADR-0052:258 |
 | `inspection_lot_creator` | 1 | ADR-0070:77 |
-| `planning_work_items` | 3 | ADR-0024:224, ADR-0031:81, ADR-0064:169 |
-| a consumer in `production` | 4 | ADR-0034:244, ADR-0057:47, ADR-0062:104 |
-| a consumer in `purchasing` | 6 | ADR-0024:261, ADR-0024:345, ADR-0037:45 |
+| `planning_work_items` | 3 | ADR-0024:226, ADR-0031:81, ADR-0064:169 |
+| a consumer in `production` | 4 | ADR-0034:248, ADR-0057:47, ADR-0062:104 |
+| a consumer in `purchasing` | 6 | ADR-0024:263, ADR-0024:347, ADR-0037:45 |
 | a consumer in `quality` | 4 | ADR-0057:49, ADR-0070:14, ADR-0070:102 |
 | `render_worker` | 2 | ADR-0013:25, ADR-0049:199 |
-| a consumer in `sales` | 3 | ADR-0047:108, ADR-0047:238, ADR-0048:260 |
-| a consumer in `tax` | 2 | ADR-0041:150, ADR-0057:255 |
-| `tax_payment_evidence` | 2 | ADR-0044:141, ADR-0053:182 |
+| a consumer in `sales` | 3 | ADR-0047:114, ADR-0047:246, ADR-0048:262 |
+| a consumer in `tax` | 2 | ADR-0041:152, ADR-0057:255 |
+| `tax_payment_evidence` | 2 | ADR-0044:145, ADR-0053:182 |
 | `usage_decision_auto_drafter` | 1 | ADR-0070:138 |
 | `usage_decision_executor` | 1 | ADR-0070:140 |
 | `work_case_opener` | 4 | ADR-0013:53, ADR-0022:76, ADR-0052:164 |

@@ -74,6 +74,8 @@ The commercial documents are a thin layer over the core (B3). They hold what was
 
    Note ([ADR-0069](0069-business-unit-dimension.md), proposed 2026-11-17): every commercial document header carries a nullable `business_unit_id`. Copying fills an empty header from the source, and it can be changed until posting.
 
+    Note ([ADR-0074](0074-core-data-structure-additions.md), proposed 2026-11-19): the partner snapshot also covers the ship-to, bill-to, payer, invoicing-party and payee parties a document names (ADR-0074 rules 1, 2); documents gain a `note` (rule 16) and the headers of ADR-0074 rule 9 gain `custom_values`.
+
 **Sales**
 
 3. `quotation`:
@@ -82,6 +84,8 @@ The commercial documents are a thin layer over the core (B3). They hold what was
    - **Not demand.** Quotations write no `demand_supply_line` and reserve nothing (ADR-0024 rule 8).
 
    Note: a quotation holds the sales order's header and lines of rule 4, without demand, reservation or item creation. A line's warehouse is optional; the warehouse checks of an order line ([ADR-0046](0046-product-configuration.md) rule 10 included) run when the line is copied to an order, which requires one. The partner must hold the active `customer` role (ADR-0019 rule 2) at `Create`, `Update` and `Submit`, otherwise `partner_role_missing`.
+
+    Note ([ADR-0074](0074-core-data-structure-additions.md), proposed 2026-11-19): a lost quotation is canceled with a reason of kind `cancel` and a note on the `document` row (`canceled_reason_id`, `canceled_note`, ADR-0074 rule 14); the interim `quotation.cancel_reason` text is gone.
 4. `sales_order`:
    - **Header:** customer, currency, price list (from the customer's profile, else the company's default sale list, ADR-0045 rule 5), payment term, salesperson, document discount percentage, requested delivery date.
    - **Lines:** item or configuration, quantity and unit, warehouse, planned delivery date (needed by FEFO, ADR-0023 rule 13), price steps (rule 16), taxes (ADR-0041 rule 6).
@@ -102,6 +106,8 @@ The commercial documents are a thin layer over the core (B3). They hold what was
    - **E-invoice.** Issued through the seam of ADR-0028 rules 6–10. The type never waits for approval and is never reversible (ADR-0009 rules 12, 19).
 
    Note: no stock sale without an order. A delivery line or a sales invoice line of a stock item without a sales order line is rejected with `sales_order_required`: the order comes first, so demand, credit and progress stay uniform, as `purchase_order_required` does for purchases (rule 12). Goods delivered before the cut-over keep rule 8's path.
+
+    Note ([ADR-0074](0074-core-data-structure-additions.md), proposed 2026-11-19): the receivable control line and its open item carry the payer (else the bill-to party, else the sold-to partner); the invoice's tax identity and printed customer are the bill-to party's (ADR-0074 rule 4).
 7. Sales returns:
    - **The goods.** `return_from_customer` (inventory) receives returned goods against delivery lines (`correction_of_id`: the delivery; ADR-0027 rule 7). `inventory` checks the quantity against the delivery line, which it owns: returned per delivery line ≤ delivered. The goods go to a `returns` bin as blocked (ADR-0023 rule 19). Their value follows the regime setting for `sales_return_receipt` (ADR-0020 rule 5).
    - **The money.** `sales_return` is the posting correction of ADR-0009 rule 23. `correction_of_id` is the sales invoice, and lines refer to the `return_from_customer` lines they credit. It posts `revenue_deduction_return` and output tax at the original line's price and tax data (ADR-0041 rule 8), and creates a `credit` item, which it may match to the invoice (ADR-0026 rule 9).
@@ -122,6 +128,8 @@ The commercial documents are a thin layer over the core (B3). They hold what was
    - **Invoices from before the cut-over.** A credit note or sales return may name an original that exists only in the old system: `correction_of_id` is empty, and `external_original` holds its number, date, net amounts, tax date and rates. This is allowed only for originals dated before the company's migration cut-over ([ADR-0044](0044-data-migration-and-export.md) rule 13). Rule 20's limits then apply against the entered amounts. Returns of goods delivered before the cut-over come in as `other_receipt` with a reason, since no delivery line exists (flagged). The same applies to supplier documents.
 
    Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): a credit or return line in another unit than its original converts the original's price per inventory unit by its own factor, `round_unit_price(p × d_o / n_o × n / d)`; a credit that completes the invoiced inventory quantity takes exactly the rest of the net amount. The same holds for purchase returns and supplier credits (rule 11).
+
+    Note ([ADR-0074](0074-core-data-structure-additions.md), proposed 2026-11-19): the lines of a return document carry an optional `return_reason_id` (kind `return`); `credit_note.reason` and `debit_note.reason` stay fixed system codes (ADR-0074 rules 14, 15).
 
 **Purchasing**
 
@@ -247,6 +255,8 @@ The commercial documents are a thin layer over the core (B3). They hold what was
     Note (catalog review, 2026-11-15): the stored states of a `credit_hold` row, `held`, `released`, `cleared` and `lapsed` (DS-22-09-42-commercial-inventory.sql), are interim: this rule does not name them.
 
     Note (simulation review, 2026-11-15): a customer profile without `credit_limit` has no credit check: `is_credit_exceeded` is false and no `credit_hold` is set for that partner; `GetCreditExposure` still reports the exposure. `CreatePartner` leaves the limit empty unless the payload gives one ([ADR-0045](0045-master-data-and-price-lists.md) rule 13 note); a company that wants every customer checked sets a limit on each profile.
+
+    Note ([ADR-0074](0074-core-data-structure-additions.md), proposed 2026-11-19): exposure, the hold and `customer_profile.credit_limit` are those of the payer (else the bill-to party, else the sold-to partner); the demand rows held are those of the orders that resolve to it (ADR-0074 rule 4).
 
 **Demand, supply and progress**
 

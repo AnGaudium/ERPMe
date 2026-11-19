@@ -113,11 +113,31 @@ CREATE TABLE quotation (
     document_discount_percent  types.percent NOT NULL DEFAULT 0 CONSTRAINT ck_quotation_document_discount_percent CHECK (document_discount_percent BETWEEN 0 AND 100),
     print_language             text,                          -- ADR-0049 rule 27
     closed_reason              text CONSTRAINT ck_quotation_closed_reason CHECK (closed_reason IN ('fulfilled', 'short')),
-    cancel_reason              text,                          -- interim: not stated in ADR-0047 (a lost quotation is canceled with a reason, rule 3)
     payment_method_id          uuid,                          -- copied from the profile, then from the source; suggests only (ADR-0068 rules 15, 17)
     incoterm_code              text REFERENCES incoterm (code),   -- advisory only (ADR-0068 rules 19, 20)
     incoterm_place             text,                          -- the named place; requires a code
     business_unit_id           uuid,                          -- set by a person or an agent, copied from the source (ADR-0069 rule 8)
+    ship_to_partner_id uuid,
+    ship_to_name text,
+    ship_to_address_id uuid,
+    ship_to_address jsonb,
+    FOREIGN KEY (company_id, ship_to_partner_id) REFERENCES partner (company_id, id),
+    FOREIGN KEY (company_id, ship_to_partner_id, ship_to_address_id) REFERENCES partner_address (company_id, partner_id, id),
+    CONSTRAINT ck_quotation_ship_to CHECK ((ship_to_partner_id IS NULL) = (ship_to_name IS NULL) AND (ship_to_partner_id IS NOT NULL OR (ship_to_address_id IS NULL AND ship_to_address IS NULL))),
+    bill_to_partner_id uuid,
+    bill_to_name text,
+    bill_to_tax_id text,
+    bill_to_address_id uuid,
+    bill_to_address jsonb,
+    FOREIGN KEY (company_id, bill_to_partner_id) REFERENCES partner (company_id, id),
+    FOREIGN KEY (company_id, bill_to_partner_id, bill_to_address_id) REFERENCES partner_address (company_id, partner_id, id),
+    CONSTRAINT ck_quotation_bill_to CHECK ((bill_to_partner_id IS NULL) = (bill_to_name IS NULL) AND (bill_to_partner_id IS NOT NULL OR bill_to_tax_id IS NULL) AND (bill_to_partner_id IS NOT NULL OR (bill_to_address_id IS NULL AND bill_to_address IS NULL))),
+    payer_partner_id uuid,
+    payer_name text,
+    FOREIGN KEY (company_id, payer_partner_id) REFERENCES partner (company_id, id),
+    CONSTRAINT ck_quotation_payer CHECK ((payer_partner_id IS NULL) = (payer_name IS NULL)),
+    note text CONSTRAINT ck_quotation_note CHECK (note IS NULL OR char_length(note) <= 4000),   -- ADR-0074 rule 16
+    custom_values jsonb NOT NULL DEFAULT '{}'::jsonb CONSTRAINT ck_quotation_custom_values CHECK (jsonb_typeof(custom_values) = 'object'),   -- ADR-0074 rules 8, 9
     recorded_at                timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, id) REFERENCES document (company_id, id),
@@ -210,6 +230,27 @@ CREATE TABLE sales_order (
     incoterm_code              text REFERENCES incoterm (code),   -- advisory only (ADR-0068 rules 19, 20)
     incoterm_place             text,                          -- the named place; requires a code
     business_unit_id           uuid,                          -- set by a person or an agent, copied from the source (ADR-0069 rule 8)
+    ship_to_partner_id uuid,
+    ship_to_name text,
+    ship_to_address_id uuid,
+    ship_to_address jsonb,
+    FOREIGN KEY (company_id, ship_to_partner_id) REFERENCES partner (company_id, id),
+    FOREIGN KEY (company_id, ship_to_partner_id, ship_to_address_id) REFERENCES partner_address (company_id, partner_id, id),
+    CONSTRAINT ck_sales_order_ship_to CHECK ((ship_to_partner_id IS NULL) = (ship_to_name IS NULL) AND (ship_to_partner_id IS NOT NULL OR (ship_to_address_id IS NULL AND ship_to_address IS NULL))),
+    bill_to_partner_id uuid,
+    bill_to_name text,
+    bill_to_tax_id text,
+    bill_to_address_id uuid,
+    bill_to_address jsonb,
+    FOREIGN KEY (company_id, bill_to_partner_id) REFERENCES partner (company_id, id),
+    FOREIGN KEY (company_id, bill_to_partner_id, bill_to_address_id) REFERENCES partner_address (company_id, partner_id, id),
+    CONSTRAINT ck_sales_order_bill_to CHECK ((bill_to_partner_id IS NULL) = (bill_to_name IS NULL) AND (bill_to_partner_id IS NOT NULL OR bill_to_tax_id IS NULL) AND (bill_to_partner_id IS NOT NULL OR (bill_to_address_id IS NULL AND bill_to_address IS NULL))),
+    payer_partner_id uuid,
+    payer_name text,
+    FOREIGN KEY (company_id, payer_partner_id) REFERENCES partner (company_id, id),
+    CONSTRAINT ck_sales_order_payer CHECK ((payer_partner_id IS NULL) = (payer_name IS NULL)),
+    note text CONSTRAINT ck_sales_order_note CHECK (note IS NULL OR char_length(note) <= 4000),   -- ADR-0074 rule 16
+    custom_values jsonb NOT NULL DEFAULT '{}'::jsonb CONSTRAINT ck_sales_order_custom_values CHECK (jsonb_typeof(custom_values) = 'object'),   -- ADR-0074 rules 8, 9
     recorded_at                timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, id) REFERENCES document (company_id, id),
@@ -328,6 +369,7 @@ CREATE TABLE purchase_request (
     closed_reason    text CONSTRAINT ck_purchase_request_closed_reason CHECK (closed_reason IN ('fulfilled', 'short')),
     print_language   text,
     business_unit_id uuid,                          -- set by a person or an agent, copied from the source (ADR-0069 rule 8)
+    note text CONSTRAINT ck_purchase_request_note CHECK (note IS NULL OR char_length(note) <= 4000),   -- ADR-0074 rule 16
     recorded_at      timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, id) REFERENCES document (company_id, id),
@@ -392,6 +434,20 @@ CREATE TABLE purchase_order (
     incoterm_code              text REFERENCES incoterm (code),   -- advisory only (ADR-0068 rules 19, 20)
     incoterm_place             text,                          -- the named place; requires a code
     business_unit_id           uuid,                          -- set by a person or an agent, copied from the source (ADR-0069 rule 8)
+    invoicing_party_partner_id uuid,
+    invoicing_party_name text,
+    invoicing_party_tax_id text,
+    invoicing_party_address_id uuid,
+    invoicing_party_address jsonb,
+    FOREIGN KEY (company_id, invoicing_party_partner_id) REFERENCES partner (company_id, id),
+    FOREIGN KEY (company_id, invoicing_party_partner_id, invoicing_party_address_id) REFERENCES partner_address (company_id, partner_id, id),
+    CONSTRAINT ck_purchase_order_invoicing_party CHECK ((invoicing_party_partner_id IS NULL) = (invoicing_party_name IS NULL) AND (invoicing_party_partner_id IS NOT NULL OR invoicing_party_tax_id IS NULL) AND (invoicing_party_partner_id IS NOT NULL OR (invoicing_party_address_id IS NULL AND invoicing_party_address IS NULL))),
+    payee_partner_id uuid,
+    payee_name text,
+    FOREIGN KEY (company_id, payee_partner_id) REFERENCES partner (company_id, id),
+    CONSTRAINT ck_purchase_order_payee CHECK ((payee_partner_id IS NULL) = (payee_name IS NULL)),
+    note text CONSTRAINT ck_purchase_order_note CHECK (note IS NULL OR char_length(note) <= 4000),   -- ADR-0074 rule 16
+    custom_values jsonb NOT NULL DEFAULT '{}'::jsonb CONSTRAINT ck_purchase_order_custom_values CHECK (jsonb_typeof(custom_values) = 'object'),   -- ADR-0074 rules 8, 9
     recorded_at                timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, id) REFERENCES document (company_id, id),
@@ -493,6 +549,8 @@ CREATE TABLE goods_receipt (
     incoterm_code      text REFERENCES incoterm (code),   -- advisory only (ADR-0068 rules 19, 20)
     incoterm_place     text,                          -- the named place; requires a code
     business_unit_id   uuid,                          -- set by a person or an agent, copied from the source (ADR-0069 rule 8)
+    note text CONSTRAINT ck_goods_receipt_note CHECK (note IS NULL OR char_length(note) <= 4000),   -- ADR-0074 rule 16
+    custom_values jsonb NOT NULL DEFAULT '{}'::jsonb CONSTRAINT ck_goods_receipt_custom_values CHECK (jsonb_typeof(custom_values) = 'object'),   -- ADR-0074 rules 8, 9
     recorded_at        timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, id) REFERENCES document (company_id, id),
@@ -553,6 +611,7 @@ CREATE TABLE return_to_supplier (
     posting_date       date NOT NULL,
     print_language     text,
     business_unit_id   uuid,                          -- set by a person or an agent, copied from the source (ADR-0069 rule 8)
+    note text CONSTRAINT ck_return_to_supplier_note CHECK (note IS NULL OR char_length(note) <= 4000),   -- ADR-0074 rule 16
     recorded_at        timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, id) REFERENCES document (company_id, id),
@@ -580,6 +639,9 @@ CREATE TABLE return_to_supplier_line (
     gr_ir_position_to       types.quantity,                  -- line's latest received positions (ADR-0047 rule 13 and its note); the
                                                              -- named receipt part, the part-as-source reference (ADR-0056 rule 10),
                                                              -- is goods_receipt_line_id
+    return_reason_id uuid,
+    return_reason_kind text NOT NULL DEFAULT 'return' CONSTRAINT ck_return_to_supplier_line_return_reason_kind CHECK (return_reason_kind = 'return'),
+    FOREIGN KEY (company_id, return_reason_id, return_reason_kind) REFERENCES reason (company_id, id, kind),
     recorded_at             timestamptz NOT NULL DEFAULT now(),
     UNIQUE (return_to_supplier_id, line_number),
     UNIQUE (company_id, id),
@@ -605,7 +667,6 @@ CREATE TABLE delivery (
     partner_name       text NOT NULL,
     partner_tax_id     text,
     partner_address    jsonb,
-    delivery_address   jsonb,                                -- interim: not stated in ADR-0047 (where the goods go)
     document_date      date NOT NULL,
     posting_date       date NOT NULL,
     print_language     text,
@@ -616,6 +677,15 @@ CREATE TABLE delivery (
     incoterm_code      text REFERENCES incoterm (code),   -- advisory only (ADR-0068 rules 19, 20)
     incoterm_place     text,                          -- the named place; requires a code
     business_unit_id   uuid,                          -- set by a person or an agent, copied from the source (ADR-0069 rule 8)
+    ship_to_partner_id uuid,
+    ship_to_name text,
+    ship_to_address_id uuid,
+    ship_to_address jsonb,
+    FOREIGN KEY (company_id, ship_to_partner_id) REFERENCES partner (company_id, id),
+    FOREIGN KEY (company_id, ship_to_partner_id, ship_to_address_id) REFERENCES partner_address (company_id, partner_id, id),
+    CONSTRAINT ck_delivery_ship_to CHECK ((ship_to_partner_id IS NULL) = (ship_to_name IS NULL) AND (ship_to_partner_id IS NOT NULL OR (ship_to_address_id IS NULL AND ship_to_address IS NULL))),
+    note text CONSTRAINT ck_delivery_note CHECK (note IS NULL OR char_length(note) <= 4000),   -- ADR-0074 rule 16
+    custom_values jsonb NOT NULL DEFAULT '{}'::jsonb CONSTRAINT ck_delivery_custom_values CHECK (jsonb_typeof(custom_values) = 'object'),   -- ADR-0074 rules 8, 9
     recorded_at        timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, id) REFERENCES document (company_id, id),
@@ -673,6 +743,7 @@ CREATE TABLE return_from_customer (
     posting_date       date NOT NULL,
     print_language     text,
     business_unit_id   uuid,                          -- set by a person or an agent, copied from the source (ADR-0069 rule 8)
+    note text CONSTRAINT ck_return_from_customer_note CHECK (note IS NULL OR char_length(note) <= 4000),   -- ADR-0074 rule 16
     recorded_at        timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, id) REFERENCES document (company_id, id),
@@ -697,6 +768,9 @@ CREATE TABLE return_from_customer_line (
     inventory_quantity        types.quantity NOT NULL CONSTRAINT ck_return_from_customer_line_inventory_quantity CHECK (inventory_quantity > 0),
     warehouse_id              uuid NOT NULL,
     bin_id                    uuid,                          -- a returns bin (ADR-0023 rule 7)
+    return_reason_id uuid,
+    return_reason_kind text NOT NULL DEFAULT 'return' CONSTRAINT ck_return_from_customer_line_return_reason_kind CHECK (return_reason_kind = 'return'),
+    FOREIGN KEY (company_id, return_reason_id, return_reason_kind) REFERENCES reason (company_id, id, kind),
     recorded_at               timestamptz NOT NULL DEFAULT now(),
     UNIQUE (return_from_customer_id, line_number),
     UNIQUE (company_id, id),
@@ -727,6 +801,7 @@ CREATE TABLE service_receipt (
     posting_date       date NOT NULL,
     print_language     text,
     business_unit_id   uuid,                          -- set by a person or an agent, copied from the source (ADR-0069 rule 8)
+    note text CONSTRAINT ck_service_receipt_note CHECK (note IS NULL OR char_length(note) <= 4000),   -- ADR-0074 rule 16
     recorded_at        timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, id) REFERENCES document (company_id, id),
@@ -787,6 +862,20 @@ CREATE TABLE sales_invoice (
     incoterm_code              text REFERENCES incoterm (code),   -- advisory only (ADR-0068 rules 19, 20)
     incoterm_place             text,                          -- the named place; requires a code
     business_unit_id           uuid,                          -- set by a person or an agent, copied from the source (ADR-0069 rule 8)
+    bill_to_partner_id uuid,
+    bill_to_name text,
+    bill_to_tax_id text,
+    bill_to_address_id uuid,
+    bill_to_address jsonb,
+    FOREIGN KEY (company_id, bill_to_partner_id) REFERENCES partner (company_id, id),
+    FOREIGN KEY (company_id, bill_to_partner_id, bill_to_address_id) REFERENCES partner_address (company_id, partner_id, id),
+    CONSTRAINT ck_sales_invoice_bill_to CHECK ((bill_to_partner_id IS NULL) = (bill_to_name IS NULL) AND (bill_to_partner_id IS NOT NULL OR bill_to_tax_id IS NULL) AND (bill_to_partner_id IS NOT NULL OR (bill_to_address_id IS NULL AND bill_to_address IS NULL))),
+    payer_partner_id uuid,
+    payer_name text,
+    FOREIGN KEY (company_id, payer_partner_id) REFERENCES partner (company_id, id),
+    CONSTRAINT ck_sales_invoice_payer CHECK ((payer_partner_id IS NULL) = (payer_name IS NULL)),
+    note text CONSTRAINT ck_sales_invoice_note CHECK (note IS NULL OR char_length(note) <= 4000),   -- ADR-0074 rule 16
+    custom_values jsonb NOT NULL DEFAULT '{}'::jsonb CONSTRAINT ck_sales_invoice_custom_values CHECK (jsonb_typeof(custom_values) = 'object'),   -- ADR-0074 rules 8, 9
     recorded_at                timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, id) REFERENCES document (company_id, id),
@@ -863,6 +952,19 @@ CREATE TABLE sales_return (
     external_original  jsonb,
     print_language     text,
     business_unit_id   uuid,                          -- set by a person or an agent, copied from the source (ADR-0069 rule 8)
+    bill_to_partner_id uuid,
+    bill_to_name text,
+    bill_to_tax_id text,
+    bill_to_address_id uuid,
+    bill_to_address jsonb,
+    FOREIGN KEY (company_id, bill_to_partner_id) REFERENCES partner (company_id, id),
+    FOREIGN KEY (company_id, bill_to_partner_id, bill_to_address_id) REFERENCES partner_address (company_id, partner_id, id),
+    CONSTRAINT ck_sales_return_bill_to CHECK ((bill_to_partner_id IS NULL) = (bill_to_name IS NULL) AND (bill_to_partner_id IS NOT NULL OR bill_to_tax_id IS NULL) AND (bill_to_partner_id IS NOT NULL OR (bill_to_address_id IS NULL AND bill_to_address IS NULL))),
+    payer_partner_id uuid,
+    payer_name text,
+    FOREIGN KEY (company_id, payer_partner_id) REFERENCES partner (company_id, id),
+    CONSTRAINT ck_sales_return_payer CHECK ((payer_partner_id IS NULL) = (payer_name IS NULL)),
+    note text CONSTRAINT ck_sales_return_note CHECK (note IS NULL OR char_length(note) <= 4000),   -- ADR-0074 rule 16
     recorded_at        timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, id) REFERENCES document (company_id, id),
@@ -887,6 +989,9 @@ CREATE TABLE sales_return_line (
     net_unit_price                 types.unit_price NOT NULL CONSTRAINT ck_sales_return_line_net_unit_price CHECK (net_unit_price >= 0),   -- the original's, after the document discount
     is_price_copied                boolean NOT NULL DEFAULT true,     -- the original line's price (ADR-0047 rules 7-8)
     line_amount                    types.amount NOT NULL CONSTRAINT ck_sales_return_line_line_amount CHECK (line_amount >= 0),
+    return_reason_id uuid,
+    return_reason_kind text NOT NULL DEFAULT 'return' CONSTRAINT ck_sales_return_line_return_reason_kind CHECK (return_reason_kind = 'return'),
+    FOREIGN KEY (company_id, return_reason_id, return_reason_kind) REFERENCES reason (company_id, id, kind),
     recorded_at                    timestamptz NOT NULL DEFAULT now(),
     UNIQUE (sales_return_id, line_number),
     UNIQUE (company_id, id),
@@ -916,6 +1021,19 @@ CREATE TABLE credit_note (
     external_original  jsonb,
     print_language     text,
     business_unit_id   uuid,                          -- set by a person or an agent, copied from the source (ADR-0069 rule 8)
+    bill_to_partner_id uuid,
+    bill_to_name text,
+    bill_to_tax_id text,
+    bill_to_address_id uuid,
+    bill_to_address jsonb,
+    FOREIGN KEY (company_id, bill_to_partner_id) REFERENCES partner (company_id, id),
+    FOREIGN KEY (company_id, bill_to_partner_id, bill_to_address_id) REFERENCES partner_address (company_id, partner_id, id),
+    CONSTRAINT ck_credit_note_bill_to CHECK ((bill_to_partner_id IS NULL) = (bill_to_name IS NULL) AND (bill_to_partner_id IS NOT NULL OR bill_to_tax_id IS NULL) AND (bill_to_partner_id IS NOT NULL OR (bill_to_address_id IS NULL AND bill_to_address IS NULL))),
+    payer_partner_id uuid,
+    payer_name text,
+    FOREIGN KEY (company_id, payer_partner_id) REFERENCES partner (company_id, id),
+    CONSTRAINT ck_credit_note_payer CHECK ((payer_partner_id IS NULL) = (payer_name IS NULL)),
+    note text CONSTRAINT ck_credit_note_note CHECK (note IS NULL OR char_length(note) <= 4000),   -- ADR-0074 rule 16
     recorded_at        timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, id) REFERENCES document (company_id, id),
@@ -969,6 +1087,19 @@ CREATE TABLE debit_note (
     posting_date       date NOT NULL,
     print_language     text,
     business_unit_id   uuid,                          -- set by a person or an agent, copied from the source (ADR-0069 rule 8)
+    bill_to_partner_id uuid,
+    bill_to_name text,
+    bill_to_tax_id text,
+    bill_to_address_id uuid,
+    bill_to_address jsonb,
+    FOREIGN KEY (company_id, bill_to_partner_id) REFERENCES partner (company_id, id),
+    FOREIGN KEY (company_id, bill_to_partner_id, bill_to_address_id) REFERENCES partner_address (company_id, partner_id, id),
+    CONSTRAINT ck_debit_note_bill_to CHECK ((bill_to_partner_id IS NULL) = (bill_to_name IS NULL) AND (bill_to_partner_id IS NOT NULL OR bill_to_tax_id IS NULL) AND (bill_to_partner_id IS NOT NULL OR (bill_to_address_id IS NULL AND bill_to_address IS NULL))),
+    payer_partner_id uuid,
+    payer_name text,
+    FOREIGN KEY (company_id, payer_partner_id) REFERENCES partner (company_id, id),
+    CONSTRAINT ck_debit_note_payer CHECK ((payer_partner_id IS NULL) = (payer_name IS NULL)),
+    note text CONSTRAINT ck_debit_note_note CHECK (note IS NULL OR char_length(note) <= 4000),   -- ADR-0074 rule 16
     recorded_at        timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, id) REFERENCES document (company_id, id),
@@ -1014,6 +1145,20 @@ CREATE TABLE purchase_invoice (
     incoterm_code          text REFERENCES incoterm (code),   -- advisory only (ADR-0068 rules 19, 20)
     incoterm_place         text,                          -- the named place; requires a code
     business_unit_id       uuid,                          -- set by a person or an agent, copied from the source (ADR-0069 rule 8)
+    invoicing_party_partner_id uuid,
+    invoicing_party_name text,
+    invoicing_party_tax_id text,
+    invoicing_party_address_id uuid,
+    invoicing_party_address jsonb,
+    FOREIGN KEY (company_id, invoicing_party_partner_id) REFERENCES partner (company_id, id),
+    FOREIGN KEY (company_id, invoicing_party_partner_id, invoicing_party_address_id) REFERENCES partner_address (company_id, partner_id, id),
+    CONSTRAINT ck_purchase_invoice_invoicing_party CHECK ((invoicing_party_partner_id IS NULL) = (invoicing_party_name IS NULL) AND (invoicing_party_partner_id IS NOT NULL OR invoicing_party_tax_id IS NULL) AND (invoicing_party_partner_id IS NOT NULL OR (invoicing_party_address_id IS NULL AND invoicing_party_address IS NULL))),
+    payee_partner_id uuid,
+    payee_name text,
+    FOREIGN KEY (company_id, payee_partner_id) REFERENCES partner (company_id, id),
+    CONSTRAINT ck_purchase_invoice_payee CHECK ((payee_partner_id IS NULL) = (payee_name IS NULL)),
+    note text CONSTRAINT ck_purchase_invoice_note CHECK (note IS NULL OR char_length(note) <= 4000),   -- ADR-0074 rule 16
+    custom_values jsonb NOT NULL DEFAULT '{}'::jsonb CONSTRAINT ck_purchase_invoice_custom_values CHECK (jsonb_typeof(custom_values) = 'object'),   -- ADR-0074 rules 8, 9
     recorded_at            timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, id) REFERENCES document (company_id, id),
@@ -1087,6 +1232,19 @@ CREATE TABLE purchase_return (
     posting_date       date NOT NULL,
     external_original  jsonb,
     business_unit_id   uuid,                          -- set by a person or an agent, copied from the source (ADR-0069 rule 8)
+    invoicing_party_partner_id uuid,
+    invoicing_party_name text,
+    invoicing_party_tax_id text,
+    invoicing_party_address_id uuid,
+    invoicing_party_address jsonb,
+    FOREIGN KEY (company_id, invoicing_party_partner_id) REFERENCES partner (company_id, id),
+    FOREIGN KEY (company_id, invoicing_party_partner_id, invoicing_party_address_id) REFERENCES partner_address (company_id, partner_id, id),
+    CONSTRAINT ck_purchase_return_invoicing_party CHECK ((invoicing_party_partner_id IS NULL) = (invoicing_party_name IS NULL) AND (invoicing_party_partner_id IS NOT NULL OR invoicing_party_tax_id IS NULL) AND (invoicing_party_partner_id IS NOT NULL OR (invoicing_party_address_id IS NULL AND invoicing_party_address IS NULL))),
+    payee_partner_id uuid,
+    payee_name text,
+    FOREIGN KEY (company_id, payee_partner_id) REFERENCES partner (company_id, id),
+    CONSTRAINT ck_purchase_return_payee CHECK ((payee_partner_id IS NULL) = (payee_name IS NULL)),
+    note text CONSTRAINT ck_purchase_return_note CHECK (note IS NULL OR char_length(note) <= 4000),   -- ADR-0074 rule 16
     recorded_at        timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, id) REFERENCES document (company_id, id),
@@ -1110,6 +1268,9 @@ CREATE TABLE purchase_return_line (
     inventory_quantity            types.quantity NOT NULL CONSTRAINT ck_purchase_return_line_inventory_quantity CHECK (inventory_quantity > 0),
     is_price_copied               boolean NOT NULL DEFAULT true,   -- the original line's price (ADR-0047 rule 15)
     line_amount                   types.amount NOT NULL CONSTRAINT ck_purchase_return_line_line_amount CHECK (line_amount > 0),
+    return_reason_id uuid,
+    return_reason_kind text NOT NULL DEFAULT 'return' CONSTRAINT ck_purchase_return_line_return_reason_kind CHECK (return_reason_kind = 'return'),
+    FOREIGN KEY (company_id, return_reason_id, return_reason_kind) REFERENCES reason (company_id, id, kind),
     recorded_at                   timestamptz NOT NULL DEFAULT now(),
     UNIQUE (purchase_return_id, line_number),
     UNIQUE (company_id, id),
@@ -1138,6 +1299,19 @@ CREATE TABLE purchase_credit_note (
     posting_date       date NOT NULL,
     external_original  jsonb,
     business_unit_id   uuid,                          -- set by a person or an agent, copied from the source (ADR-0069 rule 8)
+    invoicing_party_partner_id uuid,
+    invoicing_party_name text,
+    invoicing_party_tax_id text,
+    invoicing_party_address_id uuid,
+    invoicing_party_address jsonb,
+    FOREIGN KEY (company_id, invoicing_party_partner_id) REFERENCES partner (company_id, id),
+    FOREIGN KEY (company_id, invoicing_party_partner_id, invoicing_party_address_id) REFERENCES partner_address (company_id, partner_id, id),
+    CONSTRAINT ck_purchase_credit_note_invoicing_party CHECK ((invoicing_party_partner_id IS NULL) = (invoicing_party_name IS NULL) AND (invoicing_party_partner_id IS NOT NULL OR invoicing_party_tax_id IS NULL) AND (invoicing_party_partner_id IS NOT NULL OR (invoicing_party_address_id IS NULL AND invoicing_party_address IS NULL))),
+    payee_partner_id uuid,
+    payee_name text,
+    FOREIGN KEY (company_id, payee_partner_id) REFERENCES partner (company_id, id),
+    CONSTRAINT ck_purchase_credit_note_payee CHECK ((payee_partner_id IS NULL) = (payee_name IS NULL)),
+    note text CONSTRAINT ck_purchase_credit_note_note CHECK (note IS NULL OR char_length(note) <= 4000),   -- ADR-0074 rule 16
     recorded_at        timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, id) REFERENCES document (company_id, id),
@@ -1189,6 +1363,19 @@ CREATE TABLE purchase_debit_note (
     document_date      date NOT NULL,
     posting_date       date NOT NULL,
     business_unit_id   uuid,                          -- set by a person or an agent, copied from the source (ADR-0069 rule 8)
+    invoicing_party_partner_id uuid,
+    invoicing_party_name text,
+    invoicing_party_tax_id text,
+    invoicing_party_address_id uuid,
+    invoicing_party_address jsonb,
+    FOREIGN KEY (company_id, invoicing_party_partner_id) REFERENCES partner (company_id, id),
+    FOREIGN KEY (company_id, invoicing_party_partner_id, invoicing_party_address_id) REFERENCES partner_address (company_id, partner_id, id),
+    CONSTRAINT ck_purchase_debit_note_invoicing_party CHECK ((invoicing_party_partner_id IS NULL) = (invoicing_party_name IS NULL) AND (invoicing_party_partner_id IS NOT NULL OR invoicing_party_tax_id IS NULL) AND (invoicing_party_partner_id IS NOT NULL OR (invoicing_party_address_id IS NULL AND invoicing_party_address IS NULL))),
+    payee_partner_id uuid,
+    payee_name text,
+    FOREIGN KEY (company_id, payee_partner_id) REFERENCES partner (company_id, id),
+    CONSTRAINT ck_purchase_debit_note_payee CHECK ((payee_partner_id IS NULL) = (payee_name IS NULL)),
+    note text CONSTRAINT ck_purchase_debit_note_note CHECK (note IS NULL OR char_length(note) <= 4000),   -- ADR-0074 rule 16
     recorded_at        timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, id) REFERENCES document (company_id, id),
@@ -1646,3 +1833,444 @@ CREATE TRIGGER trg_purchase_order_line_gr_ir_layer_append_only
 -- and stays reserved when the unit goes; a supplier's SSCC may be released only after the GS1 reuse period.
 CREATE TRIGGER trg_handling_unit_register AFTER INSERT OR UPDATE OF barcode, is_legacy_barcode OR DELETE ON handling_unit
     FOR EACH ROW EXECUTE FUNCTION barcode_register('handling_unit', 'barcode', 'id');
+
+-- ===== Stock documents [inventory] (ADR-0075; ADR-0020 rules 4-7, 18; ADR-0023 rules 7, 9, 13, 18; ADR-0027 rule 7) =====
+-- The posting document types that ADR-0027 rule 7 left to a DS-09 deliverable: the stock transfer, the stock count, scrap and
+-- internal consumption. Each is a typed header with lines (ADR-0009 rule 1), reversible (ADR-0020 rule 7), and posts one
+-- material document through the stock lock helper and the journal through the posting interfaces, like goods_receipt. The
+-- material document line names its source line by source_line_number; no back-link column is kept. The remaining step 3 types
+-- (other_receipt, other_issue, opening_balance and the non-posting transfer_order) follow below (ADR-0075 rules 11 to 15).
+CREATE TABLE stock_transfer (                              -- [inventory] ADR-0075 rule 1; reversible (ADR-0020 rule 7)
+    id                    uuid PRIMARY KEY,
+    company_id            uuid NOT NULL,
+    step                  text NOT NULL CONSTRAINT ck_stock_transfer_step CHECK (step IN ('direct', 'dispatch', 'receive')),   -- one document, or two through a transit warehouse (ADR-0023 rule 7)
+    from_warehouse_id     uuid NOT NULL,
+    to_warehouse_id       uuid NOT NULL,
+    dispatch_transfer_id  uuid,                              -- a receive names the dispatch it receives
+    reference             text,                              -- the sender's or the carrier's reference
+    document_date         date NOT NULL,
+    posting_date          date NOT NULL,
+    note                  text CONSTRAINT ck_stock_transfer_note CHECK (note IS NULL OR char_length(note) <= 4000),   -- ADR-0074 rule 16
+    recorded_at           timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (company_id, id),
+    UNIQUE (company_id, id, from_warehouse_id, to_warehouse_id),
+    FOREIGN KEY (company_id, id) REFERENCES document (company_id, id),
+    FOREIGN KEY (company_id, from_warehouse_id) REFERENCES warehouse (company_id, id),
+    FOREIGN KEY (company_id, to_warehouse_id) REFERENCES warehouse (company_id, id),
+    FOREIGN KEY (company_id, dispatch_transfer_id) REFERENCES stock_transfer (company_id, id),
+    CONSTRAINT ck_stock_transfer_warehouses CHECK (from_warehouse_id <> to_warehouse_id),
+    CONSTRAINT ck_stock_transfer_dispatch CHECK ((step = 'receive') = (dispatch_transfer_id IS NOT NULL))
+);
+-- A dispatch is received by one document; a short receipt leaves the rest in transit until a count or a reversal (ADR-0075 rule 2).
+CREATE UNIQUE INDEX ux_stock_transfer_dispatch_transfer_id ON stock_transfer (dispatch_transfer_id) WHERE dispatch_transfer_id IS NOT NULL;
+CREATE TABLE stock_transfer_line (                         -- [inventory] ADR-0075 rule 1
+    id                      uuid PRIMARY KEY,
+    company_id              uuid NOT NULL,
+    stock_transfer_id       uuid NOT NULL,
+    from_warehouse_id       uuid NOT NULL,                   -- carried for the bin keys below
+    to_warehouse_id         uuid NOT NULL,
+    line_number             integer NOT NULL CONSTRAINT ck_stock_transfer_line_line_number CHECK (line_number > 0),
+    item_id                 uuid NOT NULL,
+    quantity                types.quantity NOT NULL CONSTRAINT ck_stock_transfer_line_quantity CHECK (quantity > 0),   -- as entered, in uom_id (ADR-0056 rule 9)
+    uom_id                  uuid NOT NULL REFERENCES uom (id),
+    uom_numerator           bigint NOT NULL,                    -- the conversion snapshot, as on every document line (ADR-0056 rule 9)
+    uom_denominator         bigint NOT NULL,
+    uom_factor_source       text NOT NULL,                      -- identity, item, product or global (ADR-0056 rule 6)
+    inventory_quantity      types.quantity NOT NULL CONSTRAINT ck_stock_transfer_line_inventory_quantity CHECK (inventory_quantity > 0),
+    from_bin_id             uuid,                            -- the line's bin, else the default bin (ADR-0023 rule 7)
+    to_bin_id               uuid,                            -- the receiving bin, else the default receiving bin
+    lot_id                  uuid REFERENCES lot (id),
+    serial_number_id        uuid REFERENCES serial_number (id),
+    handling_unit_id        uuid,                            -- keeps its identity through transit (ADR-0023 rule 7); transfers move available stock only
+    dispatch_line_id        uuid,                            -- a receive line names the dispatch line it receives
+    transfer_order_line_id  uuid,                            -- the transfer order line it fulfils: a direct transfer between its two warehouses, a dispatch from its source, a receive into its destination (ADR-0075 rule 14; INV-871)
+    recorded_at             timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (stock_transfer_id, line_number),
+    UNIQUE (company_id, id),
+    FOREIGN KEY (company_id, stock_transfer_id, from_warehouse_id, to_warehouse_id) REFERENCES stock_transfer (company_id, id, from_warehouse_id, to_warehouse_id),
+    FOREIGN KEY (company_id, item_id) REFERENCES item (company_id, id),
+    CONSTRAINT fk_stock_transfer_line_from_bin FOREIGN KEY (from_bin_id, from_warehouse_id) REFERENCES bin (id, warehouse_id),
+    CONSTRAINT fk_stock_transfer_line_to_bin FOREIGN KEY (to_bin_id, to_warehouse_id) REFERENCES bin (id, warehouse_id),
+    FOREIGN KEY (company_id, handling_unit_id) REFERENCES handling_unit (company_id, id),
+    FOREIGN KEY (company_id, dispatch_line_id) REFERENCES stock_transfer_line (company_id, id),
+    FOREIGN KEY (company_id, transfer_order_line_id) REFERENCES transfer_order_line (company_id, id),
+    CONSTRAINT ck_stock_transfer_line_uom_factor CHECK (uom_numerator > 0 AND uom_denominator > 0 AND uom_factor_source IN ('identity', 'item', 'product', 'global')
+        AND (uom_factor_source <> 'identity' OR (uom_numerator = 1 AND uom_denominator = 1))),
+    CONSTRAINT ck_stock_transfer_line_uom_quantity CHECK (abs(inventory_quantity * uom_denominator - quantity * uom_numerator) <= 2 * uom_denominator
+        AND (uom_factor_source <> 'identity' OR inventory_quantity = quantity)),
+    CONSTRAINT ck_stock_transfer_line_lot_or_serial CHECK (lot_id IS NULL OR serial_number_id IS NULL),
+    CONSTRAINT ck_stock_transfer_line_serial_quantity CHECK (serial_number_id IS NULL OR inventory_quantity = 1)
+);
+CREATE INDEX ix_stock_transfer_line_dispatch_line_id ON stock_transfer_line (dispatch_line_id) WHERE dispatch_line_id IS NOT NULL;
+CREATE INDEX ix_stock_transfer_line_company_id_item_id ON stock_transfer_line (company_id, item_id);
+
+CREATE TABLE stock_count (                                 -- [inventory] ADR-0075 rule 3; reversible (ADR-0020 rule 7)
+    id                  uuid PRIMARY KEY,
+    company_id          uuid NOT NULL,
+    warehouse_id        uuid NOT NULL,                       -- one count document counts one warehouse
+    document_date       date NOT NULL,
+    posting_date        date NOT NULL,
+    note                text CONSTRAINT ck_stock_count_note CHECK (note IS NULL OR char_length(note) <= 4000),   -- ADR-0074 rule 16
+    business_unit_id    uuid,                                -- set by a person or an agent (ADR-0069 rule 8)
+    recorded_at         timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (company_id, id),
+    UNIQUE (company_id, id, warehouse_id),
+    FOREIGN KEY (company_id, id) REFERENCES document (company_id, id),
+    FOREIGN KEY (company_id, warehouse_id) REFERENCES warehouse (company_id, id),
+    FOREIGN KEY (company_id, business_unit_id) REFERENCES business_unit (company_id, id)
+);
+CREATE TABLE stock_count_line (                            -- [inventory] ADR-0075 rule 3; one counted entry; several entries of one key are summed (ADR-0056 rule 15)
+    id                      uuid PRIMARY KEY,
+    company_id              uuid NOT NULL,
+    stock_count_id          uuid NOT NULL,
+    warehouse_id            uuid NOT NULL,                   -- carried for the bin key below
+    line_number             integer NOT NULL CONSTRAINT ck_stock_count_line_line_number CHECK (line_number > 0),
+    item_id                 uuid NOT NULL,
+    quantity                types.quantity NOT NULL CONSTRAINT ck_stock_count_line_quantity CHECK (quantity >= 0),   -- as entered, in uom_id (ADR-0056 rule 9)
+    uom_id                  uuid NOT NULL REFERENCES uom (id),
+    uom_numerator           bigint NOT NULL,                    -- the conversion snapshot, as on every document line (ADR-0056 rule 9)
+    uom_denominator         bigint NOT NULL,
+    uom_factor_source       text NOT NULL,                      -- identity, item, product or global (ADR-0056 rule 6)
+    inventory_quantity      types.quantity NOT NULL CONSTRAINT ck_stock_count_line_inventory_quantity CHECK (inventory_quantity >= 0),
+    bin_id                  uuid NOT NULL,                   -- the counted bin; the default bin outside bin-managed warehouses
+    lot_id                  uuid REFERENCES lot (id),
+    serial_number_id        uuid REFERENCES serial_number (id),
+    stock_status            text NOT NULL DEFAULT 'available' CONSTRAINT ck_stock_count_line_stock_status CHECK (stock_status IN ('available', 'quality_inspection', 'blocked')),   -- the counted status
+    book_quantity           types.quantity NOT NULL CONSTRAINT ck_stock_count_line_book_quantity CHECK (book_quantity >= 0),   -- inventory unit; the book quantity of the key, frozen at book_taken_at; equal on every line of one key (INV-865)
+    book_taken_at           timestamptz NOT NULL,            -- the confirmation of the count task, else the creation of the draft (ADR-0023 rule 18)
+    count_task_id           uuid,                            -- the confirmed count task that created the line
+    difference_reason_id    uuid,                            -- reason, kind count_difference, the same on every line of one key; required on a key with a difference while documents.reason_required.count_difference is true (ADR-0074 rule 22)
+    difference_reason_kind  text NOT NULL DEFAULT 'count_difference' CONSTRAINT ck_stock_count_line_difference_reason_kind CHECK (difference_reason_kind = 'count_difference'),
+    difference_note         text CONSTRAINT ck_stock_count_line_difference_note CHECK (difference_note IS NULL OR char_length(difference_note) <= 4000),
+    recorded_at             timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (stock_count_id, line_number),
+    UNIQUE (company_id, id),
+    FOREIGN KEY (company_id, stock_count_id, warehouse_id) REFERENCES stock_count (company_id, id, warehouse_id),
+    FOREIGN KEY (company_id, item_id) REFERENCES item (company_id, id),
+    CONSTRAINT fk_stock_count_line_bin FOREIGN KEY (bin_id, warehouse_id) REFERENCES bin (id, warehouse_id),
+    FOREIGN KEY (company_id, count_task_id) REFERENCES warehouse_task (company_id, id),
+    FOREIGN KEY (company_id, difference_reason_id, difference_reason_kind) REFERENCES reason (company_id, id, kind),
+    CONSTRAINT ck_stock_count_line_uom_factor CHECK (uom_numerator > 0 AND uom_denominator > 0 AND uom_factor_source IN ('identity', 'item', 'product', 'global')
+        AND (uom_factor_source <> 'identity' OR (uom_numerator = 1 AND uom_denominator = 1))),
+    CONSTRAINT ck_stock_count_line_uom_quantity CHECK (abs(inventory_quantity * uom_denominator - quantity * uom_numerator) <= 2 * uom_denominator
+        AND (uom_factor_source <> 'identity' OR inventory_quantity = quantity)),
+    CONSTRAINT ck_stock_count_line_lot_or_serial CHECK (lot_id IS NULL OR serial_number_id IS NULL),
+    CONSTRAINT ck_stock_count_line_serial_quantity CHECK (serial_number_id IS NULL OR (inventory_quantity <= 1 AND book_quantity <= 1))
+);
+CREATE INDEX ix_stock_count_line_company_id_item_id ON stock_count_line (company_id, item_id);
+CREATE INDEX ix_stock_count_line_count_task_id ON stock_count_line (count_task_id) WHERE count_task_id IS NOT NULL;
+
+CREATE TABLE scrap (                                       -- [inventory] ADR-0075 rule 4; reversible (ADR-0020 rule 7)
+    id                  uuid PRIMARY KEY,
+    company_id          uuid NOT NULL,
+    document_date       date NOT NULL,
+    posting_date        date NOT NULL,
+    note                text CONSTRAINT ck_scrap_note CHECK (note IS NULL OR char_length(note) <= 4000),   -- ADR-0074 rule 16
+    business_unit_id    uuid,                                -- set by a person or an agent (ADR-0069 rule 8)
+    recorded_at         timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (company_id, id),
+    FOREIGN KEY (company_id, id) REFERENCES document (company_id, id),
+    FOREIGN KEY (company_id, business_unit_id) REFERENCES business_unit (company_id, id)
+);
+CREATE TABLE scrap_line (                                  -- [inventory] ADR-0075 rule 4
+    id                  uuid PRIMARY KEY,
+    company_id          uuid NOT NULL,
+    scrap_id            uuid NOT NULL,
+    line_number         integer NOT NULL CONSTRAINT ck_scrap_line_line_number CHECK (line_number > 0),
+    item_id             uuid NOT NULL,
+    warehouse_id        uuid NOT NULL,
+    quantity                types.quantity NOT NULL CONSTRAINT ck_scrap_line_quantity CHECK (quantity > 0),   -- as entered, in uom_id (ADR-0056 rule 9)
+    uom_id                  uuid NOT NULL REFERENCES uom (id),
+    uom_numerator           bigint NOT NULL,                    -- the conversion snapshot, as on every document line (ADR-0056 rule 9)
+    uom_denominator         bigint NOT NULL,
+    uom_factor_source       text NOT NULL,                      -- identity, item, product or global (ADR-0056 rule 6)
+    inventory_quantity      types.quantity NOT NULL CONSTRAINT ck_scrap_line_inventory_quantity CHECK (inventory_quantity > 0),
+    bin_id              uuid NOT NULL,                       -- the line's bin; the default bin outside bin-managed warehouses (ADR-0023 rule 7)
+    lot_id              uuid REFERENCES lot (id),
+    serial_number_id    uuid REFERENCES serial_number (id),
+    stock_status        text NOT NULL DEFAULT 'available' CONSTRAINT ck_scrap_line_stock_status CHECK (stock_status IN ('available', 'quality_inspection', 'blocked')),   -- the held status the goods are scrapped from (ADR-0070 rule 15)
+    handling_unit_id    uuid,
+    scrap_reason_id     uuid,                                -- reason, kind scrap; required while documents.reason_required.scrap is true (ADR-0074 rule 22)
+    scrap_reason_kind   text NOT NULL DEFAULT 'scrap' CONSTRAINT ck_scrap_line_scrap_reason_kind CHECK (scrap_reason_kind = 'scrap'),
+    reason_note         text CONSTRAINT ck_scrap_line_reason_note CHECK (reason_note IS NULL OR char_length(reason_note) <= 4000),
+    cost_center_id      uuid,                                -- the cost center that bears the loss, when the account determination reads it
+    project_id          uuid,
+    recorded_at         timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (scrap_id, line_number),
+    UNIQUE (company_id, id),
+    FOREIGN KEY (company_id, scrap_id) REFERENCES scrap (company_id, id),
+    FOREIGN KEY (company_id, item_id) REFERENCES item (company_id, id),
+    FOREIGN KEY (company_id, warehouse_id) REFERENCES warehouse (company_id, id),
+    CONSTRAINT fk_scrap_line_bin FOREIGN KEY (bin_id, warehouse_id) REFERENCES bin (id, warehouse_id),
+    FOREIGN KEY (company_id, handling_unit_id) REFERENCES handling_unit (company_id, id),
+    FOREIGN KEY (company_id, scrap_reason_id, scrap_reason_kind) REFERENCES reason (company_id, id, kind),
+    FOREIGN KEY (company_id, cost_center_id) REFERENCES cost_center (company_id, id),
+    FOREIGN KEY (company_id, project_id) REFERENCES project (company_id, id),
+    CONSTRAINT ck_scrap_line_uom_factor CHECK (uom_numerator > 0 AND uom_denominator > 0 AND uom_factor_source IN ('identity', 'item', 'product', 'global')
+        AND (uom_factor_source <> 'identity' OR (uom_numerator = 1 AND uom_denominator = 1))),
+    CONSTRAINT ck_scrap_line_uom_quantity CHECK (abs(inventory_quantity * uom_denominator - quantity * uom_numerator) <= 2 * uom_denominator
+        AND (uom_factor_source <> 'identity' OR inventory_quantity = quantity)),
+    CONSTRAINT ck_scrap_line_lot_or_serial CHECK (lot_id IS NULL OR serial_number_id IS NULL),
+    CONSTRAINT ck_scrap_line_serial_quantity CHECK (serial_number_id IS NULL OR inventory_quantity = 1),
+    CONSTRAINT ck_scrap_line_dimension CHECK (num_nonnulls(cost_center_id, project_id) <= 1)
+);
+CREATE INDEX ix_scrap_line_company_id_item_id ON scrap_line (company_id, item_id);
+
+CREATE TABLE internal_consumption (                        -- [inventory] ADR-0075 rule 5; reversible (ADR-0020 rule 7)
+    id                  uuid PRIMARY KEY,
+    company_id          uuid NOT NULL,
+    document_date       date NOT NULL,
+    posting_date        date NOT NULL,
+    note                text CONSTRAINT ck_internal_consumption_note CHECK (note IS NULL OR char_length(note) <= 4000),   -- ADR-0074 rule 16
+    business_unit_id    uuid,                                -- set by a person or an agent (ADR-0069 rule 8)
+    recorded_at         timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (company_id, id),
+    FOREIGN KEY (company_id, id) REFERENCES document (company_id, id),
+    FOREIGN KEY (company_id, business_unit_id) REFERENCES business_unit (company_id, id)
+);
+CREATE TABLE internal_consumption_line (                   -- [inventory] ADR-0075 rule 5
+    id                  uuid PRIMARY KEY,
+    company_id          uuid NOT NULL,
+    internal_consumption_id uuid NOT NULL,
+    line_number         integer NOT NULL CONSTRAINT ck_internal_consumption_line_line_number CHECK (line_number > 0),
+    item_id             uuid NOT NULL,
+    warehouse_id        uuid NOT NULL,
+    quantity                types.quantity NOT NULL CONSTRAINT ck_internal_consumption_line_quantity CHECK (quantity > 0),   -- as entered, in uom_id (ADR-0056 rule 9)
+    uom_id                  uuid NOT NULL REFERENCES uom (id),
+    uom_numerator           bigint NOT NULL,                    -- the conversion snapshot, as on every document line (ADR-0056 rule 9)
+    uom_denominator         bigint NOT NULL,
+    uom_factor_source       text NOT NULL,                      -- identity, item, product or global (ADR-0056 rule 6)
+    inventory_quantity      types.quantity NOT NULL CONSTRAINT ck_internal_consumption_line_inventory_quantity CHECK (inventory_quantity > 0),
+    bin_id              uuid NOT NULL,
+    lot_id              uuid REFERENCES lot (id),
+    serial_number_id    uuid REFERENCES serial_number (id),
+    stock_status        text NOT NULL DEFAULT 'available' CONSTRAINT ck_internal_consumption_line_stock_status CHECK (stock_status IN ('available', 'quality_inspection', 'blocked')),   -- the held status of a sample (ADR-0070 rule 15)
+    handling_unit_id    uuid,
+    consumption_kind    text NOT NULL DEFAULT 'internal' CONSTRAINT ck_internal_consumption_line_consumption_kind CHECK (consumption_kind IN ('internal', 'quality_sample')),   -- movement type internal_consumption or quality_sample
+    cost_center_id      uuid,
+    project_id          uuid,
+    recorded_at         timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (internal_consumption_id, line_number),
+    UNIQUE (company_id, id),
+    FOREIGN KEY (company_id, internal_consumption_id) REFERENCES internal_consumption (company_id, id),
+    FOREIGN KEY (company_id, item_id) REFERENCES item (company_id, id),
+    FOREIGN KEY (company_id, warehouse_id) REFERENCES warehouse (company_id, id),
+    CONSTRAINT fk_internal_consumption_line_bin FOREIGN KEY (bin_id, warehouse_id) REFERENCES bin (id, warehouse_id),
+    FOREIGN KEY (company_id, handling_unit_id) REFERENCES handling_unit (company_id, id),
+    FOREIGN KEY (company_id, cost_center_id) REFERENCES cost_center (company_id, id),
+    FOREIGN KEY (company_id, project_id) REFERENCES project (company_id, id),
+    CONSTRAINT ck_internal_consumption_line_uom_factor CHECK (uom_numerator > 0 AND uom_denominator > 0 AND uom_factor_source IN ('identity', 'item', 'product', 'global')
+        AND (uom_factor_source <> 'identity' OR (uom_numerator = 1 AND uom_denominator = 1))),
+    CONSTRAINT ck_internal_consumption_line_uom_quantity CHECK (abs(inventory_quantity * uom_denominator - quantity * uom_numerator) <= 2 * uom_denominator
+        AND (uom_factor_source <> 'identity' OR inventory_quantity = quantity)),
+    CONSTRAINT ck_internal_consumption_line_lot_or_serial CHECK (lot_id IS NULL OR serial_number_id IS NULL),
+    CONSTRAINT ck_internal_consumption_line_serial_quantity CHECK (serial_number_id IS NULL OR inventory_quantity = 1),
+    -- exactly one cost center or project bears an internal consumption; a quality sample may name none (ADR-0075 rule 5)
+    CONSTRAINT ck_internal_consumption_line_dimension CHECK (num_nonnulls(cost_center_id, project_id) = 1
+        OR (consumption_kind = 'quality_sample' AND num_nonnulls(cost_center_id, project_id) = 0))
+);
+CREATE INDEX ix_internal_consumption_line_company_id_item_id ON internal_consumption_line (company_id, item_id);
+
+CREATE TABLE other_receipt (                                 -- [inventory] ADR-0075 rule 11; reversible (ADR-0020 rule 7)
+    id                  uuid PRIMARY KEY,
+    company_id          uuid NOT NULL,
+    document_date       date NOT NULL,
+    posting_date        date NOT NULL,
+    note                text CONSTRAINT ck_other_receipt_note CHECK (note IS NULL OR char_length(note) <= 4000),   -- ADR-0074 rule 16
+    business_unit_id    uuid,                                -- set by a person or an agent (ADR-0069 rule 8)
+    recorded_at         timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (company_id, id),
+    FOREIGN KEY (company_id, id) REFERENCES document (company_id, id),
+    FOREIGN KEY (company_id, business_unit_id) REFERENCES business_unit (company_id, id)
+);
+CREATE TABLE other_receipt_line (                                  -- [inventory] ADR-0075 rule 11
+    id                  uuid PRIMARY KEY,
+    company_id          uuid NOT NULL,
+    other_receipt_id    uuid NOT NULL,
+    line_number         integer NOT NULL CONSTRAINT ck_other_receipt_line_line_number CHECK (line_number > 0),
+    item_id             uuid NOT NULL,
+    warehouse_id        uuid NOT NULL,
+    quantity                types.quantity NOT NULL CONSTRAINT ck_other_receipt_line_quantity CHECK (quantity > 0),   -- as entered, in uom_id (ADR-0056 rule 9)
+    uom_id                  uuid NOT NULL REFERENCES uom (id),
+    uom_numerator           bigint NOT NULL,                    -- the conversion snapshot, as on every document line (ADR-0056 rule 9)
+    uom_denominator         bigint NOT NULL,
+    uom_factor_source       text NOT NULL,                      -- identity, item, product or global (ADR-0056 rule 6)
+    inventory_quantity      types.quantity NOT NULL CONSTRAINT ck_other_receipt_line_inventory_quantity CHECK (inventory_quantity > 0),
+    bin_id              uuid,                                -- the line's bin, else the default receiving bin (ADR-0023 rule 7)
+    lot_id              uuid REFERENCES lot (id),
+    serial_number_id    uuid REFERENCES serial_number (id),
+    stock_status        text NOT NULL DEFAULT 'available' CONSTRAINT ck_other_receipt_line_stock_status CHECK (stock_status IN ('available', 'quality_inspection', 'blocked')),   -- quality_inspection when the product requires inspection at receipt (ADR-0070 rule 2)
+    handling_unit_id    uuid,
+    company_amount      types.amount NOT NULL CONSTRAINT ck_other_receipt_line_company_amount CHECK (company_amount >= 0),   -- the line's value in company currency (value source document)
+    reason_id           uuid,                                -- reason, kind other_receipt; required while documents.reason_required.other_receipt is true (ADR-0074 rule 22)
+    reason_kind         text NOT NULL DEFAULT 'other_receipt' CONSTRAINT ck_other_receipt_line_reason_kind CHECK (reason_kind = 'other_receipt'),
+    reason_note         text CONSTRAINT ck_other_receipt_line_reason_note CHECK (reason_note IS NULL OR char_length(reason_note) <= 4000),
+    recorded_at         timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (other_receipt_id, line_number),
+    UNIQUE (company_id, id),
+    FOREIGN KEY (company_id, other_receipt_id) REFERENCES other_receipt (company_id, id),
+    FOREIGN KEY (company_id, item_id) REFERENCES item (company_id, id),
+    FOREIGN KEY (company_id, warehouse_id) REFERENCES warehouse (company_id, id),
+    CONSTRAINT fk_other_receipt_line_bin FOREIGN KEY (bin_id, warehouse_id) REFERENCES bin (id, warehouse_id),
+    FOREIGN KEY (company_id, handling_unit_id) REFERENCES handling_unit (company_id, id),
+    FOREIGN KEY (company_id, reason_id, reason_kind) REFERENCES reason (company_id, id, kind),
+    CONSTRAINT ck_other_receipt_line_uom_factor CHECK (uom_numerator > 0 AND uom_denominator > 0 AND uom_factor_source IN ('identity', 'item', 'product', 'global')
+        AND (uom_factor_source <> 'identity' OR (uom_numerator = 1 AND uom_denominator = 1))),
+    CONSTRAINT ck_other_receipt_line_uom_quantity CHECK (abs(inventory_quantity * uom_denominator - quantity * uom_numerator) <= 2 * uom_denominator
+        AND (uom_factor_source <> 'identity' OR inventory_quantity = quantity)),
+    CONSTRAINT ck_other_receipt_line_lot_or_serial CHECK (lot_id IS NULL OR serial_number_id IS NULL),
+    CONSTRAINT ck_other_receipt_line_serial_quantity CHECK (serial_number_id IS NULL OR inventory_quantity = 1)
+);
+CREATE INDEX ix_other_receipt_line_company_id_item_id ON other_receipt_line (company_id, item_id);
+
+CREATE TABLE other_issue (                                 -- [inventory] ADR-0075 rule 12; reversible (ADR-0020 rule 7)
+    id                  uuid PRIMARY KEY,
+    company_id          uuid NOT NULL,
+    document_date       date NOT NULL,
+    posting_date        date NOT NULL,
+    note                text CONSTRAINT ck_other_issue_note CHECK (note IS NULL OR char_length(note) <= 4000),   -- ADR-0074 rule 16
+    business_unit_id    uuid,                                -- set by a person or an agent (ADR-0069 rule 8)
+    recorded_at         timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (company_id, id),
+    FOREIGN KEY (company_id, id) REFERENCES document (company_id, id),
+    FOREIGN KEY (company_id, business_unit_id) REFERENCES business_unit (company_id, id)
+);
+CREATE TABLE other_issue_line (                                  -- [inventory] ADR-0075 rule 12
+    id                  uuid PRIMARY KEY,
+    company_id          uuid NOT NULL,
+    other_issue_id      uuid NOT NULL,
+    line_number         integer NOT NULL CONSTRAINT ck_other_issue_line_line_number CHECK (line_number > 0),
+    item_id             uuid NOT NULL,
+    warehouse_id        uuid NOT NULL,
+    quantity                types.quantity NOT NULL CONSTRAINT ck_other_issue_line_quantity CHECK (quantity > 0),   -- as entered, in uom_id (ADR-0056 rule 9)
+    uom_id                  uuid NOT NULL REFERENCES uom (id),
+    uom_numerator           bigint NOT NULL,                    -- the conversion snapshot, as on every document line (ADR-0056 rule 9)
+    uom_denominator         bigint NOT NULL,
+    uom_factor_source       text NOT NULL,                      -- identity, item, product or global (ADR-0056 rule 6)
+    inventory_quantity      types.quantity NOT NULL CONSTRAINT ck_other_issue_line_inventory_quantity CHECK (inventory_quantity > 0),
+    bin_id              uuid NOT NULL,                       -- the line's bin; the default bin outside bin-managed warehouses (ADR-0023 rule 7; ADR-0031 rule 8)
+    lot_id              uuid REFERENCES lot (id),
+    serial_number_id    uuid REFERENCES serial_number (id),
+    stock_status        text NOT NULL DEFAULT 'available' CONSTRAINT ck_other_issue_line_stock_status CHECK (stock_status IN ('available', 'quality_inspection', 'blocked')),   -- the status the goods leave
+    handling_unit_id    uuid,
+    reason_id           uuid,                                -- reason, kind other_issue; required while documents.reason_required.other_issue is true (ADR-0074 rule 22)
+    reason_kind         text NOT NULL DEFAULT 'other_issue' CONSTRAINT ck_other_issue_line_reason_kind CHECK (reason_kind = 'other_issue'),
+    reason_note         text CONSTRAINT ck_other_issue_line_reason_note CHECK (reason_note IS NULL OR char_length(reason_note) <= 4000),
+    cost_center_id      uuid,
+    project_id          uuid,
+    recorded_at         timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (other_issue_id, line_number),
+    UNIQUE (company_id, id),
+    FOREIGN KEY (company_id, other_issue_id) REFERENCES other_issue (company_id, id),
+    FOREIGN KEY (company_id, item_id) REFERENCES item (company_id, id),
+    FOREIGN KEY (company_id, warehouse_id) REFERENCES warehouse (company_id, id),
+    CONSTRAINT fk_other_issue_line_bin FOREIGN KEY (bin_id, warehouse_id) REFERENCES bin (id, warehouse_id),
+    FOREIGN KEY (company_id, handling_unit_id) REFERENCES handling_unit (company_id, id),
+    FOREIGN KEY (company_id, reason_id, reason_kind) REFERENCES reason (company_id, id, kind),
+    FOREIGN KEY (company_id, cost_center_id) REFERENCES cost_center (company_id, id),
+    FOREIGN KEY (company_id, project_id) REFERENCES project (company_id, id),
+    CONSTRAINT ck_other_issue_line_uom_factor CHECK (uom_numerator > 0 AND uom_denominator > 0 AND uom_factor_source IN ('identity', 'item', 'product', 'global')
+        AND (uom_factor_source <> 'identity' OR (uom_numerator = 1 AND uom_denominator = 1))),
+    CONSTRAINT ck_other_issue_line_uom_quantity CHECK (abs(inventory_quantity * uom_denominator - quantity * uom_numerator) <= 2 * uom_denominator
+        AND (uom_factor_source <> 'identity' OR inventory_quantity = quantity)),
+    CONSTRAINT ck_other_issue_line_lot_or_serial CHECK (lot_id IS NULL OR serial_number_id IS NULL),
+    CONSTRAINT ck_other_issue_line_serial_quantity CHECK (serial_number_id IS NULL OR inventory_quantity = 1),
+    CONSTRAINT ck_other_issue_line_dimension CHECK (num_nonnulls(cost_center_id, project_id) <= 1)
+);
+CREATE INDEX ix_other_issue_line_company_id_item_id ON other_issue_line (company_id, item_id);
+
+CREATE TABLE opening_balance (                                 -- [inventory] ADR-0075 rule 13; reversible (ADR-0020 rule 7)
+    id                  uuid PRIMARY KEY,
+    company_id          uuid NOT NULL,
+    document_date       date NOT NULL,
+    posting_date        date NOT NULL,
+    note                text CONSTRAINT ck_opening_balance_note CHECK (note IS NULL OR char_length(note) <= 4000),   -- ADR-0074 rule 16
+    recorded_at         timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (company_id, id),
+    FOREIGN KEY (company_id, id) REFERENCES document (company_id, id)
+);
+CREATE TABLE opening_balance_line (                                  -- [inventory] ADR-0075 rule 13; value spread from the item's total per valuation area (ADR-0044 rule 9)
+    id                  uuid PRIMARY KEY,
+    company_id          uuid NOT NULL,
+    opening_balance_id  uuid NOT NULL,
+    line_number         integer NOT NULL CONSTRAINT ck_opening_balance_line_line_number CHECK (line_number > 0),
+    item_id             uuid NOT NULL,
+    warehouse_id        uuid NOT NULL,
+    quantity                types.quantity NOT NULL CONSTRAINT ck_opening_balance_line_quantity CHECK (quantity > 0),   -- as entered, in uom_id (ADR-0056 rule 9)
+    uom_id                  uuid NOT NULL REFERENCES uom (id),
+    uom_numerator           bigint NOT NULL,                    -- the conversion snapshot, as on every document line (ADR-0056 rule 9)
+    uom_denominator         bigint NOT NULL,
+    uom_factor_source       text NOT NULL,                      -- identity, item, product or global (ADR-0056 rule 6)
+    inventory_quantity      types.quantity NOT NULL CONSTRAINT ck_opening_balance_line_inventory_quantity CHECK (inventory_quantity > 0),
+    bin_id              uuid NOT NULL,                       -- the line's bin; the default bin outside bin-managed warehouses (ADR-0023 rule 7; ADR-0031 rule 8)
+    lot_id              uuid REFERENCES lot (id),
+    serial_number_id    uuid REFERENCES serial_number (id),
+    stock_status        text NOT NULL DEFAULT 'available' CONSTRAINT ck_opening_balance_line_stock_status CHECK (stock_status IN ('available', 'quality_inspection', 'blocked')),   -- any status, as in the old books (ADR-0023 rule 7)
+    handling_unit_id    uuid,
+    company_amount      types.amount NOT NULL CONSTRAINT ck_opening_balance_line_company_amount CHECK (company_amount >= 0),   -- the line's value in company currency (value source document)
+    recorded_at         timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (opening_balance_id, line_number),
+    UNIQUE (company_id, id),
+    FOREIGN KEY (company_id, opening_balance_id) REFERENCES opening_balance (company_id, id),
+    FOREIGN KEY (company_id, item_id) REFERENCES item (company_id, id),
+    FOREIGN KEY (company_id, warehouse_id) REFERENCES warehouse (company_id, id),
+    CONSTRAINT fk_opening_balance_line_bin FOREIGN KEY (bin_id, warehouse_id) REFERENCES bin (id, warehouse_id),
+    FOREIGN KEY (company_id, handling_unit_id) REFERENCES handling_unit (company_id, id),
+    CONSTRAINT ck_opening_balance_line_uom_factor CHECK (uom_numerator > 0 AND uom_denominator > 0 AND uom_factor_source IN ('identity', 'item', 'product', 'global')
+        AND (uom_factor_source <> 'identity' OR (uom_numerator = 1 AND uom_denominator = 1))),
+    CONSTRAINT ck_opening_balance_line_uom_quantity CHECK (abs(inventory_quantity * uom_denominator - quantity * uom_numerator) <= 2 * uom_denominator
+        AND (uom_factor_source <> 'identity' OR inventory_quantity = quantity)),
+    CONSTRAINT ck_opening_balance_line_lot_or_serial CHECK (lot_id IS NULL OR serial_number_id IS NULL),
+    CONSTRAINT ck_opening_balance_line_serial_quantity CHECK (serial_number_id IS NULL OR inventory_quantity = 1)
+);
+CREATE INDEX ix_opening_balance_line_company_id_item_id ON opening_balance_line (company_id, item_id);
+
+-- The non-posting demand document of a planned move between two warehouses (ADR-0027 rule 7; ADR-0024 rule 8): each line is a
+-- demand row at the source and a supply row at the destination; stock transfers fulfil it in one step or two (ADR-0075 rule 14).
+CREATE TABLE transfer_order (                              -- [inventory] ADR-0075 rule 14; non-posting, change orders from step 5 (ADR-0028 rule 4)
+    id                      uuid PRIMARY KEY,
+    company_id              uuid NOT NULL,
+    from_warehouse_id       uuid NOT NULL,
+    to_warehouse_id         uuid NOT NULL,
+    transfer_route_id       uuid,                            -- the route planning converted it from; its lead time dates the supply (ADR-0024 rule 3)
+    document_date           date NOT NULL,
+    requested_date          date NOT NULL,                   -- the date the goods are needed at the destination
+    note                    text CONSTRAINT ck_transfer_order_note CHECK (note IS NULL OR char_length(note) <= 4000),   -- ADR-0074 rule 16
+    recorded_at             timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (company_id, id),
+    UNIQUE (company_id, id, from_warehouse_id, to_warehouse_id),
+    FOREIGN KEY (company_id, id) REFERENCES document (company_id, id),
+    FOREIGN KEY (company_id, from_warehouse_id) REFERENCES warehouse (company_id, id),
+    FOREIGN KEY (company_id, to_warehouse_id) REFERENCES warehouse (company_id, id),
+    FOREIGN KEY (company_id, transfer_route_id) REFERENCES transfer_route (company_id, id),
+    CONSTRAINT ck_transfer_order_warehouses CHECK (from_warehouse_id <> to_warehouse_id)
+);
+CREATE TABLE transfer_order_line (                         -- [inventory] ADR-0075 rule 14
+    id                      uuid PRIMARY KEY,
+    company_id              uuid NOT NULL,
+    transfer_order_id       uuid NOT NULL,
+    from_warehouse_id       uuid NOT NULL,                   -- carried from the header, for its key
+    to_warehouse_id         uuid NOT NULL,
+    line_number             integer NOT NULL CONSTRAINT ck_transfer_order_line_line_number CHECK (line_number > 0),
+    item_id                 uuid NOT NULL,
+    quantity                types.quantity NOT NULL CONSTRAINT ck_transfer_order_line_quantity CHECK (quantity > 0),   -- as entered, in uom_id (ADR-0056 rule 9)
+    uom_id                  uuid NOT NULL REFERENCES uom (id),
+    uom_numerator           bigint NOT NULL,                    -- the conversion snapshot, as on every document line (ADR-0056 rule 9)
+    uom_denominator         bigint NOT NULL,
+    uom_factor_source       text NOT NULL,                      -- identity, item, product or global (ADR-0056 rule 6)
+    inventory_quantity      types.quantity NOT NULL CONSTRAINT ck_transfer_order_line_inventory_quantity CHECK (inventory_quantity > 0),
+    lot_id                  uuid REFERENCES lot (id),        -- optional, by agreement; never a serial (as a reservation, ADR-0023 rule 13)
+    recorded_at             timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (transfer_order_id, line_number),
+    UNIQUE (company_id, id),
+    FOREIGN KEY (company_id, transfer_order_id, from_warehouse_id, to_warehouse_id) REFERENCES transfer_order (company_id, id, from_warehouse_id, to_warehouse_id),
+    FOREIGN KEY (company_id, item_id) REFERENCES item (company_id, id),
+    CONSTRAINT ck_transfer_order_line_uom_factor CHECK (uom_numerator > 0 AND uom_denominator > 0 AND uom_factor_source IN ('identity', 'item', 'product', 'global')
+        AND (uom_factor_source <> 'identity' OR (uom_numerator = 1 AND uom_denominator = 1))),
+    CONSTRAINT ck_transfer_order_line_uom_quantity CHECK (abs(inventory_quantity * uom_denominator - quantity * uom_numerator) <= 2 * uom_denominator
+        AND (uom_factor_source <> 'identity' OR inventory_quantity = quantity))
+);
+CREATE INDEX ix_transfer_order_line_company_id_item_id ON transfer_order_line (company_id, item_id);
+-- demand_supply_line gets the key its step 3 column was waiting for (ADR-0028 rule 2).
+ALTER TABLE demand_supply_line ADD CONSTRAINT fk_demand_supply_line_transfer_order_line
+    FOREIGN KEY (company_id, transfer_order_line_id) REFERENCES transfer_order_line (company_id, id);

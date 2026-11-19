@@ -14,6 +14,8 @@ The books are two append-only tables: `journal_entry` (one per posted document t
 
    Note ([ADR-0069](0069-business-unit-dimension.md), proposed 2026-11-17): `journal_entry` gains the nullable `business_unit_trace_id`, the entry's business unit derivation trace.
 2. A material document (DS-09) belongs to the same document, so "zero or one accounting document per material document" ([05](../spec/05-accounting-inventory-core.md)) holds by construction. An entry whose document has no material document is value-only (revaluations, costing adjustments).
+
+    Note ([ADR-0074](0074-core-data-structure-additions.md), proposed 2026-11-19): `journal_entry.note` holds the document's header note, copied at posting; the entry stays append-only (ADR-0074 rule 17).
 3. Manual journal entries are documents of type `general_journal`; moving a balance from one operational account to another (ADR-0010 rule 12) uses documents of type `balance_transfer`. Both are internal documents (ADR-0009 rules 3, 19).
 4. Within a posting date, journal entries have no business order; displays order by posting date and document number. The order in which costing processes stock movements of one day is defined by DS-09 (ADR-0007 rule 10).
 
@@ -47,6 +49,8 @@ Currency columns are foreign keys to `currency.code`, named by currency type as 
     Manual journal lines on control accounts are rejected with `manual_posting_to_control_account` unless `journal.manual_posting_to_control_accounts` is true ([ADR-0048](0048-cash-bank-receivables-payables.md) rule 15).
 
     Note: `journal.manual_posting_to_control_accounts` covers only the effective control kinds `receivable`, `payable` and `loan`. Manual journal lines on accounts whose effective control kind is `inventory`, `gr_ir`, `cost_object` or `fixed_asset` are always rejected with `manual_posting_to_control_account`, whatever the setting, because those subledgers have no manual entry path (ADR-0025 rule 4 decides the effective kind) (holistic review, 2026-11-15).
+
+    Note ([ADR-0074](0074-core-data-structure-additions.md), proposed 2026-11-19): the `partner_id` of a receivable or payable line is the payer (else the bill-to party, else the sold-to partner) of a sales document and the invoicing party (else the ordered-from partner) of a purchase document, which may differ from the header's `partner_id` (ADR-0074 rule 4). The control-kind rule itself is unchanged.
 
 **Integrity**
 

@@ -188,6 +188,8 @@ A capability check (2026-11-15) found that only approvals are configurable: the 
     - tenant environments and promotion pipelines for configuration (W11), and a visual designer over the same artifacts (W12);
     - user-defined fields and tables (spec 16 level 1), which spec 10 places after Phase 1.
 
+    Note ([ADR-0074](0074-core-data-structure-additions.md), proposed 2026-11-19): user-defined fields (without custom tables) are no longer after Phase 1: ADR-0074 rules 8 to 12 give them a minimal seam (a definition table and a `custom_values` column on chosen tables). User-defined tables stay after Phase 1.
+
 **Commands, catalogs and lab**
 
 27. Commands and queries (module, effect class, flags):

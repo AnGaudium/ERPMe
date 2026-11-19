@@ -87,6 +87,8 @@ The migration period is then locked.
      - an opening document must first be reversed (rule 14).
 
      Abandoning keeps the key map.
+
+    Note ([ADR-0074](0074-core-data-structure-additions.md), proposed 2026-11-19): `import_key_map` is `external_id_map` (company, source system, table, external key, entity ID), with the functions `external_id_resolve` and `external_key_of`. A batch names its source system (a field of `CreateImportBatch` when DS-21 is written) and keeps its provisional map in the batch; `RunImport` writes the rows with the records (ADR-0074 rule 7).
 6. Old accounts. `old_account_map` maps each old account to one operational account, or splits it by detail given in the file or by a fixed share (flagged). Every account of the old trial balance must be mapped before reconciliation can pass.
 
 **Opening documents** (internal, reversible while the migration is open, `is_approval_hold_allowed: false`; import chunks are consequence postings, ADR-0043 rule 5)
@@ -115,6 +117,8 @@ The migration period is then locked.
    - **Checks.** INV-20 to INV-24 hold.
 
    Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): opening stock lines carry the line unit block, with the snapshot resolved at load; quantities with more decimals than their unit holds are rejected and listed with the unit's decimals (rules 9, 21).
+
+    Note ([ADR-0075](0075-stock-documents.md), proposed 2026-11-19): the DDL is `opening_balance` and `opening_balance_line` (item, warehouse, bin, status, handling unit, lot or serial, the unit block and the spread `company_amount`); it posts only in the migration period (`migration_not_open`, INV-870), and the area's total divided by the quantity is the first `preliminary_price` with `price_source` `opening` (ADR-0075 rule 13; INV-872).
 10. Year-to-date at a mid-year cut-over. Income and expense of the fiscal year before the cut-over are loaded as `opening_turnover` rows (account, debit and credit turnover in company currency). These are non-posting figures that statutory reports of that year read (DS-26); the year's profit to date is already in the post-closing balance of retained earnings. Flagged.
 
     Note: `opening_turnover` is owned by `ledger` and written by `CreateOpeningTurnover`. Its rows hold turnover before closing entries, and carry `start_date` and `end_date` instead of a fiscal year, because the first fiscal year after a mid-year cut-over is short. DDL in DS-06 ([ADR-0049](0049-statutory-reporting-and-printing.md) rule 14).

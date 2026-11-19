@@ -546,6 +546,19 @@ Outcome and violation enumerations are not error codes and are not catalogued he
 | `costing_rate_overlap` | validation | 422 | no | Two rates of one costing sheet row and condition set overlap in dates ([ADR-0072](../adr/0072-costing-sheet-and-cost-component-structure.md) rule 7) |
 | `cost_component_detail_limit` | precondition | 422 | no | A thirteenth active detailed cost component in the company ([ADR-0072](../adr/0072-costing-sheet-and-cost-component-structure.md) rule 2) |
 | `cost_component_detail_in_use` | precondition | 422 | no | A change of the posting component of a detailed cost component that an estimate line or period cost detail names, or the deactivation of a default ([ADR-0072](../adr/0072-costing-sheet-and-cost-component-structure.md) rule 2) |
+| `party_invalid` | validation | 422 | no | A document party that is inactive, of another company, or with an address that is not its own ([ADR-0074](../adr/0074-core-data-structure-additions.md) rule 5) |
+| `external_id_taken` | precondition | 422 | no | `SetExternalId` for a key that names another entity in the source system ([ADR-0074](../adr/0074-core-data-structure-additions.md) rule 7) |
+| `external_id_conflict` | precondition | 422 | no | `SetExternalId` for an entity that already has another key in the source system ([ADR-0074](../adr/0074-core-data-structure-additions.md) rule 7) |
+| `external_id_table_invalid` | validation | 422 | no | `SetExternalId` for a table that is not a company table with an `id` ([ADR-0074](../adr/0074-core-data-structure-additions.md) rule 7) |
+| `custom_field_unknown` | validation | 422 | no | A `custom_values` key with no definition for the company and table ([ADR-0074](../adr/0074-core-data-structure-additions.md) rule 10) |
+| `custom_field_invalid` | validation | 422 | no | A custom value that does not fit its data type or validation, or a change of a retired field ([ADR-0074](../adr/0074-core-data-structure-additions.md) rule 10) |
+| `custom_field_required` | validation | 422 | no | A missing value of a required custom field on `Create` or `Update` ([ADR-0074](../adr/0074-core-data-structure-additions.md) rule 10) |
+| `custom_field_in_use` | precondition | 422 | no | A change of the data type of a custom field that a record already carries a value for ([ADR-0074](../adr/0074-core-data-structure-additions.md) rule 10) |
+| `custom_field_limit` | precondition | 422 | no | A 31st active custom field definition for one company and table ([ADR-0074](../adr/0074-core-data-structure-additions.md) rule 8) |
+| `reason_invalid` | validation | 422 | no | A reason that is inactive, of another company or of another kind than the column takes ([ADR-0074](../adr/0074-core-data-structure-additions.md) rule 13) |
+| `dispatch_has_receive` | precondition | 422 | no | `Reverse` of a transfer dispatch that has a posted receive ([ADR-0075](../adr/0075-stock-documents.md) rule 2) |
+| `reason_required` | validation | 422 | no | A reason of a kind whose `documents.reason_required.<kind>` setting is true is missing ([ADR-0074](../adr/0074-core-data-structure-additions.md) rule 22) |
+| `transfer_order_line_invalid` | validation | 422 | no | A stock transfer line names a transfer order line of another item, or outside its warehouses: a direct transfer between them, a dispatch from the source, a receive into the destination ([ADR-0075](../adr/0075-stock-documents.md) rule 14) |
 
 ### Check results
 

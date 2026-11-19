@@ -34,6 +34,8 @@ DS-25 keeps payments, bank statements, matching UX, netting, payment allocation 
    The side table is `open_item_collection`; `original_posting_date` and the due-date check are corrected in the DDL ([ADR-0048](0048-cash-bank-receivables-payables.md) rules 17, 18).
 
    Note: the amounts of an open item are signed like journal amounts: positive is debit, negative is credit, in every currency, so a credit-side item has negative original and open amounts. Comparisons such as "never above the open amount" use magnitudes. DS-06 checks that the sign of `original_transaction_amount` matches `natural_side`, and that a settled item has all open amounts zero (holistic review, 2026-11-15).
+
+    Note ([ADR-0074](0074-core-data-structure-additions.md), proposed 2026-11-19): the open item's `partner_id` is the payer (else the bill-to party, else the sold-to partner) of a sales document and the invoicing party of a purchase document, as the posting line carries it (ADR-0074 rule 4; INV-863). The identity rule is unchanged.
 2. `open_item_kind` is a core catalog: `invoice`, `credit` (credit notes and debit notes that reduce an invoice), `advance` (non-monetary per spec 07, excluded from revaluation by kind, ADR-0011 rule 18), `payment_on_account` (money received or paid without an item to settle), `loan` (one per drawdown, ADR-0025), `other`. DS-25 may add kinds; statutory presentation per kind and side is DS-26's (ADR-0010 rule 15), and the meaning of each kind for presentation is the regime's (open question).
 
    Note: the format of that split is [ADR-0049](0049-statutory-reporting-and-printing.md) rule 7.
@@ -96,6 +98,8 @@ DS-25 keeps payments, bank statements, matching UX, netting, payment allocation 
     Indexes: `(company_id, partner_id)`, `(company_id, account_id)` and `(company_id, due_date)` where neither settled nor reversed; `(origin_document_id)`.
 
     Note: `ListOpenItem` shows an item only within its origin document's read owner scope; `GetPartnerExposure` totals without listing, so it is registered `is_owner_scoped: false` and needs owner scope `branch` or `company` ([ADR-0054](0054-users-roles-and-authorizations.md) rule 15).
+
+    Note ([ADR-0074](0074-core-data-structure-additions.md), proposed 2026-11-19): exposure per partner is exposure per payer, else bill-to party, else sold-to partner (ADR-0074 rule 4; ADR-0030 rule 6 note).
 16. `general_journal` lines may declare `creates` or `settles` when the flagged rule on manual journals (ADR-0014 rule 10) allows posting to control accounts; step 1 tests run with that flag on in the test configuration, so the interfaces and invariants are exercised from step 1.
 
 **Placement**

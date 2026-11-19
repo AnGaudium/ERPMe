@@ -50,6 +50,6 @@ Phases 0 and 1 build only what a trading business, including importers with fore
 
 Planning is designed in [ADR-0024](../adr/0024-planning.md); its phase is the author's decision (open question).
 
-**After Phase 1:** user-defined fields and tables, plugin SDK, per-customer AI customization pipeline, multi-provider seatmap, scheduled multi-provider evaluation runs, local models and pseudonymization, catch weight, other countries' localization packages (by the community), additional e-invoice providers, pgvector, chat channels, offline warehouse app, multi-level approval, assembly (Phase 2).
+**After Phase 1:** form builders and custom tables (a minimal custom-field seam, definitions plus `custom_values` on the listed masters and document headers, is in Phase 1, [ADR-0074](../adr/0074-core-data-structure-additions.md)), plugin SDK, per-customer AI customization pipeline, multi-provider seatmap, scheduled multi-provider evaluation runs, local models and pseudonymization, catch weight, other countries' localization packages (by the community), additional e-invoice providers, pgvector, chat channels, offline warehouse app, multi-level approval, assembly (Phase 2).
 
 **Support time:** from go-live, reserve 30–50% of time for the pilot customer. No feature releases on closing days or near tax deadlines.

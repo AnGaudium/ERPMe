@@ -46,6 +46,8 @@ Tax codes, dated rates and a dated tax matrix are package rules, read live. The 
 3. `tax_matrix`: `direction`, `partner_tax_group`, `item_tax_group`, `effective_from`, `tax_codes`, basis. It is a package rule (ADR-0016 rule 5).
    - **Company rows.** A company may add `company_tax_matrix` rows only for keys that contain a group the company added itself (ADR-0018 rule 16). A row that would shadow a package key is rejected with `tax_matrix_row_invalid`, so the legal mapping and its verification gate cannot be bypassed.
    - **Groups.** Item and partner tax groups are package templates copied into the company.
+
+    Note ([ADR-0074](0074-core-data-structure-additions.md), proposed 2026-11-19): the document's partner tax group, and the tax ID copied to `tax_line`, are those of its bill-to party (else the sold-to partner) on sales and of its invoicing party on purchases (ADR-0074 rule 4).
 4. Production gate. Reading an `unverified` tax code, rate or matrix row in a `production` installation fails with `regime_setting_unverified`, as for settings (ADR-0016 rule 12).
 5. Settings. The core registers these keys with their schemas, all with `date_basis` `document_date` (ADR-0016 rule 10):
    - `tax.rate_date_basis` (per document type: which date is the tax date);
