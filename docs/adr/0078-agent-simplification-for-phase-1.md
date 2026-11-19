@@ -33,7 +33,7 @@ The safety model is unchanged: the hard floors, the permission intersection, tai
    A Phase 1 agent type is listed in this table. Adding one is a scope change, for the author (ADR-0005 item 2).
 
    Two details of the table:
-   - `purchase_invoice` keeps both entry paths of ADR-0051 and ADR-0057 rule 26: a stored e-invoice record, and (version 1.1.0) a document extraction that a person verified after the deterministic ladder.
+   - `purchase_invoice` keeps both entry paths of ADR-0051 and ADR-0057 rule 26: a stored e-invoice record, and (version 1.1.0) a document extraction that a person verified after the deterministic ladder. Its Phase 1 declaration is the "next version" of ADR-0063 rule 11: it declares the wake-up kind `supplier_invoice_received` `configurable`, so `agents.purchase_invoice.wake_up_mode.supplier_invoice_received` applies with default `always`.
    - The `assistant` declaration's interim ceilings, new here: 8 LLM calls, 40 tool calls, 40,000 input tokens, 4,000 output tokens, USD 0.50, 120 seconds and 2,000 rows read per run. `assist.max_cost_per_run` (default USD 0.20, bounds 0.01 to 0.50) may only lower the cost ceiling. Its evaluation set passes at 90% of all tasks and 100% of the refusal and taint tasks.
 
 2. Agent types moved to Phase 2, each keeping its design, DDL draft and catalog rows as seams:
@@ -132,7 +132,7 @@ The author first accepted level B (three agent types), then revised it the same 
 - **ADR notes:** ADR-0050 rules 14, 22, 30; ADR-0051 (agent types) and rules 4, 9; ADR-0057 (vision reader as a minimal declaration); ADR-0058 and ADR-0059 (who drafts artifacts); ADR-0060 (routing from the assistant); ADR-0062; ADR-0063 rule 29 (removed definitions); ADR-0064; ADR-0065; ADR-0073 rule 1 (agent type declarations); ADR-0077 rule 23.
 - **Catalogs:** nine rows removed from `settings.csv`.
 - **Runbook:** the agents table of steps 5–9 and the step 10 lines name the six agent types.
-- **Author's documents not edited:** spec 10 (Phase 1 agents, data migration and quotation agents), spec 11 (four go-live agents), spec 14 and spec 00 (shadow as a mode) still describe the earlier design. Their wording is the author's (open question).
+- **Author's documents** (author's delegation, 2026-11-19): spec 10 (Phase 1 agent list and build table), spec 11 (agents line), spec 14 (evaluation instead of shadow mode) and two glossary rows of spec 00 (agent mode, effective agent mode).
 - **ADR-0044 rule 15:** the data migration agent's part moves to Phase 2 (note).
 
 ## Revisit when

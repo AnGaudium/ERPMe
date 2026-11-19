@@ -644,6 +644,6 @@ A version cleared only by the human its tainting run acted for (small-company mo
 
 ## 19. Conflicts found
 
-Conflict: ADR-0063 rule 11 declares `supplier_invoice_received` configurable "in its next version"; ADR-0050 rule 12 note keeps every kind `always` for the ADR-0051 types. Treated as `always` unless the declaration says `configurable` (3.7).
+Resolved: the Phase 1 `purchase_invoice` declaration is ADR-0063 rule 11's "next version" and declares `supplier_invoice_received` `configurable`, default `always` (ADR-0078 rule 1; ADR-0050 rule 12 note).
 
-Conflict: two notes of ADR-0054 rule 11 seed `start_agent` differently. Followed the later note: `it_administrator` holds no agent type, `owner` holds all, and the `assistant` leaf goes to every UI template except `it_administrator` and `auditor`. The rest of the seed is in `role-template-levels.csv`.
+Resolved: two notes of ADR-0054 rule 11 seed `start_agent` differently, and the later one says it replaces the earlier seed; this text follows it: `it_administrator` holds no agent type, `owner` holds all, and the `assistant` leaf goes to every UI template except `it_administrator` and `auditor`. The rest of the seed is in `role-template-levels.csv`.

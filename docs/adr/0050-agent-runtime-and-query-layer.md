@@ -121,6 +121,8 @@ Status: accepted (2026-11-15) under ADR-0005, reviewed by Claude Fable 5.2 (buil
     Note ([ADR-0063](0063-configurable-policy-settings.md), proposed 2026-11-15): a kind declared `configurable` takes the company setting `agents.<agent_type>.wake_up_mode.<kind>` (`always`, the default, `by_rule`, `off`); the quotation agent's `inbound_message_matched` and the purchase invoice agent's `supplier_invoice_received` are declared configurable in their next versions (rule 11).
 
     Note ([ADR-0064](0064-production-agent.md), proposed 2026-11-15): agent types `production` (scope `subject` on `production_order` or `production_version`, `may_read_untrusted: false`), `production_capture` (scope `subject` on one `production_order` resolved from a `document_extraction`, tainted at start) and `production_variance` (scope `subject` on `analysis_question` or `production_order`, field class `cost`), each with its leaf `agent_<agent_type>` (rule 1).
+
+    Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-19): the Phase 1 `purchase_invoice` declaration declares `supplier_invoice_received` `configurable` (ADR-0063 rule 11's next version), default `always`; every other kind of the Phase 1 types stays `always`.
 13. Prompt templates:
     - **Files.** `backend/nativeflows/agents/prompts/<agent_type>/<template_code>.md`, Markdown with front matter: `code`, `version` (semver), `seat`, `inputs` (field paths, with `required`), `output_schema` (pydantic model path and its version).
     - **Overlays.** Provider-specific wording is a small overlay file `<template_code>.<provider>.md` (spec 17). The base and overlay are hashed together.
