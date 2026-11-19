@@ -69,6 +69,8 @@ The customs declaration, supplier cost invoices and invoice price differences to
    | Receipt period `locked` | `closed`: rule 7. The posting date must lie in the first unlocked inventory period, otherwise `landed_cost_period_mismatch` names it |
 
    Price-difference documents written by `inventory.contract.adjust_receipt_value` use the postable period, dates and split range of [ADR-0030](0030-commercial-seams-and-imports.md) rule 2 instead. Targets of one document must fall into one case and one receipt period. Otherwise `landed_cost_period_mismatch` lists the groups to split into separate documents. The plan shows each target's mode.
+
+   Note (author's delegation, 2026-11-19): confirmed: a landed cost goes into the receipt's period while that period is open. When it is locked, rule 7 applies (the first unlocked period, split by consumer); that is not an error. `landed_cost_period_mismatch` only names the required period, its date range or the groups to split, which is consistent with this.
 7. Closed mode, method `consumer_split`, the interim seed (shares landing on production consumption go to the order's material pool, [ADR-0035](0035-production-costing.md) rule 8):
    - The core reruns ADR-0020 rule 12's exact solve for the item over every locked period from the receipt's period on, once as posted and once with the allocated amount added to the receipt. It takes the difference per movement type offset key, item and warehouse.
    - The quantity on hand at the end of the last locked period takes the rest, per warehouse that holds it, as a `receipt_addition` value-only line in the posting period.
@@ -88,6 +90,8 @@ The customs declaration, supplier cost invoices and invoice price differences to
    - Whether `landed_cost` is an internal document that may be reversed (ADR-0009 rules 18–20) is an open question. Interim, flagged: `is_reversible` true, with the extra precondition that no `stock_value` it touched becomes negative.
    - A landed cost targeting a receipt refers to it, so the receipt cannot be reversed while it stands (`document_referenced`, ADR-0009 rule 19).
    - A value-only inventory line that would make a warehouse's `stock_value` negative is rejected with `negative_stock_value`; values left at zero quantity are handled by costing (ADR-0020 rule 13).
+
+   Note (author's delegation, 2026-11-19): confirmed: a landed cost document is reversible as long as no stock value becomes negative.
 
 **Source documents (step 5)**
 

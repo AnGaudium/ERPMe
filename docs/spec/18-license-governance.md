@@ -3,7 +3,7 @@
 | Layer | License | Reason |
 | --- | --- | --- |
 | Core and business modules | AGPL-3.0, OCA-style | Every modification and every plugin running in the core's process must be open. LGPL is not chosen because it allows closed modules running with the core, part of why Odoo's ecosystem is half-open |
-| SDK, command schemas, client libraries | Apache-2.0 | External integrations and agents are not constrained |
+| Client library and command schemas | Apache-2.0 | External integrations and agents are not constrained |
 | Documentation | CC BY-SA 4.0 | Allows translation and redistribution |
 | Synthetic dataset | CC0 | Free use for demos and training |
 

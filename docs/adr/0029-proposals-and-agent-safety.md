@@ -61,7 +61,7 @@ The hard floor on what a tainted run may read stays the literal spec 03 rule 1 u
 4. Agent calls: Policy may make people propose too, through a deny-only `direct_master_data_change` rule ([ADR-0043](0043-policy-and-approval.md) rule 12).
    - **Scope.** The dispatcher rejects an allowed-target command with `proposal_required` when it comes from an agent actor, or from any actor carrying an `origin_agent_run_id`. The executing consumer carries none, because the human `Approve` reset the origin (ADR-0013 rule 2). This applies in both simulate and execute mode. The error's fix names `CreateChangeProposal`.
    - **Humans.** A human with the permission may run such a command directly, unless policy (DS-28) requires a proposal for humans too.
-   - **Bank accounts.** Interim, flagged: a change of a partner's bank account always goes through a proposal, also when a human starts it, approved by a human who wrote no version of it.
+   - **Bank accounts.** Interim, flagged: a change of a partner's bank account always goes through a proposal, also when a human starts it, approved by a human who wrote no version of it. Note (author's delegation, 2026-11-19): confirmed for every company, the small-company mode included, and made a policy floor ([ADR-0043](0043-policy-and-approval.md) rule 9 note).
    - **Imports.** Human-run DS-21 import batches are outside the carrier.
 
    A person's direct `UpdateAgentTypeSetting` that sets `assisted` returns `proposal_required`: promotion of an agent type always goes through a proposal ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 14).

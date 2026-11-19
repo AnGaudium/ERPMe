@@ -21,6 +21,13 @@ No parallel run with the old software; the pilot goes live fully on NativeFlows,
 7. Load test on the large dataset against the step 4 performance baseline.
 8. Independent review of stock posting, outbox and idempotency by a reviewer agent from a different provider.
 
+**Non-functional targets (interim, author's delegation, 2026-11-19; revisited with measured data at this step's gate):** work package 7's load test, and any earlier scale test on the large synthetic dataset, use them as exit criteria.
+
+- **Volume:** design for 1,000,000 posted documents and 5,000,000 journal lines a year per company, ten times the large dataset's 100,000 documents a year; 50 concurrent users per company; up to 20 companies per installation.
+- **Latency:** simulate or execute of a single command at p95 ≤ 1 s; list and query reads at p95 ≤ 2 s for the first page; agent tool calls are excluded, because model time is separate.
+- **Batch:** period-end costing ≤ 30 min for one company at the design volume; an MRP run ≤ 15 min; the nightly scenario replay within the budget of [ADR-0003](../adr/0003-build-operating-rules.md) R6.
+- **Recovery:** RPO ≤ 15 min (WAL archiving) and RTO ≤ 4 h.
+
 **Platform-complete review (before the gate is declared):** the author walks through, with evidence:
 
 - every DS item DS-01 to DS-39 is done by the [design/README.md](../design/README.md) rule;

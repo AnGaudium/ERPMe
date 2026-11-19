@@ -74,6 +74,8 @@ DS-25 keeps payments, bank statements, matching UX, netting, payment allocation 
 7. Open-item accounts use the `specific` method only; `moving_average` (ADR-0011 rule 15) applies to balance-level accounts such as cash and bank (interim, flagged; open question).
 8. Overpayment: the excess of a payment over the items it names is posted by the document as a new `payment_on_account` item (interim, flagged: the business may instead refund or hold). Write-offs and early-payment discounts settle items through the same interface with their own lines; their accounting and approval are DS-25's and the regime's (flagged).
 9. Matching items of one partner and account in one currency is an `open_item_matching` document (internal, ADR-0009 rule 19): two lines netting to zero in transaction currency, each settling one item at that item's carrying amount, plus realized FX lines for the difference (flagged). A credit note always creates a `credit` item; applying it to an invoice is always an `open_item_matching`, which the correction document may create in the same command. Who may post a matching (agent draft, policy, human) is DS-28's. Netting across accounts or partners, and across currencies, is DS-25's. Matchings pass the usual policy points ([ADR-0043](0043-policy-and-approval.md) rule 17).
+
+    Note (author's delegation, 2026-11-19): rules 2, 6, 8 and 9 are confirmed: an overpayment becomes a payment on account, FX is realized at clearing, and revaluation is released at clearing. INV-32 is rewritten to cover the settled and open parts of an open item (invariants.csv).
 10. Revaluation lines (ADR-0011 rule 19) are `adjusts` lines on items of accounts the regime revalues per open item; accounts revalued per balance carry no item reference on revaluation lines.
 
 **Reversal, moves, loans**
@@ -105,6 +107,8 @@ DS-25 keeps payments, bank statements, matching UX, netting, payment allocation 
 **Placement**
 
 17. Design now; proposed build: step 1 (table, catalog, payment terms, the posting path, matching, queries); step 4 (opening items per invoice, DS-21); step 5 (invoices, credit notes); step 6 (DS-25 processes). The step change is the author's decision. Opening items per old invoice: `opening_open_item_entry` ([ADR-0044](0044-data-migration-and-export.md) rule 8).
+
+    Note (author's delegation, 2026-11-19): the proposed build is decided: the open-item core (tables, catalog, clearing and the posting path) is built in step 1; opening items come in step 4, invoices in step 5 and the DS-25 processes in step 6. Moving this in spec 11 and the runbook is the author's documents' edit, not made here.
 
 ## Context
 

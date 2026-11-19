@@ -73,6 +73,8 @@ The other optimizer findings are either decided elsewhere (OPT-02 in the adjudic
 
 15. ADR-0013 rule 6 allows the consumer queue `jobs` beside `events` and `integrations`, for consumers that do long-job work. ADR-0030 rule 9's import chunks are the first. Such a consumer has a lease of its 15-minute timeout (ADR-0022 rule 9) plus one minute. Whether all jobs move onto the delivery machinery is the OPT-08 question for the author.
 
+    Note (author's delegation, 2026-11-19): OPT-08 is decided: Procrastinate is dropped. System jobs, scheduled jobs and the PDF worker run on the outbox workers and queues that already exist (ADR-0013, ADR-0022 rule 12). A spike at step 0 confirms it; if the spike needs more than one small module, Procrastinate stays.
+
 **One shape for exceptions** (OPT-10)
 
 16. From step 5, every exception is one `work_item` (DS-29) with `kind`, `subject` (table and ID), `evidence` (links to a derivation trace, pegging, task or delivery), `owner` and `due_date`. The claimable unit is the single work item (Principle 8).

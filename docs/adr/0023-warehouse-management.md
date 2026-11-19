@@ -215,6 +215,8 @@ A small shop and a managed distribution warehouse run on the same model.
 
     Note ([ADR-0071](0071-work-orders-and-shop-floor-execution.md), proposed 2026-11-17): `inventory.contract` gains a change of a reservation's `destination_bin_id`, used when a WO moves to another work center; staged stock gets a move task to the new supply bin (ADR-0071 rule 16).
 
+    Note (author's delegation, 2026-11-19): the reservation interim is confirmed: no over-reservation, first come first served, and the newest reservation is dropped on a stock loss; production keeps the order of [ADR-0064](0064-production-agent.md) rule 7. The Phase 1 feature list of this ADR is accepted: wave picking is in the second slice at step 5; slotting, cross-docking, dock appointments and labor management come later; putaway, picking, short pick and count flows join the step 3 gate (the gate text in spec 11 and the runbook is the author's and is not edited here).
+
 **Picking and outbound**
 
 14. Pick tasks:
