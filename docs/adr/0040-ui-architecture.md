@@ -191,7 +191,7 @@ The web UI is one more client of the command and query layer. It writes data onl
     Note ([ADR-0076](0076-internal-messaging-and-notifications.md), proposed 2026-11-19): a `MessageCreated` header (subject: the message) is resolved to its conversation and forwarded only to sessions whose user may read that conversation now, through messaging's registered visibility function, and a `NotificationCreated` header only to its recipient's sessions; no tab subscribes to the noun `message`; headers carry IDs, never text (ADR-0076 rule 8).
 14. Notifications to people beyond live screens (e-mail, push) are after Phase 1 (spec 07).
 
-    Note ([ADR-0076](0076-internal-messaging-and-notifications.md), proposed 2026-11-19): ADR-0076 (proposed; its Phase 1 placement is the author's decision) adds an in-app inbox fed by messages and work items, and notification e-mail grouped per person every 5 minutes or in a daily digest, without message text (rules 6, 7). Push stays after Phase 1.
+    Note ([ADR-0076](0076-internal-messaging-and-notifications.md), proposed 2026-11-19): ADR-0076, in Phase 1 by the author's decision of 2026-11-19, adds an in-app inbox fed by messages and work items, and notification e-mail grouped per person every 5 minutes or in a daily digest, without message text (rules 6, 7). Push stays after Phase 1.
 
 **Language, keyboard, display**
 

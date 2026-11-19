@@ -59,7 +59,9 @@ def work_item_recipients(item, stage_members=()):
     if item["owner_kind"] == "user":
         return [item["owner_user"]]
     if item["owner_kind"] == "approval_stage":
-        return sorted(stage_members) if len(stage_members) <= 20 else []
+        # stage_members: (position, display name) pairs in the stage's member list; the first 20 from the top (null position last)
+        ordered = sorted(stage_members, key=lambda m: (m[0] is None, m[0] or 0, m[1]))
+        return [m[1] for m in ordered[:20]]
     return []
 
 
@@ -135,10 +137,10 @@ f4 = fan_out("record", {"author": "lan", "mentions": ["minh"]}, {"hoa": "all"}, 
 check("F04 a person who cannot read the record now gets nothing, even as a follower or a mention", f4 == {}, f4)
 f5 = fan_out("channel", {"author": "lan", "mentions": [], "parent_author": "minh", "earlier_repliers": ["hoa"]}, {"minh": "mentions", "hoa": "mentions", "tuan": "mentions"}, lambda u: True)
 check("F05 a reply notifies the parent's author and earlier repliers; a channel member at mentions gets nothing else", f5 == {"minh": "reply", "hoa": "reply"}, f5)
-check("F06 a work item notifies its owning user; an approval stage's eligible members when at most 20, else nobody; a role nobody",
+check("F06 a work item notifies its owning user; an approval stage's eligible members, at most 20, the first 20 from the top of the member list (null position last); a role nobody",
       work_item_recipients({"owner_kind": "user", "owner_user": "lan"}) == ["lan"]
-      and work_item_recipients({"owner_kind": "approval_stage"}, {"a", "b", "c"}) == ["a", "b", "c"]
-      and work_item_recipients({"owner_kind": "approval_stage"}, {str(i) for i in range(25)}) == []
+      and work_item_recipients({"owner_kind": "approval_stage"}, [(2, "b"), (1, "a"), (None, "c")]) == ["a", "b", "c"]
+      and work_item_recipients({"owner_kind": "approval_stage"}, [(i, f"u{i:02d}") for i in range(25, 0, -1)]) == [f"u{i:02d}" for i in range(1, 21)]
       and work_item_recipients({"owner_kind": "role"}) == [])
 
 # ======================================================================= M

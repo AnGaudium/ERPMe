@@ -5,7 +5,7 @@ Design item: DS-63 (new). Related decisions: none new. Principles 3, 8, 12. ADR-
 
 ## Decision
 
-The author's request of 2026-11-19: internal notifications and conversations "like Slack, but simple and light". Today a person sees a pending approval or an exception only by opening the work queue (ADR-0042); people cannot talk about a document inside the system; and e-mail and push notifications are after Phase 1 (ADR-0040 rule 14; spec 07). This ADR proposes a small messaging core owned by `work`. Whether it belongs in Phase 1 is the author's decision (open question); the design assumes step 5.
+The author's request of 2026-11-19: internal notifications and conversations "like Slack, but simple and light". Today a person sees a pending approval or an exception only by opening the work queue (ADR-0042); people cannot talk about a document inside the system; and e-mail and push notifications are after Phase 1 (ADR-0040 rule 14; spec 07). This ADR proposes a small messaging core owned by `work`, in Phase 1 from step 5 (the author's decision of 2026-11-19).
 
 | Need | Today | Decision |
 | --- | --- | --- |
@@ -46,7 +46,7 @@ It is deliberately small: seven tables, plain text, one level of replies, no sea
 
 6. `notification` is one inbox row per recipient, written only by the internal command `CreateNotification`, which the transactional consumer `messaging_fanout` runs (ADR-0013 rules 6, 9; the "notifications" row of ADR-0027 rule 9). Posting stays one small transaction.
    - **From messages** (`MessageCreated`): one notification per recipient and message (`ux_notification_recipient_message`), of the strongest kind that applies: `mention`; `direct_message` (a member of the direct conversation with `notify_level` other than `none`); `reply` (the parent's author and earlier repliers in that thread); `followed` (a member of a channel or record thread with `notify_level` `all`). The author, a member at `none`, and anyone who cannot read the conversation now get nothing. Defaults: a direct member, a follower and a mentioned person start at `all`; a channel member at `mentions` (set by the command).
-   - **From work items** (`WorkItemRaised`, `WorkItemAssigned`, ADR-0042 rule 14): a `work_item` notification to the item's owning user; for an item owned by an approval stage (ADR-0055 rule 12), to the stage's eligible members as ADR-0055's registered visibility function resolves them, when they are at most 20, else to nobody (the queue shows it; the cap of 20 is an interim default, open question); an item owned by the role `company_owner`, the fallback when nobody can approve (ADR-0055 rule 13), notifies its holders, up to 20; an item owned by any other role notifies nobody. Holders whom `RunApprovalEscalation` makes eligible later see the queue but get no notification. One unread notification per person and work item (`ux_notification_recipient_work_item`), so a re-raise or a reassignment does not duplicate it.
+   - **From work items** (`WorkItemRaised`, `WorkItemAssigned`, ADR-0042 rule 14): a `work_item` notification to the item's owning user; for an item owned by an approval stage (ADR-0055 rule 12), to the stage's eligible members as ADR-0055's registered visibility function resolves them, at most 20: when there are more, the first 20 from the top of the stage's member list (`approval_stage_member.position`; a role member's holders by display name; a substitute right after the person it stands for), the others seeing the item in the queue (the author's decision of 2026-11-19); an item owned by the role `company_owner`, the fallback when nobody can approve (ADR-0055 rule 13), notifies its holders, the first 20 by display name; an item owned by any other role notifies nobody. Holders whom `RunApprovalEscalation` makes eligible later see the queue but get no notification. One unread notification per person and work item (`ux_notification_recipient_work_item`), so a re-raise or a reassignment does not duplicate it.
    - **Text.** A notification stores IDs only (kind, actor, conversation, message, work item). Its line ("Lan mentioned you in SO-2026-0042", "Approval waiting: PO-2026-0107") is rendered at read time from current names and document numbers, so erasure reaches it and no message text or partner name is stored.
    - **Reading.** Opening the conversation or the work item marks its notifications read; `UpdateNotification` marks one or all of the caller's as read. `ListNotification` and its unread count hide what the reader can no longer read.
    - **No e-mail from replays or tainted events.** A notification written from a delivery made by `ReplayEvents` (ADR-0013 rule 16), from an event older than 24 hours, or from a tainted event (ADR-0013 rule 11: a consumer on a tainted chain sends nothing out) is never e-mailed; it stays in the inbox.
@@ -119,7 +119,7 @@ The lesson: an ERP's own chat should cover talk about its records and tell peopl
 | One grouped e-mail per run or digest, re-checked at send, no text (chosen) | Quiet; nothing sent after access is lost | A 5-minute delay |
 | Delete old messages for retention | Simple | Replies block parents; sequences break |
 | Clear old bodies, keep rows (chosen) | Threads and order stand | Metadata stays until the conversation goes |
-| Notify every holder of a role or stage | Nobody misses it | Floods a team; capped at 20 for stages |
+| Notify every holder of a role or stage | Nobody misses it | Floods a team; the first 20 of a stage, top to bottom |
 | Search in Phase 1 | Useful | A new read path to secure; cut for lightness |
 
 ## Consequences
@@ -131,9 +131,9 @@ The lesson: an ERP's own chat should cover talk about its records and tell peopl
 
 ## Documents updated
 
-- **ADRs** (notes tagged "ADR-0076, proposed 2026-11-19"): ADR-0013 rule 10; ADR-0027 rule 1; ADR-0038 rule 14; ADR-0040 rules 13 and 14; ADR-0042 rule 14; ADR-0052 rule 25; ADR-0063 rule 29.
+- **ADRs** (notes tagged "ADR-0076, proposed 2026-11-19"): ADR-0013 rule 10; ADR-0027 rule 1; ADR-0038 rule 14; ADR-0040 rules 13 and 14; ADR-0042 rule 14; ADR-0052 rule 25; ADR-0055 rule 4 (`approval_stage_member.position`); ADR-0063 rule 29.
 - **Catalogs:** authorization-areas.csv (2), role-template-levels.csv (16), settings.csv (3), invariants.csv (5), edge-cases.csv (10).
-- **Design:** DS-63-messaging.sql (new); DS-04 (eight errors); DS-16 and DS-17 (blocks and counts); backlog (DS-63); the glossary (new rows only); the generated overview.
+- **Design:** DS-63-messaging.sql (new); DS-15-access.sql (`approval_stage_member.position`); spec 07's approval-channels line (the author's decision of 2026-11-19); DS-04 (eight errors); DS-16 and DS-17 (blocks and counts); backlog (DS-63); the glossary (new rows only); the generated overview.
 - **Lab:** `t30_messaging.py` and the lab README.
 - **Index and log:** docs/adr/README.md; docs/open-questions.md; docs/runbook/step-log.md.
 
@@ -153,7 +153,7 @@ The lesson: an ERP's own chat should cover talk about its records and tell peopl
 - **EC-341** `mention_without_access`: mentioning a person who cannot read the purchase order is refused with `mention_not_permitted`; 21 mentions are refused with `mention_limit`.
 - **EC-342** `private_channel_hidden`: a non-member, and a member who left, see nothing of a private channel in `ListConversation`, `ListMessage` or its attachments.
 - **EC-343** `direct_group_fixed`: adding a fourth person to a direct conversation of three is refused with `direct_conversation_fixed`; creating one with the four opens a new conversation; a third party cannot open the pair's conversation.
-- **EC-344** `approval_notifies_stage`: a purchase order waiting at a stage with three eligible approvers notifies the three, each e-mailed after 5 minutes if unread; a stage of 25 notifies nobody and the queue shows the item.
+- **EC-344** `approval_notifies_stage`: a purchase order waiting at a stage with three eligible approvers notifies the three, each e-mailed after 5 minutes if unread; a stage of 25 notifies the first 20 from the top of its member list, and the other 5 see the item in the queue.
 - **EC-345** `agent_cannot_post`: an agent run's `CreateMessage` is refused with `tool_not_allowed`; an integration client's with `human_only`.
 - **EC-346** `record_access_revoked`: a person loses access to a customer's documents, or holds only own-document owner scope; the threads and notifications of the others' documents are hidden from their lists and unread counts.
 - **EC-347** `daily_digest_grouped`: three followed-thread notifications unread at the digest hour arrive in one e-mail, with rendered lines and one link, no message text.

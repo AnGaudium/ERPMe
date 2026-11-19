@@ -825,7 +825,7 @@ Foreign keys whose source and target tables have different stated owners. Foreig
 | `transfer_route` (planning, 4) | `company_id,destination_warehouse_id` | `warehouse` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:89 |
 | `transfer_route` (planning, 4) | `company_id,source_warehouse_id` | `warehouse` (master_data, 3) | down | docs/design/DS-43-54-planning-production.sql:88 |
 | `approval_stage` (policy, 2) | `company_id,escalation_role_id` | `role` (permissions, 2) | same layer | docs/design/DS-15-access.sql:370 |
-| `approval_stage_member` (policy, 2) | `company_id,role_id` | `role` (permissions, 2) | same layer | docs/design/DS-15-access.sql:379 |
+| `approval_stage_member` (policy, 2) | `company_id,role_id` | `role` (permissions, 2) | same layer | docs/design/DS-15-access.sql:380 |
 | `approval_stage_member` (policy, 2) | `user_account_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-15-access.sql:376 |
 | `policy_rule_version` (policy, 2) | `owner_user_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-05-platform.sql:416 |
 | `activity_type` (production, 3) | `time_uom_id` | `uom` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:344 |

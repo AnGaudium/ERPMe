@@ -375,6 +375,7 @@ CREATE TABLE approval_stage_member (
     member_kind        text NOT NULL CONSTRAINT ck_approval_stage_member_kind CHECK (member_kind IN ('user', 'role')),
     user_account_id    uuid REFERENCES user_account (id),
     role_id            uuid,
+    position           smallint CONSTRAINT ck_approval_stage_member_position CHECK (position IS NULL OR position >= 1),   -- the stage's order top to bottom; null sorts last (ADR-0076 rule 6)
     FOREIGN KEY (company_id, approval_stage_id) REFERENCES approval_stage (company_id, id),
     FOREIGN KEY (company_id, role_id) REFERENCES role (company_id, id),
     CONSTRAINT ck_approval_stage_member_target CHECK ((member_kind = 'user') = (user_account_id IS NOT NULL) AND (member_kind = 'role') = (role_id IS NOT NULL))
