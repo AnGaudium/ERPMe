@@ -6,7 +6,7 @@ No parallel run with the old software; the pilot goes live fully on NativeFlows,
 
 ## Step 10 · Platform completion (months 10–12)
 
-**Entry criteria:** step 9 gate passed; the three Phase 1 agents built ([steps-5-9.md](steps-5-9.md#agents)).
+**Entry criteria:** step 9 gate passed; the six Phase 1 agents built ([steps-5-9.md](steps-5-9.md#agents)).
 
 **Design items first:** DS-36 operations dashboard; DS-37 deployment and operations; DS-38 localization skill and basic US package; DS-39 TT133 regime. TT133 status and B03 are verified before this gate ([ADR-0003](../adr/0003-build-operating-rules.md) R10).
 
@@ -34,7 +34,7 @@ No parallel run with the old software; the pilot goes live fully on NativeFlows,
 - every DS item DS-01 to DS-39 is done by the [design/README.md](../design/README.md) rule;
 - every open question needed by steps 0–10 is closed; a rule still flagged is listed and is not one the pilot will use ([ADR-0003](../adr/0003-build-operating-rules.md) R11);
 - every Phase 1 item of the Lean scope in [10-roadmap.md](../spec/10-roadmap.md#lean-scope-for-phases-0-and-1) exists, and nothing from "After Phase 1" was built beyond reserved schema room;
-- the three Phase 1 agents pass their evaluation suites; every operation works with LLMs off (Principle 12);
+- the six Phase 1 agents pass their evaluation suites; every operation works with LLMs off (Principle 12);
 - [risks.md](../risks.md) reviewed.
 
 **Exit gate (verbatim):**
@@ -101,7 +101,7 @@ DS-40 turns this outline into the checklist. Order on cut-over:
 
 - Each month: the close checklist (DS-12) run with the chief accountant; unconfirmed agent auto-posts block the close ([03-agent-safety.md](../spec/03-agent-safety.md), rule 6); stock count, partner confirmations and bank statements reconciled; the period locked by a human, never by an agent.
 - The VAT return for the first tax period is generated from NativeFlows (01/GTGT) and filed by the customer.
-- Agents start `assisted` after passing their offline evaluation ([ADR-0078](../adr/0078-agent-simplification-for-phase-1.md) rules 5, 6); live shadow on the pilot's real transactions returns in Phase 2; an agent gains auto-posting only after its accuracy exceeds the threshold ([14-agent-workflows.md](../spec/14-agent-workflows.md)). Anonymized pilot data for evaluation stays outside the repository.
+- Agents start `assisted` after passing their offline evaluation, and reach `active` for a document type only from in-use draft acceptance (ADR-0065 rule 11) ([ADR-0078](../adr/0078-agent-simplification-for-phase-1.md) rules 5, 6); live agent shadow on the pilot's real transactions returns in Phase 2; an agent gains auto-posting only after its accuracy exceeds the threshold ([14-agent-workflows.md](../spec/14-agent-workflows.md)). Anonymized pilot data for evaluation stays outside the repository.
 - Every defect found in production becomes a synthetic regression scenario reproduced with fictional data, never with pilot data.
 
 ## Support mode

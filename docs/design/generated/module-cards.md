@@ -271,7 +271,7 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Work item kinds (2):** `attachment_rejected`, `document_extraction_review`
 - **Authorization areas (0):** none
 - **ADRs (declared):** [ADR-0027](../../adr/0027-cross-cutting-ownership.md), [ADR-0038](../../adr/0038-audit-and-observability.md), [ADR-0049](../../adr/0049-statutory-reporting-and-printing.md), [ADR-0057](../../adr/0057-document-intake-and-extraction.md)
-- **ADRs that name this module most (mentions; not complete):** [ADR-0022](../../adr/0022-repository-and-engineering-conventions.md), [ADR-0057](../../adr/0057-document-intake-and-extraction.md)
+- **ADRs that name this module most (mentions; not complete):** [ADR-0022](../../adr/0022-repository-and-engineering-conventions.md), [ADR-0057](../../adr/0057-document-intake-and-extraction.md), [ADR-0078](../../adr/0078-agent-simplification-for-phase-1.md)
 
 ## `audit` (layer 2)
 

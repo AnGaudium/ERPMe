@@ -14,7 +14,7 @@ Six agent types are designed now, each as a code-orchestrated workflow on the ru
 
 Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): a further agent type `assistant` serves the UI's assist panel and command bar. It reads through its tool list and writes only through `is_draft_only` commands, within the user's permission intersection and the `agents.assistant.*` budgets. Its DDL, catalog rows, leaf, seed and cost cap are in DS-30-ui.sql and the catalogs; it arrives at step 5, and its evaluation set of about 50 tasks is a step 5 gate item (ADR-0077 rules 13, 14, 23).
 
-Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-19): Phase 1 has three agent types: `bank_matching`, `purchase_invoice` and `assistant`. `customer_onboarding`, `quotation`, `planning` and `data_migration` move to Phase 2 with their designs kept; at step 11 migration uses the staged import with stored mappings, and the assistant may draft mappings (ADR-0078 rules 1, 2).
+Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-19): Phase 1 has six agent types on one runtime: `bank_matching`, `purchase_invoice`, `assistant`, `analysis`, `document_reader` and `auto_post_advisor`. `customer_onboarding`, `quotation`, `planning` and `data_migration` move to Phase 2 with their designs kept; at step 11 migration uses the staged import with stored mappings, and the assistant may draft mappings (ADR-0078 rules 1, 2).
 
 **Deterministic first.** Each step tries stored rules and mappings, then lookups, then fuzzy matching with a deterministic score, and only then an LLM. The LLM never computes a price, tax, quantity, account, match or score. It reads, chooses among candidates that code gave it, and writes text. Code checks every output. A resolution the LLM contributes is proposed as a stored mapping or rule, so the next case is deterministic.
 
@@ -49,7 +49,7 @@ Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-19)
 
    Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), proposed 2026-11-15): the `analysis` agent type is a second stated exception: it drafts nothing a person resolves, so its promotion evidence is the version's CI evaluation report and, from 30 verified examples, the shadow evaluation over them; below 30 examples the CI report alone is flagged for the author (rule 25).
 
-   Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-19): in Phase 1 the modes are `off` and `assisted`; promotion evidence is the offline evaluation result and replay, not shadow evaluation rows, and a version or seat-model change drops the effective mode to `off` (ADR-0078 rules 5, 6).
+   Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-19): in Phase 1 the modes are `off`, `assisted`, and `active` only as the gateway uses it; promotion to `assisted` uses the offline evaluation result and replay, not shadow evaluation rows, and an unevaluated version or seat model drops the effective mode to `off` (ADR-0078 rules 5, 6).
 5. Quality monitor:
    - **The job.** `RunAgentQualityCheck` (daily system job, `agents`) computes, per company and assisted agent type, the 30-day share of drafts accepted unedited and of drafts rejected or canceled (rule 6).
    - **The signal.** When agreement falls 10 points below the workflow's threshold, it raises `agent_quality_below_threshold` (owner `company_owner`) with the figures. It does not demote by itself; a person decides.

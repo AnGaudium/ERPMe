@@ -85,7 +85,7 @@ Title, status and design item come from each ADR's first lines. **Declared** ADR
 | [ADR-0075](../../adr/0075-stock-documents.md) | Stock documents | proposed 2026-11-19 |  | `inventory` | 3 | `inventory`, `documents` |
 | [ADR-0076](../../adr/0076-internal-messaging-and-notifications.md) | Internal messaging and notifications | proposed 2026-11-19 |  | `work` | 2 | `work`, `master_data`, `registry` |
 | [ADR-0077](../../adr/0077-ui-floorplans-annotations-and-embedded-agent.md) | UI floorplans, annotation vocabulary and embedded agent interaction | proposed 2026-11-19 | DS-30 | `agents`, `registry` | 5, 2 | `agents`, `registry` |
-| [ADR-0078](../../adr/0078-agent-simplification-for-phase-1.md) | Agent simplification for Phase 1 | proposed 2026-11-19 | DS-32, DS-33, DS-34 | — | — | `purchasing` |
+| [ADR-0078](../../adr/0078-agent-simplification-for-phase-1.md) | Agent simplification for Phase 1 | proposed 2026-11-19 | DS-32, DS-33, DS-34 | — | — | `attachments`, `purchasing` |
 
 ## By module
 
@@ -112,7 +112,7 @@ Title, status and design item come from each ADR's first lines. **Declared** ADR
 | 3 | `production` | ADR-0025, ADR-0032, ADR-0033, ADR-0034, ADR-0035, ADR-0037, ADR-0046, ADR-0055, ADR-0062, ADR-0068, ADR-0071, ADR-0072 | ADR-0024, ADR-0025, ADR-0032, ADR-0033, ADR-0034, ADR-0035, ADR-0036, ADR-0037, ADR-0043, ADR-0046, ADR-0049, ADR-0062, ADR-0064, ADR-0068, ADR-0070, ADR-0071, ADR-0072 |
 | 3 | `tax` | ADR-0004, ADR-0028, ADR-0041, ADR-0053 | ADR-0041 |
 | 2 | `agent_runs` | ADR-0027, ADR-0050, ADR-0057 | ADR-0027, ADR-0042, ADR-0050, ADR-0057, ADR-0063, ADR-0065 |
-| 2 | `attachments` | ADR-0027, ADR-0038, ADR-0049, ADR-0057 | ADR-0022, ADR-0057 |
+| 2 | `attachments` | ADR-0027, ADR-0038, ADR-0049, ADR-0057 | ADR-0022, ADR-0057, ADR-0078 |
 | 2 | `audit` | ADR-0019, ADR-0038, ADR-0052, ADR-0054 | ADR-0006, ADR-0019, ADR-0038, ADR-0052, ADR-0058 |
 | 2 | `configuration` | ADR-0022, ADR-0027, ADR-0058, ADR-0059 | ADR-0058, ADR-0059 |
 | 2 | `db` | — | — |

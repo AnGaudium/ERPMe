@@ -168,13 +168,16 @@ Applies to every step below:
 
 ## Agents
 
-Agents are not a separate step ([11-build-order.md](../spec/11-build-order.md)). Each is built right after its manual path passes its gate. Phase 1 has three agent types, all done before the platform counts as complete (step 10); the others move to Phase 2 ([ADR-0078](../adr/0078-agent-simplification-for-phase-1.md) rules 1, 2).
+Agents are not a separate step ([11-build-order.md](../spec/11-build-order.md)). Each is built right after its manual path passes its gate. Phase 1 has six agent types, all done before the platform counts as complete (step 10); the others move to Phase 2 ([ADR-0078](../adr/0078-agent-simplification-for-phase-1.md) rules 1, 2).
 
 | Agent | Starts after | Design items |
 | --- | --- | --- |
 | Assistant | Step 5 gate | DS-32, DS-33 (first agent), [ADR-0077](../adr/0077-ui-floorplans-annotations-and-embedded-agent.md) rules 13–18 |
+| Analysis | Step 5 gate | [ADR-0060](../adr/0060-agent-assisted-reporting-and-analysis.md) |
 | Bank matching | Step 6 gate | DS-34 bank matching, DS-25 |
 | Purchase invoices | Step 7 gate | DS-34 purchase invoices, DS-24 |
+| Document reader (vision) | Step 7 gate | [ADR-0057](../adr/0057-document-intake-and-extraction.md), vision seat configured |
+| Auto-post advisor | Step 7 gate | [ADR-0065](../adr/0065-deterministic-auto-post-gateway.md), with the gateway's purchase invoice checker |
 
 **Work packages per agent:** the workflow as a code-orchestrated cascade (stored rules and mappings → lookup → fuzzy matching with a deterministic score → LLM only for what remains, Principle 13); fixed tool list; untrusted-content tainting; budgets with circuit breaker; run records; replay evaluation in CI; a real-LLM evaluation run whenever a model or prompt changes (Principle 11); metric for the share of steps handled deterministically ([14-agent-workflows.md](../spec/14-agent-workflows.md)).
 
