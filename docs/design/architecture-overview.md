@@ -12,7 +12,7 @@ B1 [Purpose and scope](#b1-purpose-and-scope) · B2 [System context](#b2-system-
 
 ## B1. Purpose and scope
 
-NativeFlows is an open-source ERP designed for agentic workflows, for trading and assembly businesses (01-vision:3), with production in Phase 1 for manufacturers ([ADR-0032](../adr/0032-phase-1-scope-with-production.md) rule 1), and with CRM from the start. Its accounting and inventory core follows SAP concepts (S/4HANA for the data model, Business One for SME scope) ([01-vision](../spec/01-vision.md):3; D5). Country rules live in localization packages ([ADR-0016](../adr/0016-localization-package-structure.md)).
+NativeFlows is an open-source ERP designed for agentic workflows, for trading and assembly businesses (01-vision:3), with production in Phase 1 for manufacturers ([ADR-0032](../adr/0032-phase-1-scope-with-production.md) rule 1), and with CRM from the start. Its accounting and inventory core follows SAP concepts (S/4HANA for the data model, Business One for a lean first release; no company-size limit, the design scales to large enterprises) ([01-vision](../spec/01-vision.md):3; D5). Country rules live in localization packages ([ADR-0016](../adr/0016-localization-package-structure.md)).
 
 **Phase 1** is defined by [spec 09](../spec/09-mvp-scope.md) as amended by [ADR-0032](../adr/0032-phase-1-scope-with-production.md): every capability a customer cannot operate without is in Phase 1 in full depth, and production, multi-level MRP, planning and subcontracting move into Phase 1 (ADR-0032:7–16). Spec 09 itself still shows production as later; that wording waits for the author ([open-questions](../open-questions.md):122).
 

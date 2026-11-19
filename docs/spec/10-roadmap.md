@@ -11,7 +11,7 @@ No parallel run with the old accounting software: the pilot customer goes live f
 4. **Phase 3 · Expansion:** fixed assets, loans, full approval, chat channels (Zalo OA), repeat-sales suggestions, website and e-commerce from seeded skills, AI customization pipeline per customer, local models. Phases 2 and 3 start after Phase 1 passes its gate.
    - Gate: a reference customer with audited financial statements. At least one partner deploys independently without the author.
 
-Pilot selection criteria (select and commit only after the platform is complete): a trading business of 10–50 people, imports and foreign-currency transactions allowed, a chief accountant willing to switch fully, an owner who commits time, regular incoming e-invoices, agreement to share anonymized data for agent evaluation, kept outside the repository (pilot data never enters the repository). Go live at the start of an accounting period, preferably a quarter, so opening balances are clean.
+Pilot selection criteria for the first pilot only; they do not limit the target market (select and commit only after the platform is complete): a trading business of 10–50 people, imports and foreign-currency transactions allowed, a chief accountant willing to switch fully, an owner who commits time, regular incoming e-invoices, agreement to share anonymized data for agent evaluation, kept outside the repository (pilot data never enters the repository). Go live at the start of an accounting period, preferably a quarter, so opening balances are clean.
 
 ## Lean scope for Phases 0 and 1
 

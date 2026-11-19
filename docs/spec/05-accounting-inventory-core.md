@@ -1,6 +1,6 @@
 # Accounting and inventory core modeled on SAP
 
-The accounting and inventory core follows SAP's long-proven model: S/4HANA for the data model, Business One for SME scope and leanness. Learn the concepts and the organization; do not copy SAP documentation and do not use SAP trademarks in the product. Learning from ERPClaw (an open ERP designed for agents, built ERPNext-style) was considered and rejected: its source code showed the ledger and inventory core are not correct enough (amounts stored as strings, original lines mutated on cancellation, no revaluation after backdated documents, sales returns received at selling price).
+The accounting and inventory core follows SAP's long-proven model: S/4HANA for the data model, Business One for the leanness of a first release, with no company-size limit (author, 2026-11-19). Learn the concepts and the organization; do not copy SAP documentation and do not use SAP trademarks in the product. Learning from ERPClaw (an open ERP designed for agents, built ERPNext-style) was considered and rejected: its source code showed the ledger and inventory core are not correct enough (amounts stored as strings, original lines mutated on cancellation, no revaluation after backdated documents, sales returns received at selling price).
 
 | Concept | Applied as | Why |
 | --- | --- | --- |

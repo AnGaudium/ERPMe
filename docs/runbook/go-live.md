@@ -23,7 +23,8 @@ No parallel run with the old software; the pilot goes live fully on NativeFlows,
 
 **Non-functional targets (interim, author's delegation, 2026-11-19; revisited with measured data at this step's gate):** work package 7's load test, and any earlier scale test on the large synthetic dataset, use them as exit criteria.
 
-- **Volume:** design for 1,000,000 posted documents and 5,000,000 journal lines a year per company, ten times the large dataset's 100,000 documents a year; 50 concurrent users per company; up to 20 companies per installation.
+- **Volume:** design for 1,000,000 posted documents and 5,000,000 journal lines a year per company, ten times the large dataset's 100,000 documents a year; 50 concurrent users per company; up to 20 companies per installation. These are the Phase 1 exit criteria, not a ceiling.
+- **Scale path (author, 2026-11-19: no company-size limit):** no design choice may block ten times more: 50,000,000 journal lines a year per company and 500 concurrent users per installation. Ledger partitioning follows ADR-0006 rule 23, by ADR, when a company's journal approaches 100,000,000 lines; read replicas for reporting and the agent query layer come before that.
 - **Latency:** simulate or execute of a single command at p95 ≤ 1 s; list and query reads at p95 ≤ 2 s for the first page; agent tool calls are excluded, because model time is separate.
 - **Batch:** period-end costing ≤ 30 min for one company at the design volume; an MRP run ≤ 15 min; the nightly scenario replay within the budget of [ADR-0003](../adr/0003-build-operating-rules.md) R6.
 - **Recovery:** RPO ≤ 15 min (WAL archiving) and RTO ≤ 4 h.
@@ -56,7 +57,7 @@ No parallel run with the old software; the pilot goes live fully on NativeFlows,
 
 **Work packages, in order:**
 
-1. **Pilot selection** by the [pilot selection criteria](../spec/10-roadmap.md): trading business of 10–50 people, imports and foreign-currency transactions allowed, chief accountant willing to switch fully, owner who commits time, regular incoming e-invoices, agreement to share anonymized data for agent evaluation outside the repository. The author selects; written commitment only now.
+1. **Pilot selection** by the [pilot selection criteria](../spec/10-roadmap.md): trading business of 10–50 people (first pilot only, not a market limit), imports and foreign-currency transactions allowed, chief accountant willing to switch fully, owner who commits time, regular incoming e-invoices, agreement to share anonymized data for agent evaluation outside the repository. The author selects; written commitment only now.
 2. **Go-live date:** the start of an accounting period, preferably a quarter.
 3. **Reader** for the pilot's current system if none exists (e.g. MISA), using the data migration agent and the DS-21 batch format (D16).
 4. **Load real data on staging** (author-operated servers in Vietnam, author-only access; real data deleted within 7 days after the rehearsal, [ADR-0003](../adr/0003-build-operating-rules.md) R12): master data, opening balances, AR/AP open items per invoice, inventory per warehouse, lots and serials with opening cost, each as a simulated command batch, never an SQL script ([15-migration-ux-docs.md](../spec/15-migration-ux-docs.md)).

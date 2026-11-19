@@ -1,6 +1,6 @@
 # Vision
 
-Build a completely new open-source ERP, designed from the ground up for agentic workflows. The target is trading and assembly businesses worldwide, with CRM from day one. English is the source language, with a Vietnamese translation shipped. The accounting and inventory core follows the SAP model: S/4HANA for the data model, Business One for SME scope and leanness. Every country-specific rule lives in a localization package; the first packages are Vietnam and the US, and the first pilot customer is in Vietnam. The architecture is simple and does not try to do everything, but whatever it does, it does in depth.
+Build a completely new open-source ERP, designed from the ground up for agentic workflows. The target is trading and assembly businesses worldwide, with CRM from day one. English is the source language, with a Vietnamese translation shipped. The accounting and inventory core follows the SAP model: S/4HANA for the data model, Business One for the leanness of a first release. There is no company-size limit: the design must grow to large enterprises as the product matures (author, 2026-11-19). Every country-specific rule lives in a localization package; the first packages are Vietnam and the US, and the first pilot customer is in Vietnam. The architecture is simple and does not try to do everything, but whatever it does, it does in depth.
 
 Why rebuild instead of continuing on Odoo:
 
