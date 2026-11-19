@@ -232,6 +232,8 @@ A capability check found multimodal input largely undesigned: business-card phot
     - machine-checked fields (parsed, OCR or aligned, with every rule passing) shown apart from human-confirmed ones, and unaligned suggestions greyed;
     - duplicates found, the hidden-text flag, the injection signal and failed rules at the top;
     - the attempts of the ladder and the reader of each value on demand.
+
+    Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): this screen is the registered custom component `extraction_verification`. Dropping a file on a generated form calls `RequestDocumentExtraction` with the form's purpose, and the verified result opens as a draft in that form with per-field provenance (ADR-0077 rules 18, 22).
 23. Verification commands (module `attachments`, effect class `other`, `human_only`, at `edit` on the purpose's leaf):
     - **`VerifyExtractionFields`** (extraction, list of current field rows) appends one `extraction_confirmation` row per field (confirmed by, at). A row that is no longer current is refused (`extraction_field_superseded`); a `vision_unaligned` row cannot be confirmed as it is. No rule run follows (rule 14).
     - **`CorrectExtractionField`** (verb Correct; extraction, field path, the row it supersedes or none, value, optional evidence) appends a `human` row with the same value type and its confirmation; a new rule run follows in the same transaction (rule 14). It emits `ExtractionFieldCorrected`.

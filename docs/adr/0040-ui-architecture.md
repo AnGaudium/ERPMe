@@ -57,6 +57,8 @@ The web UI is one more client of the command and query layer. It writes data onl
    - **Not per screen.** Nothing is maintained per screen in the frontend. User-defined fields (after Phase 1) appear through the same schemas, so the renderer never hard-codes field lists.
 
     Note ([ADR-0074](0074-core-data-structure-additions.md), proposed 2026-11-19): the annotation `x-nativeflows-custom-values` names the table whose company-defined fields the renderer reads through `ListCustomFieldDefinitions`; user-defined fields (without tables) appear in the same schemas as that rule says (ADR-0074 rules 8 to 11).
+
+   Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): the vocabulary is closed and grows to 24 keys: `widget` gains `State`; `hidden-when` and `read-only-when` may name the subject's `state`; `lookup` gains `depends_on`; `list-defaults` gains declared `variants`; `line-columns` gains `editor`; `scale-from` is required on money and quantity; new keys `importance`, `default-from`, `scan`, `ai-fillable`, `floorplan`, `title`, `header-facets`, `actions`, `links`, `search` and `assist`. Every key has one renderer, and a key outside the vocabulary fails `check` (ADR-0077 rules 8–12).
 5. CI checks the hints:
    - every hint names an existing field;
    - every `Ref` has a lookup query the registry knows;
@@ -90,6 +92,10 @@ The web UI is one more client of the command and query layer. It writes data onl
    Note ([ADR-0066](0066-work-cases.md), 2026-11-16 (proposed)): two further generated screen kinds. The case view shows a work case's timeline on the left, the selected artifact's record view or its command form with the plan panel on the right, and the case's pending commands above. The case list is a list over `ListWorkCase`. The company setting `work.landing_page` maps role templates to `work_queue` or `case_list` as their home. Cases serve unstructured and exception work; routine structured work keeps the screens above and the six hand-built screens, and nothing is computed in the client (rule 2) ([ADR-0066](0066-work-cases.md) rules 4, 21).
 
    Note ([ADR-0071](0071-work-orders-and-shop-floor-execution.md), proposed 2026-11-17): the WO tablet is a further hand-built PWA screen over `ListWorkCenterQueue` and `GetOperationWorkspace` (ADR-0071 rules 13, 14).
+
+   Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): the screen kinds map onto seven floorplans: list report, object page, create and edit form (with a wizard variant), worklist, overview, plan panel and approval view. A route renders exactly one of them, or a registered custom component (ADR-0077 rules 1–3, 22).
+
+   Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): user-saved list variants are in Phase 1: personal or shared with a role, storing filters, columns, sort and grouping server-side in `list_variant`; `ListListVariant`, `CreateListVariant`, `UpdateListVariant`, `DeleteListVariant`; sharing needs `share_list_variant` (ADR-0077 rule 10a). Column choice is saved in variants; the browser keeps only the viewer's last choice.
 7. Navigation:
    - **The menu** is generated from the registry. Modules are grouped by area: accounting, inventory, sales, purchasing, production, warehouse, planning, work, settings. The user sees only nouns they may list, from `GetSessionContext`.
    - **The command palette** (`Ctrl/Cmd+K`) finds any permitted command, query, list or record by English or translated name.
@@ -100,6 +106,8 @@ The web UI is one more client of the command and query layer. It writes data onl
      - `/_installation/…` for installation-scoped ones.
 
      Command types and queries appear in their `snake_case` REST form (ADR-0004 rule 19). `run`, `query` and names starting with `_` are reserved: company codes cannot start with `_`, and no noun is called `run` or `query`. Filters never go into a URL (ADR-0008 rule 22).
+
+   Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): the command palette becomes the command bar: text that matches no name becomes an `assist_request` with purpose `resolve_command`, whose answer is a proposed invocation shown with its parameters and opened as a prefilled form; it runs simulate first and never executes by itself (ADR-0077 rule 18).
 8. `ListAllowedCommand` (subject table and ID) is a computed query, an exception to ADR-0004 rule 21 as in ADR-0015 rule 14. It returns `allowed_command` rows: each command applicable to the subject, with `is_allowed` and, when false, the error code the command would return.
    - **Single source.** Applicability comes from registry declarations the dispatcher itself uses: each command's `subject_table` and `allowed_states` (notes on ADR-0008 rule 1 and on ADR-0009 rule 5, whose `invalid_state_transition` reads the same declaration).
    - **Checks evaluated:** the caller's permission, `human_only`, `segregation_of_duties` for `Approve` (ADR-0017 rule 16), and a pending change (ADR-0028).
@@ -213,6 +221,10 @@ The web UI is one more client of the command and query layer. It writes data onl
     - **Registration.** All shortcuts are registered in one map with translated labels, and every action works without a mouse.
 
     Note ([ADR-0061](0061-barcodes.md), proposed 2026-11-15): a keyboard-wedge scan into a focused code field ends with the scanner's Enter suffix, which moves to the next field as above. Every code field on desktop screens accepts wedge scans and resolves them with `EvaluateBarcode` for the field's expected type; a scan is told from typing by the AIM prefix, the suffix and its speed (rule 22).
+
+    Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): each floorplan adds its own keys to this map (`/` search and `Space` select in lists, `Alt+1`–`Alt+9` sections on object pages, `j`/`k` and `c` in worklists, `Alt+Y`/`Alt+R` in the approval view, `Ctrl+/` the assist panel); `check` keeps the map free of conflicts (ADR-0077 rules 4, 19).
+
+    Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): grids keep this model in `line_grid`, the repository's TanStack Table grid, which replaces AG Grid (ADR-0077 rule 5).
 17. Display and targets:
     - **Untrusted fields.** Shown as plain text in a marked "external content" style, never rendered as HTML, with links not clickable.
     - **Taint.** A badge on tainted versions and proposals, with the clearance record.
@@ -227,6 +239,8 @@ The web UI is one more client of the command and query layer. It writes data onl
     Note: the untrusted-field rule holds in printed files too: untrusted fields are escaped and never rendered as HTML ([ADR-0049](0049-statutory-reporting-and-printing.md) rule 29).
 
     Note (author's delegation, 2026-11-19): the size targets are set, interim: the initial route at most 250 KB of JavaScript gzipped, each further route chunk at most 150 KB gzipped, and the generated schema bundle loaded per area, not all at once. They are revisited when the Center framework is built. Accessibility and browser targets stay as written.
+
+    Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): the size targets apply to generated routes; the densities `compact` (desktop) and `touch` (PWA, coarse pointers) and the theme are design tokens; targets are at least 24 px at `compact` and 44 px at `touch`; axe-core runs on every floorplan in the generated tests (ADR-0077 rules 7, 19, 21) AG Grid leaves the stack: line entry uses `line_grid`, an editable grid on TanStack Table written in the repository, keyboard first, with barcode-capable cells and within the route budget (ADR-0077 rules 5, 20).
 
 **Structure, tests and scope**
 
@@ -257,6 +271,8 @@ The web UI is one more client of the command and query layer. It writes data onl
     - **Elsewhere:** shop-floor and warehouse flows (DS-31), print (DS-27), list export (DS-33).
 
     Note ([ADR-0061](0061-barcodes.md), proposed 2026-11-15): DS-31 builds the PWA's scanning on ADR-0061: BarcodeDetector for EAN/UPC and ITF only, until the scanner check page proves on a device that it passes GS through, and a WebAssembly decoder for Code 128, GS1-128, DataMatrix and QR; wedge capture, the shipped scanner profiles and the check page. The WebAssembly modules load on first use and are measured apart from the JavaScript budget of rule 17 (rules 22, 23).
+
+    Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): the six step 9 entry screens are no longer hand-built: they are generated create and edit forms with the editable line grid, and their UX spec becomes annotation tuning; the MISA measure is unchanged. The extraction verification screen, the work-order tablet, the analysis view and the PWA scanning flows are registered custom components (ADR-0077 rules 5, 22).
 
 ## Context
 

@@ -74,7 +74,7 @@ flowchart LR
 | Security | argon2, pyotp, Authlib (ADR-0002:29) |
 | Observability | structlog, OpenTelemetry (ADR-0002:31) |
 | Testing | pytest on real PostgreSQL via testcontainers, Hypothesis (ADR-0002:35) |
-| Frontend | React, TypeScript, Vite, openapi-typescript, TanStack Query and Router, shadcn/ui, AG Grid Community, react-hook-form, i18next (ADR-0002:41–47) |
+| Frontend | React, TypeScript, Vite, openapi-typescript, TanStack Query and Router, shadcn/ui, react-hook-form, i18next (ADR-0002:41–47); AG Grid replaced by the in-repository TanStack Table grid `line_grid` ([ADR-0077](../adr/0077-ui-floorplans-annotations-and-embedded-agent.md) rule 5) |
 | Infrastructure | Docker Compose, Caddy, pgBackRest, GitHub Actions (ADR-0002:52) |
 | Not used | Heavy ORMs, event sourcing, microservices, GraphQL, Kafka, Redis, Elasticsearch, LangChain, a workflow engine (ADR-0002:68) |
 

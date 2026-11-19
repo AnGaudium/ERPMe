@@ -25,6 +25,7 @@ Applies to every step below:
 5. Returns, discounts, promotions, credit limit.
 6. Minimal CRM: partners, contacts, interaction timeline, email intake (DS-35).
 7. Step 5 simulator adapter; simulator writes emails with quotation requests ([12-testing.md](../spec/12-testing.md#synthetic-dataset)).
+8. The `assistant` agent, the assist panel and the command bar ([ADR-0077](../adr/0077-ui-floorplans-annotations-and-embedded-agent.md) rules 13–18), with its evaluation set.
 
 **How agents are used:** builders implement documents as thin layers; the reviewer checks that no document posts anything except step 1 and step 3 commands, and that the core is unchanged by the pull request (B3).
 
@@ -33,6 +34,8 @@ Applies to every step below:
 **Exit gate (verbatim):**
 
 > Import purchase → receipt → sale → issue runs end to end through REST and MCP; books equal step 4
+
+**Gate item** ([ADR-0077](../adr/0077-ui-floorplans-annotations-and-embedded-agent.md) rule 13; author's delegation, 2026-11-19): the assistant seat passes its evaluation set of about 50 tasks across its three modes (read answers with correct citations, drafts with correct field diffs, refusals outside its scope, taint handling including pasted untrusted text), as spec 17 requires of every pair of seat and model.
 
 **Artifacts:** sales, purchasing, imports, CRM, work queue and policy modules; DS-22 state machines; step 5 adapter; book-comparison report against step 4.
 

@@ -10,9 +10,15 @@ These are the author's decisions of 2026-11-18. Governance is his under ADR-0005
 The author does not read code. Line-by-line review by a person is therefore replaced by mechanical assurance, which works in this order:
 
 1. what the database enforces;
+
+    Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): declarations carry the UI annotations of ADR-0077 on payload and result fields and on the declaration object: per field `importance`, `group`, `order`, `lookup`, `default-from`, `scan`, `ai-fillable`, visibility rules; per entity `title`, `list-defaults`, `header-facets`, `line-columns`, `actions`, `links`, `search`, `floorplan`, `assist` (ADR-0077 rules 8–10).
 2. what static checks refuse;
+
+    Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): `check` enforces the required annotations and the vocabulary of ADR-0077 rule 19, and the `frontend` job runs the Playwright tests generated per floorplan, with axe-core and visual regression.
 3. tests the coding model cannot change;
 4. mutation testing;
+
+    Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): the declaration drafter (Sonnet 5.5) writes the UI annotations with each declaration, and the declaration reviewer checks them; annotations are therefore never added in a second pass (ADR-0077 rule 23).
 5. two independent model reviews;
 6. branch protection with no override.
 
