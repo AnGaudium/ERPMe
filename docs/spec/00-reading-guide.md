@@ -575,6 +575,10 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Allowed command | allowed\_command (query `ListAllowedCommand`) | A command applicable to a record now, or the error code it would return |
 | Session context | session\_context (query `GetSessionContext`) | The signed-in user's companies, permissions, field classes, record scope, language and time zone, returned for the UI to draw itself |
 | UI metadata | ui\_metadata (`x-nativeflows-*` annotations) | Hints in the generated JSON Schemas from which the renderer draws screens |
+| Floorplan | floorplan (`x-nativeflows-floorplan`) | One of the seven generated screen patterns: `list\_report`, `object\_page`, `edit\_form`, `worklist`, `overview`, `plan\_panel`, `approval\_view` ([ADR-0077](../adr/0077-ui-floorplans-annotations-and-embedded-agent.md) rule 1) |
+| Value help | lookup (`x-nativeflows-lookup`) | The list of candidates a reference field offers, from a registered `List<Noun>` query, filtered by other fields through `depends\_on` ([ADR-0077](../adr/0077-ui-floorplans-annotations-and-embedded-agent.md) rule 9) |
+| Assist panel | assist\_request | The side panel of every floorplan in which the `assistant` agent answers and drafts within the user's permission intersection; typed text travels in an `assist\_request` row ([ADR-0077](../adr/0077-ui-floorplans-annotations-and-embedded-agent.md) rules 13–17) |
+| Custom component | custom component (`custom:<name>`) | A registered screen that fits no floorplan, each with its own ADR ([ADR-0077](../adr/0077-ui-floorplans-annotations-and-embedded-agent.md) rule 22) |
 | Command palette | command\_palette | Keyboard search (`Ctrl/Cmd+K`) over the commands, queries, lists and records the user may use |
 | Expected plan hash | expected\_plan\_hash | The `plan_hash` the client reviewed; required to execute; a different hash rejects the execution |
 | Command registry | command\_registry | The one place where command types and queries are registered; REST, MCP, JSON Schema and TypeScript are generated from it |

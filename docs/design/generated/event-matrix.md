@@ -6,10 +6,10 @@ Event types named in backticks in the ADRs, recognised by the event forms of the
 
 | Event | Noun table | Producer module | Consumers named with it | First mentions |
 | --- | --- | --- | --- | --- |
-| `AgentRunCompleted` | `agent_run` | agent_runs | — | ADR-0050:180, ADR-0060:265 |
-| `AgentRunStarted` | `agent_run` | agent_runs | — | ADR-0050:158, ADR-0050:164 |
+| `AgentRunCompleted` | `agent_run` | agent_runs | — | ADR-0050:182, ADR-0060:265 |
+| `AgentRunStarted` | `agent_run` | agent_runs | — | ADR-0050:158, ADR-0050:166 |
 | `AttachmentCreated` | `attachment` | attachments | — | ADR-0038:136, ADR-0038:144 |
-| `BankLineSuggestionRecorded` | — | — | a consumer in `cash` | ADR-0048:126, ADR-0051:184, ADR-0051:188 |
+| `BankLineSuggestionRecorded` | — | — | a consumer in `cash` | ADR-0048:126, ADR-0051:186, ADR-0051:190 |
 | `ChangeProposalApproved` | `change_proposal` | documents | — | ADR-0029:48 |
 | `ComplaintClosed` | `complaint` | crm | a consumer in `cash` | ADR-0048:243, ADR-0052:226, ADR-0052:358 |
 | `ComplaintCreated` | `complaint` | crm | a consumer in `cash` | ADR-0048:243, ADR-0052:226, ADR-0052:358 |
@@ -21,14 +21,14 @@ Event types named in backticks in the ADRs, recognised by the event forms of the
 | `ContactCreated` | `contact` | master_data | a consumer in `crm` | ADR-0052:183 |
 | `ContactUpdated` | `contact` | master_data | a consumer in `crm` | ADR-0052:183 |
 | `DataSubjectErased` | — | — | a consumer in `cash`, `imports_data_subject_erasure` | ADR-0052:258, ADR-0052:358 |
-| `DocumentExtractionCanceled` | `document_extraction` | attachments | — | ADR-0057:239, ADR-0057:307 |
-| `DocumentExtractionRecorded` | `document_extraction` | attachments | `certificate_result_drafter`, a consumer in `crm`, a consumer in `tax` | ADR-0057:75, ADR-0057:251, ADR-0057:255 (+2) |
-| `DocumentExtractionRequested` | `document_extraction` | attachments | `document_extraction_runner` | ADR-0057:54, ADR-0057:59, ADR-0057:307 |
-| `DocumentExtractionVerified` | `document_extraction` | attachments | `certificate_result_drafter`, a consumer in `purchasing` | ADR-0057:238, ADR-0057:266, ADR-0057:307 (+1) |
-| `ExtractionFieldCorrected` | `extraction_field` | attachments | — | ADR-0057:237, ADR-0057:244, ADR-0057:307 |
+| `DocumentExtractionCanceled` | `document_extraction` | attachments | — | ADR-0057:241, ADR-0057:309 |
+| `DocumentExtractionRecorded` | `document_extraction` | attachments | `certificate_result_drafter`, a consumer in `crm`, a consumer in `tax` | ADR-0057:75, ADR-0057:253, ADR-0057:257 (+2) |
+| `DocumentExtractionRequested` | `document_extraction` | attachments | `document_extraction_runner` | ADR-0057:54, ADR-0057:59, ADR-0057:309 |
+| `DocumentExtractionVerified` | `document_extraction` | attachments | `certificate_result_drafter`, a consumer in `purchasing` | ADR-0057:240, ADR-0057:268, ADR-0057:309 (+1) |
+| `ExtractionFieldCorrected` | `extraction_field` | attachments | — | ADR-0057:239, ADR-0057:246, ADR-0057:309 |
 | `ForecastCompleted` | — | — | — | ADR-0024:284 |
 | `GoodsReceiptPosted` | `goods_receipt` | inventory | `inspection_lot_creator` | ADR-0004:7, ADR-0004:61, ADR-0009:102 (+4) |
-| `InboundMessageRecorded` | `inbound_message` | crm | a consumer in `crm` | ADR-0052:358, ADR-0057:251 |
+| `InboundMessageRecorded` | `inbound_message` | crm | a consumer in `crm` | ADR-0052:358, ADR-0057:253 |
 | `InspectionLotApproved` | `inspection_lot` | quality | `usage_decision_executor` | ADR-0070:140 |
 | `InspectionLotExecutionRecorded` | `inspection_lot_execution` | quality | — | ADR-0070:178 |
 | `InspectionPlanRevisionReleased` | `inspection_plan_revision` | quality | — | ADR-0070:178 |
@@ -42,12 +42,12 @@ Event types named in backticks in the ADRs, recognised by the event forms of the
 | `MailboxIntakeCompleted` | `mailbox` | crm | — | ADR-0052:125, ADR-0052:358 |
 | `MailboxIntakeOutcomeRecorded` | `mailbox` | crm | — | ADR-0052:358 |
 | `MailboxUpdated` | `mailbox` | crm | — | ADR-0052:358 |
-| `MessageCreated` | `message` | work | `messaging_fanout` | ADR-0040:191, ADR-0076:48, ADR-0076:67 (+2) |
+| `MessageCreated` | `message` | work | `messaging_fanout` | ADR-0040:197, ADR-0076:48, ADR-0076:67 (+2) |
 | `NonconformanceCanceled` | `nonconformance` | quality | — | ADR-0070:178 |
 | `NonconformanceClosed` | `nonconformance` | quality | — | ADR-0070:178 |
 | `NonconformanceCreated` | `nonconformance` | quality | — | ADR-0070:178 |
 | `NonconformanceUpdated` | `nonconformance` | quality | — | ADR-0070:178 |
-| `NotificationCreated` | `notification` | work | — | ADR-0040:191, ADR-0076:67, ADR-0076:87 |
+| `NotificationCreated` | `notification` | work | — | ADR-0040:197, ADR-0076:67, ADR-0076:87 |
 | `NotificationEmailCreated` | `notification_email` | work | `messaging_mailer` | ADR-0076:60, ADR-0076:61, ADR-0076:87 (+1) |
 | `NotificationMailCompleted` | `notification` | work | `messaging_mailer` | ADR-0076:61, ADR-0076:87 |
 | `OperationAssigned` | — | — | — | ADR-0071:113 |
@@ -121,9 +121,9 @@ A module name here means the ADR speaks of a consumer of that module without nam
 | Consumer | Mentions | First mentions |
 | --- | --- | --- |
 | `agent_runner` | 3 | ADR-0013:30, ADR-0013:58, ADR-0013:66 |
-| `agent_wake_up` | 3 | ADR-0013:58, ADR-0050:151, ADR-0050:162 |
+| `agent_wake_up` | 3 | ADR-0013:58, ADR-0050:151, ADR-0050:164 |
 | `automation_dispatch` | 3 | ADR-0013:36, ADR-0058:27, ADR-0058:95 |
-| a consumer in `cash` | 7 | ADR-0048:221, ADR-0048:243, ADR-0051:188 |
+| a consumer in `cash` | 7 | ADR-0048:221, ADR-0048:243, ADR-0051:190 |
 | `certificate_result_drafter` | 1 | ADR-0070:103 |
 | a consumer in `crm` | 7 | ADR-0048:245, ADR-0052:122, ADR-0052:177 |
 | `crm_mail_sender` | 1 | ADR-0052:288 |
@@ -139,7 +139,7 @@ A module name here means the ADR speaks of a consumer of that module without nam
 | a consumer in `quality` | 4 | ADR-0057:49, ADR-0070:14, ADR-0070:102 |
 | `render_worker` | 2 | ADR-0013:25, ADR-0049:199 |
 | a consumer in `sales` | 3 | ADR-0047:114, ADR-0047:246, ADR-0048:262 |
-| a consumer in `tax` | 2 | ADR-0041:152, ADR-0057:255 |
+| a consumer in `tax` | 2 | ADR-0041:152, ADR-0057:257 |
 | `tax_payment_evidence` | 2 | ADR-0044:147, ADR-0053:182 |
 | `usage_decision_auto_drafter` | 1 | ADR-0070:138 |
 | `usage_decision_executor` | 1 | ADR-0070:140 |

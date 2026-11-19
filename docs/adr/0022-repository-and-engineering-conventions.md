@@ -241,6 +241,8 @@ Checks:
 
     Thresholds and lists move into the ratchet file `.github/assurance.toml`, which may be tightened freely and loosened only with an ADR (ADR-0073 rules 12, 14, 16).
 
+    Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): the UI annotation checks join `nativeflows_dev.checks`: required annotations, known keys with renderers, label keys, `scale-from` pairing, at most 8 default list columns and 6 header facets, actions and value help naming registered commands and queries, assist actions only `is_draft_only`, custom component names registered, and a conflict-free shortcut map (ADR-0077 rule 19).
+
 **One command for agents and CI**
 
 14. `nativeflows-dev` subcommands. Each prints a JSON summary as its last line with `--json`; at `build_step` 0 a subcommand whose inputs do not exist yet reports `skipped` with the reason:
@@ -303,6 +305,8 @@ Checks:
     Note ([ADR-0073](0073-coding-pipeline-and-mechanical-assurance.md), proposed 2026-11-18): `generate` derives the registry outputs from the declarations of ADR-0008 rule 1's note, for declarations that have a handler. It also writes, from the catalogs, the `Literal` types that declarations use: authorization leaves, error and check codes, event types, lock names, and tables with their states. `nativeflows-dev scaffold <declaration>` is separate and runs once. It writes the handler, the service stub and the test skeleton, refuses to overwrite, and is never rerun (ADR-0073 rule 2).
 
     Note ([ADR-0074](0074-core-data-structure-additions.md), proposed 2026-11-19): the schema of a command or query that names a table with `custom_values` carries it as an object annotated `x-nativeflows-custom-values`; the company's own keys are read at run time, so no generated file depends on a company (ADR-0074 rule 11).
+
+    Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): `generate` emits the closed vocabulary of ADR-0077 (24 `x-nativeflows-*` keys) from the declarations, and the renderer's key map is compared with it by `check` (ADR-0077 rules 8, 19).
 
 **Test server and nightly**
 

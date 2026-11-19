@@ -80,3 +80,4 @@ One file per decision, named `NNNN-short-title.md`, using [template.md](template
 | [ADR-0074](0074-core-data-structure-additions.md) | Core data-structure additions (DS-20, DS-22, DS-05, DS-21) | Proposed (2026-11-19) |
 | [ADR-0075](0075-stock-documents.md) | Stock documents (DS-09, DS-22, DS-42) | Proposed (2026-11-19) |
 | [ADR-0076](0076-internal-messaging-and-notifications.md) | Internal messaging and notifications (DS-63) | Proposed (2026-11-19) |
+| [ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md) | UI floorplans, annotation vocabulary and embedded agent interaction (DS-30) | Proposed (2026-11-19) |

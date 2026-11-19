@@ -168,6 +168,8 @@ ZPL and a print agent, GS1 location and asset keys, Digital Link generation, an 
 
     Note ([ADR-0063](0063-configurable-policy-settings.md), proposed 2026-11-15): (15) fills the expiry date only while `barcode.gs1.best_before_fills_expiry` reads true for the category; the default false stores it as the lot's `best_before_date` (rule 26).
 
+    Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): the annotation is `x-nativeflows-scan`: the expected barcode type and the GS1 Application Identifier mapping of the field (ADR-0077 rule 9).
+
 18. **Variable-measure quantities.** A quantity from a measure AI enters in the AI's unit, which becomes the line's entered unit (a note on ADR-0056 rule 13). It must be an allowed unit of the item (ADR-0056 rule 6), else `uom_not_allowed`. The measure is never rounded: one with more decimals than its unit holds is accepted when the extra decimals are zeros (`3105115600` is 1.15600 kg, entered as 1.156) and otherwise rejected with `too_many_decimal_places` (ADR-0006 rule 14; ADR-0056 rule 8). The line takes the unit block of ADR-0056 rule 9: the snapshot from `convert_quantity`, and the inventory quantity rounded as ADR-0056 rule 8 says for receipts. Examples: `3102001156` on an item kept in `KGM` is 11.56 `KGM`, identity; on an item kept in `GRM` it is 11.56 `KGM` converted through the catalog to 11560 `GRM`; on an item kept in pieces without a kilogram unit it is refused; `3105012345` on any item is refused, since `KGM` holds three decimals.
 
 19. **Serial capture.**

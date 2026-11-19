@@ -347,3 +347,15 @@
 - [ ] (ADR-0076 rule 10) Read markers (`SetConversationRead`, `SetNotificationRead`) leave audit rows that are kept as audit rows are, beyond message retention. Accepted for now; revisit if the audit volume or the privacy cost matters.
 - [ ] (ADR-0076 rule 13) Message search, push notifications (browser or app), posting rate limits, agents that summarize threads, and bridges to Slack, Microsoft Teams or Zalo OA are after Phase 1, each by its own decision.
 - [ ] (ADR-0076 rule 3) A partner that gains the `employee` role after its record thread exists keeps a thread that the allowlist would refuse today. Proposed: refuse the role while a thread exists, or close the thread's posting; the author decides when the case is real.
+
+## UI floorplans, annotations and embedded agent (ADR-0077, 2026-11-19)
+
+- [ ] (ADR-0077 rules 13, 24; ADR-0054) Which role templates hold `start_agent:assistant`? Interim proposal, flagged: every template except `auditor` and `it_administrator`, since the panel acts within each user's own rights and drafts only. Business behavior users see, so the author's (ADR-0005 item 11).
+- [ ] (ADR-0077 rules 14, 24; ADR-0050 rule 22) The `assistant` per-run ceilings and the DDL of `assist_request`, drafted before the assistant is built after the large synthetic-data test. Interim proposal: 6 LLM calls, 30 tool calls, USD 0.30 and 120 s per run, inside the company cap.
+- [ ] (ADR-0077 rule 18) Voice capture on mobile: the author's plan of 2026-11-19 names voice, but the capture agent design keeps voice after Phase 1. Voice needs a speech-to-text seat and its personal-data routing (D12); proposed to stay after Phase 1.
+- [ ] (ADR-0077 rule 20; ADR-0002) Whether AG Grid Community's chunk fits the 150 KB route budget, measured at step 1 work package 7. If not, either measure the grid chunk apart (as the WebAssembly decoders are) or replace it with a grid on TanStack Table; replacing an ADR-0002 tool is the author's (ADR-0005 item 2).
+- [ ] (ADR-0077 rule 10; ADR-0040 rule 6) Variants are declared in code only; user-saved views stay after Phase 1. Confirm, or bring user-saved variants into the Centers ADR.
+- [ ] (ADR-0077 rule 13; ADR-0029; ADR-0050 rule 15) Taint of the assistant's typed text, flagged for the author (ADR-0005 item 7). Proposed: a run starts tainted when its context subject or a selected row is outside content or effectively tainted, and always for `purpose` `act`, since a person may paste a customer's e-mail; for `ask`, `resolve_command` and `resolve_filter` the text is the person's own input, as an `analysis_question` is.
+- [ ] (ADR-0077 rules 9, 17) `ai-fillable` is a UI and intake hint. Should the dispatcher also refuse an agent write to a field that is not `ai-fillable`? That would be a new floor, so it is the author's.
+- [ ] (ADR-0077 rule 13; ADR-0050 rule 14) The assistant's evaluation: `ask` and the two resolve purposes copy the analysis agent's exception (verified examples instead of a shadow comparison); `act` follows `off`, `shadow`, `assisted` and is never promoted to `active`. The verified example set and its size are to be drafted with the assistant.
+

@@ -181,6 +181,8 @@ A case never widens an agent's read scope.
 
     `work.landing_page.<role_template>` chooses a role's home (rule 4). Lists, record views, command forms, the keyboard model and the six hand-built screens are unchanged.
 
+    Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): the case view is the worklist floorplan with its right pane showing an object page, edit form or approval view; the Centers ADR builds on the worklist and overview floorplans (ADR-0077 rules 1–3).
+
 **Checks**
 
 22. Invariants and edge cases are listed in the section "Edge cases and invariants" below.

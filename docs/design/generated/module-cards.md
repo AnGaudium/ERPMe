@@ -74,7 +74,7 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Work item kinds (2):** `analysis_answer_disputed`, `analysis_catalog_request`
 - **Authorization areas (10):** `analysis_debug`, `analysis_question`, `report_finance`, `report_inventory`, `report_production`, `report_purchasing`, `report_quality`, `report_sales`, `report_tax`, `saved_analysis`
 - **ADRs (declared):** [ADR-0060](../../adr/0060-agent-assisted-reporting-and-analysis.md)
-- **ADRs that name this module most (mentions; not complete):** [ADR-0022](../../adr/0022-repository-and-engineering-conventions.md), [ADR-0050](../../adr/0050-agent-runtime-and-query-layer.md), [ADR-0060](../../adr/0060-agent-assisted-reporting-and-analysis.md)
+- **ADRs that name this module most (mentions; not complete):** [ADR-0022](../../adr/0022-repository-and-engineering-conventions.md), [ADR-0050](../../adr/0050-agent-runtime-and-query-layer.md), [ADR-0060](../../adr/0060-agent-assisted-reporting-and-analysis.md), [ADR-0077](../../adr/0077-ui-floorplans-annotations-and-embedded-agent.md)
 
 ## `sdk` (layer 5)
 

@@ -158,6 +158,8 @@ Status: accepted (2026-11-15) under ADR-0005, reviewed by Claude Fable 5.2 (buil
     - **Result.** An `agent_run` in state `queued`, and the event `AgentRunStarted`.
 
     Note ([ADR-0057](0057-document-intake-and-extraction.md), proposed 2026-11-15): `document_extraction` is an outside-content subject table: a `document_reader` run on it starts tainted, and reads its words, fields, rule runs and pages, a reading put to the author ([ADR-0057](0057-document-intake-and-extraction.md) rule 11).
+
+    Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): the UI's assist panel starts runs of the agent type `assistant` with an `assist_request` row as subject, which carries the user's typed text (up to 2,000 characters, written by the `human_only` `CreateAssistRequest`) and the screen's context, as `analysis_question` does for the analysis agent; runs stay asynchronous with no dialogue. The run starts tainted when the context subject or a selected row is outside content or effectively tainted, and always for `purpose` `act` (open question). `GetAgentBudgetStatus`, a people-only query on no tool list, shows the remaining daily budget (ADR-0077 rules 13, 14, 17).
 16. Executing a run:
     - **Wake-ups.** The consumer `agent_wake_up` reacts to `WorkItemRaised` for kinds an agent type declares, in companies where that type's mode is not `off`, and dispatches `StartAgentRun` (ADR-0013 rule 12; ADR-0042 rule 14). It skips `WorkItemRaised` events that carry an origin agent run (ADR-0013 rules 9, 11), so nothing in an agent's chain wakes an agent. Only raises wake agents, so a run that unclaims an item never wakes another (no loop). For a tainted item this stays within ADR-0013 rule 11, because the run starts tainted (rule 15) and can only draft.
     - **No agent wakes an agent.** A kind that a command on any agent tool list can raise may not be declared by any agent type (a registry check), like `agent_task` (ADR-0042 rule 11).
@@ -276,6 +278,8 @@ Status: accepted (2026-11-15) under ADR-0005, reviewed by Claude Fable 5.2 (buil
     - **Its writes are tainted:** document versions (INV-88), events (ADR-0013 rule 11), work item raises and notes (INV-210).
 
     Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), proposed 2026-11-15): `UpdateAnalysisAnswer` is registered `is_draft_only` although it writes no draft: it writes once to the run's own question row, which only the asker reads, and changes no document, master data or outside party, so it carries no more risk than a work item note (rule 21).
+
+    Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): `UpdateAssistAnswer` is registered `is_draft_only`, on the `assistant` tool list for workflow code only, and writes only the answer fields of its own `assist_request`, as `UpdateAnalysisAnswer` does (ADR-0077 rule 14).
 27. Tainted read scope, the literal spec 03 rule 1 (ADR-0029 rule 14):
     - **A tainted run reads only:**
       1. rows in its scope: rows whose partner column equals `scope_partner_id` (scope `partner`), rows of `scope_import_batch_id` (scope `import_batch`), or the run's subject row (scope `subject`);
@@ -322,6 +326,8 @@ Status: accepted (2026-11-15) under ADR-0005, reviewed by Claude Fable 5.2 (buil
     Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), proposed 2026-11-15): `ListAnalysisResultRow`, the list query through which people export analysis results, and `ListAnalysisQuestion` are on no tool list either (rules 14, 17).
 
     Note ([ADR-0064](0064-production-agent.md), proposed 2026-11-15): also never on a tool list: `TransferStockReservation` (accepted only from a change proposal's execution), `ImportOperationConfirmation` (an integration's command) and `RunProductionOrderCheck` (a system job) (rules 12, 24, 25; INV-730).
+
+    Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): `CreateAssistRequest` and `GetAgentBudgetStatus` join this list (ADR-0077 rules 14, 17).
 31. Effective permissions are the intersection of the agent type's declared permissions and those of the human acted for, re-evaluated at every call against current assignments, for permissions, record scope and field classes (ADR-0017 rule 11). A tainted run's read scope (rule 27) narrows that further. The tool list is a third limit: a tool must be on the list and allowed by the intersection.
 
     Note: agent types get no role assignments, so no further set of rights joins this intersection; the human's owner scope binds the run as their record scope does ([ADR-0054](0054-users-roles-and-authorizations.md) rule 16).
