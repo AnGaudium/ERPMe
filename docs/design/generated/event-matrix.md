@@ -26,7 +26,7 @@ Event types named in backticks in the ADRs, recognised by the event forms of the
 | `DocumentExtractionRequested` | `document_extraction` | attachments | `document_extraction_runner` | ADR-0057:54, ADR-0057:59, ADR-0057:307 |
 | `DocumentExtractionVerified` | `document_extraction` | attachments | `certificate_result_drafter`, a consumer in `purchasing` | ADR-0057:238, ADR-0057:266, ADR-0057:307 (+1) |
 | `ExtractionFieldCorrected` | `extraction_field` | attachments | — | ADR-0057:237, ADR-0057:244, ADR-0057:307 |
-| `ForecastCompleted` | — | — | — | ADR-0024:282 |
+| `ForecastCompleted` | — | — | — | ADR-0024:284 |
 | `GoodsReceiptPosted` | `goods_receipt` | inventory | `inspection_lot_creator` | ADR-0004:7, ADR-0004:61, ADR-0009:98 (+4) |
 | `InboundMessageRecorded` | `inbound_message` | crm | a consumer in `crm` | ADR-0052:356, ADR-0057:251 |
 | `InspectionLotApproved` | `inspection_lot` | quality | `usage_decision_executor` | ADR-0070:140 |
@@ -53,7 +53,7 @@ Event types named in backticks in the ADRs, recognised by the event forms of the
 | `OperationPaused` | — | — | — | ADR-0071:92 |
 | `OperationStarted` | — | — | — | ADR-0071:92 |
 | `OperationTransferred` | — | — | — | ADR-0071:138 |
-| `OtherReceiptPosted` | — | — | `inspection_lot_creator` | ADR-0070:77 |
+| `OtherReceiptPosted` | `other_receipt` | inventory | `inspection_lot_creator` | ADR-0070:77 |
 | `OutboundMessageOutcomeRecorded` | `outbound_message` | crm | — | ADR-0052:356 |
 | `OutboundMessageSendRequested` | `outbound_message` | crm | — | ADR-0052:284, ADR-0052:356 |
 | `PartnerCreated` | `partner` | master_data | a consumer in `crm` | ADR-0052:177, ADR-0052:183 |
@@ -62,9 +62,9 @@ Event types named in backticks in the ADRs, recognised by the event forms of the
 | `PartnerEmailDomainUpdated` | `partner_email_domain` | crm | — | ADR-0052:356 |
 | `PartnerInsightComputationCompleted` | `partner_insight` | crm | — | ADR-0052:325, ADR-0052:356 |
 | `PartnerUpdated` | `partner` | master_data | a consumer in `crm` | ADR-0052:183, ADR-0058:119 |
-| `PlannedOrderConverted` | `planned_order` | planning | — | ADR-0024:282 |
-| `PlannedOrderFirmed` | `planned_order` | planning | — | ADR-0024:282 |
-| `PlanningCompleted` | — | — | `planning_work_items` | ADR-0024:224, ADR-0024:282 |
+| `PlannedOrderConverted` | `planned_order` | planning | — | ADR-0024:284 |
+| `PlannedOrderFirmed` | `planned_order` | planning | — | ADR-0024:284 |
+| `PlanningCompleted` | — | — | `planning_work_items` | ADR-0024:226, ADR-0024:284 |
 | `PostingPeriodLocked` | `posting_period` | — (lab stub) | — | ADR-0012:38 |
 | `PostingPeriodOpened` | `posting_period` | — (lab stub) | — | ADR-0012:38 |
 | `PostingPeriodRestricted` | `posting_period` | — (lab stub) | — | ADR-0012:38 |
@@ -83,19 +83,19 @@ Event types named in backticks in the ADRs, recognised by the event forms of the
 | `ProductionReceiptReversed` | `production_receipt` | production | — | ADR-0070:83 |
 | `PurchaseOrderCreated` | `purchase_order` | purchasing | — | ADR-0058:253 |
 | `PurchaseRequestCreated` | `purchase_request` | purchasing | — | ADR-0058:251, ADR-0058:253 |
-| `ReplenishmentRequested` | — | — | a consumer in `purchasing` | ADR-0024:260, ADR-0024:261, ADR-0024:282 (+2) |
+| `ReplenishmentRequested` | — | — | a consumer in `purchasing` | ADR-0024:262, ADR-0024:263, ADR-0024:284 (+2) |
 | `ReportRenderRequested` | — | — | — | ADR-0049:196 |
 | `ReturnFromCustomerPosted` | `return_from_customer` | inventory | `inspection_lot_creator` | ADR-0070:77 |
 | `SalesOrderApproved` | `sales_order` | sales | — | ADR-0058:118, ADR-0058:245, ADR-0058:253 (+1) |
 | `SalesOrderChanged` | `sales_order` | sales | — | ADR-0058:119 |
 | `SalesOrderClosed` | `sales_order` | sales | — | ADR-0009:98 |
-| `StockReservationCanceled` | `stock_reservation` | inventory | — | ADR-0023:280, ADR-0064:126 |
-| `StockReservationCreated` | `stock_reservation` | inventory | — | ADR-0023:280 |
+| `StockReservationCanceled` | `stock_reservation` | inventory | — | ADR-0023:284, ADR-0064:126 |
+| `StockReservationCreated` | `stock_reservation` | inventory | — | ADR-0023:284 |
 | `StockReservationTransferred` | `stock_reservation` | inventory | — | ADR-0064:254 |
 | `TaxReturnRenderRequested` | — | — | — | ADR-0049:196 |
-| `WarehouseTaskCanceled` | `warehouse_task` | inventory | — | ADR-0023:280, ADR-0070:145 |
-| `WarehouseTaskConfirmed` | `warehouse_task` | inventory | a consumer in `production` | ADR-0023:280, ADR-0034:248, ADR-0070:145 (+1) |
-| `WarehouseTaskCreated` | `warehouse_task` | inventory | — | ADR-0023:280 |
+| `WarehouseTaskCanceled` | `warehouse_task` | inventory | — | ADR-0023:284, ADR-0070:145 |
+| `WarehouseTaskConfirmed` | `warehouse_task` | inventory | a consumer in `production` | ADR-0023:284, ADR-0034:248, ADR-0070:145 (+1) |
+| `WarehouseTaskCreated` | `warehouse_task` | inventory | — | ADR-0023:284 |
 | `WorkCaseAssigned` | `work_case` | work | — | ADR-0066:136 |
 | `WorkCaseCanceled` | `work_case` | work | — | ADR-0066:136 |
 | `WorkCaseOpened` | `work_case` | work | — | ADR-0066:93, ADR-0066:136 |
@@ -127,14 +127,14 @@ A module name here means the ADR speaks of a consumer of that module without nam
 | `document_extraction_runner` | 1 | ADR-0057:59 |
 | `imports_data_subject_erasure` | 1 | ADR-0052:258 |
 | `inspection_lot_creator` | 1 | ADR-0070:77 |
-| `planning_work_items` | 3 | ADR-0024:224, ADR-0031:81, ADR-0064:169 |
+| `planning_work_items` | 3 | ADR-0024:226, ADR-0031:81, ADR-0064:169 |
 | a consumer in `production` | 4 | ADR-0034:248, ADR-0057:47, ADR-0062:104 |
-| a consumer in `purchasing` | 6 | ADR-0024:261, ADR-0024:345, ADR-0037:45 |
+| a consumer in `purchasing` | 6 | ADR-0024:263, ADR-0024:347, ADR-0037:45 |
 | a consumer in `quality` | 4 | ADR-0057:49, ADR-0070:14, ADR-0070:102 |
 | `render_worker` | 2 | ADR-0013:25, ADR-0049:199 |
 | a consumer in `sales` | 3 | ADR-0047:114, ADR-0047:246, ADR-0048:262 |
 | a consumer in `tax` | 2 | ADR-0041:152, ADR-0057:255 |
-| `tax_payment_evidence` | 2 | ADR-0044:143, ADR-0053:182 |
+| `tax_payment_evidence` | 2 | ADR-0044:145, ADR-0053:182 |
 | `usage_decision_auto_drafter` | 1 | ADR-0070:138 |
 | `usage_decision_executor` | 1 | ADR-0070:140 |
 | `work_case_opener` | 4 | ADR-0013:53, ADR-0022:76, ADR-0052:164 |

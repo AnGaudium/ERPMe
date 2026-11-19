@@ -557,6 +557,8 @@ Outcome and violation enumerations are not error codes and are not catalogued he
 | `custom_field_limit` | precondition | 422 | no | A 31st active custom field definition for one company and table ([ADR-0074](../adr/0074-core-data-structure-additions.md) rule 8) |
 | `reason_invalid` | validation | 422 | no | A reason that is inactive, of another company or of another kind than the column takes ([ADR-0074](../adr/0074-core-data-structure-additions.md) rule 13) |
 | `dispatch_has_receive` | precondition | 422 | no | `Reverse` of a transfer dispatch that has a posted receive ([ADR-0075](../adr/0075-stock-documents.md) rule 2) |
+| `reason_required` | validation | 422 | no | A reason of a kind whose `documents.reason_required.<kind>` setting is true is missing ([ADR-0074](../adr/0074-core-data-structure-additions.md) rule 22) |
+| `transfer_order_line_invalid` | validation | 422 | no | A stock transfer line names a transfer order line of another item, or outside its warehouses: a direct transfer between them, a dispatch from the source, a receive into the destination ([ADR-0075](../adr/0075-stock-documents.md) rule 14) |
 
 ### Check results
 

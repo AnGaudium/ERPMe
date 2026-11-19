@@ -82,7 +82,7 @@ Before step 1 code freezes the platform modules, every entity that several modul
 
    Note ([ADR-0070](0070-quality-management-core.md), proposed 2026-11-17): the non-posting document type `inspection_lot` is owned by `quality` (ADR-0070 rule 7).
 
-    Note ([ADR-0075](0075-stock-documents.md), proposed 2026-11-19): the fields and reversibility flags of `stock_transfer`, `stock_count`, `scrap` and `internal_consumption` are written (ADR-0075); `other_receipt`, `other_issue`, `opening_balance` and `transfer_order` remain for the same deliverable.
+    Note ([ADR-0075](0075-stock-documents.md), proposed 2026-11-19): the fields and reversibility flags of every type of this rule are written (ADR-0075 rules 1 to 6 and 11 to 14), with the link from `transfer_order` to `stock_transfer` as `stock_transfer_line.transfer_order_line_id` (one step, or two through transit; rule 14).
 8. Owners of entities that had none:
 
    | Entity | Owner |

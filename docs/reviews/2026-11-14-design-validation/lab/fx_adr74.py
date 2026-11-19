@@ -104,7 +104,7 @@ def build(c):
           (I[aid], I[co], I[pid], kind, ["1 Example Street"]))
     X("insert into cost_center (id, company_id, code, name, kind) values (%s,%s,'CC1','CC','other')", (I["cc"], I["co"]))
     X("insert into project (id, company_id, code, name) values (%s,%s,'P1','P1')", (I["proj"], I["co"]))
-    for kind in ("cancel", "reject", "return", "scrap", "count_difference", "block"):
+    for kind in ("cancel", "reject", "return", "scrap", "count_difference", "block", "other_receipt", "other_issue"):
         I["reason_" + kind] = new()
         X("insert into reason (id, company_id, kind, code, name) values (%s,%s,%s,%s,%s)", (I["reason_" + kind], I["co"], kind, kind + "_1", kind.title()))
     return I

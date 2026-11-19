@@ -650,6 +650,11 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Stock count | stock\_count, stock\_count\_line, book\_quantity | The posting document of a physical count: counted quantities per key against the book quantity stored at the freeze ([ADR-0075](../adr/0075-stock-documents.md) rule 3) |
 | Scrap | scrap, scrap\_line | The posting document that writes off stock with a required scrap reason ([ADR-0075](../adr/0075-stock-documents.md) rule 4) |
 | Internal consumption | internal\_consumption, consumption\_kind: internal, quality\_sample | The posting document that issues stock to one cost center or project ([ADR-0075](../adr/0075-stock-documents.md) rule 5) |
+| Reason requirement | documents.reason\_required.<kind> | A company setting per reason kind saying whether a reason is required; true for count differences, scrap, returns, rejections, other receipts and issues, false for cancels and blocks ([ADR-0074](../adr/0074-core-data-structure-additions.md) rule 22) |
+| Other receipt | other\_receipt, other\_receipt\_line | The posting document of goods received without a purchase, sales or production source, valued from the document ([ADR-0075](../adr/0075-stock-documents.md) rule 11) |
+| Other issue | other\_issue, other\_issue\_line | The posting document of goods issued for a purpose no other movement type covers ([ADR-0075](../adr/0075-stock-documents.md) rule 12) |
+| Opening stock | opening\_balance, opening\_balance\_line | The stock document of the migration's opening stock, posted only in the migration period; its value sets the first preliminary price ([ADR-0075](../adr/0075-stock-documents.md) rule 13) |
+| Transfer order | transfer\_order, transfer\_order\_line | The non-posting demand document of a planned move between two warehouses, fulfilled by stock transfers ([ADR-0075](../adr/0075-stock-documents.md) rule 14) |
 
 **Command verbs** ([ADR-0004](../adr/0004-naming-conventions.md) rules 17–22). A command type starts with one of these verbs; its event, if any, ends with the event form. The intent column says what the verb is for, nothing more: which states and preconditions allow a command is decided by DS-05 and the DS item that owns the noun. A new verb is added here, with its intent and event form, in the same change as the first command that needs it; a verb never takes a second meaning.
 

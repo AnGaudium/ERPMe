@@ -1085,7 +1085,7 @@ CREATE TABLE custom_field_definition (                     -- [master_data] ADR-
 CREATE TABLE reason (                                      -- [master_data] ADR-0074 rules 13, 14; company data, change-tracked
     id          uuid PRIMARY KEY,
     company_id  uuid NOT NULL REFERENCES company (id),
-    kind        text NOT NULL CONSTRAINT ck_reason_kind CHECK (kind IN ('cancel', 'reject', 'return', 'scrap', 'count_difference', 'block')),
+    kind        text NOT NULL CONSTRAINT ck_reason_kind CHECK (kind IN ('cancel', 'reject', 'return', 'scrap', 'count_difference', 'block', 'other_receipt', 'other_issue')),
     code        text NOT NULL CONSTRAINT ck_reason_code CHECK (code ~ '^[a-z][a-z0-9_]*$'),
     name        text NOT NULL,                             -- in the company's language; others in data_translation (ADR-0018 rule 17)
     is_active   boolean NOT NULL DEFAULT true,

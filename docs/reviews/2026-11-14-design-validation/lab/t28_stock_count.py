@@ -292,7 +292,8 @@ if "--load" in sys.argv:
         scrap(c, stock_status="blocked", reason_note="cracked")
         scrap(c, cost_center_id=I["cc"])
     check("X25 a scrap line from the blocked status with a reason, and one with a cost center, are stored", True)
-    trial("X26 a scrap line needs a reason", lambda cx: scrap(cx, scrap_reason_id=None), "null value in column \"scrap_reason_id\"")
+    check("X26 the scrap reason column is nullable: the company setting documents.reason_required.scrap decides, checked by the command (ADR-0074 rule 22)",
+          cols["scrap_line"].get("scrap_reason_id") == "YES")
     trial("X27 the scrap reason is of kind scrap", lambda cx: scrap(cx, scrap_reason_id=I["reason_cancel"]), "scrap_line_company_id_scrap_reason_id_")
     trial("X28 a scrap bears at most one of cost center and project", lambda cx: scrap(cx, cost_center_id=I["cc"], project_id=I["proj"]), "ck_scrap_line_dimension")
     trial("X29 a scrap quantity is positive", lambda cx: scrap(cx, q=0), "ck_scrap_line_")

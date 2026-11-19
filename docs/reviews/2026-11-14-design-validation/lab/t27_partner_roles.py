@@ -286,7 +286,7 @@ if "--load" in sys.argv:
     d2 = doc(c, I, "quotation", state="draft", partner="sold")
     trial("X38 a reason of another kind is refused by the key", lambda cx: cx.execute(c_sql, (I["reason_scrap"], d2)), "document_company_id_canceled_reason_id_")
     trial("X39 a canceled reason is allowed only in state canceled", lambda cx: cx.execute("update document set canceled_reason_id=%s where id=%s", (I["reason_cancel"], d2)), "ck_document_canceled")
-    trial("X40 a reason kind is one of the six", lambda cx: cx.execute("insert into reason (id, company_id, kind, code, name) values (%s,%s,'other','x','X')", (new(), I["co"])), "ck_reason_kind")
+    trial("X40 a reason kind is one of the eight", lambda cx: cx.execute("insert into reason (id, company_id, kind, code, name) values (%s,%s,'other','x','X')", (new(), I["co"])), "ck_reason_kind")
     trial("X41 one reason code per company and kind", lambda cx: cx.execute("insert into reason (id, company_id, kind, code, name) values (%s,%s,'cancel','cancel_1','Dup')", (new(), I["co"])), "reason_company_id_kind_code_key")
     X("insert into reason (id, company_id, kind, code, name) values (%s,%s,'scrap','cancel_1','Same code, other kind')", (new(), I["co"]))
     check("X42 the same code may exist under another kind", True)

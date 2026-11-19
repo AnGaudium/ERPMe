@@ -12,7 +12,7 @@ The author's decisions of 2026-11-19, from the coverage scan of the data structu
 | Who is invoiced, who pays, where the goods go | One partner and one address snapshot per header; `delivery.delivery_address` is an interim `jsonb` | Parties on documents, with defaults from `partner_relationship` (rules 1 to 6) |
 | The ID of a record in another system | `import_key_map`, named in ADR-0044 and never defined | One table, `external_id_map`, with a lookup function (rule 7) |
 | Company-defined extra fields | Deferred past Phase 1 with no seam | A definition table and a `custom_values jsonb` column on 11 tables (rules 8 to 12) |
-| Cancel, reject, return, scrap and count reasons | Free text, or no reason at all | One `reason` catalog, referenced by foreign key (rules 13 to 15) |
+| Cancel, reject, return, scrap and count reasons | Free text, or no reason at all | One `reason` catalog, referenced by foreign key; a company setting per kind says whether a reason is required (rules 13 to 15, 22) |
 | A note on a document | None on any header | `note` on 17 document headers and on the journal entry (rules 16, 17) |
 | Parallel ledgers | Not designed | Out of scope, the author's decision (rule 18) |
 | `updated_by`, `updated_at` on every table | `recorded_at` only | Not added; change history stays with the audit rows (rule 19) |
@@ -74,7 +74,7 @@ The author's decisions of 2026-11-19, from the coverage scan of the data structu
 
 **4. Reason catalogs**
 
-13. `reason` (owner `master_data`, company data, change-tracked) holds `kind` (`cancel`, `reject`, `return`, `scrap`, `count_difference`, `block`), `code`, `name` (company language; others in `data_translation`) and `is_active`, unique per company, kind and code, and by `(company_id, id, kind)`. A column that takes one kind stores the kind beside the ID (`<column>_kind`, default and CHECK to that kind) and references `(company_id, id, kind)`, so the database holds the kind (the pattern of `price_list_kind`). The kind `block` has no consumer in this ADR: it is reserved for the partner and item blocks a later ADR adds. Reasons are company data seeded by a package template if the package has one; the core seeds none. A command that names a reason takes an active one of its company and kind (`reason_invalid`, also for a required reason that is missing); deactivating a reason never touches a document that names it.
+13. `reason` (owner `master_data`, company data, change-tracked) holds `kind` (`cancel`, `reject`, `return`, `scrap`, `count_difference`, `block`, and `other_receipt` and `other_issue` for the documents of ADR-0075 rules 11 and 12), `code`, `name` (company language; others in `data_translation`) and `is_active`, unique per company, kind and code, and by `(company_id, id, kind)`. A column that takes one kind stores the kind beside the ID (`<column>_kind`, default and CHECK to that kind) and references `(company_id, id, kind)`, so the database holds the kind (the pattern of `price_list_kind`). The kind `block` has no consumer in this ADR: it is reserved for the partner and item blocks a later ADR adds. Reasons are company data seeded by a package template if the package has one; the core seeds none. A command that names a reason takes an active one of its company and kind (`reason_invalid`); a missing reason that the company's setting requires is `reason_required` (rule 22); deactivating a reason never touches a document that names it.
 14. **What becomes a foreign key:**
 
     | Was | Becomes |
@@ -101,7 +101,24 @@ The author's decisions of 2026-11-19, from the coverage scan of the data structu
 **Commands, leaves, catalogs and DDL**
 
 20. Commands, all `master_data_change` and change-tracked unless stated: `CreatePartnerRelationship` and `UpdatePartnerRelationship` (leaf `partner`); `CreateReason` and `UpdateReason` (new leaf `reason`); `CreateCustomFieldDefinition` and `UpdateCustomFieldDefinition` (new leaf `custom_field`); `SetExternalId` and `ClearExternalId` (leaf `data_import`, human or integration actor). Queries: `ListPartnerRelationships`, `ListReasons`, `ListCustomFieldDefinitions`, `ResolveExternalId`, `ListExternalIds`. These are new names, registered in the command registry (ADR-0008) when the code is written; there is no separate catalog of commands. The two new leaves sit under `master_data`, so the owner template has them at full; no other template gets them in this ADR.
-21. DDL: `partner_relationship`, `external_id_map` with its two functions, `custom_field_definition` and `reason` in DS-20; the columns of rules 1, 3, 4 and 5 on the tables named, in DS-20, DS-22, DS-43, DS-05 and DS-06. Every new table is owned by `master_data`. `partner_address` and `project` gain `UNIQUE (company_id, partner_id, id)` and `UNIQUE (company_id, id)`.
+21. DDL: `partner_relationship`, `external_id_map` with its two functions, `custom_field_definition` and `reason` in DS-20; the columns of rules 1 to 3, 9, 14, 16 and 17 on the tables named, in DS-20, DS-22, DS-43, DS-05 and DS-06. Every new table is owned by `master_data`. `partner_address` and `project` gain `UNIQUE (company_id, partner_id, id)` and `UNIQUE (company_id, id)`.
+
+**Reason requirement** (the chief architect's decision for the author, 2026-11-19)
+
+22. Whether a reason is required is policy, so it is one company setting per kind (ADR-0063), boolean, scope `company`, leaf `reason`, direction `true_tighter`:
+
+    | Setting | Core default | Why |
+    | --- | --- | --- |
+    | `documents.reason_required.count_difference` | true | a difference changes stock and value |
+    | `documents.reason_required.scrap` | true | a write-off changes stock and value |
+    | `documents.reason_required.return` | true | a return changes stock and value |
+    | `documents.reason_required.reject` | true | a rejection needs an audit trail |
+    | `documents.reason_required.other_receipt` | true | an unplanned receipt changes stock and value |
+    | `documents.reason_required.other_issue` | true | an unplanned issue changes stock and value |
+    | `documents.reason_required.cancel` | false | a canceled draft or pending document posted nothing |
+    | `documents.reason_required.block` | false | no consumer in Phase 1 |
+
+    A missing required reason is `reason_required` (validation), checked by the command on the line or header that takes the reason: a count key with a difference, a scrap line, a production issue, confirmation or receipt with scrap, a return line, an other receipt or other issue line, a rejection, a cancel. The database keeps every reason column nullable, so the setting alone decides; loosening a setting does not touch documents already written. The catalog `settings.csv` carries the eight rows (ADR-0063 rule 29 note).
 
 ## Context
 
@@ -149,9 +166,9 @@ The other scan items stay for the step 0 review.
 
 ## Documents updated
 
-- **ADRs** (notes tagged "ADR-0074, proposed 2026-11-19"): ADR-0009 rule 1; ADR-0014 rules 2 and 10; ADR-0018 rule 17; ADR-0019 rule 5; ADR-0022 rule 17; ADR-0026 rules 1 and 15; ADR-0028 rule 16; ADR-0030 rule 6; ADR-0034 rules 11 and 12; ADR-0040 rule 4; ADR-0041 rule 3; ADR-0044 rule 5; ADR-0047 rules 2, 3, 6, 8 and 18; ADR-0048 rules 8 and 19; ADR-0052 rule 18; ADR-0058 (user-defined fields); ADR-0064 (scrap reason list); ADR-0068 rule 22; ADR-0071 rules 2 and 4.
-- **Catalogs:** authorization-areas.csv (2), invariants.csv (5), edge-cases.csv (10).
-- **Design:** DS-20, DS-22-09-42, DS-43-54, DS-05 and DS-06 SQL; DS-04 (ten error codes); DS-16 and DS-17 (blocks and counts); the glossary (new rows only); the generated overview.
+- **ADRs** (notes tagged "ADR-0074, proposed 2026-11-19"): ADR-0009 rule 1; ADR-0014 rules 2 and 10; ADR-0018 rule 17; ADR-0019 rule 5; ADR-0022 rule 17; ADR-0026 rules 1 and 15; ADR-0028 rule 16; ADR-0030 rule 6; ADR-0034 rules 11 and 12; ADR-0040 rule 4; ADR-0041 rule 3; ADR-0044 rule 5; ADR-0047 rules 2, 3, 6, 8 and 18; ADR-0048 rules 8 and 19; ADR-0052 rule 18; ADR-0058 (user-defined fields); ADR-0064 (scrap reason list); ADR-0063 rule 29 (the eight settings); ADR-0068 rule 22; ADR-0071 rules 2 and 4.
+- **Catalogs:** authorization-areas.csv (2), settings.csv (8, rule 22), invariants.csv (5), edge-cases.csv (11).
+- **Design:** DS-20, DS-22-09-42, DS-43-54, DS-05 and DS-06 SQL; DS-04 (eleven error codes, `reason_required` among them); DS-16 and DS-17 (blocks and counts); the glossary (new rows only); the generated overview.
 - **Lab:** `t27_partner_roles.py` and the lab README (findings); fixtures of `t14_commercial_inventory_ddl.py` (M5 expects 22 headers), `t16_planning_production_ddl.py` (N52 names a reason row) and `t17_uom.py` (D03 expects the four stock line tables).
 - **Index and log:** docs/adr/README.md; docs/open-questions.md (the decisions of rules 18 and 19 marked decided; new questions); docs/runbook/step-log.md.
 
@@ -165,7 +182,7 @@ The other scan items stay for the step 0 review.
 - **INV-863** `payer_is_open_item_partner` (area `receivables_payables`): the open item of a posted sales invoice, credit note or debit note belongs to its payer, else its bill-to party, else its sold-to partner; of a purchase document, to its invoicing party, else its ordered-from partner.
 - **INV-864** `document_party_complete` (area `documents`): every named document party has its name; a tax ID, an address or an address key is held only with its party, and the address is one of the party's own; every party is a partner of the document's company; a party is named exactly when its name is.
 
-**Edge cases** (DS-17; block EC-310 to EC-319, all taken):
+**Edge cases** (DS-17; block EC-310 to EC-319, all taken, and EC-330):
 
 - **EC-310** `invoice_head_office_and_payer`: an order with a ship-to site, a head-office bill-to party and a paying group: the delivery goes to the site, the invoice and its tax carry the head office, the open item and the credit exposure the group.
 - **EC-311** `party_defaults_from_relationships`: a partner with one default ship-to and no payer relationship gets the ship-to on a new order and no payer; changing the default does not touch an existing order.
@@ -177,3 +194,4 @@ The other scan items stay for the step 0 review.
 - **EC-317** `scrap_reason_needs_scrap`: a production receipt with a scrap reason and no scrap quantity is refused.
 - **EC-318** `header_note_frozen`: a note written on a draft is part of its version and cannot change after posting; the journal entry carries a copy.
 - **EC-319** `payee_change_by_proposal`: an agent that changes a supplier's payee relationship directly gets `proposal_required`; its proposal executes after a person approves.
+- **EC-330** `reason_required_by_setting` (block EC-330 to EC-339, shared with ADR-0075's remaining documents): with the core defaults, a count difference, a scrap line or an other issue without a reason is refused with `reason_required` and a cancel without one succeeds; after `documents.reason_required.scrap` is set false, the same scrap line posts.
