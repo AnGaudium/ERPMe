@@ -153,6 +153,8 @@ Every exception, pending approval and other piece of business work is one `work_
 
     The wake-up consumer is `agent_wake_up`; a kind that a command on an agent tool list can raise is declared by no agent type ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 16).
 
+    Note ([ADR-0076](0076-internal-messaging-and-notifications.md), proposed 2026-11-19): the transactional consumer `messaging_fanout` turns `WorkItemRaised` and `WorkItemAssigned` into a `work_item` notification: to the owning user; for an item owned by an approval stage, to its eligible members when they are at most 20; an item owned by a role notifies nobody and waits in the queue (ADR-0076 rule 6).
+
 **Taint and agents**
 
 15. An item raised by a tainted event, or by a tainted run, has `is_tainted`. A run started from it is tainted from its start (ADR-0029 rule 10), and its drafts are tainted versions.

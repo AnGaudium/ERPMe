@@ -187,7 +187,11 @@ The web UI is one more client of the command and query layer. It writes data onl
     The query builder emits one `SELECT` per statement, and `EXECUTE` on `pg_notify` is revoked from `PUBLIC` and granted to `nativeflows_app` and `nativeflows_worker` ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 44).
 
     Note: the header also carries the subject document's `owner_employee_id` and `created_by_user_id` (IDs), and a header is forwarded only when the session's read owner scope reaches the document, checked against the same cached assignments and organization data ([ADR-0054](0054-users-roles-and-authorizations.md) rule 15).
+
+    Note ([ADR-0076](0076-internal-messaging-and-notifications.md), proposed 2026-11-19): a `MessageCreated` header (subject: the message) is resolved to its conversation and forwarded only to sessions whose user may read that conversation now, through messaging's registered visibility function, and a `NotificationCreated` header only to its recipient's sessions; no tab subscribes to the noun `message`; headers carry IDs, never text (ADR-0076 rule 8).
 14. Notifications to people beyond live screens (e-mail, push) are after Phase 1 (spec 07).
+
+    Note ([ADR-0076](0076-internal-messaging-and-notifications.md), proposed 2026-11-19): ADR-0076 (proposed; its Phase 1 placement is the author's decision) adds an in-app inbox fed by messages and work items, and notification e-mail grouped per person every 5 minutes or in a daily digest, without message text (rules 6, 7). Push stays after Phase 1.
 
 **Language, keyboard, display**
 

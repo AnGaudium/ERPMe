@@ -259,6 +259,8 @@ Leads, opportunities, marketing automation, appointments, chat connectors and se
     - **Records.** It writes an audit record and a processing log entry (ADR-0038 rule 9).
 
     Note ([ADR-0057](0057-document-intake-and-extraction.md), proposed 2026-11-15): the subject's document extractions (by partner, by result links to the subject's contact or partner, by the subject's inbound messages) are erased through `attachments.contract`, except the accounting fields of an extraction linked to an incoming e-invoice record or a posted accounting document ([ADR-0057](0057-document-intake-and-extraction.md) rule 19).
+
+    Note ([ADR-0076](0076-internal-messaging-and-notifications.md), proposed 2026-11-19): `EraseDataSubject` of a partner also clears the bodies of that partner's record thread and ends their attachment links (ADR-0076 rule 10); threads on the partner's documents are an open question.
 26. `personal_data_processing_log` is owned by `audit` (layer 2), because its writers sit in layers 2 to 5: the LLM gateway (DS-32), tax ID lookups, exports (ADR-0044) and erasure.
     - **Writing.** Through `audit.contract.log_personal_data_processing`, in the caller's transaction.
     - **Columns:** `processing_kind` (`llm_send`, `tax_id_lookup`, `export`, `erasure`), `subject_table` and `subject_id` (none for a whole-company export), `field_names`, `recipient` (provider and model, or lookup provider), `agent_run_id`, `audit_record_id`.

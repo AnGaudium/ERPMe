@@ -17,7 +17,7 @@ Tables per owner module, from the DDL drafts in `docs/design/*.sql` and the owne
 | `permissions` | 2 | 18 |
 | `policy` | 2 | 7 |
 | `registry` | 2 | 6 |
-| `work` | 2 | 5 |
+| `work` | 2 | 12 |
 | `inventory` | 3 | 44 |
 | `ledger` | 3 | 4 |
 | `master_data` | 3 | 74 |
@@ -31,7 +31,7 @@ Tables per owner module, from the DDL drafts in `docs/design/*.sql` and the owne
 | `sales` | 4 | 14 |
 | `query` | 5 | 4 |
 | `(no owner stated)` | — | 16 |
-| **total** | | **373** |
+| **total** | | **380** |
 
 ## `agent_runs`
 
@@ -165,6 +165,13 @@ Tables per owner module, from the DDL drafts in `docs/design/*.sql` and the owne
 
 | Table | Purpose | Section | Key references | Source |
 | --- | --- | --- | --- | --- |
+| `conversation` | ADR-0076 rule 1 | Conversations | `user_account` | docs/design/DS-63-messaging.sql:9 |
+| `conversation_member` | ADR-0076 rules 2, 3; a member is a row with left_at null; for a record thread, a follower | Conversations | `conversation`, `user_account` | docs/design/DS-63-messaging.sql:33 |
+| `message` | ADR-0076 rule 4; people only write messages | Messages | `conversation`, `message`, `user_account` | docs/design/DS-63-messaging.sql:50 |
+| `message_mention` | ADR-0076 rule 5; at most 20 per message, picked in the composer | Messages | `message`, `user_account` | docs/design/DS-63-messaging.sql:74 |
+| `notification` | ADR-0076 rule 6; written only by CreateNotification, from the fan-out consumer | Notifications | `conversation`, `message`, `notification_email`, `user_account`, `work_item` | docs/design/DS-63-messaging.sql:102 |
+| `notification_email` | ADR-0076 rule 7; one e-mail to one person, the intent of ADR-0013 rule 10 | Notifications | `user_account` | docs/design/DS-63-messaging.sql:87 |
+| `notification_preference` | ADR-0076 rule 7; a missing row takes the kind's default; SetNotificationPreferences replaces a person's list | Notifications | `user_account` | docs/design/DS-63-messaging.sql:131 |
 | `work_case` | one business intent; links only, documents stay the source of truth (ADR-0066 rules 1-2) | Work queue | `branch`, `partner`, `user_account`, `warehouse` | docs/design/DS-05-platform.sql:134 |
 | `work_case_link` | append-only; unlinking sets unlinked_at once (ADR-0066 rule 8) | Work queue | `work_case` | docs/design/DS-05-platform.sql:175 |
 | `work_item` |  | Work queue | `agent_run`, `approval_stage`, `branch`, `user_account`, `warehouse`, `work_case` | docs/design/DS-05-platform.sql:58 |
@@ -1119,6 +1126,14 @@ Foreign keys whose source and target tables have different stated owners. Foreig
 | `tax_line` (tax, 3) | `company_id,declaring_branch_id` | `branch` (master_data, 3) | same layer | docs/design/DS-05-platform.sql:1026 |
 | `tax_line` (tax, 3) | `company_id,document_id` | `document` (documents, 2) | down | docs/design/DS-05-platform.sql:1025 |
 | `tax_line` (tax, 3) | `transaction_currency` | `currency` (master_data, 3) | same layer | docs/design/DS-05-platform.sql:1014 |
+| `conversation` (work, 2) | `created_by_user_account_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-63-messaging.sql:20 |
+| `conversation_member` (work, 2) | `user_account_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-63-messaging.sql:36 |
+| `message` (work, 2) | `author_user_account_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-63-messaging.sql:56 |
+| `message_mention` (work, 2) | `user_account_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-63-messaging.sql:78 |
+| `notification` (work, 2) | `actor_user_account_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-63-messaging.sql:107 |
+| `notification` (work, 2) | `recipient_user_account_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-63-messaging.sql:105 |
+| `notification_email` (work, 2) | `recipient_user_account_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-63-messaging.sql:90 |
+| `notification_preference` (work, 2) | `user_account_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-63-messaging.sql:133 |
 | `work_case` (work, 2) | `company_id,branch_id` | `branch` (master_data, 3) | up | docs/design/DS-05-platform.sql:158 |
 | `work_case` (work, 2) | `company_id,partner_id` | `partner` (master_data, 3) | up | docs/design/DS-05-platform.sql:160 |
 | `work_case` (work, 2) | `company_id,warehouse_id` | `warehouse` (master_data, 3) | up | docs/design/DS-05-platform.sql:159 |
@@ -1129,7 +1144,7 @@ Foreign keys whose source and target tables have different stated owners. Foreig
 | `work_item` (work, 2) | `company_id,warehouse_id` | `warehouse` (master_data, 3) | up | docs/design/DS-05-platform.sql:89 |
 | `work_item` (work, 2) | `owner_user_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-05-platform.sql:67 |
 
-601 cross-module foreign keys.
+609 cross-module foreign keys.
 
 ## Foreign keys to tables without a stated owner or without DDL
 
@@ -1199,6 +1214,7 @@ Column pairs `<x>_table` + `<x>_id` that point at any table. An FK scan cannot s
 | `audit_record` | audit | `subject_table`, `subject_id` | docs/design/DS-05-platform.sql:841 |
 | `automation_execution` | configuration | `subject_table`, `subject_id` | docs/design/DS-28-34-configuration-artifacts.sql:96 |
 | `change_proposal_item` | documents | `target_table`, `target_id` | docs/design/DS-05-platform.sql:736 |
+| `conversation` | work | `subject_table`, `subject_id` | docs/design/DS-63-messaging.sql:9 |
 | `document_line_price_step` | — | `source_table`, `source_id` | docs/design/DS-22-09-42-commercial-inventory.sql:1431 |
 | `event_delivery` | outbox | `subject_table`, `subject_id` | docs/design/DS-05-platform.sql:819 |
 | `event_subject` | outbox | `subject_table`, `subject_id` | docs/design/DS-05-platform.sql:777 |
