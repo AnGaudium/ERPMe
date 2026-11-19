@@ -29,6 +29,8 @@ No external semantic engine runs in the core, and agents still never export file
    - **Imports.** `query` imports `db`, `registry` and `agent_runs`, as before, and now also the `work` contract, to raise its two work item kinds (ADR-0042 rule 5). `work` is layer 2, so the import goes downward.
    - **`agents`** (layer 5) owns the `analysis` workflow (rules 20–25). It reaches `query` only through the dispatcher, as for every workflow; nothing in `agents` imports `query`.
    - **No external engine.** No semantic layer product (Cube, dbt Semantic Layer or the like) runs inside the core: it would duplicate record scope, owner scope, field classes and taint, which the views already enforce, and add a second security model. Exporting the catalog to such tools comes after Phase 1 (rule 38).
+
+   Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-19): the `analysis` agent moves to Phase 2; saved analyses that people build stay in Phase 1 (ADR-0078 rule 2).
 2. The catalog lives in `backend/nativeflows/query/analysis/catalog.py` beside the view declarations (ADR-0050 rule 45). It declares four kinds of object:
    - **Facts:** a semantic view of schema `query`, its grain (what one row is), its time dimensions, its scope columns as the view declares them, and whether it is owner-scoped (ADR-0054 rule 15). A fact view pre-joins every dimension column it offers along a declared many-to-one path, so the compiler never joins facts to dimension tables, except for member labels (rule 12).
    - **Measures:** rule 4.

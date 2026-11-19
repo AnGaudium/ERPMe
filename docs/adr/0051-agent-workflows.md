@@ -14,6 +14,8 @@ Six agent types are designed now, each as a code-orchestrated workflow on the ru
 
 Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): a further agent type `assistant` serves the UI's assist panel and command bar. It reads through its tool list and writes only through `is_draft_only` commands, within the user's permission intersection and the `agents.assistant.*` budgets. Its DDL, catalog rows, leaf, seed and cost cap are in DS-30-ui.sql and the catalogs; it arrives at step 5, and its evaluation set of about 50 tasks is a step 5 gate item (ADR-0077 rules 13, 14, 23).
 
+Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-19): Phase 1 has three agent types: `bank_matching`, `purchase_invoice` and `assistant`. `customer_onboarding`, `quotation`, `planning` and `data_migration` move to Phase 2 with their designs kept; at step 11 migration uses the staged import with stored mappings, and the assistant may draft mappings (ADR-0078 rules 1, 2).
+
 **Deterministic first.** Each step tries stored rules and mappings, then lookups, then fuzzy matching with a deterministic score, and only then an LLM. The LLM never computes a price, tax, quantity, account, match or score. It reads, chooses among candidates that code gave it, and writes text. Code checks every output. A resolution the LLM contributes is proposed as a stored mapping or rule, so the next case is deterministic.
 
 **People decide.** Agents draft documents and change proposals. People submit, approve, post and send. Only the deterministic bank cascade may ever auto-post, under an enabled policy rule with shadow evidence.
@@ -46,6 +48,8 @@ Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed
    Note ([ADR-0059](0059-ai-tuning-and-development-of-deterministic-functions.md), proposed 2026-11-15): the same ladder, generalized to configuration and decision artifacts, is rule 12 there.
 
    Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), proposed 2026-11-15): the `analysis` agent type is a second stated exception: it drafts nothing a person resolves, so its promotion evidence is the version's CI evaluation report and, from 30 verified examples, the shadow evaluation over them; below 30 examples the CI report alone is flagged for the author (rule 25).
+
+   Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-19): in Phase 1 the modes are `off` and `assisted`; promotion evidence is the offline evaluation result and replay, not shadow evaluation rows, and a version or seat-model change drops the effective mode to `off` (ADR-0078 rules 5, 6).
 5. Quality monitor:
    - **The job.** `RunAgentQualityCheck` (daily system job, `agents`) computes, per company and assisted agent type, the 30-day share of drafts accepted unedited and of drafts rejected or canceled (rule 6).
    - **The signal.** When agreement falls 10 points below the workflow's threshold, it raises `agent_quality_below_threshold` (owner `company_owner`) with the figures. It does not demote by itself; a person decides.
@@ -105,6 +109,8 @@ Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed
    Note ([ADR-0064](0064-production-agent.md), proposed 2026-11-15): `production` 10 LLM calls, 120 tool calls, 200,000 input and 10,000 output tokens, USD 1.00, 600 seconds, 10,000 rows, USD 15 and 400 runs a day; `production_capture` 6, 30, 80,000, 5,000, USD 0.40, 180 seconds, 500 rows, USD 10 and 500 runs; `production_variance` 14, 40, 140,000, 12,000, USD 0.95, 180 seconds, 2,000 rows, USD 10 and 100 runs (rule 28).
 
    Note (Design hardening, 2026-11-16): these values are the core defaults of the company settings `agents.<agent_type>.daily_max_cost` and `agents.<agent_type>.daily_max_runs` and the ceilings of the per-run settings. A company lowers any of them at once and raises a daily value, or a per-run value up to its ceiling, by a proposal another person approves ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 22 note). "Every daily cost stays below the company cap of USD 50" holds for the defaults; the company cap and the reserve pool still bind every run.
+
+   Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-19): these per-run values become the ceilings of each agent type's declaration; the per-agent-type daily budgets are removed, and the company's daily cap is the only daily tier (ADR-0078 rules 3, 7).
 
 10. The literal read scope (ADR-0050 rule 27; ADR-0029 rule 14) in these workflows:
     - **Tainted runs choose among related items only.** A tainted `quotation` run reads items only through the partner's `partner_item_overview` rows and its earlier document lines. A tainted `purchase_invoice` run reads the supplier's `partner_item` and `supplier_item` rows and its open purchase order lines. Lines that need anything else stay unresolved and go to a person.

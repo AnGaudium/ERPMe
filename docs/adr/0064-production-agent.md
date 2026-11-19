@@ -41,6 +41,8 @@ ADR-0051 rule 29 left the production agents to their own ADR. The production rul
    - **Why three.** Taint and promotion evidence stay apart. A tainted capture run could never run the sweep or read other orders; a clean `production` run never reads a report's free text.
 
    Note ([ADR-0072](0072-costing-sheet-and-cost-component-structure.md), proposed 2026-11-18): the `production` type gains the subject table `costing_sheet`. It drafts costing sheets, site assignments, detailed components and mappings only as change proposals, and rates only from a person's stated source or `GetCostingRateSuggestion`; the model never sees a rate (ADR-0072 rule 18).
+
+   Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-19): the three production agent types move to Phase 2; the production core and its manual capture stay in Phase 1 (ADR-0078 rule 2).
 2. Boundary with planning (decision 2): planned orders, their firming and conversion stay with the `planning` agent (ADR-0051 rules 23–25; ADR-0036 rule 12). The production agent works on production orders from `CreateProductionOrder` until they are closed, and no production tool list holds a planned-order command.
 3. Common to the three types:
    - **Deterministic first.** Every quantity, date and amount comes from a deterministic function or is a stated value with its source (a span or an extraction field). Every number in model text appears in the step's input (ADR-0050 rule 36).
@@ -268,7 +270,7 @@ ADR-0051 rule 29 left the production agents to their own ADR. The production rul
     - **Risk order** on the verification screen: order number, operation, yield, scrap, date.
     - **Sources** (`production.capture.enabled_sources`): `spreadsheet` (document kind `spreadsheet`), `photo` (`image`, `pdf_image`; vision values need the seat permission of [ADR-0057](0057-document-intake-and-extraction.md) rule 21 and stay untrusted until confirmed) and `message_text` (an operator's message, document kind `email`). A mailbox may carry `document_intake_purpose` `shop_floor_report`. Voice stays later (ADR-0057 rule 29).
 
-    Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): Phase 1 mobile capture in the UI is photo and text, through this agent when the source `photo` is enabled; voice stays after Phase 1, and the capture intake keeps a seam to accept an audio attachment later (ADR-0077 rule 18).
+    Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): Phase 1 mobile capture in the UI is photo and text, without this agent, which moves to Phase 2 (ADR-0078); voice stays after Phase 1, and the capture intake keeps a seam to accept an audio attachment later (ADR-0077 rule 18).
 27. DDL ([DS-43-54-planning-production.sql](../design/DS-43-54-planning-production.sql), [DS-22-09-42-commercial-inventory.sql](../design/DS-22-09-42-commercial-inventory.sql), [DS-36-document-intake.sql](../design/DS-36-document-intake.sql), [DS-35-crm.sql](../design/DS-35-crm.sql)):
     - `planning_exception`: kinds `production_order_start_overdue` and `production_order_overdue`; column `production_order_id` with its company key, set exactly for those kinds.
     - `operation_confirmation`: `entry_source` (`person`, `capture_agent`, `production_import`; default `person`) and `external_reference`, set exactly for `production_import`, not blank, and unique per company.

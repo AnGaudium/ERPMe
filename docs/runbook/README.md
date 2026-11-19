@@ -8,7 +8,7 @@ The operating manual the author and the AI agents follow to execute the build pl
 | --- | --- |
 | [README.md](README.md) | This overview and the operating rhythm |
 | [steps-0-4.md](steps-0-4.md) | Phase 0: steps 0–4, ending at the Phase 0 gate (= step 4 gate) |
-| [steps-5-9.md](steps-5-9.md) | Phase 1 build: steps 5–9 and the four agents |
+| [steps-5-9.md](steps-5-9.md) | Phase 1 build: steps 5–9 and the three Phase 1 agents |
 | [go-live.md](go-live.md) | Steps 10–11, cut-over, the first three monthly closes, support mode, the Phase 1 gate |
 | [testing-operations.md](testing-operations.md) | Test server, simulator, nightly runs, budgets, defects to regression scenarios, coverage reports |
 | [escalation.md](escalation.md) | When an agent stops and asks; what an agent never decides; unverified legal rules |

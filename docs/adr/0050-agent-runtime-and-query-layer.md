@@ -144,6 +144,8 @@ Status: accepted (2026-11-15) under ADR-0005, reviewed by Claude Fable 5.2 (buil
 
     Note ([ADR-0065](0065-deterministic-auto-post-gateway.md), 2026-11-16 (proposed)): a fourth mode, `active`: `assisted`, and in addition the type's drafts of the document types named at promotion may pass the auto-post gateway as tainted drafts. The agent still only drafts (floor 4 of [ADR-0043](0043-policy-and-approval.md) rule 9). The version declares `auto_post_document_types`, otherwise `agent_mode_not_declared`. Setting `active` is a proposal that another person approves, from `assisted` at the same behavior hash and seat models, naming per document type an `agent_promotion_evidence` row with target mode `active` from `GetAgentDraftAcceptance` (at least ceil(3 / `auto_post.max_error_rate`) drafts over at least two calendar months, at least (1 - rate) posted unchanged, none to another partner); `agent_type_setting.active_document_types` records the types. The effective mode drops as today on a version or seat model change, and counts as `assisted` for the gateway while an `agent_quality_below_threshold` item is open. Lowering is direct. "Agents never post ..., so there is no further mode" now reads: there is no mode in which an agent posts ([ADR-0065](0065-deterministic-auto-post-gateway.md) rule 11).
 
+    Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-19): Phase 1 offers only `off` and `assisted`. Promotion evidence is the offline evaluation set and the replay of recorded responses, recorded per pair of seat and model; live shadow comparison and `active` return in Phase 2, and `demote_to_shadow` acts as `pause_new_runs` until then (ADR-0078 rules 5, 6).
+
 **Runs**
 
 15. Starting a run, `StartAgentRun` (module `agents`, effect class `other`; it writes through `agent_runs.contract.create_run`):
@@ -246,6 +248,8 @@ Status: accepted (2026-11-15) under ADR-0005, reviewed by Claude Fable 5.2 (buil
     - **Lowering reaches running runs.** `agent_run.budget` keeps the per-run values in force at start, and each reservation checks the run against the lower of that snapshot and the values in force.
 
     The declared values of [ADR-0051](0051-agent-workflows.md) rule 9 and of later agent types stay the core defaults of the daily values and the ceilings of the per-run values.
+
+    Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-19): two tiers in Phase 1: the company's daily cap (with the installation maximum and the internal reserve) and the per-run ceilings of the agent type version's declaration. The nine keys `agents.<agent_type>.daily_max_cost`, `.daily_max_runs` and `.run_max_*` are removed from `settings.csv`; reservation, stop and `agent_budget_exhausted` stay. The per-type usage rows count without a limit, the reservation checks the company row, and `agents.internal_reserve_share` defaults to 0 while no internal agent type exists (ADR-0078 rule 7).
 23. Accounting by reservation:
     - **Before every LLM call** the runtime computes the worst case: counted input tokens times the input price, plus `max_output_tokens` times the output price. `agent_runs.contract.reserve_budget` adds it, in one statement each, to the run's totals and to `agent_budget_usage` rows (company, agent type, business date; company, business date; installation, day), each guarded by `reserved + spent + amount <= limit`. If any guard fails, nothing is reserved, the call is not made, and the run stops with `budget_exceeded`.
     - **After the call,** `settle_budget` replaces the reservation by the actual cost. A failed call settles at the provider's reported usage, or zero when it reports none; a call whose outcome is unknown settles at its reserved amount (rule 16).
@@ -328,6 +332,8 @@ Status: accepted (2026-11-15) under ADR-0005, reviewed by Claude Fable 5.2 (buil
     Note ([ADR-0064](0064-production-agent.md), proposed 2026-11-15): also never on a tool list: `TransferStockReservation` (accepted only from a change proposal's execution), `ImportOperationConfirmation` (an integration's command) and `RunProductionOrderCheck` (a system job) (rules 12, 24, 25; INV-730).
 
     Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): `CreateAssistRequest` and `GetAgentBudgetStatus` join this list (ADR-0077 rules 14, 17).
+
+    Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-19): in Phase 1 an agent type's tool list lives in its `AgentTypeDeclaration`, and `check` refuses any entry on this list or any command not registered `is_draft_only` (ADR-0078 rules 3, 4).
 31. Effective permissions are the intersection of the agent type's declared permissions and those of the human acted for, re-evaluated at every call against current assignments, for permissions, record scope and field classes (ADR-0017 rule 11). A tainted run's read scope (rule 27) narrows that further. The tool list is a third limit: a tool must be on the list and allowed by the intersection.
 
     Note: agent types get no role assignments, so no further set of rights joins this intersection; the human's owner scope binds the run as their record scope does ([ADR-0054](0054-users-roles-and-authorizations.md) rule 16).

@@ -12,6 +12,8 @@ The author does not read code. Line-by-line review by a person is therefore repl
 1. what the database enforces;
 
     Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): declarations carry the UI annotations of ADR-0077 on payload and result fields and on the declaration object: per field `importance`, `group`, `order`, `lookup`, `default-from`, `scan`, `ai-fillable`, visibility rules; per entity `title`, `list-defaults`, `header-facets`, `line-columns`, `actions`, `links`, `search`, `floorplan`, `assist` (ADR-0077 rules 8–10).
+
+    Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-19): agent types are declared the same way: one `AgentTypeDeclaration` named `DECLARATION` in `backend/src/nativeflows/agents/declarations/<agent_type>.py`, holding its subjects and triggers, tool list, LLM output schemas, per-run ceilings, seats and evaluation set; `check` validates it (ADR-0078 rules 3, 4).
 2. what static checks refuse;
 
     Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): `check` enforces the required annotations and the vocabulary of ADR-0077 rule 19, and the `frontend` job runs the Playwright tests generated per floorplan, with axe-core and visual regression.
