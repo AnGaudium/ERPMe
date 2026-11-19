@@ -44,6 +44,8 @@ A command writes its state changes, its journal and stock rows, its events and o
     - **State.** The document stays in `issuing` ([ADR-0028](0028-document-lifecycle-hardening.md) rule 10 note) or `sending` ([ADR-0052](0052-minimal-crm.md) rule 28 note) meanwhile.
 
     The placeholder `<provider>` takes the registered provider adapters (DS-24, DS-37).
+
+    Note ([ADR-0076](0076-internal-messaging-and-notifications.md), proposed 2026-11-19): the notification e-mail of ADR-0076 follows this rule with one departure: SMTP has no status query, so an `unknown` outcome is recorded once and never resent, and a temporary refusal fails after three attempts; the in-app inbox still holds every notification (ADR-0076 rule 7).
 11. An event emitted by an agent run that has read untrusted content carries `is_tainted = true` ([03-agent-safety.md](../spec/03-agent-safety.md) rule 1). A consumer may act on a tainted event only by creating drafts and work items; it may not post, change master data or send anything out (DS-32). Events emitted by commands that a consumer runs for a tainted event are tainted too. Taint also lives on document versions and `is_untrusted` fields, and a run becomes tainted by what it reads ([ADR-0029](0029-proposals-and-agent-safety.md) rules 8–10).
 
     `agent_wake_up` skips events with an origin agent run, so nothing in an agent's chain wakes an agent; a run on a tainted item, or on a subject that is outside content, starts tainted ([ADR-0050](0050-agent-runtime-and-query-layer.md) rules 15–16).

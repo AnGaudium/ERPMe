@@ -559,6 +559,14 @@ Outcome and violation enumerations are not error codes and are not catalogued he
 | `dispatch_has_receive` | precondition | 422 | no | `Reverse` of a transfer dispatch that has a posted receive ([ADR-0075](../adr/0075-stock-documents.md) rule 2) |
 | `reason_required` | validation | 422 | no | A reason of a kind whose `documents.reason_required.<kind>` setting is true is missing ([ADR-0074](../adr/0074-core-data-structure-additions.md) rule 22) |
 | `transfer_order_line_invalid` | validation | 422 | no | A stock transfer line names a transfer order line of another item, or outside its warehouses: a direct transfer between them, a dispatch from the source, a receive into the destination ([ADR-0075](../adr/0075-stock-documents.md) rule 14) |
+| `mention_not_permitted` | validation | 422 | no | A mentioned person cannot read the conversation ([ADR-0076](../adr/0076-internal-messaging-and-notifications.md) rule 5) |
+| `mention_limit` | validation | 422 | no | More than 20 mentions in one message ([ADR-0076](../adr/0076-internal-messaging-and-notifications.md) rule 5) |
+| `direct_conversation_fixed` | precondition | 422 | no | A member added to a direct conversation, whose membership is fixed; create a new one ([ADR-0076](../adr/0076-internal-messaging-and-notifications.md) rule 2) |
+| `conversation_closed` | precondition | 422 | no | A post or change in a closed channel ([ADR-0076](../adr/0076-internal-messaging-and-notifications.md) rule 1) |
+| `conversation_not_readable` | permission | 403 | no | The actor cannot read the conversation: not a current member of a private channel or direct conversation, or no read of the thread's record ([ADR-0076](../adr/0076-internal-messaging-and-notifications.md) rules 1-3) |
+| `conversation_subject_invalid` | validation | 422 | no | A record thread on a table outside the allowed subjects, or on an employee partner ([ADR-0076](../adr/0076-internal-messaging-and-notifications.md) rule 3) |
+| `channel_name_taken` | conflict | 409 | no | Another channel of the company has that name ([ADR-0076](../adr/0076-internal-messaging-and-notifications.md) rule 1) |
+| `message_not_author` | permission | 403 | no | `UpdateMessage` by someone other than the author ([ADR-0076](../adr/0076-internal-messaging-and-notifications.md) rule 4) |
 
 ### Check results
 

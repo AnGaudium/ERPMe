@@ -47,7 +47,7 @@ The policy engine decides whether an action needs approval and which procedure a
   - Conditions: amount, discount, credit limit exceeded, margin, price below cost, price outside price list.
   - (After Phase 1) Multiple levels, sequential or parallel, minimum approvers per level.
   - (After Phase 1) **Delegation and escalation:** delegate when absent, escalate when overdue. Pending approvals live in the shared work queue.
-- **Approval channels:** Phase 1 approves on the web. (After Phase 1) Email notification with an authenticated link, mobile app, chat apps.
+- **Approval channels:** Phase 1 approves on the web and notifies the approver in the app and by e-mail ([ADR-0076](../adr/0076-internal-messaging-and-notifications.md)). (After Phase 1) Approving from an authenticated e-mail link, mobile app, chat apps.
 - **Agents prepare the approval file:** reason summary, comparison with history, risks. Agents never approve on a human's behalf.
 - **Approval decisions are immutable,** carry a reason, attach to the document and bind to the hash of the document version; a new version invalidates the approval.
 - The same approval engine serves documents, master data and promoting customizations to production. Phase 1 approves at one level by threshold.

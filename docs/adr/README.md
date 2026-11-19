@@ -79,3 +79,4 @@ One file per decision, named `NNNN-short-title.md`, using [template.md](template
 | [ADR-0073](0073-coding-pipeline-and-mechanical-assurance.md) | Coding pipeline and mechanical assurance (DS-18, DS-04, DS-16) | Proposed (2026-11-18) |
 | [ADR-0074](0074-core-data-structure-additions.md) | Core data-structure additions (DS-20, DS-22, DS-05, DS-21) | Proposed (2026-11-19) |
 | [ADR-0075](0075-stock-documents.md) | Stock documents (DS-09, DS-22, DS-42) | Proposed (2026-11-19) |
+| [ADR-0076](0076-internal-messaging-and-notifications.md) | Internal messaging and notifications (DS-63) | Proposed (2026-11-19) |

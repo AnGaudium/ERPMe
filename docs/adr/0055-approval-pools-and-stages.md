@@ -70,6 +70,8 @@ ADR-0043 decides whether a document needs approval and at which rank, and approv
      - rule 3's monotonic selection.
    - **Too few people.** For each active procedure rank, the required stages are satisfiable when their places can be filled by distinct people: k places per stage, each filled by a different active user who is directly eligible for that stage in some scope (a member who holds an `Approve<Type>` of the pool's types; rule 7, condition 2). Outside ADR-0054's small-company mode, the preparer may not approve, so the places must still be fillable with any one of those people left out. Saving returns the check result `approval_stage_unsatisfiable`, naming each rank that fails. `Submit` returns the same check result for its own plan and document, counting the document's writers out (rule 7, condition 5). This replaces `policy_no_eligible_approver` for stages; ADR-0043 rule 13 gets a note.
 
+    Note ([ADR-0076](0076-internal-messaging-and-notifications.md), proposed 2026-11-19): `approval_stage_member` gains `position`, the stage's order of its members top to bottom (null sorts last): the notifications of ADR-0076 rule 6 go to at most 20 eligible members, the first 20 in that order (the author's decision of 2026-11-19).
+
 **Link to ADR-0043**
 
 5. Required stages:
