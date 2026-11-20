@@ -30,7 +30,7 @@ No external semantic engine runs in the core, and agents still never export file
    - **`agents`** (layer 5) owns the `analysis` workflow (rules 20–25). It reaches `query` only through the dispatcher, as for every workflow; nothing in `agents` imports `query`.
    - **No external engine.** No semantic layer product (Cube, dbt Semantic Layer or the like) runs inside the core: it would duplicate record scope, owner scope, field classes and taint, which the views already enforce, and add a second security model. Exporting the catalog to such tools comes after Phase 1 (rule 38).
 
-   Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-19): the `analysis` agent stays in Phase 1 as one declaration on the shared runtime; the assistant routes questions that need figures to it, so there is one analysis path (ADR-0078 rules 1, 8).
+   Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-19): the `analysis` agent is one of the six Phase 1 agent types, one declaration on the shared runtime and an internal type that draws on the reserve of ADR-0050 rule 22; the assistant routes questions that need figures to it, so there is one analysis path (ADR-0078 rules 1, 8).
 2. The catalog lives in `backend/nativeflows/query/analysis/catalog.py` beside the view declarations (ADR-0050 rule 45). It declares four kinds of object:
    - **Facts:** a semantic view of schema `query`, its grain (what one row is), its time dimensions, its scope columns as the view declares them, and whether it is owner-scoped (ADR-0054 rule 15). A fact view pre-joins every dimension column it offers along a declared many-to-one path, so the compiler never joins facts to dimension tables, except for member labels (rule 12).
    - **Measures:** rule 4.
@@ -340,6 +340,8 @@ No external semantic engine runs in the core, and agents still never export file
     - **Catalog changes.** The `analysis` agent type version declares the catalog hash it was evaluated with, so a catalog change is a new version that runs in shadow until promoted again (ADR-0050 rule 14).
 
     Note ([ADR-0063](0063-configurable-policy-settings.md), proposed 2026-11-15): the 30 examples and the synthetic-only promotion are the settings `artifacts.analysis.min_verified_examples` and `artifacts.analysis.allow_synthetic_only_promotion` (default true) (rule 13).
+
+    Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-21): in Phase 1 there is no `shadow` mode (`check` refuses it). Where this rule says "shadow", the daily `RunAnalysisEvaluation` on the company's verified examples is `analysis`'s evaluation in use, and a version, or a catalog change that makes a new version, without a passing evaluation runs as `off` (ADR-0078 rule 6).
 
 **Saved analyses, KPIs and examples**
 

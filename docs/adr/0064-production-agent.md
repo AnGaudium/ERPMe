@@ -42,7 +42,7 @@ ADR-0051 rule 29 left the production agents to their own ADR. The production rul
 
    Note ([ADR-0072](0072-costing-sheet-and-cost-component-structure.md), proposed 2026-11-18): the `production` type gains the subject table `costing_sheet`. It drafts costing sheets, site assignments, detailed components and mappings only as change proposals, and rates only from a person's stated source or `GetCostingRateSuggestion`; the model never sees a rate (ADR-0072 rule 18).
 
-   Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-19): the three production agent types move to Phase 2; the production core and its manual capture stay in Phase 1 (ADR-0078 rule 2).
+   Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-19): the three production agent types move to Phase 2; the production core and its manual capture stay in Phase 1. `production` reads no outside content, never taints and is the first of them to bring forward when a Phase 2 agent is chosen (ADR-0078 rule 2).
 2. Boundary with planning (decision 2): planned orders, their firming and conversion stay with the `planning` agent (ADR-0051 rules 23–25; ADR-0036 rule 12). The production agent works on production orders from `CreateProductionOrder` until they are closed, and no production tool list holds a planned-order command.
 3. Common to the three types:
    - **Deterministic first.** Every quantity, date and amount comes from a deterministic function or is a stated value with its source (a span or an extraction field). Every number in model text appears in the step's input (ADR-0050 rule 36).

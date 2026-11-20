@@ -1,6 +1,6 @@
 # Agents: the current design for Phase 1
 
-Generated 2026-11-19 from ADR-0078, ADR-0050 and ADR-0051 with their notes, ADR-0029, ADR-0043 rule 9, ADR-0054 rules 11, 16 and 24, ADR-0077 rules 13–18, ADR-0065 (the gateway), ADR-0059 (the artifact lifecycle), ADR-0060 (analysis), ADR-0057 (the ladder and the vision step), ADR-0048 (rules 8, 9 and 5), ADR-0063 (agent settings) and the rows `agents.*`, `assist.*` and `auto_post.*` of `docs/catalogs/settings.csv`.
+Generated 2026-11-19 and reworked 2026-11-21 from ADR-0078, ADR-0029, ADR-0050, ADR-0051 (rules 23–25 for `planning`), ADR-0057, ADR-0059, ADR-0060, ADR-0063, ADR-0065 and their notes, and ADR-0077, as ADR-0078 rule 10 lists them; also, for the rules cited in the text, ADR-0042 (the work item), ADR-0043 rule 9, ADR-0048 (rules 5, 8, 9), ADR-0054 rules 11, 16 and 24, and ADR-0066 rule 17; and the rows `agents.*`, `assist.*` and `auto_post.*` of `docs/catalogs/settings.csv`.
 
 A rule cites its source as `ADR-nnnn rule n` or `ADR-nnnn rule n note`. A "note" is a "Note (" paragraph at the end of that rule. Where a rule has no cite, it joins the rule before it.
 
@@ -12,7 +12,7 @@ A rule cites its source as `ADR-nnnn rule n` or `ADR-nnnn rule n note`. A "note"
 
 1.3 This text is regenerated when an ADR changes. Do not edit it by hand to change a rule (ADR-0078 rule 10).
 
-1.4 Precedence when sources differ: ADR-0078 first, then the notes of ADR-0050 and ADR-0051, then their rule text, then the other ADRs (ADR-0078 rule 9, Decision).
+1.4 Precedence when sources differ: ADR-0078 first, then the notes of ADR-0050 and ADR-0051, then their rule text, then the other ADRs. The ADRs win wherever this text disagrees with them, as 1.2 says (ADR-0078 rule 10).
 
 1.5 The safety model is unchanged by Phase 1. The hard floors, the permission intersection, taint, the tainted read scope and drafts-only all stay. Changing them is the author's decision (ADR-0078 Decision; ADR-0005 item 7).
 
@@ -24,12 +24,12 @@ A rule cites its source as `ADR-nnnn rule n` or `ADR-nnnn rule n note`. A "note"
 
 | Agent type | Trigger / subject | What it drafts | Starts after |
 | --- | --- | --- | --- |
-| `bank_matching` | Work item `bank_line_unmatched`; subject: one `bank_statement_line` (ADR-0051 rule 17) | No document. It stores a suggestion on the line (tokens, payer name, purpose) with `RecordBankLineSuggestion`. A `cash` consumer may then draft a receipt or payment from it (ADR-0051 rules 17, 18) | step 6 gate |
-| `purchase_invoice` | Work item `supplier_invoice_received` on a stored incoming `e_invoice_record`; and, from version 1.1.0, `supplier_invoice_extracted` on a person-verified extraction (ADR-0051 rule 20; ADR-0057 rule 26) | A purchase invoice draft, and one change proposal with `CreatePartnerItem` mappings (ADR-0051 rule 21) | step 7 gate |
 | `assistant` | A person: the UI assist panel or command bar, with an `assist_request` row as subject (ADR-0077 rules 13, 14) | Answers, drafts and change proposals through `is_draft_only` commands. It routes questions that need figures to `analysis` (ADR-0078 rule 1) | step 5 gate |
 | `analysis` | A person's question: an `analysis_question` row (ADR-0060 rule 20) | A deterministic analysis plan and an answer written to the question row; no document | step 5 gate |
+| `bank_matching` | Work item `bank_line_unmatched`; subject: one `bank_statement_line` (ADR-0051 rule 17) | No document. It stores a suggestion on the line (tokens, payer name, purpose) with `RecordBankLineSuggestion`. A `cash` consumer may then draft a receipt or payment from it (ADR-0051 rules 17, 18) | step 6 gate |
+| `purchase_invoice` | Work item `supplier_invoice_received` on a stored incoming `e_invoice_record`; and, from version 1.1.0, `supplier_invoice_extracted` on a person-verified extraction (ADR-0051 rule 20; ADR-0057 rule 26) | A purchase invoice draft, and one change proposal with `CreatePartnerItem` mappings (ADR-0051 rule 21) | step 7 gate |
 | `document_reader` | Work item `document_extraction_review`; subject: a `document_extraction` (ADR-0057 rule 11) | Extraction field rows (`CreateExtractionFields`), never a document | step 7 gate |
-| `auto_post_advisor` | A person starts it for a document type (ADR-0065 rule 18) | A decision table version and a change proposal of settings, both drafts | step 7 gate |
+| `planning` | Work items `planning_exception` and `capacity_overload`, or a planner's start on an item and warehouse (ADR-0051 rule 23) | One change proposal for the planning action the explanation recommends (ADR-0051 rules 24, 25) | the gate of the planning slice with multi-level MRP (ADR-0024 rule 26; ADR-0036) |
 
 2.2 A Phase 1 agent type is one of these six. Adding one is a scope change for the author (ADR-0078 rule 1; ADR-0005 item 2).
 
@@ -38,6 +38,8 @@ A rule cites its source as `ADR-nnnn rule n` or `ADR-nnnn rule n note`. A "note"
 2.4 `agent_type` codes are `snake_case` nouns (ADR-0050 rule 12).
 
 2.5 The eight other agent types are registered with mode `off` and no workflow code. See section 17 (ADR-0078 rule 2).
+
+2.6 Agents take part in business work through the same work items as people. The work item, not the run, is the unit of work, and the kind is the contract with the domain module. See section 20 (ADR-0078 rules 11 to 15).
 
 ## 3. Declarations
 
@@ -60,7 +62,8 @@ A rule cites its source as `ADR-nnnn rule n` or `ADR-nnnn rule n note`. A "note"
 - the tool list names only registered queries and `is_draft_only` commands, and none of the never-list (section 5.6);
 - every per-run ceiling is set and within the installation maxima;
 - every LLM step has an output schema with no `confidence`, `score`, `probability` or `certainty` field;
-- the evaluation set exists, and a version without a passing result cannot be promoted.
+- the evaluation set exists, and a version without a passing result cannot be promoted;
+- no work item kind is declared by two agent types (section 20, 20.6).
 
 3.6 A registry check: a work item kind that a command on any agent tool list can raise may not be declared by any agent type. `agent_task` is such a kind (ADR-0050 rule 16).
 
@@ -189,7 +192,11 @@ An agent type only lists the subject tables it accepts. It does not decide taint
 - Change proposals: their `Submit` always gets at least the lowest rank (floor 7).
 - A change of a partner's bank account always goes through a change proposal approved by a person other than its writer, in every company (tenth floor, ADR-0043 rule 9 note; ADR-0029 rule 4).
 
-5.12 Agents never submit, post, issue, send or approve These commands are on the never-list (ADR-0050 rule 30; 5.6). `Submit` from any actor carrying an origin agent run is refused with `origin_run_submit_not_allowed`, before policy (ADR-0029 rule 6 note). Effective rights are the intersection of the type's tool list and the person's rights (ADR-0054 rule 16). ADR-0043 rule 9 adds only `human_post` for agent postings (ADR-0078 rule 9).
+5.12 Agents never submit, post, issue, send or approve. These commands are on the never-list (ADR-0050 rule 30; 5.6). `Submit` from any actor carrying an origin agent run is refused with `origin_run_submit_not_allowed`, before policy (ADR-0029 rule 6 note). Effective rights are the intersection of the type's tool list and the person's rights (ADR-0054 rule 16). ADR-0043 rule 9 adds only `human_post` for agent postings (ADR-0078 rule 9).
+
+5.13 `ListAllowedCommand` stays people-only in Phase 1 (ADR-0040 rule 8). Agents plan from their fixed tool list and from simulate mode, whose refusals are recorded (ADR-0050 rule 34).
+
+5.14 No view over `audit_record`, `audit_change`, `audit_denial`, `policy_decision`, `agent_run_step` or `personal_data_processing_log` is registered for agents. Tainted runs never read audit data (ADR-0038 rule 7). People read these through their own queries (ADR-0050 rule 50).
 
 ## 6. Untrusted content and taint
 
@@ -203,7 +210,7 @@ An agent type only lists the subject tables it accepts. It does not decide taint
 
 6.4 Views and query result models omit `is_untrusted` columns unless the request sets `include_untrusted: true`. Listing documents therefore does not taint (ADR-0050 rule 28; ADR-0029 rule 10).
 
-6.5 An agent type that must stay clean declares `may_read_untrusted: false`. For its runs `include_untrusted` returns `untrusted_read_not_allowed`, and rows that would taint are left out with `is_taint_filtered: true` (ADR-0050 rule 28).
+6.5 An agent type that must stay clean declares `may_read_untrusted: false` (for example `planning`, section 12). For its runs `include_untrusted` returns `untrusted_read_not_allowed`, and rows that would taint are left out with `is_taint_filtered: true` (ADR-0050 rule 28).
 
 ### Tainted commands
 
@@ -306,9 +313,9 @@ An agent type only lists the subject tables it accepts. It does not decide taint
 - Per company per day: `agents.company_daily_max_cost`, within `agents.installation_daily_max_cost`, with the reserve `agents.internal_reserve_share` (default 0.40, see 8.6).
 - Per run: the ceilings of the agent type version's declaration. For the assistant, `assist.max_cost_per_run` may lower its cost ceiling.
 
-8.2 The nine settings `agents.<agent_type>.daily_max_cost`, `agents.<agent_type>.daily_max_runs` and the seven `agents.<agent_type>.run_max_*` keys are removed. A per-type daily cap returns only if one agent type is measured crowding out the others (ADR-0078 rule 7).
+8.2 The nine settings `agents.<agent_type>.daily_max_cost`, `agents.<agent_type>.daily_max_runs` and the seven `agents.<agent_type>.run_max_*` keys are removed. A per-type cap returns under "Revisit when" of ADR-0078, if one agent type is measured using more than half of a company's daily cap. Until then the customer sets the company's daily cap and the assistant's cost per run only (ADR-0078 rule 7).
 
-8.3 Per-run ceilings, declared in the declaration (ADR-0078 rule 3): `max_llm_calls`, `max_tool_calls`, `max_input_tokens`, `max_output_tokens`, `max_cost`, `max_seconds`, `max_rows_read` (ADR-0050 rule 22). The declared values of ADR-0051 rule 9, ADR-0060 rule 20 and ADR-0057 rule 34. The `auto_post_advisor` values come with its first version (ADR-0065 rule 18) (the agent's proposal, flagged for the author):
+8.3 Per-run ceilings, declared in the declaration (ADR-0078 rule 3): `max_llm_calls`, `max_tool_calls`, `max_input_tokens`, `max_output_tokens`, `max_cost`, `max_seconds`, `max_rows_read` (ADR-0050 rule 22). The declared values of ADR-0051 rule 9, ADR-0060 rule 20 and ADR-0057 rule 34 (the agent's proposal, flagged for the author; the daily columns of ADR-0051 rule 9 are not used in Phase 1):
 
 | Agent type | LLM calls | Tool calls | Input tokens | Output tokens | Cost (USD) | Seconds | Rows read |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -316,6 +323,7 @@ An agent type only lists the subject tables it accepts. It does not decide taint
 | `purchase_invoice` | 15 | 60 | 120,000 | 10,000 | 0.60 | 300 | 2,000 |
 | `analysis` (ADR-0060 rule 20) | 14 | 40 | 140,000 | 12,000 | 0.95 | 180 | 2,000 |
 | `document_reader` (ADR-0057 rule 34) | 12 | 10 | 150,000 | 8,000 | 0.80 | 300 | 500 |
+| `planning` (ADR-0051 rule 9) | 10 | 80 | 200,000 | 10,000 | 1.00 | 600 | 5,000 |
 
 8.4 The assistant's interim per-run ceilings are 8 LLM calls, 40 tool calls, 40,000 input tokens, 4,000 output tokens, USD 0.50, 120 seconds and 2,000 rows read (ADR-0078 rule 1). `assist.max_cost_per_run` (company setting, default USD 0.20, bounds 0.01 to 0.50) may only lower the cost ceiling. Lowering is immediate. Raising is a proposal another person approves (ADR-0077 rules 13, 14; `settings.csv`).
 
@@ -324,12 +332,12 @@ An agent type only lists the subject tables it accepts. It does not decide taint
 - `agents.company_daily_max_cost`: default USD 50. The installation value, set at deployment, is the maximum of every company's value. Without one, `agents.installation_daily_max_cost` is. No company cap may exceed it (`setting_out_of_bounds`).
 - Every budget day is the company's business date (`clock.today`) (ADR-0050 rule 22 note).
 
-8.6 `agents.internal_reserve_share` (company, default 0.40, bounds 0 to 0.9) is the share of the company's daily cap that only internal agent types may use. `analysis` reads no outside content, so it is the one internal type of Phase 1 and may use the whole cap. `auto_post_advisor` reads supplier invoices and is not internal. Types that read outside content share the remainder, (1 − share) × the company cap, and also reserve on the `company_outside_content` row (ADR-0078 rule 7; ADR-0050 rule 22 note, rule 23 note).
+8.6 `agents.internal_reserve_share` (company, default 0.40, bounds 0 to 0.9) is the share of the company's daily cap that only internal agent types may use. `analysis` and `planning` read no outside content, so they are the internal types of Phase 1 and may use the whole cap. Types that read outside content share the remainder, (1 − share) × the company cap, and also reserve on the `company_outside_content` row (ADR-0078 rule 7; ADR-0050 rule 22 note, rule 23 note).
 
 8.7 Change path (ADR-0050 rule 22 note; ADR-0063 rule 3): lowering a cap or raising the reserve share is immediate, by one person holding `edit` on the leaf `agent`. Raising a cap, or lowering the reserve share, is a loosening: a change proposal approved by another person holding `agent` at `full`. A one-person company cannot raise them.
 
 8.8 Reservation before every LLM call (ADR-0050 rule 23 and note):
-- The runtime computes the worst case: counted input tokens times the input price, plus `max_output_tokens` times the output price. `agent_runs.contract.reserve_budget` adds it to the run's totals and to the `agent_budget_usage` rows, guarded by `reserved + spent + amount <= limit`. It checks the company row only. The per-type `company_agent_type` rows keep counting cost and runs with no limit (ADR-0078 rule 7). All guards of one call run in one transaction.
+- The runtime computes the worst case: counted input tokens times the input price, plus `max_output_tokens` times the output price. `agent_runs.contract.reserve_budget` adds it to the run's totals and to the `agent_budget_usage` rows, guarded by `reserved + spent + amount <= limit`. It checks the company row, the installation row and, for agent types that read outside content, the `company_outside_content` row. It checks no per-type limit: the per-type `company_agent_type` rows keep counting cost and runs, with `limit_amount` equal to the company cap and `run_limit_count` null, so they never bind before the company row (ADR-0078 rule 7). All guards of one call run in one transaction.
 - If any guard fails, nothing is reserved, the call is not made, and the run stops with `budget_exceeded`.
 - After the call, `settle_budget` replaces the reservation by the actual cost. A failed call settles at the reported usage (zero if none). A call with an unknown outcome settles at its reserved amount.
 - LLM calls, tool calls and rows read are checked the same way. Before each step the runtime checks the remaining time; a step that cannot start in time ends the run with `time_exceeded`.
@@ -343,7 +351,7 @@ An agent type only lists the subject tables it accepts. It does not decide taint
 
 9.1 Phase 1 modes in `agent_type_setting.mode`: `off`, `assisted`, and `active` only as the gateway uses it. The DDL keeps `shadow` for Phase 2, and `check` refuses it in Phase 1 seed and configuration (ADR-0078 rule 5).
 
-9.2 `off`: no runs. `assisted`: runs create drafts and change proposals (ADR-0050 rule 14). `active` is `assisted` plus one thing: the type's drafts of the document types named in `active_document_types` may pass the auto-post gateway as tainted drafts. The agent still only drafts (ADR-0065 rule 11; ADR-0050 rule 30; ADR-0043 rule 9, floor 4). The assistant is never `active` (ADR-0078 rule 5).
+9.2 `off`: no runs. `assisted`: runs create drafts and change proposals (ADR-0050 rule 14). `active` is `assisted` plus one thing: the type's drafts of the document types named in `active_document_types` may pass the auto-post gateway as tainted drafts. The agent still only drafts (ADR-0065 rule 11; ADR-0050 rule 30; ADR-0043 rule 9, floor 4). The assistant and `planning` are never `active` (ADR-0078 rule 5).
 
 9.3 `agent_type_setting` (company data, change-tracked) holds the agent type, `mode`, `workflow_owner_id` (required unless `off`), and `promoted_version` with `promoted_seat_models`. Default mode for every company: `off` (ADR-0050 rule 14 and notes).
 
@@ -351,29 +359,54 @@ An agent type only lists the subject tables it accepts. It does not decide taint
 
 ### Evaluation and promotion
 
-9.5 A version is promoted to `assisted` when it passes its evaluation set and the replay of recorded responses in CI. The evidence is the stored evaluation result, named in `agent_type_setting.promoted_version` and `promoted_seat_models` (ADR-0078 rule 6). `CreateAgentPromotionEvidence` computes the evidence from the stored offline evaluation result instead of `GetAgentShadowEvaluation` (ADR-0078 rule 6). `document_reader` is promoted by the golden-set thresholds of ADR-0057 rule 34; the live shadow-agreement criterion is replaced by replaying the company golden set of at least 50 real documents that rule requires before `assisted` (ADR-0078 rule 6).
+9.5 A version is promoted to `assisted` when it passes its evaluation set with the real provider, per pair of seat and model, and the replay of recorded responses in CI (ADR-0050 rules 39, 40; spec 17). The replay proves the code path. Only the real-provider run proves a model, so a new seat model always needs it. The evidence is the stored evaluation result, named in `agent_type_setting.promoted_version` and `promoted_seat_models`. `CreateAgentPromotionEvidence` computes the evidence from that stored result instead of `GetAgentShadowEvaluation` (ADR-0078 rule 6). `document_reader` is promoted by the golden-set thresholds of ADR-0057 rule 34; its live shadow-agreement criterion is replaced by replaying the company golden set of at least 50 real documents that rule requires before `assisted` (ADR-0078 rule 6). `planning` is promoted by its evaluation set; the shadow comparator of ADR-0051 rule 25 returns with live shadow (ADR-0078 rule 6).
 
 9.6 Spec 17 requires each pair of seat and model to pass. The evaluation result records the pair (ADR-0078 rule 6).
 
 9.6a Promotion to `active` for a document type uses ADR-0065 rule 11 unchanged: `GetAgentDraftAcceptance` over the agent's `assisted` drafts of that document type (at least two calendar months, at least ceil(3 / `auto_post.max_error_rate`) drafts, at least 1 − rate posted unchanged, none to another partner), by an approved proposal another person approves. The gateway's own mode `shadow` for the document type runs its deterministic checker without posting. No live agent shadow is needed (ADR-0078 rules 5, 6).
 
-9.6b `analysis` keeps its stated exception: the daily job `RunAnalysisEvaluation` on the company's verified examples is its offline evaluation, whatever its mode. It does not use mode `shadow`. Its promotion evidence is the version's CI evaluation report and, from 30 verified examples, that evaluation (ADR-0050 rule 14 note; ADR-0060 rule 25; ADR-0078 rule 6).
+9.6b `analysis` keeps its stated exception: the daily job `RunAnalysisEvaluation` on the company's verified examples is its offline evaluation, whatever its mode. It does not use mode `shadow`. Its promotion evidence is the version's CI evaluation report and, from 30 verified examples, that evaluation. A version with no passing CI evaluation is `off` like any other, and a failing daily evaluation raises `agent_quality_below_threshold` (9.11) (ADR-0050 rule 14 note; ADR-0060 rule 25; ADR-0078 rule 6).
 
-9.7 The offline evaluation runs in CI for each release, so its result is installation-wide. A company already `assisted` stays `assisted` across a new version or seat model whose evaluation for that pair passed; no new proposal is needed. A version or seat model without a passing result runs nothing: where ADR-0050 rule 14 drops the effective mode to `shadow`, Phase 1 drops it to `off`. There is no live shadow period. This applies to all six types, the assistant's `ask` and resolve purposes included (ADR-0078 rule 6).
+9.7 The offline evaluation runs in CI for each release, so its result is installation-wide. A company already `assisted` stays `assisted` across a change of the behavior hash (version, constants, promoted parameter set or seat model; ADR-0050 rule 14) whose evaluation passed; no new proposal is needed. A behavior hash without a passing result runs nothing: where ADR-0050 rule 14 drops the effective mode to `shadow`, Phase 1 drops it to `off`, with the same reason and the same `agent_mode_degraded` work item. There is no live shadow period. This applies to all six types, the assistant's `ask` and resolve purposes included (ADR-0078 rule 6).
+
+9.7a `active` does not carry over. On any change of the behavior hash an `active` agent type counts as `assisted` for the gateway until it is promoted again under ADR-0065 rule 11 on drafts of the new behavior (ADR-0078 rule 6).
 
 9.8 The evaluation set and its pass threshold are in the declaration. Each workflow has a golden evaluation set built from the synthetic dataset's input files and the simulator's known answer: the input, the expected drafted commands and the expected outcome. Recordings of the reference run are synthetic and committed under `backend/tests/agents/<agent_type>/` (ADR-0050 rule 39).
 
-9.9 Thresholds: at least 90% of cases equal the known answer, or the higher threshold set for the workflow. Golden set thresholds from ADR-0051 rule 7: `bank_matching` 90%, `purchase_invoice` 95%. The assistant's set has about 50 tasks across its three modes (read answers with correct citations, drafts with correct field diffs, refusals outside its scope, taint handling including pasted untrusted text). It passes at 90% of all tasks and 100% of its refusal and taint tasks, and is a step 5 gate item `analysis`: 90% of cases equal, at most 2% wrong, and 90% of abstention cases abstaining as expected (ADR-0051 rule 7 note). `document_reader`: 95% of aligned fields (ADR-0051 rule 7 note; ADR-0057 rule 34). (ADR-0078 rule 1; ADR-0077 rule 13; ADR-0050 rule 39).
+9.8a The real-provider evaluation run (ADR-0050 rule 40; Principle 11):
+- It runs whenever a template, output schema, agent type version or `seatmap.yaml` changes. Merging needs it to pass.
+- It runs in CI with a provider key held by the CI secret store. It never runs on pull requests from forks, which never receive the key.
+- It is capped at USD 10 per agent type per evaluation run by a circuit breaker. Above the cap it fails as inconclusive.
+- `evaluation_report.json` (cases, scores, thresholds, model, template versions, cost) is a CI artifact. `seatmap.yaml` names the report that admitted each (seat, model) pair.
+
+9.8b Scoring (ADR-0050 rule 39): workflow comparators (ADR-0051) compare drafted commands field by field. The eval judge scores free text only, and is a different model from the one scored (spec 17). For a case whose run is tainted, the known answer is what the literal read scope allows. Pilot recordings are replayed only on staging and never enter the repository (D16).
+
+9.8c Run modes (`agent_run.mode`; ADR-0050 rule 37): `live`; `shadow` (Phase 2); `replay`, with recorded outputs; `evaluation`, live calls against the golden set. Replay and evaluation runs happen only in `test` and `simulation` environments, or on staging (ADR-0003 R12). Phase 1 has no `shadow` run (9.1).
+
+9.8d A synthetic golden set does not show everything that real cases will. Only real cases show whether a threshold or a model behaves the same, so a change of constants or of seat model is a new version that needs its evaluation (ADR-0051 rule 4).
+
+9.9 Thresholds: at least 90% of cases equal the known answer, or the higher threshold set for the workflow (ADR-0050 rule 39). Golden set thresholds from ADR-0051 rule 7: `bank_matching` 90%, `purchase_invoice` 95%, `planning` 90% over 30 exceptions, `document_reader` 95% of aligned fields (ADR-0051 rule 7 note; ADR-0057 rule 34).
+
+9.9a The assistant's evaluation set has about 50 tasks across its three modes: read answers with correct citations, drafts with correct field diffs, refusals outside its scope, and taint handling including pasted untrusted text. It passes at 90% of all tasks and 100% of its refusal and taint tasks. This is a step 5 gate item (ADR-0078 rule 1; ADR-0077 rule 13).
+
+9.9b `analysis` has its own figures: 90% of cases equal, at most 2% wrong, and 90% of abstention cases abstaining as expected (ADR-0051 rule 7 note; ADR-0060 rule 29).
 
 9.10 Replay: the `replay` adapter returns the recorded response when the new request's `request_hash` equals the recorded one. A different hash is a divergence (`replay_diverged`, a harness result). The same database state, version and recorded responses give the same tool calls, commands and plan hashes; CI checks this per golden case (ADR-0050 rule 38).
 
 ### Drift
 
-9.11 `RunAgentQualityCheck` (daily system job in `agents`) computes, per company and assisted agent type, the 30-day share of drafts accepted unedited and of drafts rejected or canceled. When agreement falls 10 points below the workflow's threshold, it raises `agent_quality_below_threshold` (owner `company_owner`, due 5 days) with the figures. It does not demote by itself (ADR-0051 rule 5).
+9.11 `RunAgentQualityCheck` (daily system job in `agents`) runs per company and `assisted` agent type over the last 30 days. With no live shadow, the Phase 1 measure is what people did with the agent's output (ADR-0051 rule 5; ADR-0078 rule 15):
+- `purchase_invoice`, and the assistant's `act` drafts: the share of drafts posted unchanged, as `GetAgentDraftAcceptance` counts them, and the share canceled;
+- `bank_matching`: the share of suggested matches a person confirmed unchanged;
+- `planning`: the share of proposals approved unchanged, and the share rejected;
+- `document_reader`: the share of vision values confirmed unchanged at verification;
+- `analysis`: its daily evaluation (9.6b).
+
+When a measure falls more than 10 points below the agent type's evaluation threshold, it raises `agent_quality_below_threshold` (owner `company_owner`, due 5 days) with the figures, and `agents.<agent_type>.drift_action` applies (9.12). It does not demote by itself. While that item is open, an `active` agent type counts as `assisted` for the gateway (ADR-0065 rule 11).
 
 9.12 The setting `agents.<agent_type>.drift_action` keeps its values: `signal` (default), `pause_new_runs`, `demote_to_shadow`. `pause_new_runs` makes the effective mode `off` for new runs until a person resolves the item. Until Phase 2, `demote_to_shadow` acts as `pause_new_runs` (ADR-0078 rule 5; ADR-0063 rule 12).
 
-9.13 Effective mode: the stored mode is the person's choice and no command changes it on its own. The runtime computes an effective mode at each start. It stays `assisted` while the version and seat models in use have a passing evaluation (9.7). A version or seat model without a passing result has effective mode `off`, with the reason and work item of 9.14. An `active` type counts as `assisted` for the gateway while an `agent_quality_below_threshold` item is open for it (ADR-0078 rule 6; ADR-0050 rule 14 note; ADR-0065 rule 11).
+9.13 Effective mode: the stored mode is the person's choice and no command changes it on its own. The runtime computes an effective mode at each start. It stays `assisted` while the behavior hash in use has a passing evaluation (9.7). A behavior hash without a passing result has effective mode `off`, with the reason and work item of 9.14. An `active` type counts as `assisted` for the gateway after a change of the hash (9.7a) and while an `agent_quality_below_threshold` item is open for it (ADR-0078 rule 6; ADR-0050 rule 14 note; ADR-0065 rule 11).
 
 9.14 `GetAgentTypeSetting` returns the stored mode, the effective mode and the reason they differ (`version_changed`, `seat_model_changed`). When they first differ, `agents` raises one work item `agent_mode_degraded` (owner `company_owner`, due `days:1`), which resolves when the type is promoted again or its mode is lowered. It is checked at every `StartAgentRun` and by the daily `RunAgentQualityCheck` (ADR-0050 rule 14).
 
@@ -424,15 +457,15 @@ An agent type only lists the subject tables it accepts. It does not decide taint
 - `resolve_filter` returns a structured filter validated against the list's filter schema, shown as editable chips before it runs.
 - The command bar (`Ctrl/Cmd+K`): `resolve_command` returns a proposed invocation validated against its schema. The bar opens the command's form prefilled and runs simulate. It never executes by itself.
 
-11.11 The assistant also covers, as drafts only, what the deferred agents would help with by hand (ADR-0078 rule 1). At step 11 the assistant in `act` mode may draft migration mappings on a draft import batch (ADR-0078 rule 2).
+11.11 The assistant also covers, as drafts only, what the deferred agents would help with by hand, such as gateway settings and decision tables (there is no advisor in Phase 1) (ADR-0078 rules 1, 2). At step 11 the assistant in `act` mode may draft migration mappings on a draft import batch (ADR-0078 rule 2).
 
-## 12. The two background agents
+## 12. The background agents
 
 ### Common
 
-12.1 Both runs start tainted, because their subject is outside content (4.8). They read only their scope (6.13) and run only `is_draft_only` commands in the model-facing path (6.6).
+12.1 `bank_matching` and `purchase_invoice` runs start tainted, because their subject is outside content (4.8). They read only their scope (6.13) and run only `is_draft_only` commands in the model-facing path (6.6). A `planning` run reads internal data only and is never tainted (12.32).
 
-12.2 Both runs act for the workflow owner (`workflow_owner_id` of the type's setting) and need `start_agent:<agent_type>` (ADR-0051 rules 17, 20; 4.3).
+12.2 A run a wake-up starts acts for the workflow owner (`workflow_owner_id` of the type's setting), and the human acted for needs `start_agent:<agent_type>` (ADR-0051 rules 17, 20, 23; 4.3).
 
 ### bank_matching
 
@@ -478,7 +511,7 @@ An agent type only lists the subject tables it accepts. It does not decide taint
 - `EInvoiceRecordReader` is network-free and deterministic. It parses one XML file into the record's fields and lines and returns `signature_state` (`passed`, `failed`, `absent`).
 - `ImportEInvoiceRecord` (module `tax`) runs the reader, refuses a second record with the same supplier-invoice key (`duplicate_external_document`), and writes the record. When the signature did not pass, its plan carries `e_invoice_signature_unverified`.
 - In the same transaction `tax` raises `supplier_invoice_received` for the record.
-- The deterministic ladder of intake stays in Phase 1: structured XML, XML embedded in a PDF, QR and vCard, spreadsheet cells, PDF text layer confirmed by OCR, OCR words. A system job runs it, not an agent. The vision rung (rung 7, agent type `document_reader`) is deferred and the vision seat stays disabled (ADR-0078 rule 2; ADR-0057 rule 4).
+- The deterministic ladder of intake stays in Phase 1: structured XML, XML embedded in a PDF, QR and vCard, spreadsheet cells, PDF text layer confirmed by OCR, OCR words. A system job runs it, not an agent. The vision rung (rung 7) is the `document_reader` agent type (section 16), run only when the deterministic rungs fail and the vision seat is usable (ADR-0078 rules 1, 8; ADR-0057 rule 4).
 - A record without a passed signature is imported quarantined (`is_quarantined`): it holds no supplier-invoice key and the agent waits for `ConfirmEInvoiceSupplier` (ADR-0057 rule 25).
 
 12.21 D1 `check_record`: the status check of the reader; the signature check or supplier confirmation was already required to start. The duplicate key: the draft's simulation returns `duplicate_external_document`, and the run ends `not_applicable` naming the existing document (ADR-0051 rule 21).
@@ -501,9 +534,35 @@ An agent type only lists the subject tables it accepts. It does not decide taint
 
 12.30 Version 1.1.0 of the agent, per ADR-0057 rule 26: PDF-only supplier invoices get deterministic reading and full human verification. A `purchasing` consumer of `DocumentExtractionVerified` raises `supplier_invoice_extracted` for a verified supplier-invoice extraction without an e-invoice record. The agent then runs D1 (key check) and D2 to D5, scoped to the supplier whose tax ID equals the verified `seller_tax_id`, when exactly one active supplier has it. It accepts `document_extraction` as a subject. ADR-0078 rule 1 keeps both entry paths.
 
+### planning
+
+12.31 Trigger: work items `planning_exception` and `capacity_overload` (ADR-0042 rule 18), which the agent type declares, and runs a planner starts on an item and warehouse (ADR-0051 rule 23). The agent type starts after the planning slice with multi-level MRP has passed its gate (ADR-0078 rule 1).
+
+12.32 Scope and taint: the data is internal. The agent type declares `may_read_untrusted: false`, so its runs never become tainted and read within the permission intersection (ADR-0051 rule 23; ADR-0050 rule 28). `ListPegging` and `demand_supply_overview` return rows of tainted versions as a numeric-only projection that does not taint, so the clean planning agent is not filtered on them (ADR-0050 rule 28 note). It is an internal agent type for the budget (8.6; ADR-0078 rule 7).
+
+12.33 Inputs: the exception, `ListPegging`, `GetProjectedAvailability`, `planned_order_overview`, `demand_supply_overview`, `stock_overview`, `GetAvailableToPromise` for other warehouses, `partner_item_overview` for supplier terms, `ListCapacityLoad`, `GetCapacityLevelingProposal`, `forecast_accuracy` (ADR-0051 rule 23).
+
+12.34 Steps (ADR-0051 rule 24):
+- D1 `gather`: pegging, projection and the planned orders involved.
+- D2 `candidate_actions`, computed by code from the exception code, each with its effect on the projection:
+  - a shortage inside lead time: firm and convert the proposed planned order now; or a stock transfer from a warehouse whose available to promise covers it;
+  - supplier minimums or container fill: the consolidation of planned orders inside the conversion window that meets the minimum (ADR-0024 rule 23);
+  - capacity overload: the leveling proposal's new dates (ADR-0036 rule 12);
+  - a missing parameter, or a planned lead time that differs from the stored mean of `supplier_item_lead_time` by more than 20%: a parameter change with the mean and standard deviation as evidence. No median is computed (ADR-0051 rule 24 notes; ADR-0024 rule 2).
+- L1 `explain` (seat `analysis`): input the exception facts, pegging rows, projection buckets and the candidates with their computed effects. Output `PlanningExplainOutput`: `explanation` (at most 1,200 characters), `recommended` (a candidate handle or `none`), `reason_codes`. Checks: the handle was offered; every number in the text appears in the input.
+- D3 `propose` (step code `planning.propose`): one change proposal with the recommended candidate's commands (`UpdatePlannedOrder`, `FirmPlannedOrder`, `ConvertPlannedOrder`, which are proposal-bound, ADR-0036 rule 12; or a parameter or lead-time update, ADR-0024 rule 23: the lead-time update is `UpdateSupplierItem` on the measured supplier item), with pegging and projection as evidence and the explanation as the reason. With `none`, only the note.
+
+12.35 Outputs and human gates: the proposal and a note with the explanation. The run creates the proposal as a draft. A planner submits it (ADR-0029 rule 3). The approver is an eligible person of the current stage of the proposal's pool (`general` by default) who holds `ApproveChangeProposal` and the target permissions, that is `edit` on `planned_order` for the planned-order commands, and is not the human the run acted for (ADR-0055 rule 7; ADR-0043 rule 12; ADR-0051 rule 25 note). The executing consumer converts, and the drafts it creates follow their own approval (ADR-0024 rule 22). Sending to a supplier stays a separate approved step (ADR-0051 rule 25).
+
+12.36 Policy: proposals always need approval (ADR-0043 rule 9, floor 7). Automatic conversion stays an open question (ADR-0043 rule 17). A `planning` run is never `active`: its outputs are proposals that a person approves (ADR-0078 rule 5).
+
+12.37 Failures: no candidate gives an explanation only, outcome `no_action` (ADR-0051 rule 25).
+
+12.38 Budget and evaluation: per-run ceilings in 8.3. The evaluation set is 30 exceptions at 90% (ADR-0051 rule 7). Promotion is by that set, and the shadow comparator of ADR-0051 rule 25 returns with live shadow (ADR-0078 rule 6). Quality in use: 9.11.
+
 ## 13. The auto-post gateway
 
-13.1 The gateway (ADR-0065) is in Phase 1 as designed. It is code and data, not an agent. A deterministic checker per document type decides; agents only feed it drafts and proposals (ADR-0078 Decision, rule 8). It lands with `policy` at step 5. The purchase invoice checker and the advisor follow at step 7 (ADR-0078 rule 8).
+13.1 The gateway (ADR-0065) is in Phase 1 as designed. It is code and data, not an agent. A deterministic checker per document type decides; agents only feed it drafts and proposals (ADR-0078 Decision, rule 8). It lands with `policy` at step 5. The purchase invoice checker follows at step 7, after the purchase invoice manual path (ADR-0078 rule 8; this corrects "step 6" in the build line of ADR-0065).
 
 13.2 What an agent needs from it (ADR-0065 rules 1, 3, 4, 7):
 - `policy` owns `evaluate_auto_post`. A module registers one checker per document type through the hook `auto_post_checker`. The system job `RunAutoPostGateway` (module `automation`, every 5 minutes) takes drafts whose latest version a non-human wrote, simulates `Post<Type>` as `system`, and executes it only when the decision is `auto_post` and the mode is `live`.
@@ -539,11 +598,11 @@ A version cleared only by the human its tainting run acted for (small-company mo
 
 13.9 The purchase invoice checker `purchasing.purchase_invoice_auto_post` (ADR-0065 rule 19) has `accepts_tainted: true` and fails to `require_human`, except where `reject` is stated, on: `supplier_differs_from_order` (`reject`), `line_kind_not_matchable`, `line_item_not_mapped` (an item an LLM chose is `llm_read_only`), `supplier_history_below_minimum`, `price_outside_auto_post_tolerance`, `quantity_outside_auto_post_tolerance`, `order_not_fully_received`, `duplicate_suspected`. The bank cascade and the production import are instances with `runner: own`; their behavior is unchanged (ADR-0065 rule 20).
 
-13.10 The advisor `auto_post_advisor` (ADR-0065 rule 18) is a drafting agent type. A person starts it for a document type. It reads the deterministic tools `ListAutoPostCase`, `EvaluateAutoPostBacktest` and `ListAutoPostThresholdCandidate` (held-out filtered), chooses among the threshold candidates that code gave it, and writes the explanation. It drafts a decision table version (`CreateDecisionTableVersion`) and a change proposal of `UpdateCompanySetting` items (`CreateChangeProposal`). It never submits, approves, enables or changes a setting, a table state, a policy rule or an agent mode. Its drafts are written tainted and a person submits them. Its leaf is `agent_auto_post_advisor`. It is not an internal type for the budget, because it reads supplier invoices (8.6; ADR-0078 rule 7).
+13.10 The advisor `auto_post_advisor` (ADR-0065 rule 18) is a Phase 2 agent type (section 17). Until then people propose gateway settings and decision tables, and the assistant in `act` mode may draft them on request (ADR-0078 rule 2).
 
 ## 14. AI drafting of artifacts
 
-14.1 Parameter sets, decision tables and rule sets may be drafted by agents. There is no tuning agent. The sources of drafts are `auto_post_advisor` (gateway decision tables and settings), the stored-resolution proposals of `bank_matching` and `purchase_invoice` (bank matching rules, item mappings; ADR-0051 rule 2), and the assistant in `act` mode on request (ADR-0078 rule 8; ADR-0059 rule 1 and note).
+14.1 Parameter sets, decision tables and rule sets may be drafted by agents. There is no tuning agent. The sources of drafts in Phase 1 are the stored-resolution proposals of `bank_matching` and `purchase_invoice` (bank matching rules, item mappings; ADR-0051 rule 2), the parameter and lead-time proposals of `planning` (ADR-0024 rule 23), and the assistant in `act` mode on request. There is no advisor in Phase 1 (ADR-0078 rule 8; ADR-0059 rule 1 and note).
 
 14.2 Every draft enters the lifecycle of ADR-0059. States: `draft`, `backtested`, `shadow`, `assisted`, `active`, `retired`. A version in `assisted` is never in force where the system acts without a person. Each kind declares which middle stages it needs. The version in force is a pointer, and rollback moves the pointer back (`SetArtifactCurrentVersion`) (ADR-0059 rule 12, 13).
 
@@ -557,7 +616,7 @@ A version cleared only by the human its tainting run acted for (small-company mo
 
 15.1 `analysis` (ADR-0060 rule 20) turns a question into a JSON analysis plan. Code validates the plan against the declared catalog, compiles it to one read-only `SELECT`, and runs it as the asker (`EvaluateAnalysisPlan`). Every number in an answer is a server cell. The model plans and picks claims; code computes and renders (ADR-0060 Decision).
 
-15.2 Subject and scope: one `analysis_question` row, typed by a signed-in person (`CreateAnalysisQuestion`, `human_only`), so the run starts clean. It declares `may_read_untrusted: false` and field classes `cost` and `margin` (ADR-0060 rule 20). It is the internal agent type (8.6).
+15.2 Subject and scope: one `analysis_question` row, typed by a signed-in person (`CreateAnalysisQuestion`, `human_only`), so the run starts clean. It declares `may_read_untrusted: false` and field classes `cost` and `margin` (ADR-0060 rule 20). It is an internal agent type (8.6).
 
 15.3 Tools: read tools for LLM steps (`ListAnalysisCatalog`, `ListAnalysisDimensionMember`, `GetAnalysisPlanExplanation`, `ListSavedAnalysis`, `GetSavedAnalysis`, `ListAnalysisExample`). Workflow code also calls `EvaluateAnalysisPlan`, `ListAnalysisCellRow`, `GetAnalysisQuestion`, `UpdateAnalysisAnswer` (`is_draft_only`) and `CreateChangeProposal`. Nothing posts, sends or exports (ADR-0060 rule 20).
 
@@ -591,12 +650,12 @@ A version cleared only by the human its tainting run acted for (small-company mo
 
 ## 17. Deferred to Phase 2
 
-17.1 These agent types move to Phase 2, each registered with mode `off`, no workflow code, and refused by `StartAgentRun` with `agent_mode_off`. Their designs, DDL drafts, leaves, settings and evaluation rows stay as seams (ADR-0078 rule 2; ADR-0050 rule 15). Do not build them:
+17.1 These agent types move to Phase 2, each registered with mode `off`, no workflow code, and refused by `StartAgentRun` with `agent_mode_off`. `check` refuses any other mode for them in seed and configuration. Their designs, DDL drafts, leaves, settings and evaluation rows stay as seams, and the work item kinds they would wake on are raised and handled by people. Do not build them (ADR-0078 rule 2; ADR-0050 rule 15):
+- `auto_post_advisor` (ADR-0065 rule 18): it reads months of gateway outcomes, and no gateway outcomes exist before go-live;
 - `customer_onboarding` and `quotation` (ADR-0051);
-- `planning` (ADR-0051);
 - `data_migration` (ADR-0051; migration at step 11 uses the staged import, ADR-0044, ADR-0030);
 - `product_engineering` (ADR-0062);
-- `production`, `production_capture` and `production_variance` (ADR-0064).
+- `production`, `production_capture` and `production_variance` (ADR-0064). `production` reads no outside content, so it is the first to bring forward when a Phase 2 agent is chosen.
 
 17.2 Live agent shadow comparison against what people did, and its evidence tables (`GetAgentShadowEvaluation`), return in Phase 2 (ADR-0078 rules 5, 6).
 
@@ -632,7 +691,7 @@ A version cleared only by the human its tainting run acted for (small-company mo
 
 ### Work item kinds
 
-18.5 Wake agents: `bank_line_unmatched` (ADR-0048 rule 9; ADR-0051 rule 17), `supplier_invoice_received` (module `tax`; ADR-0051 rule 20 and note), `supplier_invoice_extracted` (ADR-0057 rule 26).
+18.5 Wake agents: `bank_line_unmatched` (ADR-0048 rule 9; ADR-0051 rule 17), `supplier_invoice_received` (module `tax`; ADR-0051 rule 20 and note), `supplier_invoice_extracted` (ADR-0057 rule 26), `planning_exception` and `capacity_overload` (ADR-0042 rule 18; ADR-0051 rule 23).
 
 18.6 Raised by `agents` (ADR-0050 rule 55): `agent_run_stopped`, `agent_budget_exhausted`, `agent_denials_repeated`, `agent_mode_degraded`. Also `agent_quality_below_threshold` (ADR-0051 rule 30). Gateway items: `auto_post_review`, `auto_post_unconfirmed`, `auto_post_suspended` (ADR-0065 rule 22; ADR-0063 rule 29). Also `document_extraction_review` wakes `document_reader` (ADR-0057 rule 11).
 
@@ -644,6 +703,40 @@ A version cleared only by the human its tainting run acted for (small-company mo
 
 ## 19. Conflicts found
 
+Resolved: ADR-0078 cited ADR-0051 rule 9 for the evaluation set of `planning`; the 30 exceptions at 90% are in the table of ADR-0051 rule 7, and rule 9 holds the ceilings (corrected in ADR-0078 rule 1).
+
 Resolved: the Phase 1 `purchase_invoice` declaration is ADR-0063 rule 11's "next version" and declares `supplier_invoice_received` `configurable`, default `always` (ADR-0078 rule 1; ADR-0050 rule 12 note).
 
 Resolved: two notes of ADR-0054 rule 11 seed `start_agent` differently, and the later one says it replaces the earlier seed; this text follows it: `it_administrator` holds no agent type, `owner` holds all, and the `assistant` leaf goes to every UI template except `it_administrator` and `auditor`. The rest of the seed is in `role-template-levels.csv`.
+
+## 20. One work model
+
+20.1 Four things must not be confused (ADR-0078 rule 11):
+
+| Concept | In NativeFlows | Authoritative state |
+| --- | --- | --- |
+| Business work | A `work_item` (ADR-0042): kind, subject, evidence, owner, due date | `open`, `claimed`, `done`, `canceled`; the owner is always a person, a role or an approval stage |
+| Progress of a process | The document's lifecycle state, its open work items and, where a company turns it on, the `work_case` that groups them (ADR-0066) | The documents and work items themselves. There is no workflow instance and no orchestration engine in Phase 1 (ADR-0058; D2, D4): waiting is a work item, asynchrony is the outbox |
+| Work given to an agent | The work item while an agent run holds its claim (or an `agent_task` item of the run's own) | `claimed_by_kind` `agent_run`; the claim is a lease that expires |
+| One attempt | An `agent_run` with its steps (ADR-0050) | `queued`, `running`, `completed`, `stopped`, `canceled` |
+
+20.2 Five rules follow from the table (ADR-0078 rule 11):
+- **A run is not the work.** A run that ends leaves the work item unclaimed with its owner, with links to the drafts and a note. Only a person, the owning module or a registered command resolves a work item; agents never do (`is_agent_resolvable` is false for every Phase 1 kind, ADR-0042 rule 16). Several runs may work on one item, one at a time: a retry after a crash continues the same run, and a new run needs a new raise or a person.
+- **A person can always take over.** A person's claim takes the item from a run, whose later commands fail with `work_item_claim_lost` (ADR-0042; INV-205). The drafts and the note stay.
+- **Nothing waits inside a model.** An agent run never waits for a person. The human step finishes as its own command, which raises the next work item or event, and that starts a new run from stored rows: the draft, the work item's links and notes, verified extraction fields, stored resolutions. No state is rebuilt from an earlier model response or a chat (spec 03 rule 9). A follow-up to the assistant is a new request that names the previous one; the new run reads the previous request's stored text and answer, and nothing else carries over.
+- **Handoff keeps the controls.** The owner stays the owner; the run acts for the workflow owner or the person who started it, within the intersection of rights; what a tainted run wrote stays tainted until a person other than that human clears it (ADR-0029 rule 8).
+- **A running run finishes on its version.** A change of the agent type's version or mode applies to runs that start afterwards. Rights are evaluated at every call, so a revoked right denies the next call, and the third denial stops the run (ADR-0050 rules 31, 33).
+
+20.3 The work item kind is the contract (ADR-0078 rule 12). A domain module names no agent type. It raises a work item of a kind and registers the commands that act on the subject. Which participant does the work is declared outside it: the kind's owner rule names the people; an agent type's declaration lists the kinds that wake it; a deterministic consumer may resolve a kind whose resolution is `system`.
+
+20.4 Adding an agent later changes no module. The kinds that the deferred agent types wake on are raised in Phase 1 and handled by people. Bringing an agent type forward adds its declaration, its steps and its evaluation set; the module, the work item kind and the manual path stay as they are. The same holds for replacing an agent step by deterministic code (ADR-0078 rule 12).
+
+20.5 There is no capability registry. A separate catalog of capabilities that workflows request would repeat what the work item kind and the registered commands already state. It is reconsidered when two agent types need to serve one kind (ADR-0078 rule 12 and "Revisit when").
+
+20.6 One agent type per kind. `check` refuses a kind declared by two agent types, so a wake-up is never ambiguous (ADR-0078 rules 4, 12).
+
+20.7 Every workflow has its manual path, and it is tested (ADR-0078 rule 13). With `llm_provider` unset, every agent mode is `off`, every work item stays with people, and every operation works (Principle 12; ADR-0050 rule 14). Proposed gate item, for the author (gates are reserved, ADR-0005): the purchase invoice flow is a golden scenario at step 7 in two variants over the same input files, with agents using recorded responses and with the LLM off, and both must end in the same posted invoice. The flow has every kind of step: deterministic intake and extraction, the vision reader, a person's verification, the agent's draft, the three-way match, approval where the match is exceeded, the gateway in `shadow`, and a person's posting. The planning slice gains the same pair for one planning exception. Until the author accepts the item it is not a gate.
+
+20.8 Tracing (ADR-0078 rule 14). An operator follows one piece of work from the work item: `ListAgentRun` filters by `work_item_id`; `GetAgentRun` returns the steps with tool name, plan hash and audit record; the case timeline of ADR-0066 rule 17 shows items, runs, versions, approvals and policy decisions in order. Cost and runs per company, agent type and business date are the `company_agent_type` rows of `agent_budget_usage`, shown on the operations dashboard (ADR-0038).
+
+20.9 Quality in use: 9.11 gives the measure per agent type (ADR-0078 rule 15).

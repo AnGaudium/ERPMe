@@ -320,7 +320,7 @@ The UI is generated from metadata, not hand-built. Every screen is one of seven 
     - **Later floorplans.** The worklist and approval view follow with the work queue at step 5. The overview follows with the Centers.
     - **The `assistant` agent**, the assist panel, natural-language filters and the command bar's `resolve_command` arrive at step 5, with the work queue; the evaluation set of rule 13 is a step 5 gate item ([steps-5-9.md](../runbook/steps-5-9.md)).
 
-    Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-19): the assistant is one of the six Phase 1 agent types; it routes questions that need figures to `analysis` and drafts what the deferred agents would help with (ADR-0078 rules 1, 8).
+    Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-19): the assistant is one of the six Phase 1 agent types (`assistant`, `analysis`, `bank_matching`, `purchase_invoice`, `document_reader`, `planning`); it routes questions that need figures to `analysis` and drafts what the deferred agents would help with, such as gateway settings (no advisor in Phase 1), mappings and artifacts, on request (ADR-0078 rules 1, 8).
 
 24. The eight open questions of this ADR were decided by the chief architect on the author's delegation of 2026-11-19 and are applied above: the start leaf (rule 13), the taint of typed text (rule 13), `ai-fillable` as a hint (rule 9), the cost cap and DDL (rules 13, 14), voice (rule 18), the line grid without AG Grid (rules 5, 20), user-saved variants (rule 10a) and the evaluation set (rule 13).
 

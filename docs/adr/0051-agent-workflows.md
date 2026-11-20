@@ -14,7 +14,7 @@ Six agent types are designed now, each as a code-orchestrated workflow on the ru
 
 Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): a further agent type `assistant` serves the UI's assist panel and command bar. It reads through its tool list and writes only through `is_draft_only` commands, within the user's permission intersection and the `agents.assistant.*` budgets. Its DDL, catalog rows, leaf, seed and cost cap are in DS-30-ui.sql and the catalogs; it arrives at step 5, and its evaluation set of about 50 tasks is a step 5 gate item (ADR-0077 rules 13, 14, 23).
 
-Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-19): Phase 1 has six agent types on one runtime: `bank_matching`, `purchase_invoice`, `assistant`, `analysis`, `document_reader` and `auto_post_advisor`. `customer_onboarding`, `quotation`, `planning` and `data_migration` move to Phase 2 with their designs kept; at step 11 migration uses the staged import with stored mappings, and the assistant may draft mappings (ADR-0078 rules 1, 2).
+Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-19): Phase 1 has six agent types on one runtime: `assistant`, `analysis`, `bank_matching`, `purchase_invoice`, `document_reader` and `planning`; `planning` (rules 23–25) starts after the planning slice with multi-level MRP has passed its gate. `customer_onboarding`, `quotation`, `data_migration` and `auto_post_advisor` move to Phase 2 with their designs kept; at step 11 migration uses the staged import with stored mappings, and the assistant may draft mappings (ADR-0078 rules 1, 2).
 
 **Deterministic first.** Each step tries stored rules and mappings, then lookups, then fuzzy matching with a deterministic score, and only then an LLM. The LLM never computes a price, tax, quantity, account, match or score. It reads, chooses among candidates that code gave it, and writes text. Code checks every output. A resolution the LLM contributes is proposed as a stored mapping or rule, so the next case is deterministic.
 
@@ -49,7 +49,7 @@ Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-19)
 
    Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), proposed 2026-11-15): the `analysis` agent type is a second stated exception: it drafts nothing a person resolves, so its promotion evidence is the version's CI evaluation report and, from 30 verified examples, the shadow evaluation over them; below 30 examples the CI report alone is flagged for the author (rule 25).
 
-   Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-19): in Phase 1 the modes are `off`, `assisted`, and `active` only as the gateway uses it; promotion to `assisted` uses the offline evaluation result and replay, not shadow evaluation rows, and an unevaluated version or seat model drops the effective mode to `off` (ADR-0078 rules 5, 6).
+   Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-19): in Phase 1 the modes are `off`, `assisted`, and `active` only as the gateway uses it; promotion to `assisted` uses the offline evaluation result (run with the real provider per pair of seat and model) and replay, not shadow evaluation rows. A change of the behavior hash (version, constants, promoted parameter set or seat model) whose evaluation passed keeps a company `assisted`; a hash without a passing result drops the effective mode to `off`, not `shadow`. `active` does not carry over a change of the hash (ADR-0078 rules 5, 6).
 5. Quality monitor:
    - **The job.** `RunAgentQualityCheck` (daily system job, `agents`) computes, per company and assisted agent type, the 30-day share of drafts accepted unedited and of drafts rejected or canceled (rule 6).
    - **The signal.** When agreement falls 10 points below the workflow's threshold, it raises `agent_quality_below_threshold` (owner `company_owner`) with the figures. It does not demote by itself; a person decides.
@@ -57,6 +57,8 @@ Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-19)
    Note ([ADR-0059](0059-ai-tuning-and-development-of-deterministic-functions.md), proposed 2026-11-15): for agent types the monitor keeps only signalling, while artifacts are demoted automatically to the version in force before (rule 21).
 
    Note ([ADR-0063](0063-configurable-policy-settings.md), proposed 2026-11-15): the response beyond the signal is the setting `agents.<agent_type>.drift_action` (`signal`, the default, `pause_new_runs`, `demote_to_shadow`) (rule 12).
+
+   Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-21): in Phase 1, with no live shadow, the measure of `RunAgentQualityCheck` is what people did with the agent's output: drafts posted unchanged and canceled for `purchase_invoice` and the assistant's `act` drafts, suggested matches confirmed unchanged for `bank_matching`, proposals approved unchanged and rejected for `planning`, vision values confirmed unchanged for `document_reader`, and the daily evaluation for `analysis` (ADR-0078 rule 15).
 6. Policy and posting:
    - **Agents never submit, post, issue or send** (ADR-0050 rule 30). People submit agent drafts, and the company's policy table applies at their `Submit` and `Post` (DS-28); agents set no discount or manual price.
    - **Tainted drafts** are posted only by a person (ADR-0043 rule 9, floor 3).
@@ -110,7 +112,7 @@ Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-19)
 
    Note (Design hardening, 2026-11-16): these values are the core defaults of the company settings `agents.<agent_type>.daily_max_cost` and `agents.<agent_type>.daily_max_runs` and the ceilings of the per-run settings. A company lowers any of them at once and raises a daily value, or a per-run value up to its ceiling, by a proposal another person approves ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 22 note). "Every daily cost stays below the company cap of USD 50" holds for the defaults; the company cap and the reserve pool still bind every run.
 
-   Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-19): these per-run values become the ceilings of each agent type's declaration; the per-agent-type daily budgets are removed, and the company's daily cap is the only daily tier (ADR-0078 rules 3, 7).
+   Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-19): these per-run values become the ceilings of each agent type's declaration; the per-agent-type daily budgets are removed, and the company's daily cap is the only daily tier, so the daily columns of this table are not used in Phase 1 (ADR-0078 rules 3, 7).
 
 10. The literal read scope (ADR-0050 rule 27; ADR-0029 rule 14) in these workflows:
     - **Tainted runs choose among related items only.** A tainted `quotation` run reads items only through the partner's `partner_item_overview` rows and its earlier document lines. A tainted `purchase_invoice` run reads the supplier's `partner_item` and `supplier_item` rows and its open purchase order lines. Lines that need anything else stay unresolved and go to a person.
@@ -272,6 +274,8 @@ Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-19)
     - **Failures.** No candidate: explanation only, outcome `no_action`.
 
     Note (flow review, 2026-11-15): correction of "a planner other than the human the run acted for approves it": the approver is an eligible person of the current stage of the proposal's pool (`general` by default) who holds `ApproveChangeProposal` and the target permissions ([ADR-0055](0055-approval-pools-and-stages.md) rule 7; ADR-0043 rule 12), that is `edit` on `planned_order` for the planned-order commands. Under the seed these are the production planner, the purchasing manager and the owner (ADR-0055 rule 5 note); accountants and chief accountants read planning only. The human the run acted for stays excluded.
+
+    Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-21): the planning agent is a Phase 1 agent type, started after the planning slice with multi-level MRP has passed its gate. Its shadow comparator returns with live shadow (Phase 2); in Phase 1 it is promoted by its evaluation set of 30 exceptions at 90% (rule 7), and its quality in use is the share of proposals approved unchanged and the share rejected (ADR-0078 rules 1, 6, 15).
 
 **Data migration** (spec 14 workflow 2; ADR-0044 rule 15)
 
