@@ -22,7 +22,7 @@ CREATE TABLE assist_request (                              -- the subject of an 
     selected_table       text,                                 -- the table of the selected rows
     selected_ids         uuid[] NOT NULL DEFAULT '{}' CONSTRAINT ck_assist_request_selected CHECK (cardinality(selected_ids) <= 100),
     active_filters       jsonb,                                -- the list's filters as sent to its query
-    previous_request_id  uuid,                                 -- a follow-up names the request it follows
+    previous_request_id  uuid,                                 -- a follow-up names a previous request of the same person (key below; ADR-0078 rule 11)
     agent_run_id         uuid,                                 -- the run that answered; null until StartAgentRun binds it
     state                text NOT NULL DEFAULT 'open' CONSTRAINT ck_assist_request_state CHECK (state IN ('open', 'answered', 'failed')),
     answer               jsonb,                                -- answer handles and record IDs (ask), proposed invocation (resolve_command), structured filter (resolve_filter)
@@ -33,8 +33,9 @@ CREATE TABLE assist_request (                              -- the subject of an 
     erased_at            timestamptz,                          -- request text blanked by retention or erasure
     recorded_at          timestamptz NOT NULL,
     UNIQUE (company_id, id),
+    UNIQUE (company_id, requested_by_user_id, id),
     FOREIGN KEY (company_id, agent_run_id) REFERENCES agent_run (company_id, id),
-    FOREIGN KEY (company_id, previous_request_id) REFERENCES assist_request (company_id, id),
+    FOREIGN KEY (company_id, requested_by_user_id, previous_request_id) REFERENCES assist_request (company_id, requested_by_user_id, id),
     CONSTRAINT ck_assist_request_context CHECK ((context_subject_table IS NULL) = (context_subject_id IS NULL)),
     CONSTRAINT ck_assist_request_selected_table CHECK ((cardinality(selected_ids) = 0) = (selected_table IS NULL)),
     CONSTRAINT ck_assist_request_closed CHECK ((state = 'open') = (answered_at IS NULL)

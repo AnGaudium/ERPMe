@@ -9,7 +9,7 @@ Event types named in backticks in the ADRs, recognised by the event forms of the
 | `AgentRunCompleted` | `agent_run` | agent_runs | — | ADR-0050:192, ADR-0060:267 |
 | `AgentRunStarted` | `agent_run` | agent_runs | — | ADR-0050:166, ADR-0050:176 |
 | `AttachmentCreated` | `attachment` | attachments | — | ADR-0038:144, ADR-0038:152 |
-| `BankLineSuggestionRecorded` | — | — | a consumer in `cash` | ADR-0048:126, ADR-0051:194, ADR-0051:198 |
+| `BankLineSuggestionRecorded` | — | — | a consumer in `cash` | ADR-0048:126, ADR-0051:196, ADR-0051:200 |
 | `ChangeProposalApproved` | `change_proposal` | documents | — | ADR-0029:48 |
 | `ComplaintClosed` | `complaint` | crm | a consumer in `cash` | ADR-0048:243, ADR-0052:226, ADR-0052:364 |
 | `ComplaintCreated` | `complaint` | crm | a consumer in `cash` | ADR-0048:243, ADR-0052:226, ADR-0052:364 |
@@ -20,14 +20,14 @@ Event types named in backticks in the ADRs, recognised by the event forms of the
 | `ConfiguredItemCreated` | — | — | — | ADR-0046:136, ADR-0046:137, ADR-0046:174 (+1) |
 | `ContactCreated` | `contact` | master_data | a consumer in `crm` | ADR-0052:183 |
 | `ContactUpdated` | `contact` | master_data | a consumer in `crm` | ADR-0052:183 |
-| `DataSubjectErased` | — | — | a consumer in `cash`, `imports_data_subject_erasure` | ADR-0052:258, ADR-0052:364 |
+| `DataSubjectErased` | — | — | a consumer in `cash`, `imports_data_subject_erasure` | ADR-0052:258, ADR-0052:265, ADR-0052:364 (+1) |
 | `DocumentExtractionCanceled` | `document_extraction` | attachments | — | ADR-0057:243, ADR-0057:311 |
 | `DocumentExtractionRecorded` | `document_extraction` | attachments | `certificate_result_drafter`, a consumer in `crm`, a consumer in `tax` | ADR-0057:77, ADR-0057:255, ADR-0057:259 (+2) |
 | `DocumentExtractionRequested` | `document_extraction` | attachments | `document_extraction_runner` | ADR-0057:56, ADR-0057:61, ADR-0057:311 |
 | `DocumentExtractionVerified` | `document_extraction` | attachments | `certificate_result_drafter`, a consumer in `purchasing` | ADR-0057:242, ADR-0057:270, ADR-0057:311 (+1) |
 | `ExtractionFieldCorrected` | `extraction_field` | attachments | — | ADR-0057:241, ADR-0057:248, ADR-0057:311 |
 | `ForecastCompleted` | — | — | — | ADR-0024:284 |
-| `GoodsReceiptPosted` | `goods_receipt` | inventory | `inspection_lot_creator` | ADR-0004:7, ADR-0004:61, ADR-0009:102 (+4) |
+| `GoodsReceiptPosted` | `goods_receipt` | inventory | `inspection_lot_creator` | ADR-0004:7, ADR-0004:61, ADR-0009:106 (+4) |
 | `InboundMessageRecorded` | `inbound_message` | crm | a consumer in `crm` | ADR-0052:364, ADR-0057:255 |
 | `InspectionLotApproved` | `inspection_lot` | quality | `usage_decision_executor` | ADR-0070:140 |
 | `InspectionLotExecutionRecorded` | `inspection_lot_execution` | quality | — | ADR-0070:178 |
@@ -92,7 +92,7 @@ Event types named in backticks in the ADRs, recognised by the event forms of the
 | `ReturnFromCustomerPosted` | `return_from_customer` | inventory | `inspection_lot_creator` | ADR-0070:77 |
 | `SalesOrderApproved` | `sales_order` | sales | — | ADR-0058:120, ADR-0058:247, ADR-0058:255 (+1) |
 | `SalesOrderChanged` | `sales_order` | sales | — | ADR-0058:121 |
-| `SalesOrderClosed` | `sales_order` | sales | — | ADR-0009:102 |
+| `SalesOrderClosed` | `sales_order` | sales | — | ADR-0009:106 |
 | `StockReservationCanceled` | `stock_reservation` | inventory | — | ADR-0023:286, ADR-0064:130 |
 | `StockReservationCreated` | `stock_reservation` | inventory | — | ADR-0023:286 |
 | `StockReservationTransferred` | `stock_reservation` | inventory | — | ADR-0064:258 |
@@ -123,7 +123,7 @@ A module name here means the ADR speaks of a consumer of that module without nam
 | `agent_runner` | 3 | ADR-0013:30, ADR-0013:58, ADR-0013:66 |
 | `agent_wake_up` | 3 | ADR-0013:58, ADR-0050:159, ADR-0050:174 |
 | `automation_dispatch` | 3 | ADR-0013:36, ADR-0058:27, ADR-0058:97 |
-| a consumer in `cash` | 7 | ADR-0048:221, ADR-0048:243, ADR-0051:198 |
+| a consumer in `cash` | 7 | ADR-0048:221, ADR-0048:243, ADR-0051:200 |
 | `certificate_result_drafter` | 1 | ADR-0070:103 |
 | a consumer in `crm` | 7 | ADR-0048:245, ADR-0052:122, ADR-0052:177 |
 | `crm_mail_sender` | 1 | ADR-0052:292 |

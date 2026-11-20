@@ -295,7 +295,7 @@ Planning answers, per item and warehouse: what to buy or move, how much, and by 
     | Later in Phase 1 | The later slice: forecast methods by backtest, service-level safety stock, more action messages, the planning agent |
     | Phase 2 | `bill_of_materials` edges |
 
-    Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-21): the planning agent of the later slice is a Phase 1 agent type. It starts after the planning slice with multi-level MRP has passed its gate (ADR-0078 rule 1; ADR-0036).
+    Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-21): the planning agent of the later slice is a Phase 1 agent type. It starts after the manual path of planning with multi-level MRP is built and has passed its gate (after step 5; this rule, ADR-0032 rule 7). The runbook does not place that work yet (open question) (ADR-0078 rule 1; ADR-0036).
 
 ## Context
 

@@ -252,6 +252,8 @@ The simulator runs fictional companies day by day. It writes what happened in bu
 
     "Covered in the log" is the step 0 gate view (ADR-0003 R1). "Exercised" is the step 4 view for steps 1–3 and the step 10 view for all steps ([testing-operations.md](../runbook/testing-operations.md#coverage-reports)). The runbook's step 0 fallback (ship only step 1 events) does not lift R1: the small log still covers every EC.
 
+    Note ([ADR-0078](../adr/0078-agent-simplification-for-phase-1.md), proposed 2026-11-21): EC-57, EC-79, EC-80, EC-83, EC-87 and EC-227 are not executable in Phase 1, because their agent types (`quotation`, `customer_onboarding`, `auto_post_advisor`) are deferred to Phase 2 (ADR-0078 rule 9a). They are excluded from the Phase 1 coverage counts and come back with their agent types. EC-185 is not one of them: its row is re-hosted on `purchase_invoice`.
+
 ## 9. Storage, locks and budget
 
 26. Logs and input files are not committed; they are reproducible from the triple and versions.
