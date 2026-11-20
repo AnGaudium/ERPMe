@@ -20,6 +20,7 @@ Event types named in backticks in the ADRs, recognised by the event forms of the
 | `ConfiguredItemCreated` | — | — | — | ADR-0046:136, ADR-0046:137, ADR-0046:174 (+1) |
 | `ContactCreated` | `contact` | master_data | a consumer in `crm` | ADR-0052:183 |
 | `ContactUpdated` | `contact` | master_data | a consumer in `crm` | ADR-0052:183 |
+| `DataErasureRecorded` | — | — | — | ADR-0079:58, ADR-0079:60 |
 | `DataSubjectErased` | — | — | a consumer in `cash`, `imports_data_subject_erasure` | ADR-0052:258, ADR-0052:265, ADR-0052:364 (+1) |
 | `DocumentExtractionCanceled` | `document_extraction` | attachments | — | ADR-0057:243, ADR-0057:311 |
 | `DocumentExtractionRecorded` | `document_extraction` | attachments | `certificate_result_drafter`, a consumer in `crm`, a consumer in `tax` | ADR-0057:77, ADR-0057:255, ADR-0057:259 (+2) |
@@ -112,7 +113,7 @@ Event types named in backticks in the ADRs, recognised by the event forms of the
 | `WorkItemResolved` | `work_item` | work | — | ADR-0042:150 |
 | `WorkItemUnclaimed` | `work_item` | work | — | ADR-0042:109, ADR-0042:150 |
 
-105 event types.
+106 event types.
 
 ## Consumers named in the ADRs
 

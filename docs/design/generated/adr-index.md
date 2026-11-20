@@ -86,7 +86,7 @@ Title, status and design item come from each ADR's first lines. **Declared** ADR
 | [ADR-0076](../../adr/0076-internal-messaging-and-notifications.md) | Internal messaging and notifications | accepted 2026-11-21 |  | `work` | 2 | `work`, `master_data`, `registry` |
 | [ADR-0077](../../adr/0077-ui-floorplans-annotations-and-embedded-agent.md) | UI floorplans, annotation vocabulary and embedded agent interaction | accepted 2026-11-21 | DS-30 | `agents`, `registry` | 5, 2 | `agents`, `registry` |
 | [ADR-0078](../../adr/0078-agent-simplification-for-phase-1.md) | Agent scope and the common work model for Phase 1 | accepted 2026-11-21 | DS-32, DS-33, DS-34 | — | — | `planning`, `purchasing`, `agent_runs`, `attachments` |
-| [ADR-0079](../../adr/0079-personal-data-protection.md) | Personal data protection in the core | proposed 2026-11-21 |  | `audit` | 2 | `audit`, `master_data`, `crm` |
+| [ADR-0079](../../adr/0079-personal-data-protection.md) | Personal data protection in the core | accepted 2026-11-21 |  | `audit` | 2 | `audit`, `master_data`, `crm` |
 
 ## By module
 

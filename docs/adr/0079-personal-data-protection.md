@@ -1,6 +1,6 @@
 # ADR-0079: Personal data protection in the core
 
-Status: proposed (2026-11-21) under ADR-0005 (builder Claude Fable 5.2).
+Status: accepted (2026-11-21) under ADR-0005, reviewed by Claude Opus 5.5 after three review rounds (builder Claude Fable 5.2, with the DDL, catalog and lab built by Claude Opus 5.5 and Claude Sonnet 5.5).
 Design items: DS-64 (personal data), DS-36 (audit), DS-35 (CRM), DS-15 (access), DS-37 (operations), DS-40 (go-live kit). Related decisions: D12. Principles 7, 12. ADR-0008, ADR-0009, ADR-0013, ADR-0014, ADR-0016, ADR-0017, ADR-0019, ADR-0028, ADR-0038, ADR-0044, ADR-0050, ADR-0052, ADR-0054, ADR-0057, ADR-0060, ADR-0063, ADR-0066, ADR-0073, ADR-0074, ADR-0076, ADR-0077; spec 17.
 
 ## Decision
@@ -45,7 +45,7 @@ Personal data is protected by one mechanism for the whole core, not only on the 
    - its catalog columns are masked in lists, searches, exports and the UI for everyone who does not hold the capability `read_blocked_personal_data`. Statutory reports and prints of posted documents (ADR-0049) are not masked: they are the legal purpose the data is kept for. The capability is the leaf `blocked_personal_data`; the `owner` template holds it at `full`, like every capability, and grants it to the people who answer authorities and auditors (ADR-0017 rule 6); no other template holds it; every read under it is logged (rule 12);
    - posted documents, open items and the journal stay complete and keep working: a blocked customer's invoice can still be paid, reversed, corrected and reported. Amounts, accounts and document numbers are never masked.
    - **Release.** `ReleaseDataSubject` (`human_only`, leaf `data_protection` at `full`, module `audit`) releases a block made in error or for a returning customer, only from `blocked`, with a reason; it writes an audit record. A destroyed subject is never released.
-6. **Destroyed** means every catalog column of the subject, in every store class, has had its erasure action applied.
+6. **Destroyed** means every catalog column of the subject, in every store class, has had its erasure action applied. Each module's hook sets its table's erasure flag (`erased_at`, `body_removed_at`), where the table has one, in the same update.
    - **Master and CRM stores:** as `EraseDataSubject` does today (ADR-0019 rule 10; ADR-0052 rule 25).
    - **Frozen documents and versions:** the snapshot columns (`partner_name`, `partner_tax_id`, addresses, the party columns of ADR-0074) are blanked and the catalog keys of `document_version.content` are cleared (`clear_keys`). The version's stored `version_hash` stays as it was and the version's `erased_at` (DS-05) is set, so the hash is no longer checked against the content (as ADR-0038 rule 4 marks erased audit rows with `erased_at`; INV-10 skips such versions).
    - **Journal:** `journal_entry.note` and `journal_line.description` of entries that name the subject as partner are blanked. No amount, account, date or key changes, so every balance and every invariant of the ledger holds.

@@ -68,12 +68,12 @@ Tables per owner module, from the DDL drafts in `docs/design/*.sql` and the owne
 | `audit_change` | field changes of change-tracked tables; partitioned by month on id (rules 3, 6) | Audit | `audit_record` | docs/design/DS-05-platform.sql:890 |
 | `audit_denial` | Rule 5: coalesced, written outside the refused transaction | Audit |  | docs/design/DS-05-platform.sql:907 |
 | `audit_record` | one per executed command or batch item; partitioned by month on id (rule 6) | Audit | `policy_decision` | docs/design/DS-05-platform.sql:842 |
-| `data_erasure_entry` | ADR-0079 rule 7; one row per rewritten row; names columns, holds no values; append-only (trigger below) | Erasure entries | `document` | docs/design/DS-64-personal-data.sql:65 |
-| `data_subject_state` | ADR-0079 rules 4-5; one row per subject that is or was blocked; a later block updates the same row | Data subject state | `document` | docs/design/DS-64-personal-data.sql:20 |
-| `personal_data_breach` | ADR-0079 rule 16; what an authority asks for; the case's kind is personal_data_breach (checked by the command) | Breach register | `work_case` | docs/design/DS-64-personal-data.sql:114 |
+| `data_erasure_entry` | ADR-0079 rule 7; one row per rewritten row; names columns, holds no values; append-only (trigger below) | Erasure entries | `document` | docs/design/DS-64-personal-data.sql:67 |
+| `data_subject_state` | ADR-0079 rules 4-5; one row per subject that is or was blocked; a later block updates the same row | Data subject state | `document` | docs/design/DS-64-personal-data.sql:22 |
+| `personal_data_breach` | ADR-0079 rule 16; what an authority asks for; the case's kind is personal_data_breach (checked by the command) | Breach register | `work_case` | docs/design/DS-64-personal-data.sql:115 |
 | `personal_data_processing_log` | IDs and field names only, never values; append-only (trigger below) | Processing log |  | docs/design/DS-35-crm.sql:472 |
-| `personal_data_read_log` | ADR-0079 rule 12; query name, user, field names and row count, never values; append-only (trigger below) | Read log | `agent_run`, `integration_client`, `user_account` | docs/design/DS-64-personal-data.sql:89 |
-| `retention_rule` | ADR-0079 rule 9; seeded per company from the package's rules; the core seeds none | Retention rules |  | docs/design/DS-64-personal-data.sql:45 |
+| `personal_data_read_log` | ADR-0079 rule 12; query name, user, field names and row count, never values; append-only (trigger below) | Read log | `user_account` | docs/design/DS-64-personal-data.sql:91 |
+| `retention_rule` | ADR-0079 rule 9; seeded per company from the package's rules; the core seeds none | Retention rules |  | docs/design/DS-64-personal-data.sql:47 |
 
 ## `configuration`
 
@@ -564,12 +564,10 @@ Foreign keys whose source and target tables have different stated owners. Foreig
 | `extraction_confirmation` (attachments, 2) | `confirmed_by_user_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-36-document-intake.sql:162 |
 | `extraction_field` (attachments, 2) | `company_id,agent_run_id` | `agent_run` (agent_runs, 2) | same layer | docs/design/DS-36-document-intake.sql:124 |
 | `extraction_field` (attachments, 2) | `entered_by_user_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-36-document-intake.sql:114 |
-| `data_erasure_entry` (audit, 2) | `company_id,data_subject_request_id` | `document` (documents, 2) | same layer | docs/design/DS-64-personal-data.sql:81 |
-| `data_subject_state` (audit, 2) | `company_id,data_subject_request_id` | `document` (documents, 2) | same layer | docs/design/DS-64-personal-data.sql:35 |
-| `personal_data_breach` (audit, 2) | `company_id,work_case_id` | `work_case` (work, 2) | same layer | docs/design/DS-64-personal-data.sql:135 |
-| `personal_data_read_log` (audit, 2) | `company_id,agent_run_id` | `agent_run` (agent_runs, 2) | same layer | docs/design/DS-64-personal-data.sql:105 |
-| `personal_data_read_log` (audit, 2) | `integration_client_id` | `integration_client` (permissions, 2) | same layer | docs/design/DS-64-personal-data.sql:94 |
-| `personal_data_read_log` (audit, 2) | `user_account_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-64-personal-data.sql:92 |
+| `data_erasure_entry` (audit, 2) | `company_id,data_subject_request_id` | `document` (documents, 2) | same layer | docs/design/DS-64-personal-data.sql:83 |
+| `data_subject_state` (audit, 2) | `company_id,data_subject_request_id` | `document` (documents, 2) | same layer | docs/design/DS-64-personal-data.sql:37 |
+| `personal_data_breach` (audit, 2) | `company_id,work_case_id` | `work_case` (work, 2) | same layer | docs/design/DS-64-personal-data.sql:136 |
+| `personal_data_read_log` (audit, 2) | `user_account_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-64-personal-data.sql:94 |
 | `bank_statement` (cash, 4) | `company_id,source_attachment_id` | `attachment` (attachments, 2) | down | docs/design/DS-05-platform.sql:1134 |
 | `bank_statement` (cash, 4) | `imported_by_user_id` | `user_account` (permissions, 2) | down | docs/design/DS-05-platform.sql:1128 |
 | `bank_statement_line` (cash, 4) | `company_id,matched_document_id` | `document` (documents, 2) | down | docs/design/DS-05-platform.sql:1181 |
@@ -1167,7 +1165,7 @@ Foreign keys whose source and target tables have different stated owners. Foreig
 | `work_item` (work, 2) | `company_id,warehouse_id` | `warehouse` (master_data, 3) | up | docs/design/DS-05-platform.sql:89 |
 | `work_item` (work, 2) | `owner_user_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-05-platform.sql:67 |
 
-620 cross-module foreign keys.
+618 cross-module foreign keys.
 
 ## Foreign keys to tables without a stated owner or without DDL
 
@@ -1239,8 +1237,8 @@ Column pairs `<x>_table` + `<x>_id` that point at any table. An FK scan cannot s
 | `automation_execution` | configuration | `subject_table`, `subject_id` | docs/design/DS-28-34-configuration-artifacts.sql:96 |
 | `change_proposal_item` | documents | `target_table`, `target_id` | docs/design/DS-05-platform.sql:737 |
 | `conversation` | work | `subject_table`, `subject_id` | docs/design/DS-63-messaging.sql:9 |
-| `data_erasure_entry` | audit | `subject_table`, `subject_id` | docs/design/DS-64-personal-data.sql:65 |
-| `data_subject_state` | audit | `subject_table`, `subject_id` | docs/design/DS-64-personal-data.sql:20 |
+| `data_erasure_entry` | audit | `subject_table`, `subject_id` | docs/design/DS-64-personal-data.sql:67 |
+| `data_subject_state` | audit | `subject_table`, `subject_id` | docs/design/DS-64-personal-data.sql:22 |
 | `document_line_price_step` | — | `source_table`, `source_id` | docs/design/DS-22-09-42-commercial-inventory.sql:1431 |
 | `event_delivery` | outbox | `subject_table`, `subject_id` | docs/design/DS-05-platform.sql:820 |
 | `event_subject` | outbox | `subject_table`, `subject_id` | docs/design/DS-05-platform.sql:778 |
@@ -1250,7 +1248,7 @@ Column pairs `<x>_table` + `<x>_id` that point at any table. An FK scan cannot s
 | `nonconformance` | quality | `source_table`, `source_id` | docs/design/DS-58-quality.sql:274 |
 | `outbox_event` | outbox | `subject_table`, `subject_id` | docs/design/DS-05-platform.sql:796 |
 | `personal_data_processing_log` | audit | `subject_table`, `subject_id` | docs/design/DS-35-crm.sql:472 |
-| `personal_data_read_log` | audit | `subject_table`, `subject_id` | docs/design/DS-64-personal-data.sql:89 |
+| `personal_data_read_log` | audit | `subject_table`, `subject_id` | docs/design/DS-64-personal-data.sql:91 |
 | `work_case` | work | `origin_table`, `origin_id` | docs/design/DS-05-platform.sql:134 |
 | `work_case_link` | work | `target_table`, `target_id` | docs/design/DS-05-platform.sql:175 |
 | `work_item` | work | `subject_table`, `subject_id` | docs/design/DS-05-platform.sql:58 |
