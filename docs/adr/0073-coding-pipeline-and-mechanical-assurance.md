@@ -1,6 +1,6 @@
 # ADR-0073: Coding pipeline and mechanical assurance
 
-Status: proposed (2026-11-18) under ADR-0005 (builder Claude Opus 5.5).
+Status: accepted (2026-11-21) under ADR-0005, reviewed by Claude Fable 5.2 (builder Claude Opus 5.5; proposed 2026-11-18) after three review rounds, the fixes verified by Claude Opus 5.5.
 Design items: DS-18 (repository and engineering conventions), DS-04 (command registry), DS-16 (harness). Related decisions: D2, D3, D14, D15. Build principles B2, B4, B7. ADR-0002, ADR-0003, ADR-0004, ADR-0005, ADR-0008, ADR-0022, ADR-0027, ADR-0059, ADR-0063.
 
 ## Decision

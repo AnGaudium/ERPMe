@@ -1,6 +1,6 @@
 # ADR-0075: Stock documents
 
-Status: proposed (2026-11-19) under ADR-0005 (builder Claude Sonnet 5.5).
+Status: accepted (2026-11-21) under ADR-0005, reviewed by Claude Fable 5.2 (builder Claude Sonnet 5.5; proposed 2026-11-19) after three review rounds, the fixes verified by Claude Opus 5.5.
 Design items: DS-09 (stock documents), DS-22, DS-42 (warehouse management), DS-58 (quality). Related decisions: none new. Principles 6, 12. ADR-0004, ADR-0006, ADR-0009, ADR-0014, ADR-0015, ADR-0020, ADR-0023, ADR-0024, ADR-0027, ADR-0028, ADR-0031, ADR-0034, ADR-0044, ADR-0056, ADR-0061, ADR-0063, ADR-0067, ADR-0069, ADR-0070, ADR-0074.
 
 ## Decision

@@ -1,6 +1,6 @@
 # ADR-0077: UI floorplans, annotation vocabulary and embedded agent interaction
 
-Status: proposed (2026-11-19) under ADR-0005 (builder Claude Opus 5.5). Design item: DS-30. Related decisions: D2, D8, D12, D14. Principles 1, 3, 6, 8, 12, 13. ADR-0002, ADR-0008, ADR-0016, ADR-0017, ADR-0022, ADR-0029, ADR-0040, ADR-0042, ADR-0043, ADR-0050, ADR-0051, ADR-0054, ADR-0055, ADR-0057, ADR-0060, ADR-0061, ADR-0063, ADR-0064, ADR-0065, ADR-0066, ADR-0067, ADR-0071, ADR-0073, ADR-0076.
+Status: accepted (2026-11-21) under ADR-0005, reviewed by Claude Fable 5.2 (builder Claude Opus 5.5; proposed 2026-11-19) after three review rounds, the fixes verified by Claude Opus 5.5. Design item: DS-30. Related decisions: D2, D8, D12, D14. Principles 1, 3, 6, 8, 12, 13. ADR-0002, ADR-0008, ADR-0016, ADR-0017, ADR-0022, ADR-0029, ADR-0040, ADR-0042, ADR-0043, ADR-0050, ADR-0051, ADR-0054, ADR-0055, ADR-0057, ADR-0060, ADR-0061, ADR-0063, ADR-0064, ADR-0065, ADR-0066, ADR-0067, ADR-0071, ADR-0073, ADR-0076.
 
 ## Decision
 

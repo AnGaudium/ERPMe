@@ -1,6 +1,6 @@
 # ADR-0069: Business unit dimension
 
-Status: proposed (2026-11-17) under ADR-0005 (builder Claude Opus 5.5).
+Status: accepted (2026-11-21) under ADR-0005, reviewed by Claude Fable 5.2 (builder Claude Opus 5.5; proposed 2026-11-17) after three review rounds, the fixes verified by Claude Opus 5.5.
 Design items: DS-06 (universal journal), DS-20 (master data), DS-22 (commercial documents), DS-28 (settings), DS-33 (analysis), DS-04 (errors), DS-16 and DS-17. Related decisions: D5; the author's request of 2026-11-17. Principles 6, 7, 13. ADR-0004, ADR-0005, ADR-0006, ADR-0007, ADR-0010, ADR-0012, ADR-0014, ADR-0015, ADR-0018, ADR-0022, ADR-0027, ADR-0035, ADR-0045, ADR-0047, ADR-0048, ADR-0050, ADR-0060, ADR-0063, ADR-0068.
 
 ## Decision

@@ -1,6 +1,6 @@
 # ADR-0071: Work orders and shop-floor execution
 
-Status: proposed (2026-11-17) under ADR-0005 (builder Claude Opus 5.5).
+Status: accepted (2026-11-21) under ADR-0005, reviewed by Claude Fable 5.2 (builder Claude Opus 5.5; proposed 2026-11-17) after three review rounds, the fixes verified by Claude Opus 5.5.
 Design items: DS-52 (production orders and shop floor), DS-31 (shop-floor flows), DS-53 (costing), DS-34 (agents), DS-15 (roles). Related decisions: D6. Principles 2, 3, 12. ADR-0004, ADR-0006, ADR-0007, ADR-0008, ADR-0009, ADR-0013, ADR-0022, ADR-0023, ADR-0024, ADR-0027, ADR-0028, ADR-0029, ADR-0033, ADR-0034, ADR-0035, ADR-0040, ADR-0042, ADR-0063, ADR-0064, ADR-0066, ADR-0068, ADR-0070.
 
 ## Decision

@@ -1,6 +1,6 @@
 # ADR-0070: Quality management core
 
-Status: proposed (2026-11-17) under ADR-0005 (builder Claude Opus 5.5).
+Status: accepted (2026-11-21) under ADR-0005, reviewed by Claude Fable 5.2 (builder Claude Opus 5.5; proposed 2026-11-17) after three review rounds, the fixes verified by Claude Opus 5.5.
 Design items: DS-58 (new: quality management), DS-20 (master data), DS-22 (inventory documents), DS-52 (shop floor), DS-36 (document intake), DS-29 (work queue), DS-15 (access), DS-28 (settings and policy), DS-04 (errors), DS-16 and DS-17. Related decisions: Principles 2, 3, 12. ADR-0004, ADR-0006, ADR-0007, ADR-0008, ADR-0009, ADR-0013, ADR-0018, ADR-0020, ADR-0022, ADR-0023, ADR-0027, ADR-0029, ADR-0032, ADR-0033, ADR-0034, ADR-0043, ADR-0047, ADR-0054, ADR-0055, ADR-0057, ADR-0063, ADR-0066, ADR-0068.
 
 ## Decision

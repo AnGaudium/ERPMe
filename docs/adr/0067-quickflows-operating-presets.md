@@ -1,6 +1,6 @@
 # ADR-0067: QuickFlows mode: operating presets for small teams
 
-Status: proposed (2026-11-17) under ADR-0005 (builder Claude Opus 5.5).
+Status: accepted (2026-11-21) under ADR-0005, reviewed by Claude Fable 5.2 (builder Claude Opus 5.5; proposed 2026-11-17) after three review rounds, the fixes verified by Claude Opus 5.5.
 Design items: DS-28 (settings, policy and configuration), DS-30 (UI), DS-15 (segregation of duties), DS-04 (errors), DS-20 (company), DS-16 and DS-17. Related decisions: D2, D5. Principles 2, 3, 12. ADR-0004, ADR-0005, ADR-0008, ADR-0009, ADR-0010, ADR-0017, ADR-0023, ADR-0029, ADR-0031, ADR-0033, ADR-0034, ADR-0038, ADR-0040, ADR-0043, ADR-0044, ADR-0047, ADR-0050, ADR-0054, ADR-0055, ADR-0063, ADR-0065; spec 02, 03, 14, 18.
 
 ## Decision

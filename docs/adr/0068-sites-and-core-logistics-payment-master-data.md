@@ -1,6 +1,6 @@
 # ADR-0068: Sites and core logistics and payment master data
 
-Status: proposed (2026-11-17) under ADR-0005 (builder Claude Opus 5.5).
+Status: accepted (2026-11-21) under ADR-0005, reviewed by Claude Fable 5.2 (builder Claude Opus 5.5; proposed 2026-11-17) after three review rounds, the fixes verified by Claude Opus 5.5.
 Design items: DS-20 (master data), DS-09 (inventory and costing), DS-22 (commercial documents), DS-25 (cash), DS-51 to DS-54 (production and planning), DS-04, DS-16 and DS-17. Related decisions: the chief architect's core master-data decisions of 2026-11-17 (site, payment method, Incoterms, delivery method, resource group). Principles 3, 6, 13. ADR-0004, ADR-0006, ADR-0009, ADR-0015, ADR-0019, ADR-0020, ADR-0021, ADR-0022, ADR-0023, ADR-0024, ADR-0029, ADR-0030, ADR-0033, ADR-0034, ADR-0035, ADR-0036, ADR-0045, ADR-0047, ADR-0048, ADR-0063, ADR-0067, ADR-0069.
 
 ## Decision

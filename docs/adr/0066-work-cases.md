@@ -1,6 +1,6 @@
 # ADR-0066: Work cases
 
-Status: proposed (2026-11-16) under ADR-0005 (builder Claude Opus 5.5).
+Status: accepted (2026-11-21) under ADR-0005, reviewed by Claude Fable 5.2 (builder Claude Opus 5.5; proposed 2026-11-16) after three review rounds, the fixes verified by Claude Opus 5.5.
 Design items: DS-29 (work queue), DS-30 (UI), DS-28 (settings), DS-04 (errors). Related decisions: D2. Principles 3, 8. ADR-0005, ADR-0008, ADR-0009, ADR-0013, ADR-0022, ADR-0028, ADR-0029, ADR-0040, ADR-0042, ADR-0047, ADR-0050, ADR-0051, ADR-0052, ADR-0054, ADR-0055, ADR-0057, ADR-0058, ADR-0063, ADR-0065.
 
 ## Decision
@@ -126,7 +126,7 @@ A case never widens an agent's read scope.
     - `CreateWorkCase`;
     - `UpdateWorkCase`: due date, priority, and `partner_id` from a trusted source;
     - `LinkWorkCaseTarget` and `UnlinkWorkCaseTarget`;
-    - `ResolveWorkCase`: a resolution code, for kinds with resolution `person`. It is an ordinary command with no internal flag: people run it for those kinds, and the `automation` resolver of rule 15 runs the same command as `system` for kinds with resolution `system`. The command refuses a person on a `system` kind and `system` on a `person` kind with `validation` (review note, 2026-11-21);
+    - `ResolveWorkCase`: a resolution code, for kinds with resolution `person`. It is an ordinary command with no internal flag: people run it for those kinds, and the `automation` resolver of rule 15 runs the same command as `system` for kinds with resolution `system`. The command refuses a person on a `system` kind and `system` on a `person` kind with `validation_failed` (review note, 2026-11-21);
     - `AssignWorkCase`: the owner;
     - `CancelWorkCase`: a reason.
 

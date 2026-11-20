@@ -1,6 +1,6 @@
 # ADR-0074: Core data-structure additions
 
-Status: proposed (2026-11-19) under ADR-0005 (builder Claude Sonnet 5.5).
+Status: accepted (2026-11-21) under ADR-0005, reviewed by Claude Fable 5.2 (builder Claude Sonnet 5.5; proposed 2026-11-19) after three review rounds, the fixes verified by Claude Opus 5.5.
 Design items: DS-20 (master data), DS-22 (commercial documents), DS-05 (documents), DS-06 (journal), DS-21 (migration), DS-30 (UI), DS-43 (production). Related decisions: none new. Principles 6, 12, 13. ADR-0004, ADR-0006, ADR-0009, ADR-0011, ADR-0014, ADR-0017, ADR-0018, ADR-0019, ADR-0022, ADR-0026, ADR-0028, ADR-0029, ADR-0030, ADR-0038, ADR-0040, ADR-0041, ADR-0044, ADR-0047, ADR-0048, ADR-0049, ADR-0052, ADR-0054, ADR-0055, ADR-0058, ADR-0063, ADR-0064, ADR-0068, ADR-0071, ADR-0072.
 
 ## Decision
