@@ -179,6 +179,10 @@ The hard floor on what a tainted run may read stays the literal spec 03 rule 1 u
 
     Note ([ADR-0065](0065-deterministic-auto-post-gateway.md), 2026-11-16 (proposed)): "spec 03 lets no policy, threshold or setting relax a hard floor" now has one exception, the author's decision of 2026-11-16: a tainted draft may be auto-posted when the company enables it for the document type and the deterministic checker passes (default off; [ADR-0065](0065-deterministic-auto-post-gateway.md) rule 10). The read scope of this rule is unchanged: the decision lets a checked draft post and widens no run's reads. The author rewords spec 03 rule 1 (open question) ([ADR-0065](0065-deterministic-auto-post-gateway.md) rules 10, 12).
 
+    Note (S1 review, 2026-11-21): the rewording was delegated on 2026-11-19 and applied on 2026-11-21.
+
+    Note (S1 review, 2026-11-21): spec 03 rule 1 was reworded on 2026-11-21 under the author's delegation of 2026-11-19. It names this rule as the tainted read scope and changes nothing in it. The author's decision item 2 of 2026-11-19 also lists the whole item catalog, the partner's price lists and available to promise as readable by a tainted run; that is wider than this rule and is not applied: it is recorded as a conflict for the author (open-questions, S1 review section).
+
 **Audit and checks**
 
 15. Audit rows (ADR-0027 rule 8) also record `origin_agent_run_id`, `on_behalf_of_id` and `policy_decision_id`. Full columns: [ADR-0038](0038-audit-and-observability.md) rule 2.

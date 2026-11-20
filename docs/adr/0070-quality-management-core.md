@@ -76,7 +76,7 @@ The author's decision of 2026-11-17 gives Phase 1 a thin but complete quality co
 8. Creation:
    - **The consumer.** The transactional consumer `inspection_lot_creator` (queue `events`) handles `GoodsReceiptPosted`, `OtherReceiptPosted`, `ProductionReceiptPosted`, `ReturnFromCustomerPosted` and `OperationConfirmationPosted`. It reads the posted lines through the owners' contracts.
    - **When it creates a lot.** It runs `CreateInspectionLot` as `system` for each line whose product's `inspection_points` contains the point and, except at `in_process`, whose stock was posted in `quality_inspection` or, for returns, `blocked`.
-     - At `in_process`, a lot is created only when a released plan names that item and operation. Its quantity is the confirmation's yield. No `in_process` lot is created for a confirmation whose yield is 0 (time-only or scrap-only confirmations, ADR-0071 rule 2): the lot quantity must be above 0. (review note, 2026-11-21)
+     - At `in_process`, a lot is created only when rule 4 selects a released plan for that item and operation. (review note, 2026-11-21) Its quantity is the confirmation's yield. No `in_process` lot is created for a confirmation whose yield is 0 (time-only or scrap-only confirmations, ADR-0071 rule 2): the lot quantity must be above 0. (review note, 2026-11-21)
      - The command key is `inspection_lot_creator:<event id>:<line number>`.
    - **What it raises.** Each lot raises `inspection_lot_open` (owner `role:quality_inspector`).
    - **No plan.** A lot without a matching plan is created anyway, with no characteristics, and a person decides it.

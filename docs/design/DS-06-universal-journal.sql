@@ -186,7 +186,7 @@ CREATE TABLE journal_line (
     purchase_order_line_id     uuid,         -- ADR-0030 rule 3: GR/IR per order line; FK to purchase_order_line added at step 5
     evidence_method            text          CONSTRAINT ck_journal_line_evidence_method CHECK (evidence_method IS NULL OR (open_item_id IS NOT NULL AND evidence_method IN ('cash', 'bank_transfer', 'card', 'offset', 'third_party', 'none'))),   -- lines of ADR-0048 rule 18; how a settlement was paid, in any regime (ADR-0053 rule 11)
     derivation_trace_id        uuid          REFERENCES derivation_trace (id),
-    business_unit_id           uuid,   -- ADR-0069 rule 4; composite key to business_unit below (the unit is of the line's company); profit-and-loss lines only in Phase 1 (rule 5, posting logic)
+    business_unit_id           uuid,         -- ADR-0069 rule 4; composite key to business_unit below (the unit is of the line's company); profit-and-loss lines only in Phase 1 (rule 5, posting logic)
     business_unit_source       text          CONSTRAINT ck_journal_line_business_unit_source CHECK (business_unit_source IN ('line', 'item', 'cost_center', 'project', 'document', 'site', 'company_default', 'reversal', 'closing')),   -- the derivation step that set it (ADR-0069 rules 9, 11)
     description                text,
     recorded_at                timestamptz   NOT NULL DEFAULT now(),

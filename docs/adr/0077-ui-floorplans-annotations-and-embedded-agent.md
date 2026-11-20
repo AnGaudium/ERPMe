@@ -192,7 +192,7 @@ The UI is generated from metadata, not hand-built. Every screen is one of seven 
     - `purpose`: `ask`, `act`, `resolve_command` or `resolve_filter`;
     - `request_text`: up to 2,000 characters;
     - `language`: the language tag of the request;
-    - the context: `context_subject_table` and `context_subject_id`, up to 100 `selected_ids`, `active_filters` as JSON, and the `floorplan` code;
+    - the context: `context_subject_table` and `context_subject_id`, up to 100 `selected_ids` with `selected_table`, the table of the selected rows (required when `selected_ids` is not empty, null otherwise), `active_filters` as JSON, and the `floorplan` code (review note, 2026-11-21);
     - `requested_by_user_id`: the requesting user.
 
     **Personal data.** `request_text` is labeled personal (spec 17) and follows the routing switch as `analysis_question.question_text` does (ADR-0060 rule 21). It is blanked, which sets `erased_at`, when the requesting user's account is erased and by the retention job after `analysis_question_retention_days`, the same value as for analysis questions (ADR-0060 rule 21; no new setting). (review note, 2026-11-21)
