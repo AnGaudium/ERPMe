@@ -7,7 +7,7 @@ debit_note,bill_to_address_id,"reference id to partner_address, not a value"
 delivery,ship_to_address_id,"reference id to partner_address, not a value"
 document_extraction,signature_state,"state code of a digital signature check, not a person"
 inbound_message,is_sender_authenticated,"boolean flag, not a value"
-mailbox,email_address,"shared company mailbox address, internal (ADR-0052 rule 29); unsure"
+mailbox,email_address,company mailbox
 message,body_removed_at,timestamp
 money_account,bank_account_number,own bank account of the company
 notification,recipient_user_account_id,"reference id, not a value"
@@ -21,7 +21,6 @@ personal_data_processing_log,recipient,"provider and model or lookup provider, n
 print_profile,address,company letterhead address
 print_profile,phone,company letterhead phone
 print_profile,email,company letterhead email
-print_profile,signature_attachment_id,reference id to an attachment (signature image of the legal representative; DDL comment: label internal); unsure
 purchase_credit_note,invoicing_party_address_id,"reference id to partner_address, not a value"
 purchase_debit_note,invoicing_party_address_id,"reference id to partner_address, not a value"
 purchase_invoice,invoicing_party_address_id,"reference id to partner_address, not a value"
@@ -35,3 +34,98 @@ sales_order,bill_to_address_id,"reference id to partner_address, not a value"
 sales_return,bill_to_address_id,"reference id to partner_address, not a value"
 site,address,company site address
 warehouse,address,company warehouse address
+analysis_question,failure_reason,"a code from a closed list, not text about a person"
+assist_request,failure_reason,"a code from a closed list, not text about a person"
+automation_rule,disabled_reason,"a code from a closed list, not text about a person"
+data_processing_permission,suspension_reason,"a code from a closed list, not text about a person"
+interaction_match_candidate,reason,"a code from a closed list, not text about a person"
+planning_exception,reason,"a code from a closed list, not text about a person"
+processing_basis,end_reason,"a code from a closed list, not text about a person"
+role_permission_hold,reason,"a code from a closed list, not text about a person"
+purchase_order,closed_reason,"a code from a closed list, not text about a person"
+sales_order,closed_reason,"a code from a closed list, not text about a person"
+quotation,closed_reason,"a code from a closed list, not text about a person"
+purchase_request,closed_reason,"a code from a closed list, not text about a person"
+document,closed_reason,"a code from a closed list, not text about a person"
+demand_supply_line,closed_reason,"a code from a closed list, not text about a person"
+demand_supply_line,hold_reasons,"codes from a closed list, not text about a person"
+credit_note,reason,"a code from a closed list, not text about a person"
+debit_note,reason,"a code from a closed list, not text about a person"
+open_item_collection,payment_block_reason,"a code from a closed list, not text about a person"
+tax_line_adjustment,reason,"the condition type's reason (failing_method, lapsed), not text about a person"
+agent_run_step,tool_name,"the registered name of a tool, table or query"
+data_translation,table_name,"the registered name of a tool, table or query"
+external_id_map,table_name,"the registered name of a tool, table or query"
+list_variant,query_name,"the registered name of a tool, table or query"
+personal_data_read_log,query_name,"the registered name of a tool, table or query"
+automation_rule,name,the name a user gives a configuration object; describes no person
+decision_table,name,the name a user gives a configuration object; describes no person
+saved_analysis,name,the name a user gives a configuration object; describes no person
+list_variant,name,the name a user gives a configuration object; describes no person
+branch,name,legal entity (branch of the company)
+company,legal_name,legal entity (the company)
+department,name,the name of the company's own object
+project,name,the name of the company's own object
+promotion,name,the name of the company's own object
+site,name,the name of the company's own object
+warehouse,name,the name of the company's own object
+mailbox,name,the name of the company's own object
+money_account,name,the name of the company's own object
+delivery_method,name,the name of the company's own object
+money_account,bank_name,the bank of the company's own account
+conversation,name,a channel slug
+integration_client,name,the client system's name
+partner_insight,name,the name of the computed measure; the value is in the catalog
+partner_item,partner_item_name,"the partner's name for an item, not for a person"
+item_manufacturer_part,manufacturer_name,"a manufacturer, a legal entity"
+item_manufacturer_part,normalized_manufacturer_name,"a manufacturer, a legal entity"
+product,name,describes a product
+product,description,describes a product
+routing_operation,description,describes a routing operation
+activity_type,*,a code or configuration table that describes no person
+agent_type,*,a code or configuration table that describes no person
+approval_pool,*,a code or configuration table that describes no person
+approval_procedure,*,a code or configuration table that describes no person
+approval_stage,*,a code or configuration table that describes no person
+bill_of_materials,*,a code or configuration table that describes no person
+business_unit,*,a code or configuration table that describes no person
+classification_scheme,*,a code or configuration table that describes no person
+classification_value,*,a code or configuration table that describes no person
+configuration_model,*,a code or configuration table that describes no person
+cost_center,*,a code or configuration table that describes no person
+cost_component_detail,*,a code or configuration table that describes no person
+cost_object,*,a code or configuration table that describes no person
+costing_sheet,*,a code or configuration table that describes no person
+defect_code,*,a code or configuration table that describes no person
+demand_event,*,a code or configuration table that describes no person
+fixed_asset,*,a code or configuration table that describes no person
+handling_unit_type,*,a code or configuration table that describes no person
+incoterm,*,a code or configuration table that describes no person
+inspection_characteristic,*,a code or configuration table that describes no person
+inspection_plan,*,a code or configuration table that describes no person
+item_group,*,a code or configuration table that describes no person
+item_tax_group,*,a code or configuration table that describes no person
+movement_type,*,a code or configuration table that describes no person
+partner_group,*,a code or configuration table that describes no person
+partner_tax_group,*,a code or configuration table that describes no person
+payment_method,*,a code or configuration table that describes no person
+payment_term,*,a code or configuration table that describes no person
+price_list,*,a code or configuration table that describes no person
+processing_purpose,*,a code or configuration table that describes no person
+product_category,*,a code or configuration table that describes no person
+reason,*,a code or configuration table that describes no person
+resource_group,*,a code or configuration table that describes no person
+role,*,a code or configuration table that describes no person
+routing,*,a code or configuration table that describes no person
+sampling_procedure,*,a code or configuration table that describes no person
+stop_reason,*,a code or configuration table that describes no person
+storage_condition,*,a code or configuration table that describes no person
+team,*,a code or configuration table that describes no person
+uom,*,a code or configuration table that describes no person
+valuation_class,*,a code or configuration table that describes no person
+variant_attribute,*,a code or configuration table that describes no person
+variant_attribute_value,*,a code or configuration table that describes no person
+work_center,*,a code or configuration table that describes no person
+working_calendar,*,a code or configuration table that describes no person
+working_calendar_holiday,*,a code or configuration table that describes no person
+zone,*,a code or configuration table that describes no person

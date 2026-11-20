@@ -2,14 +2,14 @@ table_name,column_name,subject_kind,category,label,condition,store_class,erasure
 partner,name,partner,identity,personal,partner_is_person,master,tokenize,master_data,
 partner,legal_name,partner,identity,personal,partner_is_person,master,tokenize,master_data,
 partner,tax_id,partner,identity,personal,partner_is_person,master,blank,master_data,
-partner,custom_values,partner,free_text,personal,may_contain,master,blank,master_data,jsonb; keys whose definition has is_personal_data (ADR-0074 rule 8)
+partner,custom_values,partner,free_text,personal,may_contain,master,clear_keys,master_data,jsonb; clear_keys removes the keys whose custom_field_definition has is_personal_data true (ADR-0074 rule 8; ADR-0079 rule 1)
 partner_address,address_lines,partner,contact,personal,partner_is_person,master,blank,master_data,NOT NULL column: fixed marker
 partner_address,subdivision_code,partner,contact,personal,partner_is_person,master,blank,master_data,
 partner_address,postal_code,partner,contact,personal,partner_is_person,master,blank,master_data,
-partner_bank_account,bank_name,partner,financial,personal,partner_is_person,master,blank,master_data,NOT NULL column: fixed marker
-partner_bank_account,bank_code,partner,financial,personal,partner_is_person,master,blank,master_data,
-partner_bank_account,account_number,partner,financial,personal,partner_is_person,master,blank,master_data,NOT NULL column: fixed marker
-partner_bank_account,holder_name,partner,financial,personal,partner_is_person,master,blank,master_data,NOT NULL column: fixed marker
+partner_bank_account,bank_name,partner,financial,personal,partner_is_person,master,blank,master_data,NOT NULL: blanked to the empty string (ADR-0079 rule 1)
+partner_bank_account,bank_code,partner,financial,personal,partner_is_person,master,tokenize,master_data,"in the unique key (partner_id, bank_code, account_number): tokenized, never blanked (ADR-0079 rule 1)"
+partner_bank_account,account_number,partner,financial,personal,partner_is_person,master,tokenize,master_data,"in the unique key (partner_id, bank_code, account_number): tokenized, never blanked (ADR-0079 rule 1)"
+partner_bank_account,holder_name,partner,financial,personal,partner_is_person,master,tokenize,master_data,
 contact,name,contact,identity,personal,always,master,tokenize,master_data,
 contact,job_title,contact,identity,personal,always,master,blank,master_data,
 contact,email,contact,contact,personal,always,master,blank,master_data,
@@ -17,14 +17,14 @@ contact,phone,contact,contact,personal,always,master,blank,master_data,
 employee_profile,job_title,employee,identity,personal,always,master,blank,master_data,whole table is personal (ADR-0019 rule 7); other columns are references
 print_profile,legal_representative_name,other,identity,personal,always,master,blank,master_data,named individual on the company letterhead (DS-20 comment: personal)
 print_profile,chief_accountant_name,other,identity,personal,always,master,blank,master_data,named individual on the company letterhead (DS-20 comment: personal)
-product,custom_values,other,free_text,personal,may_contain,master,blank,master_data,jsonb; keys whose definition has is_personal_data (ADR-0074 rule 8)
-item,custom_values,other,free_text,personal,may_contain,master,blank,master_data,jsonb; keys whose definition has is_personal_data (ADR-0074 rule 8)
+product,custom_values,other,free_text,personal,may_contain,master,clear_keys,master_data,jsonb; clear_keys removes the keys whose custom_field_definition has is_personal_data true (ADR-0074 rule 8; ADR-0079 rule 1)
+item,custom_values,other,free_text,personal,may_contain,master,clear_keys,master_data,jsonb; clear_keys removes the keys whose custom_field_definition has is_personal_data true (ADR-0074 rule 8; ADR-0079 rule 1)
 user_account,login,user,online_identifier,personal,always,master,tokenize,access_account,
 user_account,display_name,user,identity,personal,always,master,tokenize,access_account,
 user_account,email,user,contact,personal,always,master,tokenize,access_account,
 user_account,password_hash,user,credential,personal,always,master,blank,access_account,credential of a person; not personal text but cleared with the account
 user_account,totp_secret,user,credential,personal,always,master,blank,access_account,
-user_account,oidc_subject,user,online_identifier,personal,always,master,blank,access_account,identifier at the identity provider
+user_account,oidc_subject,user,online_identifier,personal,always,master,tokenize,access_account,"in the unique key (oidc_issuer, oidc_subject) with oidc_issuer; both are tokenized so ck_user_account_oidc and the key hold (ADR-0079 rule 1)"
 user_invitation,login,user,online_identifier,personal,always,master,tokenize,access_account,as typed by the company
 user_invitation,display_name,user,identity,personal,always,master,tokenize,access_account,as typed by the company
 user_invitation,email,user,contact,personal,always,master,tokenize,access_account,as typed by the company
@@ -126,14 +126,14 @@ purchase_debit_note,invoicing_party_name,partner,snapshot,personal,partner_is_pe
 purchase_debit_note,invoicing_party_tax_id,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
 purchase_debit_note,invoicing_party_address,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
 purchase_debit_note,payee_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
-quotation,custom_values,other,free_text,personal,may_contain,frozen_document,blank,accounting_document,jsonb; keys with is_personal_data; blanked when the retention period ends (ADR-0079 rule 6)
-sales_order,custom_values,other,free_text,personal,may_contain,frozen_document,blank,accounting_document,jsonb; keys with is_personal_data; blanked when the retention period ends (ADR-0079 rule 6)
-delivery,custom_values,other,free_text,personal,may_contain,frozen_document,blank,accounting_document,jsonb; keys with is_personal_data; blanked when the retention period ends (ADR-0079 rule 6)
-sales_invoice,custom_values,other,free_text,personal,may_contain,frozen_document,blank,accounting_document,jsonb; keys with is_personal_data; blanked when the retention period ends (ADR-0079 rule 6)
-purchase_order,custom_values,other,free_text,personal,may_contain,frozen_document,blank,accounting_document,jsonb; keys with is_personal_data; blanked when the retention period ends (ADR-0079 rule 6)
-goods_receipt,custom_values,other,free_text,personal,may_contain,frozen_document,blank,accounting_document,jsonb; keys with is_personal_data; blanked when the retention period ends (ADR-0079 rule 6)
-purchase_invoice,custom_values,other,free_text,personal,may_contain,frozen_document,blank,accounting_document,jsonb; keys with is_personal_data; blanked when the retention period ends (ADR-0079 rule 6)
-production_order,custom_values,other,free_text,personal,may_contain,frozen_document,blank,accounting_document,jsonb; keys with is_personal_data; blanked when the retention period ends (ADR-0079 rule 6)
+quotation,custom_values,other,free_text,personal,may_contain,frozen_document,clear_keys,accounting_document,jsonb; clear_keys removes the keys whose custom_field_definition has is_personal_data true (ADR-0074 rule 8; ADR-0079 rule 1)
+sales_order,custom_values,other,free_text,personal,may_contain,frozen_document,clear_keys,accounting_document,jsonb; clear_keys removes the keys whose custom_field_definition has is_personal_data true (ADR-0074 rule 8; ADR-0079 rule 1)
+delivery,custom_values,other,free_text,personal,may_contain,frozen_document,clear_keys,accounting_document,jsonb; clear_keys removes the keys whose custom_field_definition has is_personal_data true (ADR-0074 rule 8; ADR-0079 rule 1)
+sales_invoice,custom_values,other,free_text,personal,may_contain,frozen_document,clear_keys,accounting_document,jsonb; clear_keys removes the keys whose custom_field_definition has is_personal_data true (ADR-0074 rule 8; ADR-0079 rule 1)
+purchase_order,custom_values,other,free_text,personal,may_contain,frozen_document,clear_keys,accounting_document,jsonb; clear_keys removes the keys whose custom_field_definition has is_personal_data true (ADR-0074 rule 8; ADR-0079 rule 1)
+goods_receipt,custom_values,other,free_text,personal,may_contain,frozen_document,clear_keys,accounting_document,jsonb; clear_keys removes the keys whose custom_field_definition has is_personal_data true (ADR-0074 rule 8; ADR-0079 rule 1)
+purchase_invoice,custom_values,other,free_text,personal,may_contain,frozen_document,clear_keys,accounting_document,jsonb; clear_keys removes the keys whose custom_field_definition has is_personal_data true (ADR-0074 rule 8; ADR-0079 rule 1)
+production_order,custom_values,other,free_text,personal,may_contain,frozen_document,clear_keys,accounting_document,jsonb; clear_keys removes the keys whose custom_field_definition has is_personal_data true (ADR-0074 rule 8; ADR-0079 rule 1)
 quotation,note,other,free_text,personal,may_contain,frozen_document,blank,accounting_document,header note (ADR-0074 r16); blanked when the retention period ends (ADR-0079 rule 6)
 sales_order,note,other,free_text,personal,may_contain,frozen_document,blank,accounting_document,header note (ADR-0074 r16); blanked when the retention period ends (ADR-0079 rule 6)
 purchase_request,note,other,free_text,personal,may_contain,frozen_document,blank,accounting_document,header note (ADR-0074 r16); blanked when the retention period ends (ADR-0079 rule 6)
@@ -159,7 +159,7 @@ other_receipt,note,other,free_text,personal,may_contain,frozen_document,blank,ac
 other_issue,note,other,free_text,personal,may_contain,frozen_document,blank,accounting_document,header note (ADR-0074 r16); blanked when the retention period ends (ADR-0079 rule 6)
 opening_balance,note,other,free_text,personal,may_contain,frozen_document,blank,accounting_document,header note (ADR-0074 r16); blanked when the retention period ends (ADR-0079 rule 6)
 transfer_order,note,other,free_text,personal,may_contain,frozen_document,blank,accounting_document,header note (ADR-0074 r16); blanked when the retention period ends (ADR-0079 rule 6)
-document_version,content,partner,snapshot,personal,may_contain,frozen_document,blank,accounting_document,"jsonb snapshot of the whole header and lines incl. partner names, tax ids, addresses and custom_values; never updated; blanked when the retention period ends (ADR-0079 rule 6)"
+document_version,content,partner,snapshot,personal,may_contain,frozen_document,clear_keys,accounting_document,jsonb snapshot of the header and lines; clear_keys blanks the keys that mirror the header's and lines' catalog columns and the custom_values keys with is_personal_data; the version gets erased_at and its stored hash is no longer compared (ADR-0079 rule 6)
 document_line_custom_text,text,partner,free_text,personal,always,frozen_document,blank,accounting_document,"free text for is_custom options; ADR-0046 rule 9 keeps it off the shared record so it can be erased; line of a posted document, confirm"
 payment,partner_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
 payment,partner_tax_id,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
@@ -184,8 +184,8 @@ agent_run_step,response_body,other,snapshot,personal,may_contain,expiring,blank,
 change_proposal,plan,other,snapshot,personal,may_contain,append_only,blank,audit,"simulated plan of the batch, holds field values; no erasure path stated (ADR-0029); confirm; blanked when the retention period ends (ADR-0079 rule 6)"
 change_proposal_item,payload,other,snapshot,personal,may_contain,append_only,blank,audit,command payload (e.g. partner or bank account change); blanked when the retention period ends (ADR-0079 rule 6)
 change_proposal_item,field_changes,other,snapshot,personal,may_contain,append_only,blank,audit,before and after per field; blanked when the retention period ends (ADR-0079 rule 6)
-automation_execution,condition_results,other,snapshot,personal,may_contain,append_only,keep,audit,"personal values stored as HMAC under the company key or omitted (DDL comment); pseudonymous, not removable; confirm"
-partner_email_domain,domain,partner,contact,personal,partner_is_person,master,blank,crm_interaction,deactivated by erasure (ADR-0052 rule 25)
+automation_execution,condition_results,other,snapshot,personal,may_contain,append_only,blank,audit,"the HMAC of a small personal value can be guessed, so the column is blanked at destruction (ADR-0079 rule 6)"
+partner_email_domain,domain,partner,contact,personal,partner_is_person,master,delete_row,crm_interaction,"in the unique key (partner_id, domain); no table references the row, so the row is deleted (ADR-0079 rule 1)"
 interaction,subject,contact,free_text,personal,may_contain,append_only,blank,crm_interaction,blanked only for interactions the subject wrote
 interaction_content,body_text,contact,free_text,personal,always,append_only,blank,crm_interaction,untrusted when the interaction is
 interaction_participant,email_address,contact,contact,personal,always,append_only,blank,crm_interaction,
@@ -221,7 +221,51 @@ message,body,user,free_text,personal,always,expiring,blank,message,"cleared by r
 assist_request,request_text,user,free_text,personal,always,expiring,blank,analysis_text,DDL comment: personal; null once erased
 analysis_question,question_text,user,free_text,personal,always,expiring,blank,analysis_text,blanked after analysis_question_retention_days or at erasure
 analysis_question,feedback_note,user,free_text,personal,always,expiring,blank,analysis_text,DDL comment: personal
-analysis_example,question_text,user,free_text,personal,always,append_only,blank,analysis_text,DDL comment: personal; no erasure path stated; confirm
+analysis_example,question_text,user,free_text,personal,always,append_only,tokenize,analysis_text,DDL comment: personal; NOT NULL with a non-empty CHECK: tokenized (ADR-0079 rule 1)
+analysis_example,normalized_question,user,free_text,personal,always,append_only,tokenize,analysis_text,the normalized form of question_text; part of a unique key
 saved_analysis_version,trigger_questions,user,free_text,personal,always,append_only,blank,analysis_text,DDL comment: personal; text[]; no erasure path stated; confirm
 nonconformance,description,other,free_text,personal,may_contain,master,blank,master_data,may name a supplier contact or employee
 nonconformance,close_note,other,free_text,personal,may_contain,master,blank,master_data,
+user_account,oidc_issuer,user,online_identifier,personal,always,master,tokenize,access_account,tokenized with oidc_subject so ck_user_account_oidc and the unique key hold (ADR-0079 rule 1)
+print_profile,signature_attachment_id,other,identity,personal,always,master,blank,master_data,the signature image of a named officer; subject kind other: changed by editing the record (ADR-0079 rule 4)
+attachment,storage_key,other,free_text,personal,may_contain,expiring,keep,accounting_document,the bytes behind the key are released when the last link ends and deleted after attachments.delete_grace_days (ADR-0038 rule 15); the key is a content address that identifies nobody; an attachment that is accounting evidence follows that class
+approval,reason,other,free_text,personal,may_contain,append_only,tokenize,audit,NOT NULL with a non-empty CHECK: tokenized (ADR-0079 rule 1)
+document,canceled_note,other,free_text,personal,may_contain,frozen_document,blank,accounting_document,
+open_item_collection,dispute_reason,other,free_text,personal,may_contain,master,blank,accounting_document,
+credit_note_line,description,other,free_text,personal,may_contain,frozen_document,blank,accounting_document,
+debit_note_line,description,other,free_text,personal,may_contain,frozen_document,blank,accounting_document,
+payment_line,description,other,free_text,personal,may_contain,frozen_document,blank,accounting_document,
+purchase_credit_note_line,description,other,free_text,personal,may_contain,frozen_document,blank,accounting_document,
+purchase_debit_note_line,description,other,free_text,personal,may_contain,frozen_document,blank,accounting_document,
+purchase_invoice_line,description,other,free_text,personal,may_contain,frozen_document,blank,accounting_document,
+purchase_order_line,description,other,free_text,personal,may_contain,frozen_document,blank,accounting_document,
+purchase_request_line,description,other,free_text,personal,may_contain,frozen_document,blank,accounting_document,
+quotation_line,description,other,free_text,personal,may_contain,frozen_document,blank,accounting_document,
+sales_invoice_line,description,other,free_text,personal,may_contain,frozen_document,blank,accounting_document,
+sales_order_line,description,other,free_text,personal,may_contain,frozen_document,blank,accounting_document,
+stock_count_line,difference_note,other,free_text,personal,may_contain,frozen_document,blank,accounting_document,
+other_issue_line,reason_note,other,free_text,personal,may_contain,frozen_document,blank,accounting_document,
+other_receipt_line,reason_note,other,free_text,personal,may_contain,frozen_document,blank,accounting_document,
+scrap_line,reason_note,other,free_text,personal,may_contain,frozen_document,blank,accounting_document,
+operation_time_log,note,other,free_text,personal,may_contain,master,blank,accounting_document,
+operation_time_log,cancel_reason,other,free_text,personal,may_contain,master,blank,accounting_document,
+operation_execution,block_note,other,free_text,personal,may_contain,master,blank,accounting_document,
+inspection_result,note,other,free_text,personal,may_contain,master,blank,master_data,
+delegation,reason,other,free_text,personal,may_contain,master,blank,access_account,NOT NULL: blanked to the empty string
+work_case,cancel_reason,other,free_text,personal,may_contain,master,blank,audit,
+period_unlock_request,reason,other,free_text,personal,may_contain,append_only,blank,audit,NOT NULL: blanked to the empty string
+posting_intent,plan,other,free_text,personal,may_contain,frozen_document,clear_keys,accounting_document,jsonb prospective journal; clear_keys blanks the note and description keys of its entries and lines
+notification_email,failure_reason,other,free_text,personal,may_contain,expiring,blank,message,a mail server reply may quote an address
+artifact_transition,reason,other,free_text,personal,may_contain,append_only,blank,audit,
+change_proposal,reason,other,free_text,personal,may_contain,append_only,blank,audit,NOT NULL: blanked to the empty string
+company_setup_acknowledgement,reason,other,free_text,personal,may_contain,append_only,tokenize,audit,NOT NULL with a non-empty CHECK: tokenized
+credit_hold,release_reason,other,free_text,personal,may_contain,master,tokenize,accounting_document,ck_credit_hold_manual_release needs a non-empty reason on a manual release: tokenized (ADR-0079 rule 1)
+forecast_adjustment,reason,other,free_text,personal,may_contain,master,blank,master_data,NOT NULL: blanked to the empty string
+gr_ir_write_off,reason,other,free_text,personal,may_contain,frozen_document,tokenize,accounting_document,NOT NULL with a non-empty CHECK: tokenized
+inspection_lot,deviation_reason,other,free_text,personal,may_contain,master,blank,master_data,
+nonconformance,cancel_reason,other,free_text,personal,may_contain,master,blank,master_data,
+setting_value,reason,other,free_text,personal,may_contain,append_only,tokenize,audit,NOT NULL with a non-empty CHECK: tokenized
+taint_clearance,reason,other,free_text,personal,may_contain,append_only,tokenize,audit,NOT NULL with a non-empty CHECK: tokenized
+warehouse_task,shortage_reason,other,free_text,personal,may_contain,master,blank,master_data,
+document_extraction,canceled_reason,other,free_text,personal,may_contain,append_only,blank,intake,a person's reason or a system code (ADR-0057 rule 25)
+bank_statement_line,ignore_reason,other,free_text,personal,may_contain,append_only,blank,accounting_document,

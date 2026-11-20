@@ -329,7 +329,7 @@ warehouse_keeper,agent_assistant,edit,false
 production_planner,agent_assistant,edit,false
 shop_floor_lead,agent_assistant,edit,false
 quality_inspector,agent_assistant,edit,false
-owner,blocked_personal_data,none,false
+owner,blocked_personal_data,full,false
 chief_accountant,blocked_personal_data,none,false
 accountant,blocked_personal_data,none,false
 cashier,blocked_personal_data,none,false

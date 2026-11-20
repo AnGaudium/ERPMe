@@ -8,31 +8,35 @@
 -- user_account (DS-15) is installation data without company_id, so data_subject_state and data_erasure_entry allow a null
 -- company_id for a user account subject only, and show those rows only under the setting value installation, as
 -- audit_record does (DS-05-platform.sql). The lab checks this list.
--- data_subject_request (DS-35) has no UNIQUE (company_id, id): a request is named by its own key and, for the company, by
--- document (company_id, id), as data_subject_request_content does.
+-- A data subject request (DS-35, module crm) is named through document (company_id, id) only: audit is layer 2 and refers to
+-- no crm table (ADR-0022 rule 2); the command checks that the document is a data subject request.
 -- Append-only tables use audit_refuse_change() of DS-35-crm.sql (owner audit). The erasure exception on posted documents,
 -- versions, the journal and append-only rows (ADR-0079 rule 7) is written with the ledger and document DDL in session S2.
+-- The erasure journal outside the database holds one line per data_erasure_entry with the same id (ADR-0079 rule 7);
+-- ReapplyErasures, a step of the restore procedure, re-inserts a missing entry with that id (rule 14).
 -- Nothing here holds a personal value: subjects and rows are named by table and ID, columns by name.
 
 -- ===== Data subject state [audit] (ADR-0079 rules 4-6) =====
-CREATE TABLE data_subject_state (                          -- [audit] ADR-0079 rule 4; one row per subject no longer active
+CREATE TABLE data_subject_state (                          -- [audit] ADR-0079 rules 4-5; one row per subject that is or was blocked; a later block updates the same row
     id                       uuid PRIMARY KEY,
     company_id               uuid REFERENCES company (id),        -- null only for a user account subject (installation data)
     subject_table            text NOT NULL CONSTRAINT ck_data_subject_state_subject_table CHECK (subject_table IN ('partner', 'contact', 'user_account')),
     subject_id               uuid NOT NULL,
-    state                    text NOT NULL CONSTRAINT ck_data_subject_state_state CHECK (state IN ('blocked', 'destroyed')),
+    state                    text NOT NULL CONSTRAINT ck_data_subject_state_state CHECK (state IN ('blocked', 'released', 'destroyed')),   -- released: ReleaseDataSubject, only from blocked (rule 5)
     cause                    text NOT NULL CONSTRAINT ck_data_subject_state_cause CHECK (cause IN ('request', 'retention')),
     blocked_at               timestamptz NOT NULL,                -- every subject is blocked first (rule 7)
     destroy_due_date         date,                                -- the latest destruction date of the subject's retention classes; null when no verified rule gives one (rule 9)
     destroyed_at             timestamptz,
-    data_subject_request_id  uuid REFERENCES data_subject_request (id),   -- the request, when the cause is a request
+    released_at              timestamptz,                         -- set by ReleaseDataSubject; cleared by a later block
+    data_subject_request_id  uuid,                                -- the request document, when the cause is a request
     recorded_at              timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     UNIQUE (subject_table, subject_id),
     FOREIGN KEY (company_id, data_subject_request_id) REFERENCES document (company_id, id),
     CONSTRAINT ck_data_subject_state_company CHECK (company_id IS NOT NULL OR subject_table = 'user_account'),
     CONSTRAINT ck_data_subject_state_destroyed CHECK ((state = 'destroyed') = (destroyed_at IS NOT NULL)),
-    CONSTRAINT ck_data_subject_state_dates CHECK (destroyed_at IS NULL OR destroyed_at >= blocked_at)
+    CONSTRAINT ck_data_subject_state_released CHECK ((state = 'released') = (released_at IS NOT NULL)),
+    CONSTRAINT ck_data_subject_state_dates CHECK ((destroyed_at IS NULL OR destroyed_at >= blocked_at) AND (released_at IS NULL OR released_at >= blocked_at))
 );
 CREATE INDEX ix_data_subject_state_company_id_state ON data_subject_state (company_id, state);
 CREATE INDEX ix_data_subject_state_destroy_due_date ON data_subject_state (destroy_due_date) WHERE state = 'blocked' AND destroy_due_date IS NOT NULL;
@@ -46,15 +50,15 @@ CREATE TABLE retention_rule (                              -- [audit] ADR-0079 r
     start_event              text NOT NULL CONSTRAINT ck_retention_rule_start_event CHECK (start_event IN ('record_created', 'relationship_ended', 'last_document_posted', 'fiscal_year_closed')),
     block_after_months       integer CONSTRAINT ck_retention_rule_block_after_months CHECK (block_after_months >= 0),   -- null: the class is never blocked by the job
     destroy_after_months     integer CONSTRAINT ck_retention_rule_destroy_after_months CHECK (destroy_after_months >= 0),   -- null: nothing of the class is destroyed by the job
-    source                   text NOT NULL CONSTRAINT ck_retention_rule_source CHECK (source IN ('package', 'company')),
-    package_rule_ref         text,                                -- the package rule's key, flagged as ADR-0016 rule 12 says
+    source                   text NOT NULL CONSTRAINT ck_retention_rule_source CHECK (source IN ('package', 'company')),   -- company: the company adjusted the package's periods
+    package_rule_ref         text NOT NULL,                       -- the package rule's key, flagged as ADR-0016 rule 12 says; kept when the company adjusts
     is_verified              boolean NOT NULL DEFAULT false,      -- no destruction without a verified rule (rule 9; INV-894)
     is_adjustable            boolean NOT NULL DEFAULT false,      -- the package allows the company to change the periods
     recorded_at              timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     UNIQUE (company_id, retention_class),
     CONSTRAINT ck_retention_rule_order CHECK (block_after_months IS NULL OR destroy_after_months IS NULL OR destroy_after_months >= block_after_months),
-    CONSTRAINT ck_retention_rule_package_ref CHECK (source = 'company' OR package_rule_ref IS NOT NULL)
+    CONSTRAINT ck_retention_rule_adjusted CHECK (source = 'package' OR is_adjustable)
 );
 
 -- ===== Erasure entries [audit] (ADR-0079 rule 7) =====
@@ -64,13 +68,13 @@ CREATE TABLE data_erasure_entry (                          -- [audit] ADR-0079 r
     subject_table            text NOT NULL CONSTRAINT ck_data_erasure_entry_subject_table CHECK (subject_table IN ('partner', 'contact', 'user_account')),
     subject_id               uuid NOT NULL,
     target_table             text NOT NULL CONSTRAINT ck_data_erasure_entry_target_table CHECK (target_table ~ '^[a-z][a-z0-9_]*$'),   -- a table of the catalog (rule 1)
-    target_row_id            uuid NOT NULL,                       -- the row's id, or the first key column for a table without id (interaction_content: interaction_id)
+    target_row_id            uuid NOT NULL,                       -- the row's id, or the first key column for a table without id (interaction_content: its key interaction_id)
     target_row_key           text[],                              -- the whole primary key in key order, for a table without an id column; IDs, numbers and hashes only
     column_names             text[] NOT NULL CONSTRAINT ck_data_erasure_entry_column_names CHECK (cardinality(column_names) > 0),   -- catalog columns of target_table
-    action                   text NOT NULL CONSTRAINT ck_data_erasure_entry_action CHECK (action IN ('tokenize', 'blank', 'delete_row')),
-    cause                    text NOT NULL CONSTRAINT ck_data_erasure_entry_cause CHECK (cause IN ('request', 'retention', 'restore_replay')),
-    data_subject_request_id  uuid REFERENCES data_subject_request (id),
-    command_id               uuid NOT NULL,                       -- the idempotency record of EraseDataSubject or ReapplyErasures; no foreign key, idempotency records expire (ADR-0008 rule 19)
+    action                   text NOT NULL CONSTRAINT ck_data_erasure_entry_action CHECK (action IN ('tokenize', 'blank', 'clear_keys', 'delete_row')),
+    cause                    text NOT NULL CONSTRAINT ck_data_erasure_entry_cause CHECK (cause IN ('request', 'retention')),
+    data_subject_request_id  uuid,                                -- the request document, for cause request
+    command_id               uuid NOT NULL,                       -- the idempotency record of EraseDataSubject or DestroyRetainedPersonalData; no foreign key, idempotency records expire (ADR-0008 rule 19)
     executed_at              timestamptz NOT NULL,
     recorded_at              timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
@@ -85,7 +89,10 @@ CREATE INDEX ix_data_erasure_entry_executed_at ON data_erasure_entry (executed_a
 CREATE TABLE personal_data_read_log (                      -- [audit] ADR-0079 rule 12; query name, user, field names and row count, never values; append-only (trigger below)
     id                       uuid PRIMARY KEY,
     company_id               uuid NOT NULL REFERENCES company (id),
-    user_account_id          uuid NOT NULL REFERENCES user_account (id),
+    user_account_id          uuid NOT NULL REFERENCES user_account (id),   -- the accountable person: the user, the run's human or the client's accountable user (ADR-0017)
+    actor_kind               text NOT NULL CONSTRAINT ck_personal_data_read_log_actor_kind CHECK (actor_kind IN ('human', 'agent', 'integration', 'system')),
+    integration_client_id    uuid REFERENCES integration_client (id),
+    agent_run_id             uuid,
     query_name               text NOT NULL CONSTRAINT ck_personal_data_read_log_query_name CHECK (query_name ~ '^[A-Z][A-Za-z0-9]*$'),   -- the registered query or export command
     read_kind                text NOT NULL CONSTRAINT ck_personal_data_read_log_read_kind CHECK (read_kind IN ('sensitive_field', 'blocked_subject', 'export')),
     subject_table            text CONSTRAINT ck_personal_data_read_log_subject_table CHECK (subject_table IN ('partner', 'contact', 'user_account')),
@@ -95,7 +102,10 @@ CREATE TABLE personal_data_read_log (                      -- [audit] ADR-0079 r
     read_at                  timestamptz NOT NULL,
     recorded_at              timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
-    CONSTRAINT ck_personal_data_read_log_subject CHECK ((subject_table IS NULL) = (subject_id IS NULL))
+    FOREIGN KEY (company_id, agent_run_id) REFERENCES agent_run (company_id, id),
+    CONSTRAINT ck_personal_data_read_log_subject CHECK ((subject_table IS NULL) = (subject_id IS NULL)),
+    CONSTRAINT ck_personal_data_read_log_actor CHECK ((actor_kind = 'integration') = (integration_client_id IS NOT NULL)
+        AND (actor_kind = 'agent') = (agent_run_id IS NOT NULL))
 );
 CREATE INDEX ix_personal_data_read_log_user_account_id_read_at ON personal_data_read_log (company_id, user_account_id, read_at);
 CREATE INDEX ix_personal_data_read_log_subject_id ON personal_data_read_log (subject_id) WHERE subject_id IS NOT NULL;

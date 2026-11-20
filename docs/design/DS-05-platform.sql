@@ -542,6 +542,7 @@ CREATE TABLE document_version (
     origin_agent_run_id      uuid,
     is_tainted               boolean NOT NULL,             -- set at insert, never changed (ADR-0029 rule 8; trigger below holds INV-88)
     derived_from_version_id  uuid,                         -- the version in force for a change, or the source version of version 1
+    erased_at                timestamptz,                  -- set by the destruction path of ADR-0079 rule 6; version_hash is then no longer compared with content (INV-10)
     recorded_at              timestamptz NOT NULL,
     UNIQUE (document_id, version),
     UNIQUE (company_id, id),

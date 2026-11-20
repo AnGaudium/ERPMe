@@ -6,22 +6,28 @@ Run: python t31_personal_data.py [--load]
 
 P: the DDL parse: every design/*.sql file, its CREATE TABLE blocks, columns and trailing comments.
 C: the catalog against the DDL (rule 2; INV-890): both files' headers and enum values; every catalog pair is a real column;
-   no duplicate and no pair in both files; every column whose name matches the personal-name pattern is in exactly one file,
-   and the exclusions hold only such columns; every column whose trailing comment says personal is in the catalog, except the
+   no duplicate and no pair in both files; every column whose name matches the personal-name pattern (personal words, and the
+   free-text words note, comment, remark, description, reason and every name column, except reference and code columns) is
+   in exactly one file, an exclusion row with column * excluding a whole table that has no catalog row, and the exclusions
+   hold only such columns; every column whose trailing comment says personal is in the catalog, except the
    allow-list below, each entry with its reason; every table with custom_values has a catalog row for it (ADR-0074 rule 8);
-   frozen and append-only rows never rely on a partition drop; every keep row has a note; the retention classes are the ten
+   frozen and append-only rows never rely on a partition drop; every keep row has a note; no blank action on a column of a
+   primary key, UNIQUE constraint or unique index (rule 1); the retention classes are the ten
    of rule 9, the same in the catalog, in DS-64's retention_rule CHECK and in the ADR.
-S: self-tests: three broken variants fed to the same checker (a DDL column with a personal name and no catalog row, a catalog
-   row naming a missing column, a pair in both files), each caught.
+S: self-tests: broken variants fed to the same checker (a DDL column with a personal name and no catalog row, a catalog row
+   naming a missing column, a pair in both files, a table with custom_values and no row, a new customer_note and driver_name
+   column, a blank action on a unique key column, a * exclusion of a table with catalog rows), each caught.
 K: the other catalogs and the field class (rules 5, 11, 15, 16): INV-890 to INV-894, EC-350 to EC-354, the work item kind
-   personal_data_incident_suspected, the case kind personal_data_breach, the leaf blocked_personal_data at none in every role
-   template, sensitive_personal in the role assignment and custom field CHECKs and not in the agent type version CHECK, the
-   processing log kind retention.
+   personal_data_incident_suspected, the case kind personal_data_breach, the leaf blocked_personal_data at full for the owner
+   template and none for every other, sensitive_personal suggested only to the owner template, sensitive_personal in the role
+   assignment and custom field CHECKs and not in the agent type version CHECK, the processing log kind retention.
 R: reference functions for the retention job (rule 9; EC-354): no verified rule, no destruction; blocking before destruction.
 With --load: the five tables of DS-64-personal-data.sql exist with company_id, recorded_at, UNIQUE (company_id, id) and forced
-row-level security; each CHECK and key refuses a bad row; the append-only tables refuse UPDATE and DELETE; a simulated erasure of
-a partner, its address and its contact, driven by the catalog, leaves blank or tokenized columns, one data_erasure_entry per
-rewritten row (INV-892 in SQL) and entries whose columns carry no values (no jsonb, text only for codes and names).
+row-level security; each CHECK and key refuses a bad row (released subjects, adjusted rules, actor kinds of the read log
+included); the append-only tables refuse UPDATE and DELETE; a simulated erasure of
+a partner, its address and its contact, driven by the catalog, leaves blank or tokenized columns and custom_values without its
+personal keys (clear_keys), one data_erasure_entry per rewritten row (INV-892 in SQL) and entries whose columns carry no values
+(no jsonb, text only for codes and names); document_version has the nullable erased_at of rule 6.
 Not covered: the trigger exception that lets the erasure command rewrite posted documents, versions and journal text columns
 (ADR-0079 rule 7): its DDL is written with the ledger and document DDL in session S2 (open question). Commands, the retention
 job, masking, the read log writers, the erasure journal outside the database and ReapplyErasures are not covered either.
@@ -34,9 +40,20 @@ LAB = os.environ.get("NATIVEFLOWS_LAB_DIR", HERE)
 sys.path.insert(0, LAB)
 from fx_adr74 import DOCS, RESULTS, build, check, conn, ins, new, reset_and_load, trial  # noqa: E402
 
-# The personal-name pattern of rule 2: a column whose name matches it is in the catalog or in the exclusions.
-RX = re.compile(r"(email|phone|address|tax_id|account_number|holder_name|display_name|^login$|counterparty|sender_|recipient|partner_name"
-                r"|_name_text$|contact_name|custom_values|^body|body_text|request_text|question_text|signature)")
+# The personal-name pattern of rule 2: a column whose name matches it is in the catalog or in the exclusions. Free-text names
+# (note, comment, remark, description, reason) and every name column are in it (ADR-0079 rule 2, review fix G9).
+# The free-text words do not match a reference or a code column (a name ending in _id, _ids, _kind or _code).
+class _Pattern:
+    BASE = re.compile(r"(email|phone|address|tax_id|account_number|holder_name|display_name|^login$|counterparty|sender_|recipient|partner_name"
+                      r"|_name_text$|contact_name|custom_values|^body|body_text|request_text|question_text|signature)")
+    TEXT = re.compile(r"(note|comment|remark|description|reason|_name$|^name$)")
+    REF = re.compile(r"(_id|_ids|_kind|_code)$")
+
+    def search(self, c):
+        return bool(self.BASE.search(c) or (self.TEXT.search(c) and not self.REF.search(c)))
+
+
+RX = _Pattern()
 H1 = "table_name,column_name,subject_kind,category,label,condition,store_class,erasure_action,retention_class,note".split(",")
 H2 = "table_name,column_name,reason".split(",")
 CLASSES = {"master_data", "accounting_document", "crm_interaction", "message", "agent_log", "intake", "audit", "access_account",
@@ -47,7 +64,7 @@ ENUM = {
     "label": {"personal", "sensitive_personal"},
     "condition": {"always", "partner_is_person", "may_contain"},
     "store_class": {"master", "frozen_document", "append_only", "expiring"},
-    "erasure_action": {"tokenize", "blank", "delete_row", "drop_with_partition", "keep"},
+    "erasure_action": {"tokenize", "blank", "clear_keys", "delete_row", "drop_with_partition", "keep"},
     "retention_class": CLASSES,
 }
 # Columns whose trailing comment contains the word "personal" but hold no personal data about a natural person.
@@ -66,7 +83,7 @@ SKIP = re.compile(r"^(CONSTRAINT|PRIMARY|UNIQUE|FOREIGN|CHECK|EXCLUDE|LIKE)\b", 
 
 
 # ======================================================================= the DDL parse
-def parse_ddl(files):
+def parse_ddl(files, uniques=None):
     """files: [(name, text)]. Returns {table: {column: (file, line, trailing comment)}} from the CREATE TABLE blocks.
     A trailing -- comment belongs to the item whose text ends on that line, or to the item that starts on it."""
     tables = {}
@@ -113,12 +130,31 @@ def parse_ddl(files):
                 j += 1
             for item, ln, com in items:
                 s = item.strip()
+                key = re.match(r"(?:CONSTRAINT\s+\w+\s+)?(?:UNIQUE(?:\s+NULLS\s+NOT\s+DISTINCT)?|PRIMARY\s+KEY)\s*\(([^)]*)\)", s, re.I)
+                if key and uniques is not None:
+                    uniques.setdefault(m.group(1), []).append({w.strip() for w in key.group(1).split(",")})
                 if s and not SKIP.match(s):
                     mm = re.match(r'"?(\w+)"?\s+\S', s)
                     if mm:
                         cols.setdefault(mm.group(1), (name, ln, com.strip()))
+                        if uniques is not None and re.search(r"\b(UNIQUE|PRIMARY\s+KEY)\b", re.sub(r"CHECK\s*\(.*", "", s), re.I):
+                            uniques.setdefault(m.group(1), []).append({mm.group(1)})
             i = j
+        if uniques is not None:
+            for mi in re.finditer(r"CREATE UNIQUE INDEX (?:IF NOT EXISTS )?\w+ ON (\w+)\s*(?:USING \w+\s*)?\(", text):
+                depth, k = 1, mi.end()
+                while depth and k < len(text):
+                    depth += {"(": 1, ")": -1}.get(text[k], 0)
+                    k += 1
+                uniques.setdefault(mi.group(1), []).append(set(re.findall(r"\b([a-z_][a-z0-9_]*)\b", text[mi.end():k - 1])))
     return tables
+
+
+def parse_uniques(files):
+    """{table: [set of column names]} of every PRIMARY KEY, UNIQUE constraint and unique index (expression words included)."""
+    uniques = {}
+    parse_ddl(files, uniques)
+    return uniques
 
 
 def read_rows(text):
@@ -127,8 +163,9 @@ def read_rows(text):
     return head, [(n, row) for n, row in enumerate(r, start=2) if row]
 
 
-def catalog_problems(tables, text1, text2):
-    """The check of rule 2 over parsed DDL and the two catalog texts; returns (problems, file-1 keys, file-2 keys)."""
+def catalog_problems(tables, text1, text2, uniques=None):
+    """The check of rule 2 over parsed DDL and the two catalog texts; returns (problems, file-1 keys, file-2 keys).
+    An exclusion with column_name * excludes a whole table that describes no person (rule 2)."""
     errors = []
     h1, rows1 = read_rows(text1)
     h2, rows2 = read_rows(text2)
@@ -163,15 +200,28 @@ def catalog_problems(tables, text1, text2):
         s2[key] = row[2]
         if not row[2].strip():
             errors.append(f"file 2 line {n}: empty reason")
+    whole = {t for t, c in s2 if c == "*"}
     for t, c in list(s1) + list(s2):
-        if t not in tables or c not in tables[t]:
+        if t not in tables or (c != "*" and c not in tables[t]):
             errors.append(f"not in DDL: {t}.{c}")
     for key in sorted(set(s1) & set(s2)):
         errors.append(f"in both files: {key}")
+    for t, c in s1:
+        if t in whole:
+            errors.append(f"in both files: ({t!r}, '*') excludes a table with a catalog row {t}.{c}")
+    for t in sorted(whole):
+        for c in tables.get(t, {}):
+            if (t, c) in s2:
+                errors.append(f"in both files: ({t!r}, '*') and the exclusion {t}.{c}")
+    if uniques is not None:
+        for (t, c), d in s1.items():
+            if d["erasure_action"] == "blank" and any(c in u for u in uniques.get(t, [])):
+                errors.append(f"blank on a unique key column: {t}.{c}")
     for t, cols in tables.items():
         for c, (f, ln, com) in cols.items():
             key = (t, c)
-            if RX.search(c) and key not in s1 and key not in s2:
+            excluded = key in s2 or t in whole
+            if RX.search(c) and key not in s1 and not excluded:
                 errors.append(f"personal name in neither file: {f}:{ln} {t}.{c}")
             if not RX.search(c) and key in s2:
                 errors.append(f"exclusion of a column the pattern does not match: {t}.{c}")
@@ -216,12 +266,13 @@ def retention_action(rule, start, today, has_open_item=False):
 # ======================================================================= P, C
 FILES = ddl_files(DOCS)
 TABLES = parse_ddl(FILES)
+UNIQ = parse_uniques(FILES)
 ncols = sum(len(c) for c in TABLES.values())
 check("P01 every design/*.sql file parses, DS-64-personal-data.sql among them, with the five tables of ADR-0079",
       len(FILES) >= 15 and "DS-64-personal-data.sql" in dict(FILES) and all(t in TABLES for t in DS64), f"{len(FILES)} files, {len(TABLES)} tables, {ncols} columns")
 F1 = open(os.path.join(DOCS, "catalogs", "personal-data-fields.csv"), encoding="utf-8").read()
 F2 = open(os.path.join(DOCS, "catalogs", "personal-data-exclusions.csv"), encoding="utf-8").read()
-errs, S1, S2 = catalog_problems(TABLES, F1, F2)
+errs, S1, S2 = catalog_problems(TABLES, F1, F2, UNIQ)
 
 
 def errs_of(prefixes):
@@ -256,6 +307,19 @@ broken_ddl = [(n, t) for n, t in FILES if n != "DS-20-master-data.sql"] + [
     ("DS-20-master-data.sql", dict(FILES)["DS-20-master-data.sql"] + "\nCREATE TABLE lab_selftest (\n    id uuid PRIMARY KEY,\n    mobile_phone text\n);\n")]
 e1, _, _ = catalog_problems(parse_ddl(broken_ddl), F1, F2)
 check("S01 a DDL column with a personal name and no catalog row is caught", any("lab_selftest.mobile_phone" in e and "neither file" in e for e in e1), [e for e in e1 if "lab_selftest" in e])
+broken_ddl2 = [(n, t) for n, t in FILES if n != "DS-20-master-data.sql"] + [
+    ("DS-20-master-data.sql", dict(FILES)["DS-20-master-data.sql"].replace("CREATE TABLE contact (\n", "CREATE TABLE contact (\n    customer_note text,\n", 1)
+     + "\nCREATE TABLE lab_selftest_trip (\n    id uuid PRIMARY KEY,\n    driver_name text,\n    vehicle_kind_code text\n);\n")]
+e1b, _, _ = catalog_problems(parse_ddl(broken_ddl2), F1, F2)
+check("S05 a new free-text column (contact.customer_note) and a new name column (driver_name) are caught; a code column is not",
+      any("contact.customer_note" in e and "neither file" in e for e in e1b) and any("lab_selftest_trip.driver_name" in e and "neither file" in e for e in e1b)
+      and not any("vehicle_kind_code" in e for e in e1b), [e for e in e1b if "customer_note" in e or "lab_selftest_trip" in e])
+e1c, _, _ = catalog_problems(TABLES, F1.replace("partner_bank_account,account_number,partner,financial,personal,partner_is_person,master,tokenize,",
+                                                "partner_bank_account,account_number,partner,financial,personal,partner_is_person,master,blank,", 1), F2, UNIQ)
+check("S06 a blank action on a column of a unique key (partner_bank_account.account_number) is caught (rule 1)",
+      "blank on a unique key column: partner_bank_account.account_number" in e1c, [e for e in e1c if "unique" in e])
+e1d, _, _ = catalog_problems(TABLES, F1, F2.rstrip("\n") + "\ncontact,*,lab self-test\n")
+check("S07 a whole-table exclusion (*) of a table that has catalog rows is caught", any("('contact', '*')" in e for e in e1d), [e for e in e1d if "'*'" in e][:2])
 e2, _, _ = catalog_problems(TABLES, F1.rstrip("\n") + "\npartner,nickname,partner,identity,personal,partner_is_person,master,tokenize,master_data,\n", F2)
 check("S02 a catalog row naming a missing column is caught", "not in DDL: partner.nickname" in e2, [e for e in e2 if "nickname" in e])
 e3, _, _ = catalog_problems(TABLES, F1, F2.rstrip("\n") + "\npartner,tax_id,lab self-test\n")
@@ -284,9 +348,13 @@ check("K03 work item kind personal_data_incident_suspected (audit, person) and c
 AREAS = {r["code"]: r for r in read_dicts("authorization-areas.csv")}
 TPL = {r["template"] for r in read_dicts("role-templates.csv")}
 LV = {(r["template"], r["node"]): r["level"] for r in read_dicts("role-template-levels.csv")}
-check("K04 capability read_blocked_personal_data sits on its own leaf blocked_personal_data, which every role template sets to none, the owner included",
+FC = {r["template"]: set(r["suggested_field_classes"].split(";")) for r in read_dicts("role-templates.csv")}
+check("K04 capability read_blocked_personal_data sits on its own leaf blocked_personal_data: owner at full (so it can grant it, ADR-0017 rule 6), every other template at none; "
+      "only the owner template suggests the field class sensitive_personal (rules 5, 11)",
       AREAS.get("blocked_personal_data", {}).get("parent_code") == "administration" and "read_blocked_personal_data" in AREAS["blocked_personal_data"]["meaning"]
-      and all(LV.get((t, "blocked_personal_data")) == "none" for t in TPL), sorted(t for t in TPL if LV.get((t, "blocked_personal_data")) != "none"))
+      and LV.get(("owner", "blocked_personal_data")) == "full" and all(LV.get((t, "blocked_personal_data")) == "none" for t in TPL - {"owner"})
+      and {t for t in FC if "sensitive_personal" in FC[t]} == {"owner"},
+      sorted(t for t in TPL if LV.get((t, "blocked_personal_data")) != ("full" if t == "owner" else "none")))
 flat = {n: re.sub(r"\s+", " ", t) for n, t in FILES}
 check("K05 sensitive_personal is a field class of role assignments and custom fields; no agent type version may hold it",
       "ck_role_assignment_field_classes CHECK (field_classes <@ ARRAY['cost', 'margin', 'sensitive_personal']" in flat["DS-15-access.sql"]
@@ -341,7 +409,12 @@ if "--load" in sys.argv:
     trial("X09 the subject is a partner, a contact or a user account", lambda cx: state(cx, subject_table="employee_profile"), "ck_data_subject_state_subject_table")
     trial("X10 one row per subject", lambda cx: state(cx, company_id=None, subject_table="user_account", subject_id=u_subject, cause="retention"),
           "data_subject_state_subject_table_subject_id_key")
-    trial("X11 the request is a real data subject request", lambda cx: state(cx, data_subject_request_id=new()), "data_subject_request_id_fkey")
+    trial("X11 the request is a document of the subject's company (no key to crm's table, review fix G11)", lambda cx: state(cx, data_subject_request_id=new()), "data_subject_request_id_fkey")
+    trial("X11a a released subject needs released_at", lambda cx: state(cx, state="released"), "ck_data_subject_state_released")
+    trial("X11b a blocked subject has no released_at", lambda cx: state(cx, released_at=NOW), "ck_data_subject_state_released")
+    trial("X11c released_at is never before blocked_at", lambda cx: state(cx, state="released", released_at="2026-11-20T10:00:00+00"), "ck_data_subject_state_dates")
+    state(c, state="released", released_at="2026-11-22T10:00:00+00")
+    check("X11d a subject released by ReleaseDataSubject is stored with released_at (rule 5; review fix G14)", True)
 
     def rule(cx, **o):
         v = dict(id=new(), company_id=I["co"], retention_class="crm_interaction", start_event="relationship_ended", block_after_months=12,
@@ -353,27 +426,31 @@ if "--load" in sys.argv:
     trial("X14 an unknown retention class is refused", lambda cx: rule(cx, retention_class="payroll"), "ck_retention_rule_retention_class")
     trial("X15 an unknown start event is refused", lambda cx: rule(cx, retention_class="message", start_event="contract_signed"), "ck_retention_rule_start_event")
     trial("X16 two rules for one class in a company are refused", lambda cx: rule(cx), "retention_rule_company_id_retention_class_key")
-    trial("X17 a package rule names the package rule it comes from", lambda cx: rule(cx, retention_class="message", package_rule_ref=None), "ck_retention_rule_package_ref")
-    rule(c, retention_class="message", source="company", package_rule_ref=None, block_after_months=None, destroy_after_months=None)
-    check("X18 a company rule needs no package reference, and both periods may be null", True)
+    trial("X17 every rule names the package rule it comes from, also when the company adjusted it", lambda cx: rule(cx, retention_class="message", source="company", is_adjustable=True, package_rule_ref=None), "package_rule_ref")
+    trial("X17a a company adjusts only a rule the package marks adjustable", lambda cx: rule(cx, retention_class="message", source="company", is_adjustable=False), "ck_retention_rule_adjusted")
+    rule(c, retention_class="message", source="company", is_adjustable=True, block_after_months=None, destroy_after_months=None)
+    check("X18 an adjusted rule keeps its package reference, and both periods may be null", True)
 
     def entry(cx, **o):
         v = dict(id=new(), company_id=I["co"], subject_table="partner", subject_id=I["sold"], target_table="partner", target_row_id=I["sold"],
                  column_names=["name"], action="tokenize", cause="request", command_id=new(), executed_at=NOW); v.update(o)
         return ins(cx, "data_erasure_entry", **v)
     trial("X19 an erasure entry names at least one column (empty column_names)", lambda cx: entry(cx, column_names=[]), "ck_data_erasure_entry_column_names")
-    trial("X20 the action is tokenize, blank or delete_row", lambda cx: entry(cx, action="drop_with_partition"), "ck_data_erasure_entry_action")
-    trial("X21 the cause is request, retention or restore_replay", lambda cx: entry(cx, cause="manual"), "ck_data_erasure_entry_cause")
+    trial("X20 the action is tokenize, blank, clear_keys or delete_row", lambda cx: entry(cx, action="drop_with_partition"), "ck_data_erasure_entry_action")
+    trial("X21 the cause is request or retention; a restore re-inserts the entry with its own id and cause (review fix G7)", lambda cx: entry(cx, cause="restore_replay"), "ck_data_erasure_entry_cause")
     trial("X22 a company row's entry needs company_id", lambda cx: entry(cx, company_id=None), "ck_data_erasure_entry_company")
 
     def read(cx, **o):
-        v = dict(id=new(), company_id=I["co"], user_account_id=I["user"], query_name="ListPartner", read_kind="blocked_subject", row_count=1,
+        v = dict(id=new(), company_id=I["co"], user_account_id=I["user"], actor_kind="human", query_name="ListPartner", read_kind="blocked_subject", row_count=1,
                  field_names=["partner.name"], read_at=NOW); v.update(o)
         return ins(cx, "personal_data_read_log", **v)
     rl = read(c, subject_table="partner", subject_id=I["sold"])
     trial("X23 a read log row's row count is never negative", lambda cx: read(cx, row_count=-1), "ck_personal_data_read_log_row_count")
     trial("X24 the read kind is sensitive_field, blocked_subject or export", lambda cx: read(cx, read_kind="ordinary"), "ck_personal_data_read_log_read_kind")
     trial("X25 subject table and subject ID come together", lambda cx: read(cx, subject_table="partner"), "ck_personal_data_read_log_subject")
+    trial("X25a an integration read names its client", lambda cx: read(cx, actor_kind="integration"), "ck_personal_data_read_log_actor")
+    trial("X25b an agent read names its run", lambda cx: read(cx, actor_kind="agent"), "ck_personal_data_read_log_actor")
+    trial("X25c an unknown actor kind is refused", lambda cx: read(cx, actor_kind="robot"), "ck_personal_data_read_log_actor_kind")
 
     wc = new()
     ins(c, "work_case", id=wc, company_id=I["co"], kind="personal_data_breach", open_key=str(wc), state="open", owner_kind="role", owner_role="company_owner",
@@ -396,7 +473,10 @@ if "--load" in sys.argv:
 
     # ---- a simulated erasure, driven by the catalog: an individual partner, its address and its contact
     p, adr_id, ct = new(), new(), new()
-    X("insert into partner (id, company_id, code, name, legal_name, tax_id, partner_kind, country, custom_values) values (%s,%s,'P-ERASE','Sample Person','Sample Person','0000000001','individual','VN','{\"nickname\": \"x\"}')", (p, I["co"]))
+    for code_, personal_ in (("nickname", True), ("region", False)):
+        ins(c, "custom_field_definition", id=new(), company_id=I["co"], target_table="partner", code=code_, label=code_.title(), data_type="choice", is_personal_data=personal_)
+    PERSONAL_KEYS = [r[0] for r in X("select code from custom_field_definition where company_id=%s and target_table='partner' and is_personal_data", (I["co"],)).fetchall()]
+    X("insert into partner (id, company_id, code, name, legal_name, tax_id, partner_kind, country, custom_values) values (%s,%s,'P-ERASE','Sample Person','Sample Person','0000000001','individual','VN','{\"nickname\": \"x\", \"region\": \"north\"}')", (p, I["co"]))
     X("insert into partner_address (id, company_id, partner_id, kind, address_lines, postal_code, country) values (%s,%s,%s,'billing',%s,'00000','VN')", (adr_id, I["co"], p, ["1 Sample Street"]))
     X("insert into contact (id, company_id, partner_id, name, email, phone) values (%s,%s,%s,'Sample Contact','sample@example.invalid','+0000000000')", (ct, I["co"], p))
     CAT = {}
@@ -417,6 +497,8 @@ if "--load" in sys.argv:
                     nullable, dtype = info[col]
                     if action == "tokenize":
                         assigns.append(f"{col} = 'erased-' || left(md5(id::text), 12)")
+                    elif action == "clear_keys":
+                        assigns.append(f"{col} = {col} - %(keys)s::text[]")
                     elif dtype == "jsonb":
                         assigns.append(f"{col} = '{{}}'::jsonb")
                     elif nullable == "YES":
@@ -425,7 +507,7 @@ if "--load" in sys.argv:
                         assigns.append(f"{col} = '{{}}'")
                     else:
                         assigns.append(f"{col} = ''")
-                X(f"update {t} set {', '.join(assigns)} where id = %s", (rid,))
+                X(f"update {t} set {', '.join(assigns)} where id = %(rid)s", {"rid": rid, "keys": PERSONAL_KEYS})
                 entry(c, subject_table="partner", subject_id=p, target_table=t, target_row_id=rid, column_names=sorted(cols), action=action, command_id=cmd)
                 sets_done[(t, action)] = sorted(cols)
         X("insert into data_subject_state (id, company_id, subject_table, subject_id, state, cause, blocked_at, destroyed_at) values (%s,%s,'partner',%s,'destroyed','retention',%s,%s)",
@@ -439,10 +521,12 @@ if "--load" in sys.argv:
                 bad.append(f"{t}.{col}={v}")
             if action == "blank" and v not in (None, "", "{}"):
                 bad.append(f"{t}.{col}={v}")
+            if action == "clear_keys" and (v is None or any(f'"{k}"' in v for k in PERSONAL_KEYS) or '"region"' not in v):
+                bad.append(f"{t}.{col}={v}")
         n_entries = X("select count(*) from data_erasure_entry where subject_id=%s and target_table=%s and target_row_id=%s", (p, t, rid)).fetchone()[0]
         if n_entries == 0:
             bad.append(f"no entry for {t}")
-    check("X32 INV-892 in SQL: the destroyed partner's catalog columns in partner, partner_address and contact are blank or tokenized, each row with its erasure entry",
+    check("X32 INV-892 in SQL: the destroyed partner's catalog columns in partner, partner_address and contact are blank or tokenized, custom_values lost only its personal keys (clear_keys), each row with its erasure entry",
           not bad and len(sets_done) >= 4, bad or sets_done)
     cov = X("""select count(*) from data_erasure_entry e where e.subject_id = %s
                and exists (select 1 from data_subject_state s where s.subject_table = e.subject_table and s.subject_id = e.subject_id and s.state = 'destroyed')""", (p,)).fetchone()[0]
@@ -460,6 +544,9 @@ if "--load" in sys.argv:
     ins(c, "personal_data_processing_log", id=new(), company_id=I["co"], processing_kind="retention", subject_table="partner", subject_id=p, recorded_at=NOW)
     check("X39 the processing log takes one retention entry for the subject (rule 9)",
           X("select count(*) from personal_data_processing_log where subject_id=%s and processing_kind='retention'", (p,)).fetchone()[0] == 1)
+    dv = X("select is_nullable, data_type from information_schema.columns where table_schema='nativeflows' and table_name='document_version' and column_name='erased_at'").fetchone()
+    check("X40 document_version has a nullable erased_at: an erased version's stored hash is no longer compared with its content (rule 6; INV-10)",
+          dv == ("YES", "timestamp with time zone"), dv)
     c.close()
 
 passed = sum(1 for ok_, *_ in RESULTS if ok_)
