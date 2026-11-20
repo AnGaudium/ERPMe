@@ -49,7 +49,7 @@ CREATE TABLE agent_type_version (                          -- installation data;
     content_hash       text NOT NULL CONSTRAINT ck_agent_type_version_content_hash CHECK (content_hash ~ '^[0-9a-f]{64}$'),
     behavior_hash      text NOT NULL CONSTRAINT ck_agent_type_version_behavior_hash CHECK (behavior_hash ~ '^[0-9a-f]{64}$'),   -- content hash without budget maximums (rule 14)
     declaration        jsonb NOT NULL,                     -- steps, tool list (= declared permissions), claimable kinds, scope_kind, subject tables, may_read_untrusted, seats, templates, schemas, budget maximums, evaluation suite (rule 12)
-    field_classes      text[] NOT NULL DEFAULT '{}' CONSTRAINT ck_agent_type_version_field_classes CHECK (field_classes <@ ARRAY['cost', 'margin']::text[]),   -- default none; no record scope (rule 12 note, platform review 11)
+    field_classes      text[] NOT NULL DEFAULT '{}' CONSTRAINT ck_agent_type_version_field_classes CHECK (field_classes <@ ARRAY['cost', 'margin']::text[]),   -- default none; no record scope (rule 12 note, platform review 11); never sensitive_personal (ADR-0079 rule 11)
     recorded_at        timestamptz NOT NULL,
     UNIQUE (agent_type_code, version)
 );

@@ -81,3 +81,4 @@ One file per decision, named `NNNN-short-title.md`, using [template.md](template
 | [ADR-0075](0075-stock-documents.md) | Stock documents (DS-09, DS-22, DS-42) | Proposed (2026-11-19) |
 | [ADR-0076](0076-internal-messaging-and-notifications.md) | Internal messaging and notifications (DS-63) | Proposed (2026-11-19) |
 | [ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md) | UI floorplans, annotation vocabulary and embedded agent interaction (DS-30) | Proposed (2026-11-19) |
+| [ADR-0079](0079-personal-data-protection.md) | Personal data protection in the core (DS-64) | Proposed (2026-11-21) |

@@ -363,3 +363,11 @@
 
 - [ ] (ADR-0068; ADR-0069) The labs named for site valuation (INV-810, EC-260) and for the business unit derivation (INV-820 to INV-823) are not written; write them with the step 1 and step 3 lab work. Technical.
 - [ ] (ADR-0074 rule 14; spec 00 glossary) The glossary row for scrap says "a required scrap reason"; the reason is required only while `documents.reason_required.scrap` is true. The row is the author's to align.
+
+## Personal data protection (ADR-0079, 2026-11-21)
+
+- [ ] (ADR-0079 rules 9, 16; ADR-0016 rule 12) Retention periods per retention class and breach notification deadlines (`breach_notification_hours`) per regime are package rules; none is written or verified yet, so the retention job destroys nothing and breach cases carry no due date. Author; the Vietnam values (Law 91/2025/QH15) are deferred.
+- [ ] (ADR-0079 rules 5, 15; ADR-0054 rule 11) Who holds the capability `read_blocked_personal_data` and the data-protection duties by default. Interim, flagged: every role template sets the leaf `blocked_personal_data` to `none`, the owner included, and the work item `personal_data_incident_suspected` and the case kind `personal_data_breach` go to `company_owner`, because no owner rule names a leaf holder. Author.
+- [ ] (ADR-0079 rule 7; ADR-0038 rule 4) The trigger exception for posted documents, document versions and the journal is designed in rule 7; its DDL is written with the ledger and document DDL in session S2. Lab `t31_personal_data.py` does not cover it yet. Technical.
+- [ ] (ADR-0079 rule 9; ADR-0050; ADR-0060; ADR-0052 rule 30; ADR-0038; ADR-0013) The retention settings `agent_run_step_retention_days` (ADR-0050), `analysis_question_retention_days` (ADR-0060), `crm.interaction_retention_days` (ADR-0052), `attachment_retention_years` (ADR-0038, ADR-0039) and `event_retention_days` (ADR-0013) are not in `settings.csv`. Add them in session S2. Technical.
+- [ ] (ADR-0019 rule 7; ADR-0053 rule 7; DS-20) ADR-0019 rule 7 names `household_business` where the DDL (`ck_partner_kind`) and ADR-0053 rule 7 say `sole_proprietorship`; the rule's own inline note already gives the DDL value. The catalog's condition `partner_is_person` uses `individual` or `sole_proprietorship`. Technical.

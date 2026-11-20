@@ -45,6 +45,8 @@ Every command and query is checked against one permission model before it runs (
    Note: owner scope (`own`, `team`, `department`, `branch`, `company`) narrows the record scope for documents, and everything that shows a document's data follows it; aggregating queries need `branch` or `company` ([ADR-0054](0054-users-roles-and-authorizations.md) rules 13–15).
 10. Field classes are a closed list in the glossary, starting with `cost` and `margin`; a schema field may carry one. An assignment grants field classes; a field of a class the actor lacks is omitted from responses, plans, events delivered to clients and error details (ADR-0008 rules 12, 24). A command that sets such a field fails with `permission_denied`; an `Update` that does not mention it keeps its value. Data labels ([17](../spec/17-seatmap-data-classification.md)) are separate and govern LLM routing.
 
+   Note ([ADR-0079](0079-personal-data-protection.md), proposed 2026-11-21): the closed list gains `sensitive_personal` (ADR-0079 rule 11): a column with that label is returned only to an assignment that holds the class; no role template holds it and no Phase 1 column carries it. No agent type version may hold it: `agent_type_version.field_classes` stays limited to `cost` and `margin` (DS-05).
+
 **Agents, system jobs and integrations**
 
 11. An agent type declares its fixed tool list (DS-32, [03](../spec/03-agent-safety.md) rule 2) and its permissions. An agent run's effective permissions, record scope and field classes are the intersection of its agent type's and those of its `on_behalf_of` human in that company, evaluated against current assignments at every command ([03](../spec/03-agent-safety.md) rule 3). Starting a run needs `start_agent:<agent_type>` for that human.

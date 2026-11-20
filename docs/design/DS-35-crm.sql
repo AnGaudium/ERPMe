@@ -472,7 +472,7 @@ CREATE INDEX ix_partner_search_key_company_id_normalized_tax_id ON partner_searc
 CREATE TABLE personal_data_processing_log (                -- IDs and field names only, never values; append-only (trigger below)
     id               uuid PRIMARY KEY,
     company_id       uuid NOT NULL REFERENCES company (id),
-    processing_kind  text NOT NULL CONSTRAINT ck_personal_data_processing_log_kind CHECK (processing_kind IN ('llm_send', 'tax_id_lookup', 'export', 'erasure')),
+    processing_kind  text NOT NULL CONSTRAINT ck_personal_data_processing_log_kind CHECK (processing_kind IN ('llm_send', 'tax_id_lookup', 'export', 'erasure', 'retention')),   -- retention: ADR-0079 rule 9
     subject_table    text,
     subject_id       uuid,
     field_names      text[] NOT NULL DEFAULT '{}',

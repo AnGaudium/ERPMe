@@ -42,6 +42,8 @@ Employees are partners so that advances to them are open items per person (141 i
 
    The gateway evaluates the label per value and row when it renders a prompt, and removes personal values when the routing switch is on ([ADR-0050](0050-agent-runtime-and-query-layer.md) rules 8–9).
 
+   Note ([ADR-0079](0079-personal-data-protection.md), proposed 2026-11-21): the labels, categories and conditions of every field come from [personal-data-fields.csv](../catalogs/personal-data-fields.csv); the fields named here are an extract of it, and where they disagree the catalog wins (ADR-0079 rules 1-2).
+
 **Contacts, processing basis and data subjects**
 
 8. A `contact` is a person at a partner: `partner_id`, `name`, `job_title`, `email`, `phone`, `preferred_language`, `is_active`. A contact belongs to one partner; the same person at two partners is two contacts. Contact commands normalize `email` and `phone`, the database refuses an `email` that is not lowercase, and `is_accounts_contact` marks the contacts that receive payment reminders ([ADR-0052](0052-minimal-crm.md) rules 3, 4, 28).
@@ -51,6 +53,8 @@ Employees are partners so that advances to them are open items per person (141 i
     Agent run logs: erasure blanks the request and response bodies of the `agent_run_step` rows that name the subject ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 20).
 
     Note ([ADR-0057](0057-document-intake-and-extraction.md), proposed 2026-11-15): the subject's document extractions are found by their partner, by result links to the subject's contact or partner, and by the subject's inbound messages; erasure blanks their field values, evidence and word text. An extraction linked to an incoming e-invoice record or a posted accounting document keeps its accounting fields for the accounting retention ([ADR-0057](0057-document-intake-and-extraction.md) rule 19).
+
+    Note ([ADR-0079](0079-personal-data-protection.md), proposed 2026-11-21): `EraseDataSubject` is driven by the catalog and is the only destruction path. Before retention ends it blocks the subject and destroys only what no retention rule covers; the retention job runs it as `system` for the rest once the period ends. Every rewrite leaves a `data_erasure_entry` (ADR-0079 rules 4-7).
 11. A `personal_data_processing_log` records every processing the law asks to log: personal fields sent to an LLM (DS-32; [17](../spec/17-seatmap-data-classification.md) logs this whether the routing switch is on or off), tax ID lookups of individuals and household businesses (rule 18), exports and erasures (DS-36). The breach-notification process and the data-protection role are assigned to DS-40 (open question). Exports and erasures write both an audit record and a log entry ([ADR-0038](0038-audit-and-observability.md) rule 9). The breach notification procedure is DS-40's ([ADR-0038](0038-audit-and-observability.md) rule 9). The log is owned by `audit` ([ADR-0052](0052-minimal-crm.md) rule 26).
 
     The gateway writes one entry per LLM call that sends personal values, before the call is made ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 10).

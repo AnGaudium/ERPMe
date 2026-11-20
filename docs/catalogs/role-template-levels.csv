@@ -329,3 +329,17 @@ warehouse_keeper,agent_assistant,edit,false
 production_planner,agent_assistant,edit,false
 shop_floor_lead,agent_assistant,edit,false
 quality_inspector,agent_assistant,edit,false
+owner,blocked_personal_data,none,false
+chief_accountant,blocked_personal_data,none,false
+accountant,blocked_personal_data,none,false
+cashier,blocked_personal_data,none,false
+sales_clerk,blocked_personal_data,none,false
+sales_manager,blocked_personal_data,none,false
+buyer,blocked_personal_data,none,false
+purchasing_manager,blocked_personal_data,none,false
+warehouse_keeper,blocked_personal_data,none,false
+production_planner,blocked_personal_data,none,false
+shop_floor_lead,blocked_personal_data,none,false
+auditor,blocked_personal_data,none,false
+it_administrator,blocked_personal_data,none,false
+quality_inspector,blocked_personal_data,none,false

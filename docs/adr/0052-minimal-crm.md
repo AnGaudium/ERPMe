@@ -261,10 +261,14 @@ Leads, opportunities, marketing automation, appointments, chat connectors and se
     Note ([ADR-0057](0057-document-intake-and-extraction.md), proposed 2026-11-15): the subject's document extractions (by partner, by result links to the subject's contact or partner, by the subject's inbound messages) are erased through `attachments.contract`, except the accounting fields of an extraction linked to an incoming e-invoice record or a posted accounting document ([ADR-0057](0057-document-intake-and-extraction.md) rule 19).
 
     Note ([ADR-0076](0076-internal-messaging-and-notifications.md), proposed 2026-11-19): `EraseDataSubject` of a partner also clears the bodies of that partner's record thread and ends their attachment links (ADR-0076 rule 10); threads on the partner's documents are an open question.
+
+    Note ([ADR-0079](0079-personal-data-protection.md), proposed 2026-11-21): the snapshots that `sales`, `purchasing` and `cash` keep on posted documents and versions are destroyed after their retention period by the same catalog-driven `EraseDataSubject` path, under the erasure exception of ADR-0079 rule 7; before then the subject is blocked (ADR-0079 rules 6-7).
 26. `personal_data_processing_log` is owned by `audit` (layer 2), because its writers sit in layers 2 to 5: the LLM gateway (DS-32), tax ID lookups, exports (ADR-0044) and erasure.
     - **Writing.** Through `audit.contract.log_personal_data_processing`, in the caller's transaction.
     - **Columns:** `processing_kind` (`llm_send`, `tax_id_lookup`, `export`, `erasure`), `subject_table` and `subject_id` (none for a whole-company export), `field_names`, `recipient` (provider and model, or lookup provider), `agent_run_id`, `audit_record_id`.
     - **Append-only.** It holds IDs and field names, never values, so erasure keeps it. A trigger refuses every update and delete.
+
+    Note ([ADR-0079](0079-personal-data-protection.md), proposed 2026-11-21): `processing_kind` gains `retention`, one entry per subject and run of `RunPersonalDataRetention` (ADR-0079 rule 9; DS-35).
 
 **Outgoing messages**
 
@@ -316,6 +320,8 @@ Leads, opportunities, marketing automation, appointments, chat connectors and se
     | `mailbox` columns, processing purposes and bases, the processing log, hashes (including `identity_proof_hash`) | internal | no |
 
     Event payloads carry IDs, states and codes only, never these fields (ADR-0013 rule 4).
+
+    Note ([ADR-0079](0079-personal-data-protection.md), proposed 2026-11-21): this table is an extract of [personal-data-fields.csv](../catalogs/personal-data-fields.csv); where they disagree the catalog wins and the difference is a defect (ADR-0079 rule 2).
 30. Retention:
     - **Interactions and messages** are kept until erased. Whether they must be deleted after a time when no request comes is a package rule for the author (open question). The setting `crm.interaction_retention_days` is reserved and empty.
     - **Attachments** follow ADR-0038 rule 15. A file from an e-mail that is later linked to a posted document becomes accounting evidence.

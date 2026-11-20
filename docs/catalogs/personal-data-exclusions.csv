@@ -1,0 +1,37 @@
+table_name,column_name,reason
+branch,tax_id,legal entity (branch of the company)
+branch,address,legal entity address
+company,tax_id,legal entity (the company)
+credit_note,bill_to_address_id,"reference id to partner_address, not a value"
+debit_note,bill_to_address_id,"reference id to partner_address, not a value"
+delivery,ship_to_address_id,"reference id to partner_address, not a value"
+document_extraction,signature_state,"state code of a digital signature check, not a person"
+inbound_message,is_sender_authenticated,"boolean flag, not a value"
+mailbox,email_address,"shared company mailbox address, internal (ADR-0052 rule 29); unsure"
+message,body_removed_at,timestamp
+money_account,bank_account_number,own bank account of the company
+notification,recipient_user_account_id,"reference id, not a value"
+notification,email_pending,boolean flag
+notification,notification_email_id,"reference id, not a value"
+notification_email,recipient_user_account_id,"reference id, not a value"
+notification_email,email_kind,"code, not a person"
+notification_preference,email_mode,"code, not a person"
+partner_relationship,address_id,"reference id to partner_address, not a value"
+personal_data_processing_log,recipient,"provider and model or lookup provider, not a person"
+print_profile,address,company letterhead address
+print_profile,phone,company letterhead phone
+print_profile,email,company letterhead email
+print_profile,signature_attachment_id,reference id to an attachment (signature image of the legal representative; DDL comment: label internal); unsure
+purchase_credit_note,invoicing_party_address_id,"reference id to partner_address, not a value"
+purchase_debit_note,invoicing_party_address_id,"reference id to partner_address, not a value"
+purchase_invoice,invoicing_party_address_id,"reference id to partner_address, not a value"
+purchase_order,invoicing_party_address_id,"reference id to partner_address, not a value"
+purchase_return,invoicing_party_address_id,"reference id to partner_address, not a value"
+quotation,ship_to_address_id,"reference id to partner_address, not a value"
+quotation,bill_to_address_id,"reference id to partner_address, not a value"
+sales_invoice,bill_to_address_id,"reference id to partner_address, not a value"
+sales_order,ship_to_address_id,"reference id to partner_address, not a value"
+sales_order,bill_to_address_id,"reference id to partner_address, not a value"
+sales_return,bill_to_address_id,"reference id to partner_address, not a value"
+site,address,company site address
+warehouse,address,company warehouse address

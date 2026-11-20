@@ -180,6 +180,8 @@ The migration period is then locked.
       - earlier exports and import files;
       - erased values, which stay masked (ADR-0019 rule 10).
     - **Download.** The zip is an attachment that is not accounting evidence. Its bytes are deleted after 7 days, and a download needs the same permission and is audited.
+
+    Note ([ADR-0079](0079-personal-data-protection.md), proposed 2026-11-21): `ExportDataSubject` (`human_only`, leaf `data_protection` at `full`) writes one subject's catalog values, processing bases and processing log entries into a file deleted after 7 days, as this export does; both exports write a `personal_data_read_log` row (ADR-0079 rules 3, 12).
 18. Historical transactions before the cut-over are not migrated in Phase 1 (open question); the rehearsal month of go-live is replayed as ordinary documents on staging.
 
     Note: comparatives of statements for ranges before the cut-over come from `report_comparative_value`, entered at migration ([ADR-0049](0049-statutory-reporting-and-printing.md) rule 14).

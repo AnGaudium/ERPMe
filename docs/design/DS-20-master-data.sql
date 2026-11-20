@@ -1074,7 +1074,7 @@ CREATE TABLE custom_field_definition (                     -- [master_data] ADR-
     data_type     text NOT NULL CONSTRAINT ck_custom_field_definition_data_type CHECK (data_type IN ('text', 'integer', 'decimal', 'boolean', 'date', 'choice')),
     validation    jsonb NOT NULL DEFAULT '{}'::jsonb CONSTRAINT ck_custom_field_definition_validation CHECK (jsonb_typeof(validation) = 'object'),   -- the data type's bounds, pattern or choices
     is_required   boolean NOT NULL DEFAULT false,
-    field_class   text CONSTRAINT ck_custom_field_definition_field_class CHECK (field_class IN ('cost', 'margin')),   -- ADR-0017 rule 10
+    field_class   text CONSTRAINT ck_custom_field_definition_field_class CHECK (field_class IN ('cost', 'margin', 'sensitive_personal')),   -- ADR-0017 rule 10; sensitive_personal: ADR-0079 rule 11
     is_personal_data boolean NOT NULL DEFAULT false,       -- ADR-0074 rule 8: personal-labeled for the LLM gateway (spec 17) and cleared on erasure (ADR-0038)
     is_active     boolean NOT NULL DEFAULT true,           -- a retired field keeps its values and is never deleted
     recorded_at   timestamptz NOT NULL DEFAULT now(),
