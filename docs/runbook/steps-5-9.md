@@ -172,12 +172,12 @@ Agents are not a separate step ([11-build-order.md](../spec/11-build-order.md)).
 
 | Agent | Starts after | Design items |
 | --- | --- | --- |
-| Assistant | Step 5 gate | DS-32, DS-33 (first agent), [ADR-0077](../adr/0077-ui-floorplans-annotations-and-embedded-agent.md) rules 13–18 |
+| Assistant | Step 5 (work package 8); its evaluation set is a step 5 gate item | DS-32, DS-33 (first agent), [ADR-0077](../adr/0077-ui-floorplans-annotations-and-embedded-agent.md) rules 13–18 |
 | Analysis | Step 5 gate | [ADR-0060](../adr/0060-agent-assisted-reporting-and-analysis.md) |
 | Bank matching | Step 6 gate | DS-34 bank matching, DS-25 |
 | Purchase invoices | Step 7 gate | DS-34 purchase invoices, DS-24 |
 | Document reader (vision) | Step 7 gate | [ADR-0057](../adr/0057-document-intake-and-extraction.md), vision seat configured |
-| Planning | The gate of the planning slice with MRP (after step 5) | DS-34 planning, DS-43, DS-54, [ADR-0051](../adr/0051-agent-workflows.md) rules 23–25 |
+| Planning | After the manual path of planning with multi-level MRP is built and has passed its gate (after step 5; ADR-0024 rule 26, ADR-0032 rule 7); the runbook does not place that work yet (open question) | DS-34 planning, DS-43, DS-54, [ADR-0051](../adr/0051-agent-workflows.md) rules 23–25 |
 
 **Work packages per agent:** the workflow as a code-orchestrated cascade (stored rules and mappings → lookup → fuzzy matching with a deterministic score → LLM only for what remains, Principle 13); fixed tool list; untrusted-content tainting; budgets with circuit breaker; run records; replay evaluation in CI; a real-LLM evaluation run whenever a model or prompt changes (Principle 11); metric for the share of steps handled deterministically ([14-agent-workflows.md](../spec/14-agent-workflows.md)).
 

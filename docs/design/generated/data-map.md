@@ -156,7 +156,7 @@ Tables per owner module, from the DDL drafts in `docs/design/*.sql` and the owne
 | --- | --- | --- | --- | --- |
 | `company_setup_acknowledgement` | company data | Operating presets and setup acknowledgements | `user_account` | docs/design/DS-28-settings.sql:118 |
 | `extension_point` | installation data; declared by a module, written at startup; no runtime in Phase 1 | Extension points |  | docs/design/DS-28-settings.sql:213 |
-| `list_variant` | a saved view of one List<Noun> query, personal or shared with a role | List variants | `role`, `user_account` | docs/design/DS-30-ui.sql:49 |
+| `list_variant` | a saved view of one List<Noun> query, personal or shared with a role | List variants | `role`, `user_account` | docs/design/DS-30-ui.sql:50 |
 | `setting_definition` | installation data; one row per registered key, written at startup | Setting definitions |  | docs/design/DS-28-settings.sql:23 |
 | `setting_preset` | installation data; one row per preset version, written at startup | Operating presets and setup acknowledgements |  | docs/design/DS-28-settings.sql:85 |
 | `setting_preset_item` | installation data; one row per preset version, kind and key | Operating presets and setup acknowledgements | `setting_preset` | docs/design/DS-28-settings.sql:92 |
@@ -549,7 +549,7 @@ Foreign keys whose source and target tables have different stated owners. Foreig
 | `agent_type_setting` (agent_runs, 2) | `workflow_owner_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-05-platform.sql:201 |
 | `data_processing_permission` (agent_runs, 2) | `approved_by_user_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-36-document-intake.sql:238 |
 | `data_processing_permission` (agent_runs, 2) | `company_id,assessment_attachment_id` | `attachment` (attachments, 2) | same layer | docs/design/DS-36-document-intake.sql:252 |
-| `assist_request` (agents, 5) | `company_id,agent_run_id` | `agent_run` (agent_runs, 2) | down | docs/design/DS-30-ui.sql:36 |
+| `assist_request` (agents, 5) | `company_id,agent_run_id` | `agent_run` (agent_runs, 2) | down | docs/design/DS-30-ui.sql:37 |
 | `assist_request` (agents, 5) | `requested_by_user_id` | `user_account` (permissions, 2) | down | docs/design/DS-30-ui.sql:14 |
 | `attachment` (attachments, 2) | `company_id,generated_subject_document_id` | `document` (documents, 2) | same layer | docs/design/DS-05-platform.sql:960 |
 | `document_extraction` (attachments, 2) | `company_id,inbound_message_id` | `inbound_message` (crm, 4) | up | docs/design/DS-36-document-intake.sql:69 |
@@ -1031,8 +1031,8 @@ Foreign keys whose source and target tables have different stated owners. Foreig
 | `company_setup_acknowledgement` (registry, 2) | `implementer_user_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-28-settings.sql:122 |
 | `company_setup_acknowledgement` (registry, 2) | `owner_user_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-28-settings.sql:121 |
 | `company_setup_acknowledgement` (registry, 2) | `revoked_by_user_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-28-settings.sql:126 |
-| `list_variant` (registry, 2) | `company_id,shared_role_id` | `role` (permissions, 2) | same layer | docs/design/DS-30-ui.sql:64 |
-| `list_variant` (registry, 2) | `owner_user_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-30-ui.sql:54 |
+| `list_variant` (registry, 2) | `company_id,shared_role_id` | `role` (permissions, 2) | same layer | docs/design/DS-30-ui.sql:65 |
+| `list_variant` (registry, 2) | `owner_user_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-30-ui.sql:55 |
 | `setting_value` (registry, 2) | `approved_by_user_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-28-settings.sql:176 |
 | `setting_value` (registry, 2) | `changed_by_user_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-28-settings.sql:174 |
 | `setting_value` (registry, 2) | `company_id,change_proposal_id` | `change_proposal` (documents, 2) | same layer | docs/design/DS-28-settings.sql:183 |

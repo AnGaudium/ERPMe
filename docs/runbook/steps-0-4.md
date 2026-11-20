@@ -193,4 +193,4 @@ This is also the Phase 0 gate. Review [risks.md](../risks.md) at this gate.
 
 **Fallback:** a failure is reproduced from (seed, dataset version, day), frozen as a regression scenario and fixed in the lowest layer it belongs to, then steps 1–3 verification reruns. Commercial documents (step 5) do not start until this gate passes; this is the purpose of step 4 ([11-build-order.md](../spec/11-build-order.md)).
 
-**After the gate:** no agent starts yet; the first, the assistant, follows the step 5 gate (see [steps-5-9.md](steps-5-9.md#agents); [ADR-0078](../adr/0078-agent-simplification-for-phase-1.md)).
+**After the gate:** no agent starts yet; the first, the assistant, is built inside step 5 (work package 8; its evaluation set is a step 5 gate item; see [steps-5-9.md](steps-5-9.md#agents); [ADR-0078](../adr/0078-agent-simplification-for-phase-1.md)).
