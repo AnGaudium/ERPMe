@@ -1168,7 +1168,7 @@ CREATE TABLE purchase_invoice (
     CONSTRAINT ck_purchase_invoice_incoterm_place CHECK (incoterm_place IS NULL OR incoterm_code IS NOT NULL),
     FOREIGN KEY (company_id, business_unit_id) REFERENCES business_unit (company_id, id)
 );
-CREATE INDEX ix_purchase_invoice_company_id_partner_id_partner_reference ON purchase_invoice (company_id, partner_id, partner_reference);
+CREATE INDEX ix_purchase_invoice_company_id_partner_id_partner_reference ON purchase_invoice (company_id, coalesce(invoicing_party_partner_id, partner_id), partner_reference);
 CREATE TABLE purchase_invoice_line (
     id                       uuid PRIMARY KEY,
     company_id               uuid NOT NULL,
@@ -1861,8 +1861,8 @@ CREATE TABLE stock_transfer (                              -- [inventory] ADR-00
     CONSTRAINT ck_stock_transfer_warehouses CHECK (from_warehouse_id <> to_warehouse_id),
     CONSTRAINT ck_stock_transfer_dispatch CHECK ((step = 'receive') = (dispatch_transfer_id IS NOT NULL))
 );
--- A dispatch is received by one document; a short receipt leaves the rest in transit until a count or a reversal (ADR-0075 rule 2).
-CREATE UNIQUE INDEX ux_stock_transfer_dispatch_transfer_id ON stock_transfer (dispatch_transfer_id) WHERE dispatch_transfer_id IS NOT NULL;
+-- At most one live receive per dispatch (not canceled, not reversed) is enforced by the command under the dispatch's lock and checked by INV-867 (ADR-0075 rule 2); the document state is on another table, so the index is not unique.
+CREATE INDEX ix_stock_transfer_dispatch_transfer_id ON stock_transfer (dispatch_transfer_id) WHERE dispatch_transfer_id IS NOT NULL;
 CREATE TABLE stock_transfer_line (                         -- [inventory] ADR-0075 rule 1
     id                      uuid PRIMARY KEY,
     company_id              uuid NOT NULL,

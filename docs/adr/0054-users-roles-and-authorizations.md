@@ -331,6 +331,8 @@ ADR-0017 fixed the envelope: permissions are the names of registered commands, q
 
     Note ([ADR-0067](0067-quickflows-operating-presets.md), 2026-11-17 (proposed)): decided by the author's delegation to the chief architect (2026-11-17): while the mode is on, the human for whom a tainted run acted may clear that run's versions, one `ClearTaint` per version with a reason, never in bulk; each clearance writes a `segregation_exception` of kind `own_run_taint_clearance` for `ConfirmSegregationReview` at period close. A self-cleared version never counts as cleared for the auto-post gateway's tainted-draft eligibility or for promotion evidence ([ADR-0067](0067-quickflows-operating-presets.md) rule 17).
 
+    Note (S1 review, 2026-11-21): the clause "never tainted, or cleared by another person" in the first ADR-0067 note above reads "never tainted, or cleared by `ClearTaint`, a self-clearance under [ADR-0067](0067-quickflows-operating-presets.md) rule 17 included" ([ADR-0067](0067-quickflows-operating-presets.md) rule 16). Otherwise a one-person company could never approve a tainted event-started draft above the risk amount. The approval and the clearance are separate commands, and each writes its own `segregation_exception`, reviewed at period close.
+
     Note (author's delegation, 2026-11-19): the bank-account rule is not lifted in the small-company mode; it is a policy floor ([ADR-0043](0043-policy-and-approval.md) rule 9 note).
 
 **Delegation**

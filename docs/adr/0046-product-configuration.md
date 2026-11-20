@@ -184,6 +184,8 @@ Numbers join lists: a characteristic may take a number in a range with a step, s
 
     Note ([ADR-0072](0072-costing-sheet-and-cost-component-structure.md), proposed 2026-11-18): `estimate_configuration` applies the costing sheet of the product-level version, else of its site, and gains `purpose` (default `production`); `GetSellingPriceCosting` adds the administration and selling rows for cost-plus quotes. The cost checks of this rule keep the production cost (ADR-0072 rules 9, 10).
 
+    Note (S1 review, 2026-11-21): `estimate_configuration` is a pure function with no table; `purpose` is a parameter of the function (ADR-0072).
+
 **Price**
 
 15. Configured prices, through ADR-0045 rule 4. `find_price` takes the chosen values (so an incomplete draft can be priced) instead of a list of option values:

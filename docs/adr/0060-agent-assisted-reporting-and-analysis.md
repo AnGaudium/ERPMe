@@ -417,6 +417,8 @@ No external semantic engine runs in the core, and agents still never export file
 
     Note ([ADR-0068](0068-sites-and-core-logistics-payment-master-data.md), proposed 2026-11-17): two further dimensions: `site` (entity, the parent of `warehouse`; transit and goods-sent warehouses take the site of their valuation warehouse) and `payment_method` (entity, on sales and purchase lines).
 
+    Note ([ADR-0068](0068-sites-and-core-logistics-payment-master-data.md), 2026-11-21): in rule 5's hierarchy list, `warehouse` → `site` replaces `warehouse` → `branch`, as `catalogs/analysis-dimensions.csv` has it; `site` has no parent in the catalog.
+
     Note ([ADR-0069](0069-business-unit-dimension.md), proposed 2026-11-17): a further dimension, `business_unit` (entity, a tree over `parent_id`), offered by `journal_line_overview` and `system_account_turnover`. It groups by the posted value only. With ADR-0068's two, the catalog holds 25 dimensions.
 
 **Invariants, catalogs and lab**

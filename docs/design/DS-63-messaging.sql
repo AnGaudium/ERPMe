@@ -38,7 +38,7 @@ CREATE TABLE conversation_member (                         -- [work] ADR-0076 ru
     notify_level             text NOT NULL DEFAULT 'all' CONSTRAINT ck_conversation_member_notify_level CHECK (notify_level IN ('all', 'mentions', 'none')),
     last_read_sequence       bigint NOT NULL DEFAULT 0 CONSTRAINT ck_conversation_member_last_read_sequence CHECK (last_read_sequence >= 0),
     joined_at                timestamptz NOT NULL,
-    left_at                  timestamptz,                         -- EndConversationMember; only a channel member may join again
+    left_at                  timestamptz,                         -- EndConversationMember; a channel or direct member who left may join again by their own act, which clears left_at on this row (ADR-0076 rule 2)
     recorded_at              timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (conversation_id, user_account_id),
     FOREIGN KEY (company_id, conversation_id) REFERENCES conversation (company_id, id),

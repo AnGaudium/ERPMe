@@ -1,5 +1,5 @@
 -- DS-30 UI: DDL draft for the company data of ADR-0077 (UI floorplans, annotation vocabulary and embedded agent). PostgreSQL 18.
--- assist_request is owned by agents (layer 5; ADR-0077 rule 14); list_variant is owned by registry (layer 2; ADR-0077 rule 10).
+-- assist_request is owned by agents (layer 5; ADR-0077 rule 14); list_variant is owned by registry (layer 2; ADR-0077 rule 10a).
 -- Loaded after DS-05-platform.sql (agent_run) and DS-15 (user_account, role) by the design lab's load_all.py
 -- (docs/reviews/2026-11-14-design-validation). The ADRs win if this file disagrees.
 -- Conventions of DS-20 and DS-05-platform: tables in schema nativeflows, keys inline, references between company tables
@@ -19,6 +19,7 @@ CREATE TABLE assist_request (                              -- the subject of an 
                              'worklist', 'overview', 'plan_panel', 'approval_view') OR floorplan ~ '^custom:[a-z][a-z0-9_]*$'),
     context_subject_table text,                                -- the record the panel was scoped to, if any
     context_subject_id   uuid,
+    selected_table       text,                                 -- the table of the selected rows
     selected_ids         uuid[] NOT NULL DEFAULT '{}' CONSTRAINT ck_assist_request_selected CHECK (cardinality(selected_ids) <= 100),
     active_filters       jsonb,                                -- the list's filters as sent to its query
     previous_request_id  uuid,                                 -- a follow-up names the request it follows
@@ -35,6 +36,7 @@ CREATE TABLE assist_request (                              -- the subject of an 
     FOREIGN KEY (company_id, agent_run_id) REFERENCES agent_run (company_id, id),
     FOREIGN KEY (company_id, previous_request_id) REFERENCES assist_request (company_id, id),
     CONSTRAINT ck_assist_request_context CHECK ((context_subject_table IS NULL) = (context_subject_id IS NULL)),
+    CONSTRAINT ck_assist_request_selected_table CHECK ((cardinality(selected_ids) = 0) = (selected_table IS NULL)),
     CONSTRAINT ck_assist_request_closed CHECK ((state = 'open') = (answered_at IS NULL)
         AND (state = 'failed') = (failure_reason IS NOT NULL)
         AND (state = 'answered' OR answer IS NULL)),
@@ -43,7 +45,7 @@ CREATE TABLE assist_request (                              -- the subject of an 
 );
 CREATE INDEX ix_assist_request_requested_by_user_id ON assist_request (requested_by_user_id);
 
--- ===== List variants [registry] (ADR-0077 rule 10) =====
+-- ===== List variants [registry] (ADR-0077 rule 10a) =====
 CREATE TABLE list_variant (                                -- a saved view of one List<Noun> query, personal or shared with a role [registry]
     id                   uuid PRIMARY KEY,
     company_id           uuid NOT NULL REFERENCES company (id),
@@ -64,6 +66,7 @@ CREATE TABLE list_variant (                                -- a saved view of on
         AND jsonb_typeof(sort) = 'array' AND jsonb_typeof(grouping) = 'array' AND jsonb_array_length(columns) <= 40)
 );
 CREATE UNIQUE INDEX ux_list_variant_name ON list_variant (company_id, query_name, owner_user_id, coalesce(shared_role_id, owner_user_id), lower(name)) WHERE state = 'active';
+CREATE UNIQUE INDEX ux_list_variant_shared_name ON list_variant (company_id, query_name, shared_role_id, lower(name)) WHERE state = 'active' AND shared_role_id IS NOT NULL;
 CREATE UNIQUE INDEX ux_list_variant_default_personal ON list_variant (company_id, query_name, owner_user_id) WHERE state = 'active' AND is_default AND shared_role_id IS NULL;
 CREATE UNIQUE INDEX ux_list_variant_default_shared ON list_variant (company_id, query_name, shared_role_id) WHERE state = 'active' AND is_default AND shared_role_id IS NOT NULL;
 

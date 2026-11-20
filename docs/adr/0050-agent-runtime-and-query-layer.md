@@ -144,6 +144,8 @@ Status: accepted (2026-11-15) under ADR-0005, reviewed by Claude Fable 5.2 (buil
 
     Note ([ADR-0065](0065-deterministic-auto-post-gateway.md), 2026-11-16 (proposed)): a fourth mode, `active`: `assisted`, and in addition the type's drafts of the document types named at promotion may pass the auto-post gateway as tainted drafts. The agent still only drafts (floor 4 of [ADR-0043](0043-policy-and-approval.md) rule 9). The version declares `auto_post_document_types`, otherwise `agent_mode_not_declared`. Setting `active` is a proposal that another person approves, from `assisted` at the same behavior hash and seat models, naming per document type an `agent_promotion_evidence` row with target mode `active` from `GetAgentDraftAcceptance` (at least ceil(3 / `auto_post.max_error_rate`) drafts over at least two calendar months, at least (1 - rate) posted unchanged, none to another partner); `agent_type_setting.active_document_types` records the types. The effective mode drops as today on a version or seat model change, and counts as `assisted` for the gateway while an `agent_quality_below_threshold` item is open. Lowering is direct. "Agents never post ..., so there is no further mode" now reads: there is no mode in which an agent posts ([ADR-0065](0065-deterministic-auto-post-gateway.md) rule 11).
 
+    Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), 2026-11-21): the assistant has no shadow comparison. Its promotion evidence is the stored result of its evaluation set (ADR-0077 rule 13), which `CreateAgentPromotionEvidence` records; at effective mode `shadow` the assistant starts no run and answers nobody.
+
 **Runs**
 
 15. Starting a run, `StartAgentRun` (module `agents`, effect class `other`; it writes through `agent_runs.contract.create_run`):
@@ -158,6 +160,8 @@ Status: accepted (2026-11-15) under ADR-0005, reviewed by Claude Fable 5.2 (buil
     - **Result.** An `agent_run` in state `queued`, and the event `AgentRunStarted`.
 
     Note ([ADR-0057](0057-document-intake-and-extraction.md), proposed 2026-11-15): `document_extraction` is an outside-content subject table: a `document_reader` run on it starts tainted, and reads its words, fields, rule runs and pages, a reading put to the author ([ADR-0057](0057-document-intake-and-extraction.md) rule 11).
+
+    Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), 2026-11-21): the `assist_request` row is an outside-content subject table only when its `purpose` is `act`: such a run starts tainted with `taint_source_kind` `outside_subject` and source table `assist_request` (ADR-0077 rule 13).
 
     Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): the UI's assist panel starts runs of the agent type `assistant` with an `assist_request` row as subject, which carries the user's typed text (up to 2,000 characters, written by the `human_only` `CreateAssistRequest`) and the screen's context, as `analysis_question` does for the analysis agent; runs stay asynchronous with no dialogue. A run of `purpose` `act` always starts tainted; `ask` and the resolve purposes start untainted and taint propagates when they read untrusted data. One run costs at most `assist.max_cost_per_run` (default USD 0.20). `GetAgentBudgetStatus`, a people-only query on no tool list, shows the remaining daily budget (ADR-0077 rules 13, 14, 17).
 16. Executing a run:
@@ -295,6 +299,10 @@ Status: accepted (2026-11-15) under ADR-0005, reviewed by Claude Fable 5.2 (buil
     Note ([ADR-0063](0063-configurable-policy-settings.md), proposed 2026-11-15): item 4 also covers declared projections (`tainted_projection` on a query's result model: closed shapes and internal names only, at most 20 rows per call and 10 calls per run) while `agents.tainted_reference_reads` reads `declared_projections`, the default; the run stays tainted (rule 16).
 
     Note ([ADR-0066](0066-work-cases.md), 2026-11-16 (proposed)): work cases do not widen item 2: a run reads its work item, the item's evidence links and its notes, never the work case the item belongs to. `GetWorkCase` and `ListWorkCaseTimeline` are on no agent tool list in Phase 1 ([ADR-0066](0066-work-cases.md) rule 19).
+
+    Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), 2026-11-21): for the `assistant`, scope kind `subject` covers the run's `assist_request`, its context subject row (`context_subject_table`, `context_subject_id`) and the rows of `selected_table` named in `selected_ids`, each only where the requesting user's record scope allows it. These are the records the run was started on (spec 03 rule 1, wording of 2026-11-21). The same scope applies to an `ask` or resolve run once it becomes tainted. The runtime's provenance check and the dispatcher's reference check of rule 25 accept these rows as in scope.
+
+    Note (S1 review, 2026-11-21): spec 03 rule 1 was reworded on 2026-11-21 under the author's delegation of 2026-11-19. It names this rule as the tainted read scope and changes nothing in it. The author's decision item 2 of 2026-11-19 also lists the whole item catalog, the partner's price lists and available to promise as readable by a tainted run; that is wider than this rule and is not applied: it is recorded as a conflict for the author (open-questions, S1 review section).
 28. Untrusted fields:
     - **Omitted by default.** Views and query result models omit `is_untrusted` columns unless the request sets `include_untrusted: true` (ADR-0029 rule 10). Listing documents therefore does not taint.
     - **Agent types that must stay clean** declare `may_read_untrusted: false` (for example `planning`). For their runs, `include_untrusted` returns `untrusted_read_not_allowed`, and rows that would taint them are left out, with `is_taint_filtered: true` in the response.
@@ -328,6 +336,8 @@ Status: accepted (2026-11-15) under ADR-0005, reviewed by Claude Fable 5.2 (buil
     Note ([ADR-0064](0064-production-agent.md), proposed 2026-11-15): also never on a tool list: `TransferStockReservation` (accepted only from a change proposal's execution), `ImportOperationConfirmation` (an integration's command) and `RunProductionOrderCheck` (a system job) (rules 12, 24, 25; INV-730).
 
     Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): `CreateAssistRequest` and `GetAgentBudgetStatus` join this list (ADR-0077 rules 14, 17).
+
+    Note ([ADR-0076](0076-internal-messaging-and-notifications.md), 2026-11-21): the queries `ListConversation`, `ListMessage`, `ListNotification` and `ListNotificationPreference` are on this list; no agent type's tool list may name them.
 31. Effective permissions are the intersection of the agent type's declared permissions and those of the human acted for, re-evaluated at every call against current assignments, for permissions, record scope and field classes (ADR-0017 rule 11). A tainted run's read scope (rule 27) narrows that further. The tool list is a third limit: a tool must be on the list and allowed by the intersection.
 
     Note: agent types get no role assignments, so no further set of rights joins this intersection; the human's owner scope binds the run as their record scope does ([ADR-0054](0054-users-roles-and-authorizations.md) rule 16).
