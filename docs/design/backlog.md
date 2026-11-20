@@ -90,3 +90,42 @@ Business units are reported on profit-and-loss lines in Phase 1; the column is o
 | --- | --- | --- | --- | --- |
 | DS-60 | Balance sheet per business unit (document splitting): the derivation extended to balance-sheet lines by splitting rules, so receivables, payables, inventory and tax report per unit; `open_item` may gain `business_unit_id` | ADR | DS-06, DS-44, ADR-0069 | After Phase 1 |
 | DS-61 | Allocation of shared costs to business units: allocation documents that post profit-and-loss lines with explicit units | ADR | DS-06, DS-53, ADR-0069 | After Phase 1 |
+
+## Enterprise coverage check (session S1, 2026-11-21)
+
+The chief architect checked the design against what an enterprise-grade ERP needs: organization, finance, operations, cross-cutting mechanisms, data lifecycle and extensibility. The test for each gap was the cost of adding it after the core tables are built. A gap that would change a key, add a required dimension to the journal or to every document, or split a table is closed now; anything that is a new independent table or a nullable column is only listed here.
+
+**Closed now**
+
+| Gap | Closed by |
+| --- | --- |
+| Partner roles on documents, external IDs, custom-field seam, reasons, header notes | [ADR-0074](../adr/0074-core-data-structure-additions.md) |
+| DDL of every stock document; stock-count settings | [ADR-0075](../adr/0075-stock-documents.md) |
+| Personal data: one catalog, blocking and destruction on immutable stores, retention rules, read log, restore replay, breach register | [ADR-0079](../adr/0079-personal-data-protection.md) (DS-64) |
+| Agents joining existing workflows without changing a module | [ADR-0078](../adr/0078-agent-simplification-for-phase-1.md) rules 11 and 12 |
+
+**Decided out:** parallel ledgers and `updated_by` on every table (author, 2026-11-19; ADR-0074 rules 18, 19).
+
+**Deferred, ranked by the cost of adding it later (highest first)**
+
+| # | Capability | What exists today | Cost to add later | When |
+| --- | --- | --- | --- | --- |
+| 1 | Posting date on `journal_line` | The date is on `journal_entry`; lines carry the period. Reports by date join the entry | A new required column on the largest append-only table, with a backfill | Decide with the ledger DDL in session S2 (a fix S2 needs) |
+| 2 | Valuation below the item (by lot or by valuation type) | Lots and serials carry no cost; `stock_value` is per item and valuation area (ADR-0020 rule 17) | Changes the key of `stock_value` and the costing solver's nodes | Author's question (open question); a separately valued batch is a separate item until then |
+| 3 | Master data shared across companies; a group-wide partner or item key | Partners and items belong to one company; `external_id_map` can hold a common group key per source system (ADR-0074 rule 7) | Sharing the rows would change every `(company_id, …)` key; a group key through `external_id_map` costs nothing | Author's question (open question); the group key by `external_id_map` is the seam |
+| 4 | Schedule lines on order lines (several confirmed dates and quantities) | One planned date per line; `demand_supply_line` per order line | A child table that planning and availability must read | After Phase 1; a confirmed date and quantity per line is a nullable column |
+| 5 | Intercompany documents and elimination | `partner.represents_company_id`; the partner on journal lines is the trading partner; `group_currency` and `group_amount` on every line | A nullable counter-document key on headers; an elimination report | After Phase 1 |
+| 6 | Tenancy above the company | One installation is one operator's database; row security is by company | None: a second tenant is a second installation | Stated here as the rule |
+| 7 | Per-site or per-warehouse item data | `item_warehouse_planning` for planning only | A new table keyed by item and warehouse; each reader changes | After Phase 1 |
+| 8 | Withholding tax and tax on payment | Payment-evidence conditions on input tax (`tax_line_adjustment`) | Tax lines on payment documents; a package rule | Author's question; mechanism with the tax engine at step 7 |
+| 9 | Extension mechanism for third parties | Localization packages; `extension_point` declarations; custom fields; outbox consumers | Hooks before and after a command in the dispatcher; an SDK boundary | After Phase 1 (spec 07) |
+| 10 | Archiving closed years; partitioning the ledger | UUIDv7 keys allow range partitioning by `id` without a key change (ADR-0006 rule 23) | An ADR when a journal nears 100,000,000 lines | Scale path (go-live step 10) |
+| 11 | Configuration transport between environments | Versioned rules, decision tables and settings with history | Export and import of versioned artifacts | After Phase 1 (ADR-0058 W11) |
+| 12 | Budgets and commitments; accrual and deferral schedules; recurring entries; payment runs and bank files; down-payment invoices; rebates | Open-item kinds `advance`; prepaid amortization as a close task; allocation proposals | Independent new tables and document types | After Phase 1, each by its own ADR |
+| 13 | Consolidation structure (company group, group chart level) | Group currency amounts; system accounts shared by all companies | A nullable parent on `company`; a mapping level | After Phase 1 |
+| 14 | Contracts and blanket orders; supplier RFQ; drop shipment; consignment | `owner_partner_id` reserved on stock rows (ADR-0030 rule 8) | New document types on existing lines | After Phase 1 |
+| 15 | Webhooks for outside subscribers; command schema deprecation policy; SAML; health checks and feature flags | Outbox `external` consumers; semver on command schemas; OIDC | A subscription table; a policy text; an adapter | With DS-37 (operations) at step 10 |
+| 16 | Small master-data additions: several tax registrations, classifications and contact points per partner; per-process blocks; item lifecycle status; master-data number ranges; project hierarchy; per-account dimension rules; costing variants; several actions per nonconformance; parcels; translation of text-keyed rows; merge of duplicate masters | Reason kind `block` reserved; `code_series` for products | A nullable column or an independent table each | When a pilot needs one |
+| 17 | Service orders, projects with time and expense, plant maintenance, payroll and HR | `project` as a dimension; employees as partners | New modules above the core | Phase 3 or later (spec 09) |
+
+Fixed assets and loans keep their Phase 3 seams (ADR-0025). Devices and IoT stay deferred (DS-62).

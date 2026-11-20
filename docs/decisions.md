@@ -23,3 +23,5 @@ These decisions are not reopened without a new ADR. If another file says otherwi
 | D17 | Project name NativeFlows. This repository is the source of truth for the specification; the shared Claude doc is a discussion copy | [docs/README.md](README.md) |
 
 Note on D5 (author, 2026-11-19): Business One informs the leanness of the first release, not a target segment. NativeFlows has no company-size limit; the design must scale to large enterprises as it matures ([go-live.md](runbook/go-live.md), step 10, scale path).
+
+Note on the design freeze (chief architect, session S1, 2026-11-21; this answers recommendation 1 of the independent assessment of 2026-11-19): the design is frozen. Until the build step 1 gate passes, no new ADR and no new DS file is written outside build steps 0–3, except the fixes that session S2 needs to close findings. ADRs accepted for later steps stay accepted; changes to them wait until that gate. The deferred capabilities and their seams are listed in [backlog.md](design/backlog.md), "Enterprise coverage check"; none of them is designed before the gate.

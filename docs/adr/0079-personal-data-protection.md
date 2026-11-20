@@ -1,7 +1,7 @@
 # ADR-0079: Personal data protection in the core
 
 Status: proposed (2026-11-21) under ADR-0005 (builder Claude Fable 5.2).
-Design items: DS-36 (audit), DS-35 (CRM), DS-15 (access), DS-37 (operations), DS-40 (go-live kit). Related decisions: D12. Principles 7, 12. ADR-0008, ADR-0009, ADR-0013, ADR-0014, ADR-0016, ADR-0017, ADR-0019, ADR-0028, ADR-0038, ADR-0044, ADR-0050, ADR-0052, ADR-0054, ADR-0057, ADR-0060, ADR-0063, ADR-0066, ADR-0073, ADR-0074, ADR-0076, ADR-0077; spec 17.
+Design items: DS-64 (personal data), DS-36 (audit), DS-35 (CRM), DS-15 (access), DS-37 (operations), DS-40 (go-live kit). Related decisions: D12. Principles 7, 12. ADR-0008, ADR-0009, ADR-0013, ADR-0014, ADR-0016, ADR-0017, ADR-0019, ADR-0028, ADR-0038, ADR-0044, ADR-0050, ADR-0052, ADR-0054, ADR-0057, ADR-0060, ADR-0063, ADR-0066, ADR-0073, ADR-0074, ADR-0076, ADR-0077; spec 17.
 
 ## Decision
 
@@ -38,7 +38,7 @@ Personal data is protected by one mechanism for the whole core, not only on the 
 4. A data subject is a partner, a contact or a user account. An employee is a partner (ADR-0019 rule 3). `data_subject_state` holds one row per subject that is no longer active: `blocked` or `destroyed`, with the cause (`request` or `retention`), the dates and the request.
 5. **Blocked** means:
    - the subject cannot be named on a new document, interaction, message recipient list or agent run, and is left out of search and of every LLM request, whatever the routing switch says;
-   - its catalog columns are masked for everyone who does not hold the capability `read_blocked_personal_data`, in queries, exports, printing and the UI. The capability is held by no role template by default; a company assigns it to the people who answer authorities and auditors;
+   - its catalog columns are masked for everyone who does not hold the capability `read_blocked_personal_data`, in queries, exports, printing and the UI. The capability is the leaf `blocked_personal_data`; no role template holds it by default, the `owner` template included (the one capability outside "every capability" of that template); a company assigns it to the people who answer authorities and auditors;
    - posted documents, open items and the journal stay complete and keep working: a blocked customer's invoice can still be paid, reversed and reported. Amounts, accounts and document numbers are never masked.
 6. **Destroyed** means every catalog column of the subject, in every store class, has had its erasure action applied.
    - **Master and CRM stores:** as `EraseDataSubject` does today (ADR-0019 rule 10; ADR-0052 rule 25).
@@ -51,7 +51,7 @@ Personal data is protected by one mechanism for the whole core, not only on the 
    - **Before retention ends** it blocks the subject and destroys only what no retention rule covers (CRM text, summaries, insights, agent bodies, search keys). Data in retention classes still running stays, blocked. The request is answered with what was destroyed and what is kept, under which rule and until when.
    - **After retention ends** the retention job (rule 9) runs the same command as `system` for the rest.
    - **The exception.** The dispatcher sets `nativeflows.erasure_command_id` for this command alone (ADR-0038 rule 4). The triggers that refuse changes to posted documents, versions, journal rows and append-only rows allow, under that marker, an update that changes only catalog columns of that table. Any other column, or any other command, is refused as before. Each module owns the erasure hook for its tables (ADR-0022), generated from the catalog.
-   - **Evidence.** Every rewrite appends a `data_erasure_entry`: subject, target table and row, column names, action, cause, request, command and time. It holds no values. The entry is also appended to an erasure journal object in the attachment store, outside the database.
+   - **Evidence.** Every rewrite appends a `data_erasure_entry`: subject, target table and row key (the row's primary key, which for tables without an `id` is several columns), column names, action, cause, request, command and time. It holds no values. The entry is also appended to an erasure journal object in the attachment store, outside the database.
 8. Stores that cannot be rewritten.
    - **Backups.** A backup is never edited. The backup retention window is at most `attachments.delete_grace_days` (ADR-0038 rule 15), so a destroyed value leaves the last backup within that window. After any restore, and before the system opens, `ReapplyErasures` replays every erasure journal entry later than the restore point (rule 14).
    - **Provider side.** A provider that retained a request is outside the system; the provider registry's `retention_days` and no-training flag (ADR-0063 rule 15) are what the company relies on, and the processing log names what was sent.
@@ -63,14 +63,14 @@ Personal data is protected by one mechanism for the whole core, not only on the 
    - **Periods are package rules.** A localization package supplies the rules of its regime, each flagged verified or unverified (ADR-0016 rule 12). The core seeds none. A company may shorten or lengthen a period only where the package marks it adjustable.
    - **No rule, no destruction.** Where a class has no verified rule, the job neither blocks nor destroys for that class, and `check` and the operations dashboard report the class as without a retention rule. Keeping too long is reported; destroying too early cannot be undone.
    - **The job.** `RunPersonalDataRetention` runs daily as `system` on queue `jobs`. For each subject it computes the start event per class (for example the posting date of the last document that names the partner), blocks a subject whose purpose has ended, and destroys per class when the class's period has ended. A subject with an open item, an open document, an open data subject request or an open dispute is never blocked by the job.
-   - **Evidence** is the `data_erasure_entry` rows and one processing log entry of kind `retention` per subject and run.
+   - **Evidence** is the `data_erasure_entry` rows and one processing log entry of kind `retention` per subject and run (a kind this ADR adds to ADR-0052 rule 26).
    - **Existing retention settings stay** (`messaging.message_retention_days`, the analysis question retention, the agent run step retention). They bound technical stores and may be shorter than a retention rule; where both apply, the shorter wins for stores that are not accounting evidence.
 
 **Reading**
 
 10. Personal columns are read under the record scope and leaves a role already has (ADR-0054). No new field class covers ordinary personal data: a sales clerk must read a customer's name.
 11. `sensitive_personal` is a field class beside `cost` and `margin` (ADR-0017 rule 10). A column with that label is returned only to an assignment that holds the class. No role template holds it by default, and no Phase 1 column carries it; the class exists so that a package or a custom field can use it without a schema change.
-12. Reads that are logged. `personal_data_read_log` gets one row, with query name, user, field names and row count and no values, for:
+12. Reads that are logged. `personal_data_read_log` gets one row, with query name, user, field names and row count and no values (a read by an integration client is logged under its accountable person, ADR-0017), for:
     - every read that returns a `sensitive_personal` column;
     - every read of a blocked subject's unmasked data;
     - every `ExportDataSubject`, `ExportCompanyData` and list export that includes a personal column (ADR-0044; ADR-0050).
@@ -88,7 +88,7 @@ Personal data is protected by one mechanism for the whole core, not only on the 
 
 **Breach handling**
 
-15. Signals. These raise the work item `personal_data_incident_suspected`, owned by the holder of the `data_protection` leaf at `full`:
+15. Signals. These raise the work item `personal_data_incident_suspected`, owned by the company owner until a company names its data-protection role (open question):
     - a canary value seen in a request, log or span (ADR-0050 rule 11);
     - more than a set number of denials for one actor in an hour (ADR-0038 rule 5);
     - an export, or a run of reads in `personal_data_read_log`, above a set row count by one actor in a day;
@@ -140,10 +140,11 @@ The author asked for privacy by design across the whole core (session S1, item 3
 
 ## Documents updated
 
-- **Catalogs:** [personal-data-fields.csv](../catalogs/personal-data-fields.csv) and [personal-data-exclusions.csv](../catalogs/personal-data-exclusions.csv) (new); [work-case-kinds.csv](../catalogs/work-case-kinds.csv) (`personal_data_breach`); [work-item-kinds.csv](../catalogs/work-item-kinds.csv) (`personal_data_incident_suspected`); [invariants.csv](../catalogs/invariants.csv) (INV-890 to INV-894); [edge-cases.csv](../catalogs/edge-cases.csv) (EC-350 to EC-354).
-- **Design:** [DS-64-personal-data.sql](../design/DS-64-personal-data.sql) (new): `data_subject_state`, `retention_rule`, `data_erasure_entry`, `personal_data_read_log`, `personal_data_breach`; the field class `sensitive_personal` in DS-15, DS-20 and DS-05.
-- **ADR notes:** ADR-0017 rule 10; ADR-0019 rules 7 and 10; ADR-0038 rules 1, 4 and 9; ADR-0044 rule 17; ADR-0050 rule 9; ADR-0052 rules 25 and 29; ADR-0074 rule 8.
+- **Catalogs:** [personal-data-fields.csv](../catalogs/personal-data-fields.csv) and [personal-data-exclusions.csv](../catalogs/personal-data-exclusions.csv) (new); [authorization-areas.csv](../catalogs/authorization-areas.csv) and [role-template-levels.csv](../catalogs/role-template-levels.csv) (leaf `blocked_personal_data`, held by no template); [work-case-kinds.csv](../catalogs/work-case-kinds.csv) (`personal_data_breach`); [work-item-kinds.csv](../catalogs/work-item-kinds.csv) (`personal_data_incident_suspected`); [invariants.csv](../catalogs/invariants.csv) (INV-890 to INV-894); [edge-cases.csv](../catalogs/edge-cases.csv) (EC-350 to EC-354).
+- **Design:** [DS-64-personal-data.sql](../design/DS-64-personal-data.sql) (new): `data_subject_state`, `retention_rule`, `data_erasure_entry`, `personal_data_read_log`, `personal_data_breach`; the field class `sensitive_personal` in DS-15 and DS-20 (no agent type version may hold it, DS-05); the processing log kind `retention` in DS-35; the error `data_subject_blocked` in DS-04; the field class list in [architecture-overview.md](../design/architecture-overview.md); the edge-case and invariant counts in DS-17 and DS-16.
+- **ADR notes:** ADR-0017 rule 10; ADR-0019 rules 7 and 10; ADR-0038 rules 1, 4 and 9; ADR-0044 rule 17; ADR-0050 rule 9; ADR-0052 rules 25, 26 and 29; ADR-0074 rule 8.
 - **Lab:** `t31_personal_data.py` (new).
+- **Glossary:** rows for data subject state, retention rule, erasure entry and journal, and the personal data catalog; the field class row gains `sensitive_personal` ([00-reading-guide.md](../spec/00-reading-guide.md)).
 - **Open questions, backlog, index:** [docs/open-questions.md](../open-questions.md), [backlog.md](../design/backlog.md) (DS-64; DS-37 and DS-40 notes), [docs/adr/README.md](README.md).
 
 ## Edge cases and invariants

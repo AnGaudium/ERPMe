@@ -387,3 +387,12 @@
 - [ ] (ADR-0079 rule 7; ADR-0038 rule 4) The trigger exception for posted documents, document versions and the journal is designed in rule 7; its DDL is written with the ledger and document DDL in session S2. Lab `t31_personal_data.py` does not cover it yet. Technical.
 - [ ] (ADR-0079 rule 9; ADR-0050; ADR-0060; ADR-0052 rule 30; ADR-0038; ADR-0013) The retention settings `agent_run_step_retention_days` (ADR-0050), `analysis_question_retention_days` (ADR-0060), `crm.interaction_retention_days` (ADR-0052), `attachment_retention_years` (ADR-0038, ADR-0039) and `event_retention_days` (ADR-0013) are not in `settings.csv`. Add them in session S2. Technical.
 - [ ] (ADR-0019 rule 7; ADR-0053 rule 7; DS-20) ADR-0019 rule 7 names `household_business` where the DDL (`ck_partner_kind`) and ADR-0053 rule 7 say `sole_proprietorship`; the rule's own inline note already gives the DDL value. The catalog's condition `partner_is_person` uses `individual` or `sole_proprietorship`. Technical.
+
+## Enterprise coverage check (session S1, 2026-11-21)
+
+Ranked list and seams: [backlog.md](design/backlog.md), "Enterprise coverage check". The questions below need the author; nothing is designed for them before the build step 1 gate (design freeze, [decisions.md](decisions.md)).
+
+- [ ] (ADR-0020 rule 17; DS-09) Valuation below the item. Lots and serials carry no cost, and `stock_value` is per item and valuation area. Must one item ever be valued per lot or per valuation type (for example bought and made, or new and used)? Adding it later changes the key of `stock_value` and the costing solver. Interim: no; a separately valued batch is a separate item. Accounting; the author's.
+- [ ] (ADR-0019 rule 1; ADR-0045; ADR-0074 rule 7) Master data across companies. Partners and items belong to one company. Is a group-wide key enough (one row per company, joined by a common key in `external_id_map`), or must the rows themselves be shared? Sharing rows later changes every `(company_id, …)` key. Interim: a group key through `external_id_map`. Scope; the author's.
+- [ ] (ADR-0041 rule 22; DS-23) Withholding tax and tax on payment as a mechanism of the tax engine at step 7. Tax; the author's.
+- [ ] (ADR-0014; DS-06) Should `journal_line` carry the posting date as well as the period, so that reports by date and a later partition need no join and no backfill? Technical; decided with the ledger DDL in session S2.
