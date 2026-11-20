@@ -70,7 +70,7 @@ A rule cites its source as `ADR-nnnn rule n` or `ADR-nnnn rule n note`. A "note"
 
 3.6 A registry check: a work item kind that a command on any agent tool list can raise may not be declared by any agent type. `agent_task` is such a kind (ADR-0050 rule 16).
 
-3.7 Wake-up kinds are `always` in version 1 of the declared types, except the Phase 1 `purchase_invoice` declaration, which declares `supplier_invoice_received` `configurable`, default `always` (ADR-0078 rule 1). A kind may be declared `configurable`, and then the company setting `agents.<agent_type>.wake_up_mode.<kind>` (`always` default, `by_rule`, `off`) applies (ADR-0050 rule 12 notes; ADR-0063 rule 11; `settings.csv`). ADR-0063 rule 11 names `supplier_invoice_received` of `purchase_invoice` as one such kind, "in its next version".
+3.7 Wake-up kinds are `always` in version 1 of the declared types, except the Phase 1 `purchase_invoice` declaration, which declares `supplier_invoice_received` `configurable`, default `always` (ADR-0078 rule 1). A kind may be declared `configurable`, and then the company setting `agents.<agent_type>.wake_up_mode.<kind>` (`always` default, `by_rule`, `off`) applies (ADR-0050 rule 12 notes; ADR-0063 rule 11; `settings.csv`).
 
 ## 4. Starting and running a run
 
@@ -574,7 +574,7 @@ When a measure falls more than 10 points below the agent type's evaluation thres
 
 12.37 Failures: no candidate gives an explanation only, outcome `no_action` (ADR-0051 rule 25).
 
-12.38 Budget and evaluation: per-run ceilings in 8.3. The evaluation set passes its golden set at 90% (ADR-0051 rule 7); the size of the set is fixed with the declaration. Promotion is by that set, and the shadow comparator of ADR-0051 rule 25 returns with live shadow (ADR-0078 rule 6). Quality in use: 9.11.
+12.38 Budget and evaluation: per-run ceilings in 8.3. The evaluation set passes its golden set at 90% (ADR-0051 rule 7); the size of the set is fixed with the declaration. Promotion is by that set; the comparator of ADR-0051 rule 25 measures quality in use on stored output (9.11), and live shadow runs return in Phase 2 (ADR-0078 rules 6, 15). Quality in use: 9.11.
 
 ## 13. The auto-post gateway
 

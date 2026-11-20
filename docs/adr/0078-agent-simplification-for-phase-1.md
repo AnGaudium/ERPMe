@@ -1,6 +1,6 @@
 # ADR-0078: Agent scope and the common work model for Phase 1
 
-Status: proposed (2026-11-19) under ADR-0005 (builder Claude Opus 5.5); reworked on 2026-11-21 by the chief architect of session S1 (Claude Fable 5.2), to whom the author delegated the Phase 1 agent scope. Design items: DS-32, DS-33, DS-34. Related decisions: D2, D11, D15. Principles 3, 8, 12, 13. ADR-0013, ADR-0024, ADR-0029, ADR-0030, ADR-0032, ADR-0036, ADR-0042, ADR-0043, ADR-0044, ADR-0048, ADR-0050, ADR-0051, ADR-0054, ADR-0057, ADR-0058, ADR-0059, ADR-0060, ADR-0062, ADR-0063, ADR-0064, ADR-0065, ADR-0066, ADR-0073, ADR-0077.
+Status: accepted (2026-11-21) under ADR-0005, reviewed by Claude Opus 5.5 after two review rounds (builders: Claude Opus 5.5, proposed 2026-11-19; Claude Fable 5.2, the chief architect of session S1, to whom the author delegated the Phase 1 agent scope, reworked 2026-11-21). Design items: DS-32, DS-33, DS-34. Related decisions: D2, D11, D15. Principles 3, 8, 12, 13. ADR-0013, ADR-0024, ADR-0029, ADR-0030, ADR-0032, ADR-0036, ADR-0042, ADR-0043, ADR-0044, ADR-0048, ADR-0050, ADR-0051, ADR-0054, ADR-0057, ADR-0058, ADR-0059, ADR-0060, ADR-0062, ADR-0063, ADR-0064, ADR-0065, ADR-0066, ADR-0073, ADR-0077.
 
 ## Decision
 
@@ -88,7 +88,7 @@ The safety model is unchanged: the hard floors, the permission intersection, tai
    - **Promotion to `active`** for a document type uses ADR-0065 rule 11 unchanged: `GetAgentDraftAcceptance` over the agent's `assisted` drafts of that document type (at least two calendar months, at least ceil(3 / `auto_post.max_error_rate`) drafts, at least 1 − rate posted unchanged, none to another partner), by an approved proposal another person approves. The gateway's own mode `shadow` for the document type runs its deterministic checker without posting; no live agent shadow is needed.
    - **`analysis`** keeps its stated exception (ADR-0050 rule 14 note): the daily `RunAnalysisEvaluation` on the company's verified examples is its evaluation in use. A version with no passing CI evaluation is `off` like any other; a failing daily evaluation raises `agent_quality_below_threshold` (rule 15).
    - **`document_reader`** is promoted by the golden-set thresholds of ADR-0057 rule 34. Its live shadow-agreement criterion is replaced by the replay of the company golden set of at least 50 real documents, which that rule already requires before `assisted`. It is the one exception to the carry-over: after a change of behavior it returns to `assisted` in a company only when the replay of that company's golden set has passed again (ADR-0057 rule 13).
-   - **`planning`** is promoted by its evaluation set; the shadow comparator of ADR-0051 rule 25 returns with live shadow.
+   - **`planning`** is promoted by its evaluation set; the comparator of ADR-0051 rule 25 measures quality in use on stored output (rule 15), and live shadow runs return in Phase 2.
    - Live shadow comparison of agents against what people did (ADR-0050 rule 14) returns in Phase 2, together with its evidence tables.
 
 **Budgets**
