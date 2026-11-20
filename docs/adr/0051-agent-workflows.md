@@ -249,6 +249,8 @@ Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-21)
 
     Note ([ADR-0065](0065-deterministic-auto-post-gateway.md), 2026-11-16 (proposed)): "a tainted draft needs a person to post" holds unless the company enables the auto-post gateway for purchase invoices with tainted drafts and this agent type is `active`; then a draft that passes the checker of [ADR-0065](0065-deterministic-auto-post-gateway.md) rule 19 posts as `system`, and the rule's owner confirms it. The next version of this agent type declares `auto_post_document_types` with `purchase_invoice` ([ADR-0065](0065-deterministic-auto-post-gateway.md) rules 10, 11, 19).
 
+    Note (author's delegation, 2026-11-21; decided by the chief architect): the work items `supplier_invoice_received` and `supplier_invoice_extracted` are closed by the owning module when the invoice draft linked to them is posted or canceled (resolution `system`); a person may still resolve one by hand when no draft was made. The catalog rows keep resolution `person` until step 7, because [ADR-0042](0042-work-queue.md) rule 12 leaves `ResolveWorkItem` to kinds a person resolves and a `system` kind cannot also be resolved by hand; the choice is applied at step 7.
+
 **Planning** (ADR-0024 rule 23; ADR-0036 rules 11–12)
 
 23. Trigger, scope and inputs:

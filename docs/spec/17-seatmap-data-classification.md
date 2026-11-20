@@ -45,6 +45,6 @@ The table below is a reference configuration. The model column lists the model u
 | Reviewer | Independent review of the builder's changes | Coding agent; should be a different model, ideally a different provider from the builder | High | — | Claude Fable 5.2 for changes touching money and books | Code |
 | Eval judge | Score the agent evaluation suite | Structured output | Medium | 0 | A model different from the one being scored | Anonymized data |
 
-Each seat also declares: a fallback model chain, budget per run and per day, output token limit, and its mandatory evaluation suite. Customers change model or provider by editing the seatmap and running the seat's evaluation, never by changing code.
+Each seat also declares: a fallback model chain, budget per run (the daily budget is the company's, spec 03 rule 8), output token limit, and its mandatory evaluation suite. Customers change model or provider by editing the seatmap and running the seat's evaluation, never by changing code.
 
 Seats listing a local model apply only when the customer turns on the personal-data routing switch. Otherwise those seats use a cloud model with the same capabilities, e.g. Claude Haiku 5.5 for classification and Claude Sonnet 5.5 for drafting.

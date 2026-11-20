@@ -183,6 +183,8 @@ The hard floor on what a tainted run may read stays the literal spec 03 rule 1 u
 
     Note (S1 review, 2026-11-21): spec 03 rule 1 was reworded on 2026-11-21 under the author's delegation of 2026-11-19. It names this rule as the tainted read scope and changes nothing in it. The author's decision item 2 of 2026-11-19 also lists the whole item catalog, the partner's price lists and available to promise as readable by a tainted run; that is wider than this rule and is not applied: it is recorded as a conflict for the author (open-questions, S1 review section).
 
+    Note (author's delegation, 2026-11-21; decided by the chief architect): the tainted read scope is not widened. [ADR-0050](0050-agent-runtime-and-query-layer.md) rule 27 stays as written, and so does this rule, and the wider wording of the author's decision item 2 of 2026-11-19 is withdrawn. A workflow that needs one more read for a tainted run (for example item candidates for matching) gets it only as a declared projection of a registered query (`tainted_projection`: closed shapes, internal names, row and call limits; see the ADR-0063 note of ADR-0050 rule 27 and [ADR-0063](0063-configurable-policy-settings.md) rule 16), added by an ADR note for that workflow.
+
 **Audit and checks**
 
 15. Audit rows (ADR-0027 rule 8) also record `origin_agent_run_id`, `on_behalf_of_id` and `policy_decision_id`. Full columns: [ADR-0038](0038-audit-and-observability.md) rule 2.

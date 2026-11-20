@@ -297,6 +297,8 @@ Planning answers, per item and warehouse: what to buy or move, how much, and by 
 
     Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-21): the planning agent of the later slice is a Phase 1 agent type. It starts after the manual path of planning with multi-level MRP is built and has passed its gate (after step 5; this rule, ADR-0032 rule 7). The runbook does not place that work yet (open question) (ADR-0078 rule 1; ADR-0036).
 
+    Note (author's delegation, 2026-11-21; decided by the chief architect): the later slice of this rule and multi-level MRP of [ADR-0036](0036-multi-level-mrp.md) are the build step 5b, Planning and multi-level MRP ([runbook](../runbook/steps-5-9.md), [spec 11](../spec/11-build-order.md)): it starts after the gates of steps 5 and 4b and may run beside steps 6 and 7. The planning agent starts after the step 5b gate ([ADR-0078](0078-agent-simplification-for-phase-1.md) rule 1); this replaces "the runbook does not place that work yet" in the note above.
+
 ## Context
 
 - The author's request (2026-11-14); spec 09 had MRP after the MVP, and spec 14 lists "replenishment suggestions" among the next agents.

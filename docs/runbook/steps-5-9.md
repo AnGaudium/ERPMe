@@ -45,6 +45,38 @@ Applies to every step below:
 
 ---
 
+## Step 5b · Planning and multi-level MRP
+
+**Entry criteria:** step 5 gate and step 4b gate passed. The step may run beside steps 6 and 7; no dates are set (decision of 2026-11-21, author's delegation).
+
+**Design items first:** DS-43 planning ([ADR-0024](../adr/0024-planning.md) rule 26); DS-54 multi-level MRP ([ADR-0036](../adr/0036-multi-level-mrp.md)).
+
+**Work packages, in order:**
+
+1. The later planning slice of [ADR-0024](../adr/0024-planning.md) rule 26: forecast methods chosen by backtest, service-level safety stock and the further action messages.
+2. Multi-level MRP ([ADR-0036](../adr/0036-multi-level-mrp.md)): bill of materials explosion with low-level codes and dependent demand.
+3. Lead-time offsetting and planned production orders.
+4. The capacity check and conversion of planned orders.
+5. Step 5b simulator adapter: planning events of the manufacturing company to commands.
+
+**How agents are used:** builders implement; the reviewer checks that planning writes only planned orders, pegging and exceptions, and that it changes no document except through conversion. The recomputation writer completes the naive planning recomputation straight from raw demand, supply and bills of materials, without reading planning code, as for costing at step 3.
+
+**Verification:** planned orders, pegging and exceptions on the manufacturing company equal the naive recomputation per item, warehouse and date; edge cases assigned to the step appear in the coverage report and pass; a second planning run on unchanged data produces no change.
+
+**Exit gate (verbatim):**
+
+> On the manufacturing company of the synthetic dataset, the planning run's planned orders, pegging and exceptions equal an independent naive recomputation; every planning edge case assigned to the step passes; a rerun on unchanged data changes nothing
+
+**Artifacts:** the later planning slice and multi-level MRP in the `planning` module; step 5b adapter; naive planning recomputation; golden results.
+
+**Risks:** the naive recomputation and the planning run disagree for reasons of interpretation (a rule of [ADR-0036](../adr/0036-multi-level-mrp.md), not a bug); run time on the large dataset.
+
+**Fallback:** when the planning run, the naive recomputation and a golden scenario disagree, the author decides which reading of the spec is right and records it (ADR or DS update); the code is never changed just to match one reference. A run-time problem is measured first, then handled by ADR (B2).
+
+**After the gate:** the `planning` agent starts ([ADR-0078](../adr/0078-agent-simplification-for-phase-1.md) rule 1). Its golden pair (one planning exception with the agent on recorded responses and with the LLM off, [ADR-0078](../adr/0078-agent-simplification-for-phase-1.md) rule 13) is an item of the agent's own completion, not of the step 5b gate.
+
+---
+
 ## Step 6 · Cash and AR/AP (months 5–8)
 
 **Entry criteria:** step 5 gate passed.
@@ -99,6 +131,8 @@ Applies to every step below:
 **Exit gate (verbatim):**
 
 > Tax amounts on the synthetic dataset match the independent tax recomputation; the 01/GTGT return matches a hand-built golden return
+
+**Gate item** ([ADR-0078](../adr/0078-agent-simplification-for-phase-1.md) rule 13; author's delegation, 2026-11-21): the purchase invoice flow runs as a golden scenario in two variants over the same input files, with agents on recorded responses and with the LLM off, and both end in the same posted invoice.
 
 **Artifacts:** tax engine; e-invoice adapter interface and BKAV adapter; 01/GTGT generator; golden return.
 
@@ -177,7 +211,7 @@ Agents are not a separate step ([11-build-order.md](../spec/11-build-order.md)).
 | Bank matching | Step 6 gate | DS-34 bank matching, DS-25 |
 | Purchase invoices | Step 7 gate | DS-34 purchase invoices, DS-24 |
 | Document reader (vision) | Step 7 gate | [ADR-0057](../adr/0057-document-intake-and-extraction.md), vision seat configured |
-| Planning | After the manual path of planning with multi-level MRP is built and has passed its gate (after step 5; ADR-0024 rule 26, ADR-0032 rule 7); the runbook does not place that work yet (open question) | DS-34 planning, DS-43, DS-54, [ADR-0051](../adr/0051-agent-workflows.md) rules 23–25 |
+| Planning | Step 5b gate (the manual path of planning with multi-level MRP; ADR-0024 rule 26, ADR-0032 rule 7) | DS-34 planning, DS-43, DS-54, [ADR-0051](../adr/0051-agent-workflows.md) rules 23–25 |
 
 **Work packages per agent:** the workflow as a code-orchestrated cascade (stored rules and mappings → lookup → fuzzy matching with a deterministic score → LLM only for what remains, Principle 13); fixed tool list; untrusted-content tainting; budgets with circuit breaker; run records; replay evaluation in CI; a real-LLM evaluation run whenever a model or prompt changes (Principle 11); metric for the share of steps handled deterministically ([14-agent-workflows.md](../spec/14-agent-workflows.md)).
 

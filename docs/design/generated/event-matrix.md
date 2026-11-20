@@ -136,7 +136,7 @@ A module name here means the ADR speaks of a consumer of that module without nam
 | `messaging_mailer` | 2 | ADR-0076:61, ADR-0076:89 |
 | `planning_work_items` | 3 | ADR-0024:226, ADR-0031:83, ADR-0064:173 |
 | a consumer in `production` | 4 | ADR-0034:248, ADR-0057:49, ADR-0062:106 |
-| a consumer in `purchasing` | 6 | ADR-0024:263, ADR-0024:349, ADR-0037:45 |
+| a consumer in `purchasing` | 6 | ADR-0024:263, ADR-0024:351, ADR-0037:45 |
 | a consumer in `quality` | 4 | ADR-0057:51, ADR-0070:14, ADR-0070:102 |
 | `render_worker` | 2 | ADR-0013:25, ADR-0049:199 |
 | a consumer in `sales` | 3 | ADR-0047:114, ADR-0047:246, ADR-0048:262 |
