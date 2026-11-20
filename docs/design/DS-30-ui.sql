@@ -1,5 +1,5 @@
 -- DS-30 UI: DDL draft for the company data of ADR-0077 (UI floorplans, annotation vocabulary and embedded agent). PostgreSQL 18.
--- assist_request is owned by agents (layer 5; ADR-0077 rule 14); list_variant is owned by registry (layer 2; ADR-0077 rule 10).
+-- assist_request is owned by agents (layer 5; ADR-0077 rule 14); list_variant is owned by registry (layer 2; ADR-0077 rule 10a).
 -- Loaded after DS-05-platform.sql (agent_run) and DS-15 (user_account, role) by the design lab's load_all.py
 -- (docs/reviews/2026-11-14-design-validation). The ADRs win if this file disagrees.
 -- Conventions of DS-20 and DS-05-platform: tables in schema nativeflows, keys inline, references between company tables
@@ -43,7 +43,7 @@ CREATE TABLE assist_request (                              -- the subject of an 
 );
 CREATE INDEX ix_assist_request_requested_by_user_id ON assist_request (requested_by_user_id);
 
--- ===== List variants [registry] (ADR-0077 rule 10) =====
+-- ===== List variants [registry] (ADR-0077 rule 10a) =====
 CREATE TABLE list_variant (                                -- a saved view of one List<Noun> query, personal or shared with a role [registry]
     id                   uuid PRIMARY KEY,
     company_id           uuid NOT NULL REFERENCES company (id),
@@ -64,6 +64,7 @@ CREATE TABLE list_variant (                                -- a saved view of on
         AND jsonb_typeof(sort) = 'array' AND jsonb_typeof(grouping) = 'array' AND jsonb_array_length(columns) <= 40)
 );
 CREATE UNIQUE INDEX ux_list_variant_name ON list_variant (company_id, query_name, owner_user_id, coalesce(shared_role_id, owner_user_id), lower(name)) WHERE state = 'active';
+CREATE UNIQUE INDEX ux_list_variant_shared_name ON list_variant (company_id, query_name, shared_role_id, lower(name)) WHERE state = 'active' AND shared_role_id IS NOT NULL;
 CREATE UNIQUE INDEX ux_list_variant_default_personal ON list_variant (company_id, query_name, owner_user_id) WHERE state = 'active' AND is_default AND shared_role_id IS NULL;
 CREATE UNIQUE INDEX ux_list_variant_default_shared ON list_variant (company_id, query_name, shared_role_id) WHERE state = 'active' AND is_default AND shared_role_id IS NOT NULL;
 

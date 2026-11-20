@@ -8,6 +8,8 @@ The web UI is one more client of the command and query layer. It writes data onl
 
 **Screens.** Almost every screen is rendered from the registry: lists from `List<Noun>` queries, record views from `Get<Noun>`, and forms from command schemas. Their small UI metadata travels as named `x-nativeflows-*` annotations in the generated JSON Schemas. A form shows the server's plan and check results before anything executes, and the client never computes money or quantities itself. The six hand-built entry screens of step 9 reuse the same components with their own layout and the AG Grid line editor.
 
+Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), 2026-11-21): the data grid is the in-repo TanStack Table grid, not AG Grid (ADR-0077 rules 5, 20).
+
 **Transport.**
 - **Sessions:** cookie sessions with a CSRF token.
 - **Bootstrap:** a session query tells the client what the user may see.
@@ -96,6 +98,8 @@ The web UI is one more client of the command and query layer. It writes data onl
    Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): the screen kinds map onto seven floorplans: list report, object page, create and edit form (with a wizard variant), worklist, overview, plan panel and approval view. A route renders exactly one of them, or a registered custom component (ADR-0077 rules 1–3, 22).
 
    Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): user-saved list variants are in Phase 1: personal or shared with a role, storing filters, columns, sort and grouping server-side in `list_variant`; `ListListVariant`, `CreateListVariant`, `UpdateListVariant`, `DeleteListVariant`; sharing needs `share_list_variant` (ADR-0077 rule 10a). Column choice is saved in variants; the browser keeps only the viewer's last choice.
+
+    Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), 2026-11-21): the data grid is the in-repo TanStack Table grid, not AG Grid (ADR-0077 rules 5, 20).
 7. Navigation:
    - **The menu** is generated from the registry. Modules are grouped by area: accounting, inventory, sales, purchasing, production, warehouse, planning, work, settings. The user sees only nouns they may list, from `GetSessionContext`.
    - **The command palette** (`Ctrl/Cmd+K`) finds any permitted command, query, list or record by English or translated name.
@@ -242,6 +246,8 @@ The web UI is one more client of the command and query layer. It writes data onl
 
     Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): the size targets apply to generated routes; the densities `compact` (desktop) and `touch` (PWA, coarse pointers) and the theme are design tokens; targets are at least 24 px at `compact` and 44 px at `touch`; axe-core runs on every floorplan in the generated tests (ADR-0077 rules 7, 19, 21) AG Grid leaves the stack: line entry uses `line_grid`, an editable grid on TanStack Table written in the repository, keyboard first, with barcode-capable cells and within the route budget (ADR-0077 rules 5, 20).
 
+    Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), 2026-11-21): the data grid is the in-repo TanStack Table grid, not AG Grid (ADR-0077 rules 5, 20).
+
 **Structure, tests and scope**
 
 18. `frontend/src/` holds:
@@ -273,6 +279,8 @@ The web UI is one more client of the command and query layer. It writes data onl
     Note ([ADR-0061](0061-barcodes.md), proposed 2026-11-15): DS-31 builds the PWA's scanning on ADR-0061: BarcodeDetector for EAN/UPC and ITF only, until the scanner check page proves on a device that it passes GS through, and a WebAssembly decoder for Code 128, GS1-128, DataMatrix and QR; wedge capture, the shipped scanner profiles and the check page. The WebAssembly modules load on first use and are measured apart from the JavaScript budget of rule 17 (rules 22, 23).
 
     Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): the six step 9 entry screens are no longer hand-built: they are generated create and edit forms with the editable line grid, and their UX spec becomes annotation tuning; the MISA measure is unchanged. The extraction verification screen, the work-order tablet, the analysis view and the PWA scanning flows are registered custom components (ADR-0077 rules 5, 22).
+
+    Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), 2026-11-21): the data grid is the in-repo TanStack Table grid, not AG Grid (ADR-0077 rules 5, 20).
 
 ## Context
 

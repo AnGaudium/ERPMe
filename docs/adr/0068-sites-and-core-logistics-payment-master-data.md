@@ -40,7 +40,7 @@ The CRM-only deployment profile holds: the four `master_data` tables reference n
    - **Hidden while single.** While a company has one active site, forms, lists and prints leave the site out, and commands default it (rule 2). A second active site shows it everywhere. This follows from the data, so it needs no setting or preset item (ADR-0067).
 4. Branch and site stay independent. A branch is the legal, tax and numbering unit (ADR-0009 rule 15; [ADR-0041](0041-tax-engine.md) rule 11). A site is the physical and operational unit. They are linked only by the optional `site.branch_id`: a branch may span several sites, and a site lies in at most one branch.
 5. Reporting:
-   - **No journal column.** `journal_line` gets no `site_id`. Reports roll up warehouse to site through `warehouse.site_id` and rule 2's function.
+   - **No journal column.** `journal_line` gets no `site_id`. Reports roll up warehouse to site through `warehouse.site_id` and rule 2's function. `journal_line.warehouse_id` is nullable, so lines without a warehouse fall under the empty site member. (review note, 2026-11-21)
    - **Analysis.** The analysis catalog gains the dimension `site`, which becomes the parent of `warehouse` ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md)).
 6. Recommended modelling, given by the setup agent and the guidance, and enforced by nothing:
    - **One warehouse per site.** Use one physical warehouse per site, with zones and bins ([ADR-0023](0023-warehouse-management.md) rule 2) for raw materials, the production floor, finished goods and quality.
@@ -51,7 +51,7 @@ The CRM-only deployment profile holds: the four `master_data` tables reference n
 7. `company.valuation_area_level` gains `site`, so its values are `company`, `site` and `warehouse` (a note on ADR-0020 rule 2 and ADR-0015 rule 8):
    - **The area.** With `site`, all physical warehouses of a site, together with the transit and goods-sent warehouses attached to them, form one valuation area.
    - **Fixed.** The level is still set at setup, and ADR-0020 rule 16 is unchanged.
-   - **Preset.** The setup flow fills it from the preset's record default ([ADR-0067](0067-quickflows-operating-presets.md) rule 18): `site` in `standard` and `company` in `quickflows`. `site` is the standard value for three reasons: it equals level `warehouse` when each site has one physical warehouse (rule 6); it avoids a separate average and a valuation event per internal move when a site has several; and it keeps two factories apart.
+   - **Preset.** `CreateCompany` takes an optional preset code; the preset's record default fills `valuation_area_level` when the command leaves it unset (review note, 2026-11-21). The setup flow fills it from the preset's record default ([ADR-0067](0067-quickflows-operating-presets.md) rule 18): `site` in `standard` and `company` in `quickflows`. `site` is the standard value for three reasons: it equals level `warehouse` when each site has one physical warehouse (rule 6); it avoids a separate average and a valuation event per internal move when a site has several; and it keeps two factories apart.
 8. Recording the area. This is the detail the decisions left open.
    - **The columns.** A line records its area in two nullable columns: `valuation_site_id` (new, set at level `site`) and `valuation_warehouse_id` (unchanged, set at level `warehouse`). Both are null at level `company`, and at most one is set (`ck_material_document_line_valuation_area`).
    - **Where.** `material_document_line` and `preliminary_price` carry both. The unique key of `preliminary_price` covers both, with `NULLS NOT DISTINCT`.
@@ -244,10 +244,10 @@ The CRM-only deployment profile holds: the four `master_data` tables reference n
   - [DS-04-command-envelope.md](../design/DS-04-command-envelope.md) (errors);
   - [backlog.md](../design/backlog.md) (carrier integration).
 - **Glossary:** rows for site, payment method, payment method money account, Incoterm, delivery method and resource group, in [00-reading-guide.md](../spec/00-reading-guide.md); the change to the existing valuation area row is left to the author (open questions).
-- **The lab:** `lab/t26_site_valuation.py`:
+- **The lab:** the site valuation lab is not written yet (recorded in [open-questions.md](../open-questions.md), S1 review section). It will check:
   - a transfer inside one site is value-neutral at level `site`;
   - the exact solve runs over sites;
-  - INV-810.
+  - INV-810. (review note, 2026-11-21)
 - **Open questions:** site-level pooled planning; named individual resources.
 - **Index and log:** [docs/adr/README.md](README.md); [docs/runbook/step-log.md](../runbook/step-log.md).
 

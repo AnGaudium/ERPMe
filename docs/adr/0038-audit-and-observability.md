@@ -51,6 +51,8 @@ The retention periods and the strictness of scanning are flagged for the author.
    - **Who may update.** `audit_change` and `audit_record` are append-only, except that `EraseDataSubject` replaces `before` and `after` of the subject's change rows, and `reason` on audit records whose subject is an erased record, with a marker and sets `erased_at`.
    - **How the trigger knows.** The dispatcher alone runs `SET LOCAL nativeflows.erasure_command_id` to the ID of the running command's `idempotency_record`, and only for the command registered as the erasure command. The trigger allows the update only when that setting is present and matches an idempotency record of that command type in the same transaction, and no other column changes.
    - **Finding the rows.** An index on (`subject_table`, `row_id`).
+
+   Note ([ADR-0074](0074-core-data-structure-additions.md), 2026-11-21): erasure of a record also clears the keys of its `custom_values` whose `custom_field_definition.is_personal_data` is true, and masks the `audit_change` images of those keys. Values frozen in posted document versions follow the rule for personal data on posted documents (see the personal-data ADR of the S1 additions).
 5. Denial records, `audit_denial`:
    - **When.** A command or query refused with one of these codes writes a denial record, in simulate and execute mode alike: `permission_denied`, `human_only`, `proposal_required`, `policy_denied`, `outbound_content_out_of_scope` and `segregation_of_duties`. The dispatcher classifies by error code, wherever the error was raised.
    - **Columns.**

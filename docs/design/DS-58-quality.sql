@@ -8,7 +8,7 @@
 -- FORCE ROW LEVEL SECURITY and the company policy (ADR-0017 rule 19), written at the end as rls_v1 would.
 -- Lifecycle columns are named state; enumerations are text with CHECK ck_<table>_<col> (ADR-0004 rules 14, 15).
 -- Referenced tables defined elsewhere: company, item, item_group, product, uom, warehouse, lot, serial_number, partner,
--- site (DS-20); document, agent_run (DS-05-platform); user_account (DS-15); production_order (DS-43-54);
+-- site, reason (DS-20); document, agent_run (DS-05-platform); user_account (DS-15); production_order (DS-43-54);
 -- document_extraction (DS-36). platform_check_append_only() is DS-05-platform's guard.
 -- The stock key is unchanged: a lot claims stock by (item, warehouse, lot or serial, held_stock_status) (ADR-0070 rule 9).
 -- Owner module: quality (ADR-0070 rule 1); every table below says so.
@@ -16,9 +16,10 @@
 -- (DS-20; rule 2); return_to_supplier_line.stock_status (DS-22-09-42; rule 15); the purpose certificate_of_analysis in
 -- ck_document_extraction_purpose, ck_document_reader_purposes and ck_extraction_mapping_rule_purpose (the partner's
 -- mapping rules resolve characteristic codes, rule 11), and the target inspection_result in
--- ck_extraction_result_link_target (DS-36; rule 11). The scrap and internal_consumption line tables have no DDL in
--- DS-22-09-42 yet (open question); when they are drafted, their lines carry stock_status like material_document_line, and
--- internal_consumption lines take movement type internal_consumption or quality_sample (rule 15).
+-- ck_extraction_result_link_target (DS-36; rule 11). The scrap and internal_consumption line tables are defined in
+-- DS-22-09-42 (ADR-0075 rules 4, 5); their lines carry stock_status like material_document_line, and
+-- internal_consumption lines take movement type internal_consumption or quality_sample (rule 15). inspection_lot_line.reason_id
+-- (rule 12) follows scrap_line.scrap_reason_id and return_to_supplier_line.return_reason_id (ADR-0074 rule 22).
 
 -- ===== Master data [quality] (ADR-0070 rules 3-6) =====
 CREATE TABLE sampling_procedure (                          -- [quality] ADR-0070 rule 3; company data, change-tracked, master_data_change
@@ -176,12 +177,17 @@ CREATE TABLE inspection_lot_line (                         -- [quality] ADR-0070
     disposition         text NOT NULL CONSTRAINT ck_inspection_lot_line_disposition CHECK (disposition IN ('release', 'block', 'return_to_supplier', 'scrap', 'rework', 'sample_consumption')),
     quantity            types.quantity NOT NULL CONSTRAINT ck_inspection_lot_line_quantity CHECK (quantity > 0),   -- inventory unit
     serial_number_id    uuid REFERENCES serial_number (id),
+    reason_id           uuid,                                -- only for scrap (kind scrap) and return_to_supplier (kind return); required while documents.reason_required.scrap or .return is true (ADR-0074 rule 22); the executor copies it to the draft it creates (rule 15)
+    reason_kind         text CONSTRAINT ck_inspection_lot_line_reason_kind CHECK (reason_kind IN ('scrap', 'return')),
     recorded_at         timestamptz NOT NULL,
     UNIQUE (inspection_lot_id, line_number),
     UNIQUE (company_id, id),
     UNIQUE (company_id, id, disposition),
     FOREIGN KEY (company_id, inspection_lot_id) REFERENCES inspection_lot (company_id, id),
-    CONSTRAINT ck_inspection_lot_line_serial_quantity CHECK (serial_number_id IS NULL OR quantity = 1)
+    FOREIGN KEY (company_id, reason_id, reason_kind) REFERENCES reason (company_id, id, kind),
+    CONSTRAINT ck_inspection_lot_line_serial_quantity CHECK (serial_number_id IS NULL OR quantity = 1),
+    CONSTRAINT ck_inspection_lot_line_reason CHECK ((reason_id IS NULL) = (reason_kind IS NULL)
+        AND (reason_id IS NULL OR (disposition = 'scrap' AND reason_kind = 'scrap') OR (disposition = 'return_to_supplier' AND reason_kind = 'return')))
 );
 -- What the executor created for a line, and how it ended (rule 15). Written only by RecordInspectionLotExecution;
 -- state moves created -> done | canceled once, by trigger; identity and target never change.

@@ -26,7 +26,7 @@ The UI is generated from metadata, not hand-built. Every screen is one of seven 
    | List report | `list_report` | a `List<Noun>` query, or a computed query with a row result |
    | Object page | `object_page` | a `Get<Noun>` query, or a computed query with a single-object result |
    | Create and edit form | `edit_form` | any command; wizard variant for long documents |
-   | Worklist | `worklist` | `ListWorkItem`, filtered for one Center or one person |
+   | Worklist | `worklist` | `ListWorkItem`, filtered for one Center or one person; for the case view, `ListWorkCaseTimeline` (ADR-0066 rule 21) (review note, 2026-11-21) |
    | Overview | `overview` | saved analyses ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md)) shown as KPI tiles and charts |
    | Plan panel | `plan_panel` | the `simulate` response of the command a form or action sends (ADR-0040 rule 9) |
    | Approval view | `approval_view` | a document in `pending_approval` with its approval progress |
@@ -36,7 +36,7 @@ The UI is generated from metadata, not hand-built. Every screen is one of seven 
 2. Derivation, so that most declarations need no floorplan annotation:
    - `List<Noun>` gives `list_report`, and `Get<Noun>` gives `object_page`.
    - A command gives `edit_form`; it is a wizard when its payload declares more than one field group and is annotated `wizard: true`.
-   - `ListWorkItem` gives `worklist`.
+   - `ListWorkItem` gives `worklist`; for the case view, `ListWorkCaseTimeline` does (ADR-0066 rule 21). (review note, 2026-11-21)
    - A computed query gives `list_report` for an array result and `object_page` otherwise.
    - A subject in state `pending_approval`, opened from its `approval_pending` work item or from an `Approve<Type>` action, gives `approval_view`.
    - An overview is declared by its Center (the Centers ADR), which names its saved analyses.
@@ -65,7 +65,7 @@ The UI is generated from metadata, not hand-built. Every screen is one of seven 
      - Regions: the journal lines and stock movements filtered by field class, versions, events, side information, check results, the policy outcome and review reasons (ADR-0067); after a plan change, the diff against the reviewed plan (ADR-0040 rule 9).
      - For a draft or proposal written by an agent, it adds a field-level diff against the previous version and the taint badge (rule 15).
    - **Approval view.**
-     - Regions: the document summary (the object page header and sections), `GetApprovalProgress`, the diff of this version against the last approved one, the taint badge and clearance record, and Approve and Reject with a reason field.
+     - Regions: the document summary (the object page header and sections), `GetApprovalProgress`, the diff of this version against the last approved one, the taint badge and clearance record, and Approve and Reject with a reason field. Reject takes a reason of kind `reject` (`reject_reason_id`, ADR-0074 rule 14), required while `documents.reason_required.reject` is true, and the text `reason`, which stays required for both decisions (ADR-0055 rule 9). (review note, 2026-11-21)
      - Approve stays subject to segregation of duties (ADR-0017 rule 16).
 
 4. Keyboard model. ADR-0040 rule 16 stays the global model, and each floorplan adds:
@@ -137,7 +137,7 @@ The UI is generated from metadata, not hand-built. Every screen is one of seven 
 
    How provenance is shown is not an annotation: it comes from the data (rule 15).
 
-10. Per entity or floorplan. Two keys are kept and extended, and seven are new:
+10. Per entity or floorplan. Three keys are kept (two of them extended) and seven are new:
 
     | Key | Status | On | Meaning |
     | --- | --- | --- | --- |
@@ -150,7 +150,6 @@ The UI is generated from metadata, not hand-built. Every screen is one of seven 
     | `x-nativeflows-links` | new | `Get<Noun>` result | Related objects: a `List<Noun>` query with the filter that binds it to this subject |
     | `x-nativeflows-search` | new | `List<Noun>` result | The fields the `search` filter matches, as the query declares them |
     | `x-nativeflows-assist` | new | declaration | Suggested question keys and agent actions for the assist panel (rule 17) |
-
     | `x-nativeflows-custom-values` | kept (ADR-0074) | `Get<Noun>`, `List<Noun>` result, command payload | The table whose company-defined fields the renderer reads through `ListCustomFieldDefinitions` |
 
     **The vocabulary totals 24 keys:** the 13 of ADR-0040 and ADR-0074, six of them extended (`widget`, `hidden-when`, `read-only-when`, `lookup`, `list-defaults`, `line-columns`) and `scale-from` made required, plus 11 new.
@@ -160,6 +159,7 @@ The UI is generated from metadata, not hand-built. Every screen is one of seven 
     - **Contents.** It stores filters, columns, sort and grouping for one `List<Noun>` query, server-side in `list_variant` ([DS-30-ui.sql](../design/DS-30-ui.sql), owner `registry`). A variant may be the default of its owner or of its role.
     - **Commands.** `CreateListVariant`, `UpdateListVariant` and `DeleteListVariant`. A personal variant is checked on `general_access`. A shared one needs the capability `share_list_variant` at `edit` on the leaf `list_variant` under Administration, which `owner` and `it_administrator` hold through Administration `full`; a company may grant it to other roles.
     - **Reading.** `ListListVariant` returns the caller's personal variants and those shared with the caller's roles. A variant never widens what the query returns: its filters run inside the caller's permission and record scope.
+    - **Unique names.** A personal variant name is unique per owner and query (`ux_list_variant_name`). A shared variant name is unique per role and query, whoever owns it (`ux_list_variant_shared_name`). (review note, 2026-11-21)
     - **Declared variants** of `list-defaults` stay; they show beside the saved ones. Column choice is no longer only a browser-storage convenience (ADR-0040 rule 6 note).
 
 11. What is not annotated, because the registry already declares it:
@@ -179,19 +179,25 @@ The UI is generated from metadata, not hand-built. Every screen is one of seven 
 
 13. One agent type, `assistant`, serves the UI. It is declared like the agent types of [ADR-0051](0051-agent-workflows.md):
     - **Rights.** Its effective rights are the intersection of its declared permissions and the user's, rechecked on every call ([ADR-0054](0054-users-roles-and-authorizations.md) rule 16; [ADR-0050](0050-agent-runtime-and-query-layer.md) rule 31).
-    - **Tool list.** Read queries that ADR-0050 rule 30 does not exclude, commands registered `is_draft_only`, and `UpdateAssistAnswer` for workflow code only (rule 14).
+    - **Tool list.** Read queries that ADR-0050 rule 30 does not exclude, commands registered `is_draft_only`, and `UpdateAssistAnswer` for workflow code only (rule 14). The subset depends on the purpose: `ask`, `resolve_command` and `resolve_filter` runs get read queries only; only `act` runs get the `is_draft_only` commands. (review note, 2026-11-21)
     - **Starting a run.** A run is started by `StartAgentRun` with the user's `start_agent:assistant`, held at `edit` on the leaf `agent_assistant`, so it acts for that person in that person's own context. The seed gives the leaf to every role template with UI access except `it_administrator`, in line with the decision on `start_agent` of 2026-11-19 ([ADR-0054](0054-users-roles-and-authorizations.md) rule 11 note), and except `auditor`, which ADR-0054 rule 11 keeps at `read` everywhere and nothing else, while starting a run is a command; a company may withdraw the leaf from any role.
     - **Budgets.** Its budgets are the `agents.<agent_type>.*` settings within the company cap ([ADR-0063](0063-configurable-policy-settings.md); ADR-0050 rule 22). The company setting `assist.max_cost_per_run` (default USD 0.20, bounds 0.01 to 2, lower is tighter) caps one run inside them.
-    - **Scope.** The run's scope is its `assist_request` plus the context subject and the selected rows, each checked against the user's record scope.
-    - **Taint.** A run of `purpose` `act` always starts tainted, because the user may have pasted untrusted content into the text. A run of `ask`, `resolve_command` or `resolve_filter` starts untainted, and taint propagates as usual when it reads untrusted data (ADR-0050 rule 25). A tainted run may run only `is_draft_only` commands and reads only the tainted read scope (ADR-0050 rules 26, 27).
-    - **Modes.** `ask`, `resolve_command` and `resolve_filter` follow the stated exception of the analysis agent (ADR-0050 rule 14 note): they answer only the asking person. `act` follows the ordinary path `off`, `shadow`, `assisted`, and the assistant is never promoted to `active` (ADR-0065), so its drafts always need a person to confirm them.
-    - **Evaluation.** Spec 17 requires every pair of seat and model to pass an evaluation. The assistant seat's set has about 50 tasks across the three modes: read answers with correct citations, drafts with correct field diffs, refusals outside its scope, and taint handling, pasted untrusted text included. It is built with the assistant and is a step 5 gate item.
+    - **Scope.** The run's scope is scope kind `subject`: its `assist_request` plus the context subject and the selected rows, each checked against the user's record scope. ADR-0050 rule 27 carries a note that defines this scope for a tainted run, so an `act` run, which always starts tainted, can read these records. (review note, 2026-11-21)
+    - **Taint.** A run of `purpose` `act` always starts tainted, because the user may have pasted untrusted content into the text: it starts with `taint_source_kind` `outside_subject` and source table `assist_request`. The registry marks `assist_request` as outside content only when `purpose` is `act` (note at ADR-0050 rule 15). (review note, 2026-11-21) A run of `ask`, `resolve_command` or `resolve_filter` starts untainted, and taint propagates as usual when it reads untrusted data (ADR-0050 rule 25). A tainted run may run only `is_draft_only` commands and reads only the tainted read scope (ADR-0050 rules 26, 27).
+    - **Modes.** The assistant runs only in mode `assisted`; its default is `off`. It is never promoted to `active` (ADR-0065), so its drafts always need a person to confirm them. The evaluation set below is its promotion evidence (a step 5 gate item). The purposes `ask`, `resolve_command` and `resolve_filter` answer only the asking person and write nothing; they still require mode `assisted`. (review note, 2026-11-21)
+    - **Grouping.** The assistant has three modes of use, named once here: ask, act and resolve. Resolve has two purposes, `resolve_command` and `resolve_filter`, so `assist_request.purpose` has four values. The evaluation set counts these three. The assist panel of rule 17 has three panel modes of its own (ask, act, proactive), and the resolve purposes serve the command bar and natural-language filters (rule 18). (review note, 2026-11-21)
+    - **Evaluation.** Spec 17 requires every pair of seat and model to pass an evaluation. The set for the seats of rule 14 has about 50 tasks across the three modes: read answers with correct citations, drafts with correct field diffs, refusals outside its scope, and taint handling, pasted untrusted text included. It is built with the assistant and is a step 5 gate item.
 
 14. Typed text reaches the agent through one row, as `analysis_question` does for the analysis agent (ADR-0060). `CreateAssistRequest` is `human_only` and writes an `assist_request` with these columns:
     - `purpose`: `ask`, `act`, `resolve_command` or `resolve_filter`;
-    - `text`: up to 2,000 characters;
-    - the context: `subject_table` and `subject_id`, up to 100 selected IDs, the active filters as JSON, and the floorplan code;
-    - the requesting user.
+    - `request_text`: up to 2,000 characters;
+    - `language`: the language tag of the request;
+    - the context: `context_subject_table` and `context_subject_id`, up to 100 `selected_ids`, `active_filters` as JSON, and the `floorplan` code;
+    - `requested_by_user_id`: the requesting user.
+
+    **Personal data.** `request_text` is labeled personal (spec 17) and follows the routing switch as `analysis_question.question_text` does (ADR-0060 rule 21). It is blanked, which sets `erased_at`, when the requesting user's account is erased and by the retention job after `analysis_question_retention_days`, the same value as for analysis questions (ADR-0060 rule 21; no new setting). (review note, 2026-11-21)
+
+    **Seats.** The LLM steps of the assistant use the spec 17 seat "Data Q&A" for `ask` and the resolve purposes, and "Drafting" for `act`. (review note, 2026-11-21)
 
     The UI then sends `StartAgentRun` with the row as subject. The run writes its answer to the row through `UpdateAssistAnswer`, registered `is_draft_only` and called only by workflow code, as `UpdateAnalysisAnswer` is (ADR-0050 rule 26 note); its drafts link to its `agent_task` work item (ADR-0042), and a live update tells the panel (ADR-0040 rule 13).
 
@@ -217,7 +223,7 @@ The UI is generated from metadata, not hand-built. Every screen is one of seven 
 17. The assist panel. Every floorplan has one, opened with `Ctrl+/`.
     - **Scope.** It is scoped to the current context: the subject record, the selection, the active filters, or the Center's queue.
     - **Budget.** It shows the remaining daily budget of the user's company for `assistant` through `GetAgentBudgetStatus`. This people-only query returns amounts, not run bodies, and is on no tool list.
-    - **Three modes:**
+    - **Three panel modes:**
       - **Ask and explain** (`ask`, read only). The answer cites records as links. Every reference in it is an ID or handle that the run read through the query layer (ADR-0050 rule 36), rendered as a link to that record's object page.
       - **Propose and act** (`act`, write as drafts). The run writes drafts or change proposals only (ADR-0029). They open in the plan panel with a field-level diff and a taint badge where it applies.
       - **Proactive.** The panel never starts a run unasked. Proactive outputs come from the scheduled and triggered agents of ADR-0051 as work items.
@@ -299,14 +305,17 @@ The UI is generated from metadata, not hand-built. Every screen is one of seven 
     - `extraction_verification` (ADR-0057 rule 22);
     - `work_order_tablet` ([ADR-0071](0071-work-orders-and-shop-floor-execution.md) rule 14);
     - `analysis_view` (ADR-0060 rule 17);
-    - `scan_flow`, the PWA scanning flows (ADR-0061; DS-31).
+    - `scan_flow`, the PWA scanning flows (ADR-0061; DS-31);
+    - `conversation_view` and `notification_inbox` (ADR-0076 rule 8). (review note, 2026-11-21)
+
+    The work-center queue of ADR-0071 is not a kanban component in Phase 1: it renders as a worklist grouped by state. (review note, 2026-11-21)
 
     An MRP planning board or a warehouse bin map would each need a new ADR.
 
     `check` reports the share of generated routes. Below 85% the next custom component needs the author's look.
 
 23. Sequence:
-    - **Declaration format.** The annotation slots of rules 9 and 10 become fields of the declaration format defined next (ADR-0073, Fable's step 2 work), so that Sonnet drafts them with every declaration.
+    - **Declaration format.** The annotation slots of rules 9 and 10 become fields of the declaration format defined next (ADR-0073 defines it), so that Sonnet drafts them with every declaration.
     - **Renderer v1** (ADR-0040 rule 19, step 1) renders the list report (with variants), object page, create and edit form (with `line_grid`) and plan panel. It is the test harness during the headless steps 0–5.
     - **Later floorplans.** The worklist and approval view follow with the work queue at step 5. The overview follows with the Centers.
     - **The `assistant` agent**, the assist panel, natural-language filters and the command bar's `resolve_command` arrive at step 5, with the work queue; the evaluation set of rule 13 is a step 5 gate item ([steps-5-9.md](../runbook/steps-5-9.md)).

@@ -1545,7 +1545,7 @@ CREATE TABLE cost_estimate_line (                          -- rolled up level by
     component_item_id  uuid,
     activity_type_id   uuid,
     cost_component_detail_id  uuid NOT NULL,                   -- [production] ADR-0072 rule 4; stamped by map_cost_component_detail, or the surcharge row's detail
-    costing_sheet_row_number  integer,                         -- [production] ADR-0072 rule 8; the production surcharge row of cost_estimate.costing_sheet_id
+    costing_sheet_row_number  integer,                         -- [production] ADR-0072 rule 8; level 0 lines only: the production surcharge row of cost_estimate.costing_sheet_id. Rolled-up lines of made components (level above 0) keep the row number of the component's own estimate. The command enforces the level 0 link; there is no foreign key, because rolled-up lines name other estimates' rows (INV-852)
     credited_cost_center_id   uuid,                            -- [production] ADR-0072 rule 11; the surcharge row's credited cost center, reporting only (was the interim cost_center_id)
     quantity           types.quantity NOT NULL,                -- surcharge lines: the base amount or the output or activity units
     price              types.unit_price NOT NULL,              -- surcharge lines: the rate (percent, or amount per unit)

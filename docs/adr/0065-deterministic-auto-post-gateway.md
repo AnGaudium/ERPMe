@@ -15,7 +15,7 @@ The author's design draft "Deterministic Policy Engine (Maker-Checker Gateway)" 
 
 **Hard rules.** No LLM in the checker. Fail closed: anything unknown gives `require_human`. The gateway never changes a draft. The posting runs as `system` and must reproduce the simulated plan. Confirmation stays.
 
-**Tainted drafts, by the author's decision.** A draft with values an LLM read from outside content may be auto-posted only when the company and the document type both enable it (default off, a loosening that another person approves), the drafting agent type is in the new agent mode `active` on evidence, the checker passes, and every value the checker relies on carries a verification result. The author rewords spec 03 rule 1 (open question).
+**Tainted drafts, by the author's decision.** A draft with values an LLM read from outside content may be auto-posted only when the company and the document type both enable it (default off, a loosening that another person approves), the drafting agent type is in the new agent mode `active` on evidence, the checker passes, and every value the checker relies on carries a verification result. The author delegated the rewording of spec 03 rule 1 on 2026-11-19; it was applied on 2026-11-21 as the single permitted edit to spec 03 (review note, 2026-11-21).
 
 **Evidence before enabling, and fast demotion.** A document type runs in shadow first. It goes live only on evidence meeting `auto_post.max_error_rate` and through a change proposal that another person approves. One confirmed wrong auto-post suspends the document type at once.
 
@@ -41,7 +41,7 @@ The author's design draft "Deterministic Policy Engine (Maker-Checker Gateway)" 
 
    The registry refuses two checkers for one document type. The placeholder `<document_type>` of rule 8's keys lists the document types whose checker declares `runner: gateway_job`; in Phase 1 that is `purchase_invoice` only.
 3. Position in the flow (D2), for checkers with `runner: gateway_job`:
-   - **Candidates.** `RunAutoPostGateway` runs every 5 minutes (a declared technical timer, ADR-0007 rule 10) per company and document type whose `auto_post.<document_type>.mode` is `shadow` or `live`. A candidate is a draft of that type whose latest version was written by a non-human (an agent run that has ended, a consumer, an integration or a system job), with no gateway decision for that version yet. A version a person wrote is never a candidate: a person posts it.
+   - **Candidates.** `RunAutoPostGateway` runs every 5 minutes (a declared technical timer; the business date is fixed per run, ADR-0007 rule 17) per company and document type whose `auto_post.<document_type>.mode` is `shadow` or `live`. A candidate is a draft of that type whose latest version was written by a non-human (an agent run that has ended, a consumer, an integration or a system job), with no gateway decision for that version yet. A version a person wrote is never a candidate: a person posts it.
    - **Simulate.** For each candidate, in its own transaction, the job simulates `Post<Type>` as `system` on behalf of the owner of the enabled policy rule that allows the posting (spec 03 rule 3), or of the company's owner when none is enabled. The simulation returns the plan, `plan_hash`, the check results, `as_of_date` (ADR-0007 rule 15 note) and the gateway's decision, computed at the policy point after the handler has built the plan, as for commands registered `is_policy_in_handler` (DS-04 check order, step 9).
    - **Execute.** When the decision is `auto_post` and the mode is `live`, the job executes `Post<Type>` in a new transaction with `expected_plan_hash` set to the simulated hash and `as_of_date` set to the simulated date. The gateway is evaluated again inside that execution on the same inputs; the `policy_decision` row commits with the posting.
    - **Otherwise** (`require_human`, `reject`, shadow mode, a refused execution, an error) the job writes the decision with `RecordAutoPostDecision` in a transaction of its own and raises `auto_post_review` unless the mode is `shadow`.
@@ -52,7 +52,7 @@ The author's design draft "Deterministic Policy Engine (Maker-Checker Gateway)" 
    - **`reject`:** the stored outcome is `denied` for `system`. `auto_post_review` names the reason; the draft is wrong as it stands (a simulation error such as `duplicate_external_document`, or a checker rule declared `reject`), and a person corrects or cancels it. The gateway never cancels or changes it.
    - **Once per version.** The gateway decides a version once. A new version of the draft is a new candidate when its writer is a non-human.
 5. Evaluation (D2, D4). `evaluate_auto_post` evaluates every rule below and records each outcome; the decision is the strictest outcome (`reject` above `require_human` above `auto_post`), so it never depends on rule order. The reason code is the first failure in this order:
-   1. `auto_post_rule_not_allowed`: the policy table's decision for this `system` posting (ADR-0043 rules 7–9, floors included except as rule 12 states) is not `allowed` with confirmation, for example no enabled rule, an amount above the rule's `amount_company_max`, or an approval that the seeded `is_match_exceeded` rule requires;
+   1. `auto_post_rule_not_allowed`: the policy table's decision for this `system` posting (ADR-0043 rules 7–9, floors included except as rule 12 states) is not `allowed` with confirmation, for example no enabled rule, an amount above the rule's `amount_company_max`, or an approval that the seeded `is_match_exceeded` rule requires. In mode `shadow` the missing enabled rule for `system` is not a failure, because rule 15 enables that rule only after the shadow evidence exists: the floors and every other policy rule are evaluated as if a rule allowing `system` to post the document type with confirmation were enabled, and the amount is bounded by item 4 (review note, 2026-11-21);
    2. `auto_post_simulation_error` (`reject`): the simulation returned an error;
    3. `auto_post_check_result`: the plan carries a check result not in the checker's `allowed_check_codes`;
    4. `auto_post_amount_above_maximum`: the posting's amount in company currency is above `auto_post.<document_type>.max_amount_company`;
@@ -97,7 +97,7 @@ The author's design draft "Deterministic Policy Engine (Maker-Checker Gateway)" 
    | `auto_post.purchase_invoice.quantity_tolerance_percent` | 0 | 0 to 10 | lower tighter | `auto_post` |
    | `auto_post.purchase_invoice.require_full_receipt` | true | true, false | true tighter | `auto_post` |
 
-   - **Change path** (ADR-0063 rule 3): tightening is immediate by one person holding `edit` on `policy`; loosening is a change proposal approved by another person holding `policy` at `full`. So turning a document type to `shadow` or `live`, raising its maximum, adding a currency, enabling tainted drafts and switching verification off each need a second person, and a one-person company cannot do any of them.
+   - **Change path** (ADR-0063 rule 3): tightening is immediate by one person holding `edit` on `policy`; loosening is a change proposal approved by another person holding `policy` at `full`. So turning a document type to `shadow` or `live`, raising its maximum, adding a currency, enabling tainted drafts and switching verification off each need a second person, and a one-person company cannot do any of them. The setup path of ADR-0067 rule 9 never applies to an `auto_post.*` key, `cash.auto_post.*` included (review note, 2026-11-21).
    - **Amounts** are in company currency; the core gives no other value than 0, because an amount depends on the currency (as `cash.bank_charge.auto_post_ceiling`).
    - **The author's numbers** (more than 5 earlier invoices, below 50,000,000, 1%) are examples only. The core defaults above are safe because the mode starts `off` and the maximum at 0.
    - **Evidence.** A loosening of a key with `outdates: auto_post` marks the stored evidence of every enabled rule version that lists the key outdated (ADR-0063 rule 3 note), so a looser checker re-arms only on new evidence.
@@ -129,7 +129,7 @@ The author's design draft "Deterministic Policy Engine (Maker-Checker Gateway)" 
 12. Floors and the hard-floor text:
     - **Floors 3 and 5** of ADR-0043 rule 9 give `human_post` for a non-human posting of a tainted or agent-written version. For a `system` posting whose gateway decision is `auto_post` with every condition of rule 10 met, they are satisfied by the gateway instead: the decision is `allowed` with confirmation. In every other case they apply unchanged. Floors 4 and 6, permissions, segregation of duties and `human_only` commands are untouched.
     - **INV-84** is restated: no policy decision with outcome `allowed` for a non-human actor concerns an effectively tainted version, except a live gateway decision `auto_post` under rule 10, which INV-761 checks.
-    - **Spec 03.** Spec 03 says that no policy, threshold or customer setting relaxes rule 1. The author's decision of 2026-11-16 makes this one exception; the author rewords rule 1 (open question). Proposed wording: "No auto-post of a draft an LLM contributed to, unless the company has enabled tainted auto-post under ADR-0065 for that document type and the deterministic checker passes."
+    - **Spec 03.** Spec 03 says that no policy, threshold or customer setting relaxes rule 1. The author's decision of 2026-11-16 allows this path; the author delegated the rewording of rule 1 on 2026-11-19, and it was applied on 2026-11-21 as the single permitted edit to spec 03: rule 1 now names the deterministic auto-post gateway of this ADR as part of the rule, and the lead-in says the gateway is not a relaxation (review note, 2026-11-21).
     - **LLM-originated bank rules.** Under the same decision `cash.auto_post.accept_llm_originated_rules` is no longer bounded false: its bounds become true and false, default false. Rule 8 of ADR-0063 keeps its five conditions, and `llm_suggestion` drafts still never auto-post (ADR-0063 rule 6).
     - **Tainted read scope** (ADR-0029 rule 14) is unchanged: this decision lets a checked draft post; it widens no run's reads.
 13. Automation rules still never approve or post (D6). ADR-0058 rule 3 stands unchanged: no automation rule submits, approves, posts or issues. The gateway is a policy decision on a draft at the policy point of `Post<Type>`, evaluated by core code with settings and a decision table at a module decision point, not an automation rule, so the rule needs no exception. A decision table used here only outputs a decision; it runs no action.
@@ -168,6 +168,8 @@ The author's design draft "Deterministic Policy Engine (Maker-Checker Gateway)" 
 **Instances**
 
 19. The purchase invoice (D9), the first checker, `purchasing.purchase_invoice_auto_post` version 1 (actor `system`, `runner: gateway_job`, `accepts_tainted: true`). Its rules, in order, each failing to `require_human` unless marked:
+    Which party each rule reads: the order match (`supplier_differs_from_order`), the supplier history and the `partner_item` lookup use the ordered-from supplier (`partner_id`); the duplicate check uses the invoicing party (ADR-0074 rule 4) (review note, 2026-11-21).
+
     1. `supplier_differs_from_order` (`reject`): a referenced purchase order belongs to another supplier than the invoice;
     2. `line_kind_not_matchable`: a line is not a `goods` line with an order line, or a `service` line with a service receipt (expense and landed-cost lines have no deterministic cross-check);
     3. `line_item_not_mapped`: a line's item is not the item that the supplier's approved `partner_item` or `supplier_item` row gives for the source record line's seller code, a lookup the checker repeats; an item an LLM chose (ADR-0051 rule 21, step L1) is `llm_read_only`;
@@ -198,7 +200,7 @@ The author's design draft "Deterministic Policy Engine (Maker-Checker Gateway)" 
 
     `UpdateAgentTypeSetting` gains the mode `active` (rule 11). `EnablePolicyRule` gains `auto_post_checker_missing` (rule 14). `ConfirmAutoPost` follows the cadence of rule 8.
 22. Catalog rows:
-    - **Settings:** 11 definitions (rule 8), so [settings.csv](../catalogs/settings.csv) holds 104; `cash.auto_post.accept_llm_originated_rules` gets bounds `true|false` (rule 12).
+    - **Settings:** 11 definitions (rule 8), added to [settings.csv](../catalogs/settings.csv); `cash.auto_post.accept_llm_originated_rules` gets bounds `true|false` (rule 12).
     - **Errors** (DS-04): `auto_post_checker_missing` (precondition), `agent_mode_not_declared` (validation).
     - **Gateway reason codes** (recorded in `policy_decision.auto_post_reason_code`, not errors): the codes of rules 5, 7 and 10, and the checker's codes of rule 19.
     - **Work item kind:** `auto_post_review` (module `policy`, subject `document`, `role:accountant`, `days:1`, resolved by the system when the version is posted, canceled or replaced). `auto_post_unconfirmed` is now due at the end of its confirmation window (`named_by_raiser`, rule 8).
@@ -244,17 +246,18 @@ SAP's logistics invoice verification posts incoming electronic invoices in the b
 - **For auditors:** each auto-post has one `policy_decision` row with the settings, table versions, rule outcomes and value bases; confirmation by the rule's owner stays.
 - **For the build:** the gateway, the decision columns and `RecordAutoPostDecision` land with `policy` at step 5; the runner, the purchase invoice checker and the advisor with the purchase invoice agent and auto-post at step 6 (DS-34). The cascade and import checkers are refactors of designed hooks.
 - **Behavior changes:** none by default. Every new setting's default reproduces today's behavior (auto-post off, tainted drafts off, confirmation per period). The only change to an existing row is the lifted bound of `cash.auto_post.accept_llm_originated_rules`, whose default stays false.
-- **For the author:** spec 03 rule 1's wording (open question).
-- **Revisit when:** a second document type asks for the gateway; evidence shows the purchase invoice rules too strict or too loose; the author rewords spec 03 rule 1 differently.
+- **For the author:** nothing open on spec 03 rule 1: the rewording was delegated on 2026-11-19 and applied on 2026-11-21 (review note, 2026-11-21).
+- **Revisit when:** a second document type asks for the gateway; evidence shows the purchase invoice rules too strict or too loose; the delegated wording of spec 03 rule 1 proves wrong in use.
 
 ## Documents updated
 
 - **ADRs** (notes tagged "ADR-0065, 2026-11-16 (proposed)"): [ADR-0029](0029-proposals-and-agent-safety.md) rules 13, 14, 16; [ADR-0043](0043-policy-and-approval.md) rules 1, 5, 9, 14; [ADR-0047](0047-commercial-documents-and-pricing.md) rule 14; [ADR-0048](0048-cash-bank-receivables-payables.md) rule 9; [ADR-0050](0050-agent-runtime-and-query-layer.md) rule 14; [ADR-0051](0051-agent-workflows.md) rules 18, 22; [ADR-0057](0057-document-intake-and-extraction.md) rule 17; [ADR-0058](0058-configurable-workflows.md) rule 3; [ADR-0059](0059-ai-tuning-and-development-of-deterministic-functions.md) rules 6, 16; [ADR-0063](0063-configurable-policy-settings.md) rules 6, 8, 29; [ADR-0064](0064-production-agent.md) rule 25.
 - **Catalogs:** [settings.csv](../catalogs/settings.csv), [invariants.csv](../catalogs/invariants.csv), [edge-cases.csv](../catalogs/edge-cases.csv), [work-item-kinds.csv](../catalogs/work-item-kinds.csv), [authorization-areas.csv](../catalogs/authorization-areas.csv), [role-template-levels.csv](../catalogs/role-template-levels.csv), the [catalogs README](../catalogs/README.md).
 - **Design files:** [DS-04-command-envelope.md](../design/DS-04-command-envelope.md) (errors, check order, registry vocabulary), [DS-05-platform.sql](../design/DS-05-platform.sql), [DS-16-invariants-and-harness.md](../design/DS-16-invariants-and-harness.md), [DS-17-synthetic-dataset.md](../design/DS-17-synthetic-dataset.md), [architecture-overview.md](../design/architecture-overview.md), [architecture-core.md](../design/architecture-core.md).
-- **Open questions:** [docs/open-questions.md](../open-questions.md): the author's decision on tainted auto-post recorded as answered; the spec 03 rule 1 wording asked.
+- **Open questions:** [docs/open-questions.md](../open-questions.md): the author's decision on tainted auto-post recorded as answered; the spec 03 rule 1 wording answered by the author's delegation (2026-11-19) and applied (2026-11-21).
 - **Index and log:** [docs/adr/README.md](README.md); [docs/runbook/step-log.md](../runbook/step-log.md).
-- **Not changed:** `docs/spec/`, including the glossary; the glossary rows for the gateway's terms come with acceptance.
+- **Changed in review:** `docs/spec/03-agent-safety.md`, lead-in and rule 1 only, as delegated by the author on 2026-11-19 and applied on 2026-11-21 (review note, 2026-11-21).
+- **Not changed:** the rest of `docs/spec/`, including the glossary; the glossary rows for the gateway's terms come with acceptance.
 
 ## Edge cases and invariants
 

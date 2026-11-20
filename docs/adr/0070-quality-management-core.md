@@ -50,7 +50,7 @@ The author's decision of 2026-11-17 gives Phase 1 a thin but complete quality co
    The sample quantity is computed once, when the lot is created, and stored on the lot. Later kinds (`iso_2859`, `skip_lot`) add values of `kind` and their own parameter columns.
 4. Inspection plans:
    - **The plan.** `inspection_plan` holds `code`, `name`, exactly one of `item_id` and `item_group_id`, `inspection_point`, an optional `site_id` (ADR-0068), and, for `in_process` plans of an item, an optional `operation_number`. The tuple is unique.
-   - **Selection.** For a lot, the first plan that matches wins: item and site, then item, then item group and site, then item group. The site is that of the lot's warehouse. Within the plan, the revision used is the highest released one with `start_date` on or before the lot's business date.
+   - **Selection.** For a lot, the first plan that matches wins: item and site, then item, then item group and site, then item group. The site is that of the lot's warehouse. For `in_process`, the plan must name the confirmation's `operation_number` or have no `operation_number` (it then applies to every operation); a plan with the exact operation wins over one without. (review note, 2026-11-21) Within the plan, the revision used is the highest released one with `start_date` on or before the lot's business date.
    - **Revisions.** `inspection_plan_revision` holds `revision`, `state` (`draft` or `released`), `start_date`, `sampling_procedure_id`, `is_auto_accept_allowed`, `is_sample_destroyed`, `content_hash` and `released_at`.
      - A released revision and its characteristics are immutable, by trigger, as in ADR-0033 rules 3 and 4. A plan has at most one draft.
      - The draft commands are `other` and `is_draft_only`. `ReleaseInspectionPlanRevision` is `master_data_change`, so an agent's draft is released only through a change proposal whose `expected_version` is the draft's `content_hash` (ADR-0033 rule 2; ADR-0029 rule 5).
@@ -76,7 +76,7 @@ The author's decision of 2026-11-17 gives Phase 1 a thin but complete quality co
 8. Creation:
    - **The consumer.** The transactional consumer `inspection_lot_creator` (queue `events`) handles `GoodsReceiptPosted`, `OtherReceiptPosted`, `ProductionReceiptPosted`, `ReturnFromCustomerPosted` and `OperationConfirmationPosted`. It reads the posted lines through the owners' contracts.
    - **When it creates a lot.** It runs `CreateInspectionLot` as `system` for each line whose product's `inspection_points` contains the point and, except at `in_process`, whose stock was posted in `quality_inspection` or, for returns, `blocked`.
-     - At `in_process`, a lot is created only when a released plan names that item and operation. Its quantity is the confirmation's yield.
+     - At `in_process`, a lot is created only when a released plan names that item and operation. Its quantity is the confirmation's yield. No `in_process` lot is created for a confirmation whose yield is 0 (time-only or scrap-only confirmations, ADR-0071 rule 2): the lot quantity must be above 0. (review note, 2026-11-21)
      - The command key is `inspection_lot_creator:<event id>:<line number>`.
    - **What it raises.** Each lot raises `inspection_lot_open` (owner `role:quality_inspector`).
    - **No plan.** A lot without a matching plan is created anyway, with no characteristics, and a person decides it.
@@ -106,12 +106,12 @@ The author's decision of 2026-11-17 gives Phase 1 a thin but complete quality co
 
 **Usage decision**
 
-12. The decision is lot content, written by `UpdateInspectionLot` (people only; on no agent tool list in Phase 1).
+12. The decision is lot content, written by `UpdateInspectionLot` (on no agent tool list in Phase 1; the auto-drafter of rule 14 runs it as `system`). (review note, 2026-11-21)
     - **Outcome:**
       - `accepted`: every required characteristic passed;
       - `accepted_with_deviation`: released despite a failure or a missing plan, with a required `deviation_reason`;
       - `rejected`: any quantity is not released.
-    - **Lines** (`inspection_lot_line`): `disposition`, `quantity` and an optional `serial_number_id`. Lines exist only for lots that hold stock, and their quantities sum to the lot quantity (`usage_decision_quantity_mismatch`).
+    - **Lines** (`inspection_lot_line`): `disposition`, `quantity`, an optional `serial_number_id` and, for the dispositions `scrap` (reason kind `scrap`) and `return_to_supplier` (reason kind `return`) only, a `reason_id`. The reason is required while the matching `documents.reason_required.scrap` or `documents.reason_required.return` setting is true (ADR-0074 rule 22), so the executor's drafts are not refused with `reason_required`. (review note, 2026-11-21) Lines exist only for lots that hold stock, and their quantities sum to the lot quantity (`usage_decision_quantity_mismatch`).
 
       | Disposition | Allowed at | Carried out by (rule 15) |
       | --- | --- | --- |
@@ -125,7 +125,7 @@ The author's decision of 2026-11-17 gives Phase 1 a thin but complete quality co
       Any other combination returns `disposition_not_allowed`. `accepted` allows only `release` and `sample_consumption`.
     - **Checks at Submit.** Every result in force is confirmed (`inspection_result_unconfirmed`). `accepted` needs a passing result in force for every required characteristic and unit (`inspection_results_incomplete`). Rule 9's stock check runs.
 13. Who decides is configurable, not hard-locked:
-    - **Leaf.** `SubmitInspectionLot` needs the leaf `usage_decision` at `post`, a declared minimum above the verb's (ADR-0054 rule 8). Recording results needs `inspection_lot` at `edit`.
+    - **Leaf.** `SubmitInspectionLot` needs the leaf `usage_decision` at `post`, a declared minimum above the verb's (ADR-0054 rule 8). Recording results needs `inspection_lot` at `post` (rule 17). (review note, 2026-11-21)
     - **Policy input** (ADR-0043 rule 4): the outcome, the item and its group, the partner, the point, and the amount: the held quantity at the preliminary price in company currency. Two new flags: `is_all_passed` and `is_quality_deviation` (`accepted_with_deviation`).
     - **Seeded rule** (ADR-0043 rule 15): `quality.deviation`, at `submit` of `inspection_lot`, actor `human`, `require_approval` with `standard` when `is_quality_deviation`. Companies add rules as usual, for example approval of rejections above an amount.
     - **Setting** `quality.usage_decision.separate_from_results` (company, boolean, default false, `true_tighter`): when true, a person who recorded or confirmed a result in force of the lot cannot submit its decision (`segregation_of_duties`).
@@ -137,14 +137,14 @@ The author's decision of 2026-11-17 gives Phase 1 a thin but complete quality co
 
     The consumer `usage_decision_auto_drafter` handles `InspectionResultRecorded` and `InspectionResultConfirmed` whose payload says the lot is complete and all passed. When the first two choices hold and the lot is a draft without an outcome, it runs a batch as `system`: `UpdateInspectionLot` (`accepted`; `release` for the quantity, and `sample_consumption` for the sample when `is_sample_destroyed`), then `SubmitInspectionLot`. An unconfirmed result, a lot without a plan, and any failure stop it. No preset may seed the `allow` rule (ADR-0067 rule 3).
 15. Execution after the decision is in force:
-    - **The executor.** The consumer `usage_decision_executor` handles `InspectionLotApproved`, an approval or a direct `Submit`. Per line, in one batch as `system` on behalf of the decider, it dispatches the owner's create command of rule 12 with a client ID, then `RecordInspectionLotExecution` (`created`, the target table and ID).
+    - **The executor.** The consumer `usage_decision_executor` handles `InspectionLotApproved`, an approval or a direct `Submit`. Per line, in one batch as `system` on behalf of the decider, it dispatches the owner's create command of rule 12 with a client ID (for `scrap` and `return_to_supplier` it copies the line's `reason_id` to the draft it creates, review note, 2026-11-21), then `RecordInspectionLotExecution` (`created`, the target table and ID).
     - **Bins.** For status changes it reads the key's held stock by bin through `inventory.contract` and creates one task per bin and handling unit, in bin code order.
     - **Nothing posts.** The executor never posts: a warehouse keeper confirms tasks and posts the drafts, and a planner releases the rework order, under their own permissions and policy.
     - **Samples.** Destroyed samples are issued by `internal_consumption` lines with the new movement type `quality_sample` (offset `consumption`, SAP 331).
     - **Issuing lines name the status.** Issuing lines name the held status, so `return_to_supplier_line` gains `stock_status`. The draft `scrap` and `internal_consumption` lines carry it as ADR-0023 rule 7 allows.
     - **The tracker.** `usage_decision_tracker` handles `WarehouseTaskConfirmed`, `WarehouseTaskCanceled`, the `Posted` and `Canceled` events of the three drafts, and `ProductionOrderApproved` and `ProductionOrderCanceled`. It records `done` (with the done quantity) or `canceled` through `RecordInspectionLotExecution`.
       - A short or canceled execution raises `usage_decision_execution_failed` (owner `role:warehouse_keeper`).
-      - When every line is done, it runs `CloseInspectionLot`.
+      - When every line is done, it runs `CloseInspectionLot`. A line whose disposition needs no execution (for example `block` on stock already blocked) counts as done, so `CloseInspectionLot` runs at once when no line has an execution row. (review note, 2026-11-21)
     - **Make to order.** Released output still reaches its sales demand through ADR-0034 rule 14's consumer of `WarehouseTaskConfirmed`.
 
     Note ([ADR-0075](0075-stock-documents.md), proposed 2026-11-19): the tables `scrap`, `scrap_line`, `internal_consumption` and `internal_consumption_line` exist; their lines carry the held `stock_status`, a quality sample is a line with `consumption_kind` `quality_sample`, and `inspection_lot_execution.target_table` names these rows (ADR-0075 rules 4, 5).
@@ -155,7 +155,7 @@ The author's decision of 2026-11-17 gives Phase 1 a thin but complete quality co
     - **Columns:** `kind` (`supplier`, `internal`, `customer`), `state` (`open`, `closed`, `canceled`), `defect_code_id`, item, lot or serial, `quantity`, `partner_id`, `inspection_lot_id`, the source (`source_table` and `source_id`: a document or a complaint), `description`, `root_cause`, the containment and corrective actions (text, owner user and due date each), `opened_at`, `closed_at`, `close_note` and `version`.
     - **Creation.** The executor creates one with `CreateNonconformance` for every `rejected` lot: `supplier` at `goods_receipt`, `customer` at `customer_return`, otherwise `internal`. People create the others, for a deviation or a complaint.
     - **Actions as work items.** Creating an NC raises `nonconformance_open`, the trigger of the work case kind `nonconformance` (ADR-0066 rule 3). Naming an action owner in `UpdateNonconformance` raises `nonconformance_action` for that owner (owner and due `named_by_raiser`; open key: the NC and the action kind), in the NC's open case. Containment and corrective actions are therefore work items in a case, not a second workflow engine.
-    - **Closing.** `CloseNonconformance` takes a close note and resolves `nonconformance_open`. `CancelNonconformance` takes a reason.
+    - **Closing.** `CloseNonconformance` takes a close note and resolves `nonconformance_open`. `CancelNonconformance` takes a reason and also resolves `nonconformance_open`. (review note, 2026-11-21)
     - **Supplier quality.** `ListSupplierQualityRate` gives, per supplier and period, lots, inspected and rejected quantities and the reject rate. It is the only scorecard in Phase 1.
 
 **Commands, events and queries**
@@ -178,6 +178,7 @@ The author's decision of 2026-11-17 gives Phase 1 a thin but complete quality co
 18. Events: ADR-0009 rule 22's document events of `inspection_lot`, `InspectionPlanRevisionReleased`, `InspectionResultRecorded` and `InspectionResultConfirmed` (with `is_lot_complete` and `is_all_passed`), `InspectionLotExecutionRecorded`, and `NonconformanceCreated`, `NonconformanceUpdated`, `NonconformanceClosed` and `NonconformanceCanceled`. The consumers of rules 8, 11, 14 and 15 are `quality`'s and are registered paused (ADR-0013 rule 6).
 19. Queries: `GetInspectionLot` (results in force per characteristic and unit, the decision, executions), `ListInspectionLot`, `ListInspectionPlan`, `ListUninspectedStock`, `ListNonconformance` and `ListSupplierQualityRate`. A print subject for the lot and its results serves inspection sheets (ADR-0049 rule 25).
 20. The catalog rows, settings, leaves, the role template `quality_inspector`, work item and case kinds, errors, invariants and edge cases are listed in "Documents updated" and the section below.
+    - **Role templates.** Besides `quality_inspector`, the template `shop_floor_lead` holds `inspection_lot` at `post`, because the shop-floor lead records and confirms in-process results at the work center (operator self-inspection). `warehouse_keeper` and `production_planner` hold `read`, to see held stock. (review note, 2026-11-21)
 
 **Later, on seams that exist now**
 
@@ -271,7 +272,7 @@ The author's decision of 2026-11-17 gives Phase 1 a thin but complete quality co
 - **INV-831** `usage_decision_split` (area `warehouse`): every approved or closed lot that holds stock has lines whose quantities sum to its quantity, with dispositions allowed at its point and `sample_consumption` at most its sample quantity; an `in_process` lot has no lines; `accepted` has only `release` and `sample_consumption`; `accepted_with_deviation` has a reason.
 - **INV-832** `decision_on_confirmed_results` (area `safety`): every lot that reached `approved` had, at its Submit, every result in force confirmed; and for `accepted`, a passing result in force for every required characteristic and unit of its revision.
 - **INV-833** `auto_accept_bounded` (area `safety`): every lot submitted by actor `system` has outcome `accepted`, a revision with `is_auto_accept_allowed`, `quality.usage_decision.auto_accept` true on its business date, and a policy decision that either matched an `allow` rule for `system` or required approval.
-- **INV-834** `execution_matches_line` (area `warehouse`): every `inspection_lot_execution` belongs to a line of an approved or closed lot, its target is of the line's disposition kind, and a closed lot has every line's executions `done` or a resolved `usage_decision_execution_failed` item.
+- **INV-834** `execution_matches_line` (area `warehouse`): every `inspection_lot_execution` belongs to a line of an approved or closed lot, its target is of the line's disposition kind, and a closed lot has every line's executions `done` or a resolved `usage_decision_execution_failed` item, except a line whose disposition needed no execution (rule 15). (review note, 2026-11-21)
 
 **Edge cases** (DS-17; block EC-280 to EC-289, EC-280 to EC-287 taken; first step 5):
 

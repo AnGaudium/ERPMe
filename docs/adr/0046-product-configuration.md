@@ -183,6 +183,7 @@ Numbers join lists: a characteristic may take a number in a range with a step, s
     Note: the item's estimate is a `cost_estimate` ([ADR-0035](0035-production-costing.md) rule 14) with `item_id`. Where an estimate is read ([ADR-0020](0020-inventory-and-costing-model.md) rule 11, ADR-0035 rule 4), it is the latest released estimate for the item whose costing date is on or before the posting date, preferring one whose version's production warehouse is in the line's valuation area; its price basis is ADR-0035 rule 14's default, `actual_average` (flagged). When the consumer fails, the item stays usable on quotations and orders, whose cost checks use `estimate_configuration`; a production receipt of the item, which has no history and no released estimate, is rejected with `preliminary_price_missing` until an estimate is released or a person sets a preliminary price, as ADR-0035 rule 4 says. "Take their provisional value" above means exactly this.
 
     Note ([ADR-0072](0072-costing-sheet-and-cost-component-structure.md), proposed 2026-11-18): `estimate_configuration` applies the costing sheet of the product-level version, else of its site, and gains `purpose` (default `production`); `GetSellingPriceCosting` adds the administration and selling rows for cost-plus quotes. The cost checks of this rule keep the production cost (ADR-0072 rules 9, 10).
+    Note (S1 review, 2026-11-21): `estimate_configuration` is a pure function with no table; `purpose` is a parameter of the function (ADR-0072).
 
 **Price**
 

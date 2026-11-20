@@ -335,9 +335,11 @@ BEGIN
     NEW.change_kind := v_kind;
     -- ADR-0067 rule 9: a setup-path loosening needs an active acknowledgement of the same company naming the person as its
     -- implementer, a key that outdates no evidence, a scope other than installation, and a company still in its setup phase.
+    -- No auto_post.* key (cash.auto_post.* included) is on the setup path, even when it outdates nothing, such as a mode: every
+    -- gateway loosening needs a second person (ADR-0067 rule 9; ADR-0065 rule 8).
     -- The command read the company row FOR SHARE first (rule 7), so the first operating posting cannot overlap it.
     IF NEW.setup_acknowledgement_id IS NOT NULL AND v_kind = 'loosen' THEN
-        IF d.outdates <> 'none' OR NEW.scope_kind = 'installation' THEN
+        IF d.outdates <> 'none' OR NEW.scope_kind = 'installation' OR NEW.setting_key ~ '(^|\.)auto_post\.' THEN
             RAISE EXCEPTION 'setup_acknowledgement_invalid: % is not on the setup path', NEW.setting_key USING ERRCODE = 'check_violation';
         END IF;
         PERFORM 1 FROM nativeflows.company_setup_acknowledgement a

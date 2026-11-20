@@ -16,7 +16,7 @@ The author's decision of 2026-11-17: a **business unit** splits activity into li
    - **Tree.** `parent_id` names a unit of the same company. The command refuses a cycle (`business_unit_invalid`). Any unit may receive postings; a roll-up sums a unit and its descendants.
    - **Nothing else.** No legal role, branch, numbering, currency or ledger. Branches stay the legal and tax unit (ADR-0009) and sites the physical one (ADR-0068).
 2. Active and inactive units:
-   - **New references.** Master data, document headers and lines may name only an active unit of their company, otherwise `business_unit_invalid`.
+   - **New references.** Master data, document headers and lines may name only an active unit of their company, otherwise `business_unit_invalid`. Reversal and closing lines copy the original line's unit even when the unit is no longer active; they are exempt from the active check, as from rule 14. (review note, 2026-11-21)
    - **Deactivation** is refused with `business_unit_in_use` while an active cost center, product, open project, active site or `ledger.business_unit.default` names the unit, so derivation never meets an inactive default.
    - **Drafts.** A draft that names a unit deactivated since is refused at posting with `business_unit_invalid`.
 3. Commands and queries (module `master_data`, leaf `organization`): `CreateBusinessUnit`, `UpdateBusinessUnit` (`master_data_change`, `is_proposal_bound`), `ListBusinessUnit`, `GetBusinessUnit`.
@@ -27,7 +27,7 @@ The author's decision of 2026-11-17: a **business unit** splits activity into li
    - **`business_unit_id`**, a key to `business_unit` within the company.
    - **`business_unit_source`**, the step that set it: `line`, `item`, `cost_center`, `project`, `document`, `site`, `company_default`, `reversal` or `closing`. It is null exactly when the unit is null.
    - **Index:** `(company_id, business_unit_id, posting_period_id)` where the unit is set.
-5. **Only profit-and-loss lines carry a unit in Phase 1.** A P&L line is a line whose system account has `account_type` `income` or `expense` (ADR-0010 rule 3), read from the line's `system_account_id`. Balance-sheet lines never carry one, `income_summary` and retained earnings included, and a unit stated on one is refused with `business_unit_invalid`. A per-unit balance sheet half filled would mislead, so it waits for document splitting.
+5. **Only profit-and-loss lines carry a unit in Phase 1.** A P&L line is a line whose system account has `account_type` `income` or `expense` (ADR-0010 rule 3), read from the line's `system_account_id`. Balance-sheet lines never carry one, `income_summary` and retained earnings included, and a unit stated directly on a balance-sheet journal line (a general journal line) is refused with `business_unit_invalid`. (review note, 2026-11-21) A per-unit balance sheet half filled would mislead, so it waits for document splitting.
 6. Not carried, each for a reason:
    - **Material document lines.** They hold quantity and stock value, which are balance sheet. The P&L journal line that posts a movement, cost of goods sold for example, carries the unit and refers to its material line.
    - **Open items.** Receivables and payables per unit need document splitting (later). An open item reaches the units of its origin document's P&L lines through that document.
@@ -44,14 +44,15 @@ The author's decision of 2026-11-17: a **business unit** splits activity into li
    - **Copying.** `Create<Type>` with `source_lines` copies the source header's unit into an empty header. It can be changed until posting. Sources with different units leave the header empty unless the command states one (ADR-0047 rule 2).
    - **Lines.** The lines on which a person assigns an account carry an explicit `business_unit_id`: purchase invoice lines, payment `account` lines and general journal lines (ADR-0048 rule 15).
    - **Sales lines** have no line unit in Phase 1: the product and the header decide. A generic service product left without a unit lets the header decide.
+   - **Explicit unit as input.** An explicit unit on a document line is an input to the derivation. It is applied to the profit-and-loss lines that the document line produces, and the balance-sheet lines of the same posting carry none. (review note, 2026-11-21)
 
-    Note ([ADR-0075](0075-stock-documents.md), proposed 2026-11-19): the headers of `stock_count`, `scrap` and `internal_consumption` (ADR-0075) may name a business unit like the other document headers, set by a person or an agent; `stock_transfer` has none, because it posts no profit-and-loss line.
+    Note ([ADR-0075](0075-stock-documents.md), proposed 2026-11-19): the headers of `stock_count`, `scrap`, `internal_consumption`, `other_receipt` and `other_issue` (ADR-0075) may name a business unit like the other document headers, set by a person or an agent; `stock_transfer` has none, because it posts no profit-and-loss line.
 
 **The derivation**
 
 9. `ledger` derives the unit at posting, inside the posting transaction, for every P&L line of the entry. First match wins:
    1. the explicit unit of the document line;
-   2. the unit of the line's item (its product);
+   2. the unit of the line's item (its product). For a line whose cost object is a production order (issues, confirmations, receipts, settlement and variance lines), the item is the order's output product, so every profit-and-loss line of one order carries one unit and the production cost accounts net to zero per unit (review note, 2026-11-21);
    3. the unit of the line's cost center;
    4. the unit of the line's project;
    5. the document header's unit;
@@ -60,7 +61,7 @@ The author's decision of 2026-11-17: a **business unit** splits activity into li
 
    Inputs:
    - **From the posting module:** the explicit line unit and the header unit, in its posting request.
-   - **From master data:** the other candidates, through the hook `business_unit_defaults`, which `ledger` declares, `master_data` registers and `app` wires (ADR-0022 rule 2). `ledger` and `master_data` share layer 3, so no import is added.
+   - **From master data:** the other candidates, through the hook `business_unit_defaults`, which `ledger` declares, `master_data` registers and `app` wires (ADR-0022 rule 2). Same-layer modules may not import each other (ADR-0022 rule 2), and `ledger` and `master_data` share layer 3, so `ledger` calls the derivation through the hook that `app` wires; the hook is required. (review note, 2026-11-21)
 
    The function `ledger.contract.derive_business_unit` is pure. A conflict, such as an item unit that differs from the cost center's, is not an error: the first match wins and the trace keeps the losing values.
 10. **Account determination.**
@@ -86,6 +87,7 @@ The author's decision of 2026-11-17: a **business unit** splits activity into li
 14. The requirement:
     - **The check.** While the requirement is true, the posting logic rejects a P&L line that has no unit after the derivation, with `business_unit_missing`. The rejection comes in the simulation and in the execution. `details` names the line, its system account, the candidates tried and the commands that fill one.
     - **Exempt:** reversal and closing lines (rule 11), so documents posted before the setting can still be reversed and closed.
+    - **Companies without units.** The requirement applies only while the company has at least one active business unit; a company without units skips it, as it skips the derivation (rule 12). (review note, 2026-11-21)
     - **Where.** The check is posting logic, not the trigger, like the control-account setting (ADR-0014 rule 10).
     - **The fallback warning.** Realized exchange differences, rounding lines and bank charges without a cost center find a unit only through the company default. `UpdateCompanySetting` therefore returns the check result `business_unit_default_unset` when the requirement is true and no default is set.
 
@@ -145,7 +147,7 @@ The author's decision of 2026-11-17: a **business unit** splits activity into li
 - DS-22, DS-05: header and line columns; copying by ADR-0047 rule 2.
 - DS-28: value type `code`. DS-33: the dimension and the `system_account_turnover` grain.
 - DS-12 (closing): closing per account and unit.
-- Lab: `tNN_business_unit.py` checks that the order is deterministic, that conflicts resolve to the first match, that reversals copy, that the trace reproduces every line's unit, and that the requirement and its exemptions hold.
+- Lab: the business unit lab is not written yet (recorded in [open-questions.md](../open-questions.md), S1 review section). It will check that the order is deterministic, that conflicts resolve to the first match, that reversals copy, that the trace reproduces every line's unit, and that the requirement and its exemptions hold.
 
 ## Revisit when
 

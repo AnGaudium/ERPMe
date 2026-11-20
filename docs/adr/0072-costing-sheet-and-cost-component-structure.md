@@ -104,7 +104,7 @@ The author's decision of 2026-11-18: ADR-0035 keeps actual costing as it is (the
 
 10. Administration and selling rows:
     - **`GetSellingPriceCosting`** (module `production`, computed query, `report_production` at `read`, field class `cost`): an item or a configurable product with item-defining values, a quantity, a date and an optional site. It takes the released estimate valid on the date (ADR-0035 rule 14 note), or `estimate_configuration` for values without an item, and evaluates the current sheet with purpose `selling` over its priced lines at the date's rates. It returns the rows, the cost of goods manufactured (production rows), administration and selling, the total cost and any gaps. It is never stored and posts nothing.
-    - **`estimate_configuration`** gains `purpose`, default `production`.
+    - **`estimate_configuration`** takes `purpose` as a function parameter, default `production`: it is a pure function of `production.contract` with no table, so nothing is added to a schema. (review note, 2026-11-21)
     - **Cost checks stay on production cost.** The below-cost and margin checks (ADR-0043 rule 3; ADR-0045 rule 5; ADR-0046 rule 14) never include selling rows: the floor protects what will post to cost of goods sold, and a cost-plus markup is a pricing choice for price lists and policy rules.
     - **Never in the estimate.** A selling row never writes a `cost_estimate_line` (INV-852), so it never reaches a preliminary price, WIP or a variance.
 
@@ -188,7 +188,7 @@ The author's decision of 2026-11-18: ADR-0035 keeps actual costing as it is (the
 
 - **The ask.** The author asked for planned costing that a manufacturer can explain: how overhead enters a cost estimate, on what base and at what rate, and costs that read in more than four buckets, without touching actual costing.
 - **What SAP does.** CO-PC's costing sheet (base, overhead rate, credit) prices overhead in cost estimates; the cost component structure maps cost elements to up to 40 components and rolls them into the estimate's split. NativeFlows takes the concept in a simpler form: three row kinds, rates by date and three conditions, one structure per company, 12 details.
-- **What exists.** ADR-0035 values at periodic actual with pools, normal capacity and an exact solve; its estimate is a benchmark. ADR-0062 makes a missing price a gap, never zero. ADR-0068 adds sites. ADR-0069's business unit does not interact: estimates and sheets carry no business unit, a credited cost center is used only for reporting, and pool postings keep their derivation.
+- **What exists.** ADR-0035 values at periodic actual with pools, normal capacity and an exact solve; its estimate is a benchmark. ADR-0062 makes a missing price a gap, never zero. ADR-0068 adds sites. ADR-0069's business unit does not change estimates or sheets: they carry no business unit, a credited cost center is used only for reporting, and pool postings keep their derivation. The production cost lines that post carry the unit of the order's output product (ADR-0069 rule 9). (review note, 2026-11-21)
 - **Constraints.** No change to postings, settlement keys or INV-106; agents draft only (ADR-0029); one noun per thing (ADR-0004); configurable over hard locks; the core holds no country rules.
 
 ## Options considered
@@ -232,7 +232,7 @@ The author's decision of 2026-11-18: ADR-0035 keeps actual costing as it is (the
 
 - **INV-850** `cost_component_detail_default` (area `production`): every company has exactly one active default detailed component per posting component, and every estimate line, mapping row and period cost detail row names a detail of its own posting component.
 - **INV-851** `period_cost_detail_sums` (area `production`): for every order, period and posting component, the rows of `production_order_period_cost_detail` sum exactly, in each amount column, to the `production_order_period_cost` row, and each detail's opening equals its closing of the order's previous period with costs.
-- **INV-852** `estimate_without_selling_rows` (area `production`): every released estimate's lines sum to its `company_amount`, and its surcharge lines and sheet-row snapshot come only from `production` rows of the sheet it names.
+- **INV-852** `estimate_without_selling_rows` (area `production`): every released estimate's lines sum to its `company_amount`, and its level 0 surcharge lines and sheet-row snapshot come only from `production` rows of the sheet it names. Rolled-up lines of made components (level above 0) keep the row number of the component's own estimate and are covered by that estimate's snapshot. (review note, 2026-11-21)
 - **INV-853** `estimate_surcharge_rated` (area `production`): every production surcharge row of a released estimate's sheet has a snapshot row whose rate is the one rule 7 selects on the costing date.
 - **INV-854** `costing_structure_by_proposal` (area `safety`): no audit row of a costing-structure command (rule 17) carries an origin agent run, except the execution of an approved change proposal.
 

@@ -13,7 +13,7 @@ The author's decision of 2026-11-17: production execution should feel like Odoo'
 - **Vocabulary.** People see a production order as an **MO** and each internal operation as a **WO**. No new document type.
 - **Execution state per WO.** `waiting`, `ready`, `in_progress`, `paused`, `blocked`, `done`. Three are stored declarations; three are derived from facts that already exist.
 - **Time log.** Start, pause and block write clock records per person, team or machine, with stop reasons grouped by OEE loss class. A confirmation proposes its activity quantities from them; costing still reads only the confirmation.
-- **Queue and tablet.** A work-center queue (kanban by state) and a WO workspace, specified as queries and commands only.
+- **Queue and tablet.** A work-center queue (a worklist grouped by state, ADR-0077) and a WO workspace, specified as queries and commands only.
 - **MO tree, WO transfer inside a resource group, receipt scrap for orders without operations.**
 
 | Requirement | Today (ADR-0034) | Decision |
@@ -37,7 +37,7 @@ The author's decision of 2026-11-17: production execution should feel like Odoo'
 2. Each of the four records may be posted any number of times per MO, each one a reversible internal document:
    - **Receipts** (ADR-0034 rule 13) and **issues and returns** (rule 11): unchanged.
    - **Time.** A confirmation with yield and scrap 0 and only activity quantities is valid (a time-only confirmation, for setup or a shift without finished parts). Rule 12 never forbade it; this rule states it. ADR-0064 rule 22's duplicate check treats two time-only confirmations as duplicates only when their activity quantities are equal too.
-   - **Scrap.** A confirmation with yield 0 and scrap above 0 records scrap alone. Component scrap is an issue line with a scrap `reason_code` (rule 11's column). Receipt scrap: rule 4.
+   - **Scrap.** A confirmation with yield 0 and scrap above 0 records scrap alone. Component scrap is an issue line with a scrap `reason_code` (rule 11's column). Receipt scrap: rule 4. A confirmation with yield 0 creates no in-process inspection lot (ADR-0070 rule 8). (review note, 2026-11-21)
 
     Note ([ADR-0074](0074-core-data-structure-additions.md), proposed 2026-11-19): the component-scrap and over-issue reason of an issue line and the confirmation's scrap reason are `scrap_reason_id` references to a reason of kind `scrap`, in place of the text codes (ADR-0074 rule 14).
 3. Issuing a component that is not on the MO, from the tablet's "issue extra component":
@@ -102,7 +102,7 @@ The author's decision of 2026-11-17: production execution should feel like Odoo'
 10. Stop reasons. `stop_reason` is company data (code, name, `loss_class` `availability`, `performance` or `quality`, `is_planned` for planned stops that OEE leaves out of availability, `is_active`), with `CreateStopReason` and `UpdateStopReason` (`master_data_change`, leaf `production_structure`). OEE reporting comes later; this captures its data now.
 11. A confirmation proposes its activities from the time log:
     - **Which logs.** At create or update, the confirmation links the WO's `recorded`, closed logs not linked to another posted, not reversed confirmation (`operation_confirmation_time_log`). The person may remove or add such logs.
-    - **The mapping.** `activity_type.time_log_basis`: `none` (default: today's standards), `labor` (sum of duration × `head_count`) or `machine` (length of the union of the intervals). A `per_order` activity reads `setup` logs, a `per_base_quantity` activity reads `run` logs; stop logs are never proposed. The result is converted to the activity type's time unit and rounded half up (ADR-0006 rule 17).
+    - **The mapping.** `activity_type.time_log_basis`: `none` (default: today's standards), `labor` (sum of duration × `head_count`) or `machine` (length of the union of the intervals). A `per_order` activity reads `setup` logs, a `per_base_quantity` activity reads `run` logs; stop logs are never proposed. The result is converted to the activity type's time unit and rounded half up with `round_quantity` (ADR-0006 rule 15).
     - **Adjustable.** The proposal is stored as `proposed_quantity` beside the person's `quantity`; ADR-0064 rule 22's activity check applies to the quantity. Costing reads only the posted quantity (ADR-0035 rule 7).
     - **Final confirmation.** Refused while a setup or run log of the WO is open (`operation_time_log_open`); the tablet sends `PauseOperation` first in the same batch. An open stop log is closed at its posting.
     - **Reversal.** Reversing a confirmation leaves its links, so its logs count as unconfirmed again and the next confirmation proposes them.
@@ -112,7 +112,7 @@ The author's decision of 2026-11-17: production execution should feel like Odoo'
 
 12. `AssignOperation` (leaf `shop_floor_execution` at `edit`) sets a WO's people and teams as a whole list in `operation_assignment`; replaced rows get `ended_at`, so the history stays. Assignment grants no right and gates no command. Event `OperationAssigned`.
 13. `ListWorkCenterQueue` (module `production`, computed query, `production_order` at `read`; record scope on `production_warehouse_id`): approved MOs not technically complete, one row per WO of the given work center or resource group, with:
-    - the derived state and reasons (kanban columns `waiting`, `ready`, `in_progress`, `paused`, `blocked`, `done`, the last for a chosen date range);
+    - the derived state and reasons (the worklist groups `waiting`, `ready`, `in_progress`, `paused`, `blocked`, `done`, the last for a chosen date range; ADR-0077 rule 22 has no kanban component in Phase 1);
     - MO number, item, operation number and description, scheduled dates, expected, confirmed and open quantities;
     - assigned people and teams, open logs, and `is_assigned_to_me`;
     - order: scheduled start, then MO number, then operation number.
@@ -151,7 +151,7 @@ The author's decision of 2026-11-17: production execution should feel like Odoo'
     - **`production.operation.start_when_waiting`:** `warn` (default) or `reject`.
     - **`production.operation.stop_reason_on_pause`:** boolean, default false; true is tighter.
 20. Catalog rows and DDL ([DS-43-54-planning-production.sql](../design/DS-43-54-planning-production.sql), owner `production`):
-    - **Tables:** `stop_reason`, `operation_execution`, `operation_assignment`, `operation_time_log`, `operation_confirmation_time_log`. **Columns:** `activity_type.time_log_basis`; `operation_confirmation.work_center_id`; `operation_confirmation_activity.proposed_quantity`; `production_receipt.scrap_quantity` and `scrap_reason_code`.
+    - **Tables:** `stop_reason`, `operation_execution`, `operation_assignment`, `operation_time_log`, `operation_confirmation_time_log`. **Columns:** `activity_type.time_log_basis`; `operation_confirmation.work_center_id`; `operation_confirmation_activity.proposed_quantity`; `production_receipt.scrap_quantity` and `scrap_reason_id` (ADR-0074 rule 14).
     - **Verbs:** Pause and Block are new (level `edit`); Start, Assign and Transfer widen their intent.
     - **Errors:** `operation_not_ready`, `operation_done`, `operation_already_started`, `work_center_not_in_resource_group`, `operation_time_log_open`, `time_log_already_confirmed`, `stop_reason_required`, `receipt_scrap_not_allowed`. **Check result:** `operation_waiting`.
     - **Leaf** `shop_floor_execution` (function, area `production`); `shop_floor_lead` at `post`, `production_planner` at `read`.

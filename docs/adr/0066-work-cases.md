@@ -109,7 +109,8 @@ A case never widens an agent's read scope.
      - `related`: another case, partner or record.
    - **Append-only.** `UnlinkWorkCaseTarget` sets `unlinked_at` once and changes nothing else; the database refuses deletes.
    - **Same company.** A target is in the case's company and visible to the linking actor.
-   - **Open cases only.** Links and unlinks are refused on a final case (`work_case_closed`).
+   - **Open cases only.** A case in a final state (`resolved` or `canceled`) refuses every change by command: link, unlink, update, assignment, resolution and cancel (`work_case_closed`, DS-04) (review note, 2026-11-21).
+   - **Deleting a linked draft** is allowed. In the same transaction the system ends the draft's live links by setting `unlinked_at` on them, as it cancels work items whose subject is deleted (ADR-0042 rule 12); this is a write by `system`, not an `UnlinkWorkCaseTarget` command, so it also works on a case in a final state, and the delete's audit record names it. The table needs no new column (review note, 2026-11-21).
 9. **Downstream documents** are not linked one by one. The case view follows the document flow from each linked document through its typed line references (ADR-0028 rule 1; ADR-0047 rule 2), so a goods receipt made from a linked order appears without a link.
 10. `work_item.work_case_id` (nullable) is set once and never changed. A re-raise keeps it, like `origin_agent_run_id` (ADR-0042 rule 5). `work.contract.raise_work_item` takes an optional `work_case_id`. Without one, it sets the case itself when the item's subject is:
     - an `artifact` target of exactly one open case; or
@@ -125,7 +126,7 @@ A case never widens an agent's read scope.
     - `CreateWorkCase`;
     - `UpdateWorkCase`: due date, priority, and `partner_id` from a trusted source;
     - `LinkWorkCaseTarget` and `UnlinkWorkCaseTarget`;
-    - `ResolveWorkCase`: a resolution code, for kinds with resolution `person`;
+    - `ResolveWorkCase`: a resolution code, for kinds with resolution `person`; the system path of rule 15 runs it as `system` (`is_internal_only`);
     - `AssignWorkCase`: the owner;
     - `CancelWorkCase`: a reason.
 
@@ -144,10 +145,10 @@ A case never widens an agent's read scope.
 **Resolving**
 
 15. **Resolution `system`.** The case resolves, with resolution `completed`, when:
-    - every `artifact` target that is not unlinked is in a final state (`posted`, `reversed`, `canceled` or `closed`, ADR-0009 rule 14); and
+    - every `artifact` target that is not unlinked is in a final state (`posted`, `reversed`, `canceled` or `closed`, ADR-0009 rule 14), or, for a change proposal (rule 8), in `closed` or `canceled` (ADR-0029 rule 3) (review note, 2026-11-21); and
     - no linked work item is `open` or `claimed`.
 
-    A system job of module `work` checks this when a linked item is resolved or canceled, and when a linked document reaches a final state.
+    The resolver is a system job of module `automation` (layer 5), beside `work_case_opener`. It runs when a linked item is resolved or canceled and when a linked document reaches a final state. It reads the linked targets' states through their modules' contracts and resolves the case with the internal command `ResolveWorkCase`, run as `system`; the command is registered `is_internal_only` for the system path, and rule 13 keeps the people path for kinds with resolution `person`. `work` itself reads no document state (review note, 2026-11-21).
 16. **Pending commands.** `GetWorkCase` lists the human commands the case's artifacts still wait for (`Submit`, `Approve`, `Post`, `Issue`, `Send`, `ClearTaint`), read from `ListAllowedCommand` for the caller (ADR-0040 rule 8). The case view simulates each and lists the plans. On one confirmation it executes each as its own command under the bulk-review conditions (ADR-0042 rule 12 note):
     - each command has its own idempotency key, `expected_plan_hash`, `as_of_date`, audit record and approval record;
     - there is no shared plan hash;
@@ -169,9 +170,9 @@ A case never widens an agent's read scope.
 
 **Safety**
 
-18. **Taint stays per version.** `work_case` has no taint column. `GetWorkCase` computes a taint summary on read: the number of effectively tainted artifact versions (ADR-0029 rule 9) and their taint sources. Clearance is `ClearTaint` per version (ADR-0029 rule 8). No case-level clearance exists. Whether the case view may clear several reviewed versions in one confirmation is deferred to the author (open question).
+18. **Taint stays per version.** `work_case` has no taint column. `GetWorkCase` computes a taint summary on read: the number of effectively tainted artifact versions (ADR-0029 rule 9) and their taint sources. Clearance is `ClearTaint` per version (ADR-0029 rule 8). No case-level clearance exists. The case view shows the tainted versions of a case together, each with its untrusted fields, and each is cleared by its own `ClearTaint` with its own reason and confirmation; no confirmation covers several versions. The per-version act is the control (spec 03 rule 1), and ADR-0067 rule 17 already forbids batch clearance in the small-company mode. Decided by the chief architect under the author's delegation of 2026-11-19; revisit when measured cases hold a median of more than 5 tainted versions (review note, 2026-11-21).
 19. **No wider reads for agents.** An agent run starts only on a work item (ADR-0050 rule 15), and item 2 of ADR-0050 rule 27 stays "its work item, the item's evidence links and its notes", never the case. `GetWorkCase` and `ListWorkCaseTimeline` are on no agent tool list in Phase 1. A later ADR that wants agents to read cases must keep the tainted read scope.
-20. **Approvals stay per document.** A case adds no approval object, stage or record. One approval never counts for more than one document version (ADR-0055 rule 7 note). Whether a company may skip a purchase order's approval when it approved the purchase requests it comes from is deferred to the author (open question).
+20. **Approvals stay per document.** A case adds no approval object, stage or record. One approval never counts for more than one document version (ADR-0055 rule 7 note). A company may let a purchase order need no approval of its own when the policy input `is_within_approved_request` is true: every order line comes from an approved purchase request line of the same item, its quantity is within the request line's open quantity, and its unit price does not exceed the request line's estimated price by more than a tolerance setting (default 0). The core seeds no rule that uses the input, so the default stays approval per document as each company configures it. The input and its tolerance setting are added to the catalogs with the purchase-order policy inputs at build step 5 (DS-22, DS-28); until then the interim holds (approval per document). Decided by the chief architect under the author's delegation of 2026-11-19 (review note, 2026-11-21).
 
 **UI**
 
@@ -204,7 +205,7 @@ A case never widens an agent's read scope.
   - SAP Fiori My Inbox allows mass approval only within one task type, enabled per scenario and capped.
   - Service platforms (ServiceNow, Salesforce) are case-centric because service is their product; their postings live elsewhere.
   - Odoo's chatter is per record, which ADR-0042 already rejected as a queue.
-- **The author's decisions (2026-11-16):** the narrow form, the hybrid direction, a generic table, configurable kinds, external kinds first, and the landing page per role. The approval question for the purchase request to order chain and the taint-clearing question are deferred.
+- **The author's decisions (2026-11-16):** the narrow form, the hybrid direction, a generic table, configurable kinds, external kinds first, and the landing page per role. The approval question for the purchase request to order chain and the taint-clearing question were deferred; both were decided on 2026-11-21 under the author's delegation of 2026-11-19 (rules 18, 20) (review note, 2026-11-21).
 
 ## Options considered
 
@@ -252,19 +253,19 @@ A case never widens an agent's read scope.
   - [DS-04-command-envelope.md](../design/DS-04-command-envelope.md): errors and the registry vocabulary;
   - [DS-16-invariants-and-harness.md](../design/DS-16-invariants-and-harness.md) and [DS-17-synthetic-dataset.md](../design/DS-17-synthetic-dataset.md): code blocks;
   - [architecture-overview.md](../design/architecture-overview.md) and the generated appendices.
-- **Open questions:** [docs/open-questions.md](../open-questions.md), section "Work cases": the two deferred author questions and the interim choices.
+- **Open questions:** [docs/open-questions.md](../open-questions.md), section "Work cases": the two formerly deferred questions, now answered (rules 18, 20).
 - **Index and log:** [docs/adr/README.md](README.md); [docs/runbook/step-log.md](../runbook/step-log.md).
 - **Not changed:** `docs/spec/`, including the glossary. The glossary rows for work case, case kind, case view and case list come with acceptance.
 - **Catalog rows:**
   - **Errors** (DS-04): `work_case_kind_not_enabled` and `work_case_items_open` (precondition), `work_case_origin_not_allowed` (validation), `work_case_closed` (precondition).
-  - **Settings:** `work_case.<kind>.mode`, `work_case.<kind>.due_days` and `work.landing_page.<role_template>`; the catalog holds 107 definitions.
+  - **Settings:** `work_case.<kind>.mode`, `work_case.<kind>.due_days` and `work.landing_page.<role_template>`.
   - **Invariants** INV-790 to INV-793 of the block INV-790 to INV-799, and **edge cases** EC-240 to EC-245 of the block EC-240 to EC-249.
 
 ## Edge cases and invariants
 
 **Invariants** (DS-16; block INV-790 to INV-799, INV-790 to INV-793 taken; first step 5):
 
-- **INV-790** `work_case_links_in_company` (area `platform`): every `work_case_link` target, every linked work item and the origin of every `work_case` exist in the case's company.
+- **INV-790** `work_case_links_in_company` (area `platform`): every `work_case_link` target with `unlinked_at` null, every linked work item and the origin of every `work_case` exist in the case's company; an unlinked link may point at a deleted draft (rule 8) (review note, 2026-11-21).
 - **INV-791** `resolved_case_has_no_open_items` (area `platform`): no `work_case` in state `resolved` has a linked work item in state `open` or `claimed` whose `recorded_at` is not later than the case's `resolved_at`.
 - **INV-792** `case_actions_are_separate_commands` (area `safety`): every `approval` row and every `taint_clearance` row refers to exactly one document version, and no audit record of a work case command has effect class `posting`, `master_data_change` or `outbound_send`.
 - **INV-793** `case_never_widens_agent_reads` (area `safety`): no audit record of a query or command with actor kind `agent` names `GetWorkCase`, `ListWorkCase` or `ListWorkCaseTimeline`, and no work case command has actor kind `agent`.

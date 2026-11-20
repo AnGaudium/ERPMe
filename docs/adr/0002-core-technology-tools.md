@@ -51,6 +51,8 @@ Note ([ADR-0061](0061-barcodes.md), proposed 2026-11-15): the PDF worker draws b
 | i18n | i18next; community translations via Weblate |
 | Warehouse app | Same app as a PWA; scanning with the browser BarcodeDetector API, fallback @zxing/browser |
 
+Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), 2026-11-21): the data grid is the in-repo TanStack Table grid, not AG Grid (ADR-0077 rules 5, 20).
+
 Note ([ADR-0061](0061-barcodes.md), proposed 2026-11-15): the fallback is a WebAssembly decoder based on ZXing-C++ (Apache-2.0), which reports the symbology identifier and FNC1; it reads Code 128, GS1-128, DataMatrix and QR, while BarcodeDetector reads only EAN/UPC and ITF until a device proves it passes GS through. The PWA also runs the GS1 Syntax Engine (Apache-2.0) in WebAssembly for instant feedback; both load on first use. Apache-2.0 code may be used in the AGPL-3.0 core (spec 18) (rules 1, 22).
 
 **Infrastructure and docs:** Docker Compose, Caddy, pgBackRest, GitHub Actions; MkDocs Material; the repo has CLAUDE.md and coding-agent skills from the start.
@@ -68,6 +70,8 @@ Note ([ADR-0061](0061-barcodes.md), proposed 2026-11-15): the fallback is a WebA
    - Block long-running transactions, which stop vacuum from cleaning: time limits on agents' read-only queries and on idle-in-transaction sessions.
    - Monitor dead tuples and autovacuum lag on the operations dashboard.
 3. **The frontend is split by screen** with Vite dynamic imports. AG Grid loads only on desktop data-entry screens, and only the AG Grid modules in use are registered. The phone warehouse app never loads AG Grid. On desktop, AG Grid is prefetched when the browser is idle after login so the first open does not wait.
+
+Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), 2026-11-21): the data grid is the in-repo TanStack Table grid, not AG Grid (ADR-0077 rules 5, 20).
 
 **Deliberately not used:** heavy ORMs, event sourcing, microservices, GraphQL, Kafka, Redis, Elasticsearch, agent frameworks such as LangChain, a separate workflow engine.
 

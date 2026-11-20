@@ -270,7 +270,13 @@ if "--load" in sys.argv:
     trial("X16 a transfer is between two different warehouses", lambda cx: transfer(cx, "direct", "w1", "w1"), "ck_stock_transfer_warehouses")
     trial("X17 a receive names its dispatch", lambda cx: transfer(cx, "receive", "wt", "w2"), "ck_stock_transfer_dispatch")
     trial("X18 only a receive names a dispatch", lambda cx: transfer(cx, "direct", "w1", "w2", dispatch=dd), "ck_stock_transfer_dispatch")
-    trial("X19 a dispatch is received by one document", lambda cx: transfer(cx, "receive", "wt", "w2", dispatch=dd), "ux_stock_transfer_dispatch_transfer_id")
+    # ADR-0075 rule 2 (review note, 2026-11-21): one live receive per dispatch is the command's rule (INV-867), because the
+    # document state is on another table; the database keeps a plain index so a canceled or reversed receive can be followed.
+    with c.transaction():
+        transfer(c, "receive", "wt", "w2", dispatch=dd)
+    check("X19 a second receive row of one dispatch is stored (the command allows one live receive, INV-867)",
+          c.execute("SELECT count(*) FROM stock_transfer WHERE dispatch_transfer_id = %s", (dd,)).fetchone()[0] == 2
+          and c.execute("SELECT count(*) FROM pg_indexes WHERE schemaname = 'nativeflows' AND indexname = 'ix_stock_transfer_dispatch_transfer_id' AND indexdef NOT LIKE '%%UNIQUE%%'").fetchone()[0] == 1)
     trial("X20 a transfer line is of its header's warehouses", lambda cx: tline(cx, td, 9, 1, "w2", "w1"), "stock_transfer_line_company_id_stock_transfer_id_")
     trial("X21 a source bin is of the source warehouse", lambda cx: tline(cx, td, 9, 1, from_bin_id=I["b2"]), "fk_stock_transfer_line_from_bin")
     trial("X22 a lot and a serial are never both named", lambda cx: tline(cx, td, 9, 1, lot_id=new(), serial_number_id=new()), "ck_stock_transfer_line_lot_or_serial")
