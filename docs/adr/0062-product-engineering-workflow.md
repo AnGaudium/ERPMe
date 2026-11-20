@@ -23,6 +23,8 @@ The commands, checks and the proposal carrier for products, items, bills of mate
 **Agent type and entry points**
 
 1. `product_engineering` is an agent type of `agents` (layer 5) on the runtime of ADR-0050 and the common rules of ADR-0051 rules 1–9. It reads through registered queries and writes through the commands of `production` (ADR-0033 rule 2), `master_data` (ADR-0045) and `documents` (`CreateChangeProposal`). No new module. Its leaf is `agent_product_engineering` under `agent` (capability `start_agent:product_engineering` at `edit`); the template `production_planner` holds it at `edit`.
+
+    Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-19): `product_engineering` moves to Phase 2, with its design and DDL kept as seams (ADR-0078 rule 2).
 2. Entry points (ADR-0050 rule 15):
 
    | Entry | Subject | Taint and scope |

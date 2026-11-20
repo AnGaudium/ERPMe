@@ -30,6 +30,8 @@ The author's design draft "Deterministic Policy Engine (Maker-Checker Gateway)" 
    - **Hook.** `policy` declares the hook `auto_post_checker`. A module registers, per document type it owns, one checker implementation; `app` (layer 6) wires it. `policy` imports no module above it (ADR-0022 rule 2; ADR-0043 rule 1).
    - **Inputs that `policy` cannot read itself** are passed in by the dispatcher (`registry`), which already reads them for the actor context: the generic settings of rule 8 with their values and sources (`registry.contract.get_setting`), the draft version's effective taint, the agent run that wrote it, that run's agent type, behavior hash and effective mode (ADR-0050 rule 14), and the simulation result.
    - **The runner** is the system job `RunAutoPostGateway` of module `automation` (layer 5), which already imports `registry` for dispatch and the contracts of layers 3 and 4 (ADR-0058 rule 1). It is not an automation rule: it runs no company-composed action, and its only posting path is a gateway decision (rule 13).
+
+   Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-19): the gateway stays in Phase 1 as designed. The agent `active` mode it needs keeps the in-use draft acceptance evidence of rule 11, with no live agent shadow; `auto_post_advisor` is one of the six Phase 1 agent types (ADR-0078 rules 1, 5, 6, 8).
 2. Checker declaration (registry vocabulary, DS-04): each checker declares, with a version:
    - `document_type` and `actor_kind` (`system`, or `integration` for an import);
    - `runner`: `gateway_job` (rule 3) or `own` (the module's existing trigger, rule 20);

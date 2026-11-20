@@ -49,4 +49,4 @@ Cite these as "Build principle B5" and so on.
 
 Steps 0–4 correspond to Phase 0; steps 5–11 are the Phase 1 build before go-live. Step 4 comes before commercial documents on purpose: the core is proven correct on the synthetic dataset before any layer depends on it. The step 11 rehearsal runs on staging; it is not a production parallel run with the old software.
 
-Agents are not a separate step. Each agent is built right after its manual path passes its gate: data migration after step 4, quotation after step 5, bank matching after step 6, purchase invoices after step 7. All four are done before the platform counts as complete.
+Agents are not a separate step. Each agent is built right after its manual path passes its gate: the assistant and analysis after step 5, bank matching after step 6, purchase invoices, the vision reader and the auto-post advisor after step 7. All six are done before the platform counts as complete; data migration, quotation and the other agents come after Phase 1 ([ADR-0078](../adr/0078-agent-simplification-for-phase-1.md)).

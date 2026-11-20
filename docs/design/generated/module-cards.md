@@ -22,7 +22,7 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Owned tables (1):** `assist_request`
 - **Events produced (0):** none found
 - **Commands and queries named in ADRs (1):** `CreateAssistRequest`
-- **Settings (18):** `agents.<agent_type>.daily_max_cost`, `agents.<agent_type>.daily_max_runs`, `agents.<agent_type>.drift_action`, `agents.<agent_type>.run_max_cost`, `agents.<agent_type>.run_max_input_tokens`, `agents.<agent_type>.run_max_llm_calls`, `agents.<agent_type>.run_max_output_tokens`, `agents.<agent_type>.run_max_rows_read`, `agents.<agent_type>.run_max_seconds`, `agents.<agent_type>.run_max_tool_calls`, `agents.<agent_type>.wake_up_mode.<kind>`, `agents.company_daily_max_cost` …
+- **Settings (9):** `agents.<agent_type>.drift_action`, `agents.<agent_type>.wake_up_mode.<kind>`, `agents.company_daily_max_cost`, `agents.installation_daily_max_cost`, `agents.internal_reserve_share`, `agents.tainted_reference_reads`, `assist.max_cost_per_run`, `production.agent.readiness_horizon_days`, `production.agent.shortage_candidate_kinds`
 - **Work item kinds (7):** `agent_budget_exhausted`, `agent_denials_repeated`, `agent_mode_degraded`, `agent_quality_below_threshold`, `agent_run_stopped`, `agent_task`, `data_processing_permission_suspended`
 - **Authorization areas (16):** `agent`, `agent_analysis`, `agent_assistant`, `agent_auto_post_advisor`, `agent_bank_matching`, `agent_customer_onboarding`, `agent_data_migration`, `agent_document_reader`, `agent_planning`, `agent_product_engineering`, `agent_production`, `agent_production_capture`, `agent_production_variance`, `agent_purchase_invoice`, `agent_quotation`, `data_processing`
 - **ADRs (declared):** [ADR-0077](../../adr/0077-ui-floorplans-annotations-and-embedded-agent.md)
@@ -98,7 +98,7 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Work item kinds (1):** `bank_line_unmatched`
 - **Authorization areas (17):** `advance_settlement`, `bank_payment`, `bank_receipt`, `bank_statement`, `cash_count`, `cash_count_adjustment`, `cash_payment`, `cash_receipt`, `currency_exchange`, `dunning`, `money_account`, `money_transfer`, `partner_netting`, `payment_method_money_account`, `prepaid_amortization`, `provision_entry`, `write_off`
 - **ADRs (declared):** [ADR-0029](../../adr/0029-proposals-and-agent-safety.md), [ADR-0030](../../adr/0030-commercial-seams-and-imports.md), [ADR-0038](../../adr/0038-audit-and-observability.md), [ADR-0048](../../adr/0048-cash-bank-receivables-payables.md), [ADR-0050](../../adr/0050-agent-runtime-and-query-layer.md), [ADR-0068](../../adr/0068-sites-and-core-logistics-payment-master-data.md)
-- **ADRs that name this module most (mentions; not complete):** [ADR-0026](../../adr/0026-open-item-core.md), [ADR-0048](../../adr/0048-cash-bank-receivables-payables.md), [ADR-0051](../../adr/0051-agent-workflows.md), [ADR-0052](../../adr/0052-minimal-crm.md), [ADR-0059](../../adr/0059-ai-tuning-and-development-of-deterministic-functions.md), [ADR-0068](../../adr/0068-sites-and-core-logistics-payment-master-data.md)
+- **ADRs that name this module most (mentions; not complete):** [ADR-0026](../../adr/0026-open-item-core.md), [ADR-0048](../../adr/0048-cash-bank-receivables-payables.md), [ADR-0052](../../adr/0052-minimal-crm.md), [ADR-0059](../../adr/0059-ai-tuning-and-development-of-deterministic-functions.md), [ADR-0068](../../adr/0068-sites-and-core-logistics-payment-master-data.md)
 
 ## `crm` (layer 4)
 
@@ -136,7 +136,7 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Authorization areas (10):** `customs_declaration`, `gr_ir_rounding_clearing`, `gr_ir_write_off`, `purchase_credit_note`, `purchase_debit_note`, `purchase_invoice`, `purchase_order`, `purchase_request`, `purchase_return`, `service_receipt`
 - **Tables in DS-22-09-42-commercial-inventory.sql with no stated owner:** `document_installment` (section names sales, purchasing), `document_line_custom_text` (section names sales, purchasing), `document_line_price_step` (section names sales, purchasing) ([data-map findings](data-map.md#findings-tables-without-an-owner-and-lab-stubs))
 - **ADRs (declared):** [ADR-0028](../../adr/0028-document-lifecycle-hardening.md), [ADR-0037](../../adr/0037-subcontracting.md), [ADR-0047](../../adr/0047-commercial-documents-and-pricing.md)
-- **ADRs that name this module most (mentions; not complete):** [ADR-0020](../../adr/0020-inventory-and-costing-model.md), [ADR-0037](../../adr/0037-subcontracting.md), [ADR-0047](../../adr/0047-commercial-documents-and-pricing.md), [ADR-0054](../../adr/0054-users-roles-and-authorizations.md), [ADR-0056](../../adr/0056-multiple-units-of-measure.md), [ADR-0065](../../adr/0065-deterministic-auto-post-gateway.md), [ADR-0074](../../adr/0074-core-data-structure-additions.md)
+- **ADRs that name this module most (mentions; not complete):** [ADR-0020](../../adr/0020-inventory-and-costing-model.md), [ADR-0037](../../adr/0037-subcontracting.md), [ADR-0047](../../adr/0047-commercial-documents-and-pricing.md), [ADR-0051](../../adr/0051-agent-workflows.md), [ADR-0054](../../adr/0054-users-roles-and-authorizations.md), [ADR-0056](../../adr/0056-multiple-units-of-measure.md), [ADR-0065](../../adr/0065-deterministic-auto-post-gateway.md), [ADR-0074](../../adr/0074-core-data-structure-additions.md), [ADR-0078](../../adr/0078-agent-simplification-for-phase-1.md)
 
 ## `quality` (layer 4)
 
@@ -271,7 +271,7 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Work item kinds (2):** `attachment_rejected`, `document_extraction_review`
 - **Authorization areas (0):** none
 - **ADRs (declared):** [ADR-0027](../../adr/0027-cross-cutting-ownership.md), [ADR-0038](../../adr/0038-audit-and-observability.md), [ADR-0049](../../adr/0049-statutory-reporting-and-printing.md), [ADR-0057](../../adr/0057-document-intake-and-extraction.md)
-- **ADRs that name this module most (mentions; not complete):** [ADR-0022](../../adr/0022-repository-and-engineering-conventions.md), [ADR-0057](../../adr/0057-document-intake-and-extraction.md)
+- **ADRs that name this module most (mentions; not complete):** [ADR-0022](../../adr/0022-repository-and-engineering-conventions.md), [ADR-0057](../../adr/0057-document-intake-and-extraction.md), [ADR-0078](../../adr/0078-agent-simplification-for-phase-1.md)
 
 ## `audit` (layer 2)
 

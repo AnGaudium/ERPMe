@@ -168,17 +168,19 @@ Applies to every step below:
 
 ## Agents
 
-Agents are not a separate step ([11-build-order.md](../spec/11-build-order.md)). Each is built right after its manual path passes its gate; all four are done before the platform counts as complete (step 10).
+Agents are not a separate step ([11-build-order.md](../spec/11-build-order.md)). Each is built right after its manual path passes its gate. Phase 1 has six agent types, all done before the platform counts as complete (step 10); the others move to Phase 2 ([ADR-0078](../adr/0078-agent-simplification-for-phase-1.md) rules 1, 2).
 
 | Agent | Starts after | Design items |
 | --- | --- | --- |
-| Data migration | Step 4 gate | DS-32, DS-33 (first agent), DS-34 data migration, DS-21 |
-| Quotation | Step 5 gate | DS-34 quotation, DS-35 |
+| Assistant | Step 5 gate | DS-32, DS-33 (first agent), [ADR-0077](../adr/0077-ui-floorplans-annotations-and-embedded-agent.md) rules 13–18 |
+| Analysis | Step 5 gate | [ADR-0060](../adr/0060-agent-assisted-reporting-and-analysis.md) |
 | Bank matching | Step 6 gate | DS-34 bank matching, DS-25 |
 | Purchase invoices | Step 7 gate | DS-34 purchase invoices, DS-24 |
+| Document reader (vision) | Step 7 gate | [ADR-0057](../adr/0057-document-intake-and-extraction.md), vision seat configured |
+| Auto-post advisor | Step 7 gate | [ADR-0065](../adr/0065-deterministic-auto-post-gateway.md), with the gateway's purchase invoice checker |
 
 **Work packages per agent:** the workflow as a code-orchestrated cascade (stored rules and mappings → lookup → fuzzy matching with a deterministic score → LLM only for what remains, Principle 13); fixed tool list; untrusted-content tainting; budgets with circuit breaker; run records; replay evaluation in CI; a real-LLM evaluation run whenever a model or prompt changes (Principle 11); metric for the share of steps handled deterministically ([14-agent-workflows.md](../spec/14-agent-workflows.md)).
 
-**Verification:** the evaluation suite draws on the synthetic dataset and the input files the simulator writes (e-invoice XML, bank statements, emails, migration files). The hard floors in [03-agent-safety.md](../spec/03-agent-safety.md) have their own tests: a run that read untrusted content cannot send, change master data or post; the trigger of an agent cannot approve its drafts. Shadow mode needs real transactions and therefore runs after go-live ([go-live.md](go-live.md#first-three-monthly-closes)). **Done for step 10** ([ADR-0003](../adr/0003-build-operating-rules.md) R8): draft-only mode; replay evaluation green; hard-floor tests green; at least 90% of synthetic cases produce a draft equal to the simulator's known answer, or the higher threshold DS-34 sets. The eval judge scores only free text.
+**Verification:** the evaluation suite draws on the synthetic dataset and the input files the simulator writes (e-invoice XML, bank statements, emails). The hard floors in [03-agent-safety.md](../spec/03-agent-safety.md) have their own tests: a run that read untrusted content cannot send, change master data or post; the trigger of an agent cannot approve its drafts. Phase 1 promotes on the offline evaluation; live shadow on real transactions returns in Phase 2 ([ADR-0078](../adr/0078-agent-simplification-for-phase-1.md) rules 5, 6). **Done for step 10** ([ADR-0003](../adr/0003-build-operating-rules.md) R8): draft-only mode; replay evaluation green; hard-floor tests green; at least 90% of synthetic cases produce a draft equal to the simulator's known answer, or the higher threshold DS-34 sets. The eval judge scores only free text.
 
 **Fallback:** an agent that does not reach its threshold stays in draft-only mode; every operation still works without an LLM (Principle 12), so no gate depends on an agent's accuracy.
