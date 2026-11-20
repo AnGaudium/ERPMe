@@ -1,6 +1,6 @@
 # ADR-0073: Coding pipeline and mechanical assurance
 
-Status: proposed (2026-11-18) under ADR-0005 (builder Claude Opus 5.5).
+Status: accepted (2026-11-21) under ADR-0005, reviewed by Claude Fable 5.2 (builder Claude Opus 5.5; proposed 2026-11-18) after three review rounds, the fixes verified by Claude Opus 5.5.
 Design items: DS-18 (repository and engineering conventions), DS-04 (command registry), DS-16 (harness). Related decisions: D2, D3, D14, D15. Build principles B2, B4, B7. ADR-0002, ADR-0003, ADR-0004, ADR-0005, ADR-0008, ADR-0022, ADR-0027, ADR-0059, ADR-0063.
 
 ## Decision
@@ -219,7 +219,7 @@ The pipeline:
       | Triggers and RLS | ADR-0009 rule 14; ADR-0017 rule 19; ADR-0022 rules 7–8 |
       | Assurance changes | This ADR, rule 16: no check weakened |
     - **Untrusted input.** The diff is untrusted text. Reviews are the weakest layer, and no other layer depends on them.
-    - **Cost and secrets.** The cap is USD 2 per review run (interim). A larger input fails the job with "split the package". The provider key is an Actions secret of an environment that only this workflow uses. The reviews run in a `pull_request_target` workflow, so the secret is reachable from a fork-triggered run. The safeguards are: the workflow never checks out or runs the head's code; the secret lives in an environment only this workflow uses; the per-run cap of USD 2 stays; and runs for outside contributors need approval (ADR-0022 rule 16). (review note, 2026-11-21)
+    - **Cost and secrets.** The cap is USD 2 per review run (interim). A larger input fails the job with "split the package". The provider key is an Actions secret of an environment that only this workflow uses. The reviews run in a `pull_request_target` workflow, so the secret is reachable from a fork-triggered run. The safeguards are: the workflow never checks out or runs the head's code; the secret lives in an environment only this workflow uses; the per-run cap of USD 2 stays; and the environment that holds the review key has a required reviewer (the author), so a fork-triggered run waits for his approval before it can read the secret. (review note, 2026-11-21)
 16. **(f) Branch protection.** Merge is blocked unless every required check is green, and there is no manual override path:
     - **Required checks on `main`:** `dco`, `check`, `test`, `dataset`, `scenarios`, `guards`, `frontend`, `mutation`, `scope-guard`, `model-review-a` and `model-review-b`. Each one always runs and reports success with `skipped: <reason>` when it does not apply (ADR-0022 rule 14), so the list never depends on the pull request.
     - **Settings.**

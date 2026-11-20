@@ -1,6 +1,6 @@
 # ADR-0074: Core data-structure additions
 
-Status: proposed (2026-11-19) under ADR-0005 (builder Claude Sonnet 5.5).
+Status: accepted (2026-11-21) under ADR-0005, reviewed by Claude Fable 5.2 (builder Claude Sonnet 5.5; proposed 2026-11-19) after three review rounds, the fixes verified by Claude Opus 5.5.
 Design items: DS-20 (master data), DS-22 (commercial documents), DS-05 (documents), DS-06 (journal), DS-21 (migration), DS-30 (UI), DS-43 (production). Related decisions: none new. Principles 6, 12, 13. ADR-0004, ADR-0006, ADR-0009, ADR-0011, ADR-0014, ADR-0017, ADR-0018, ADR-0019, ADR-0022, ADR-0026, ADR-0028, ADR-0029, ADR-0030, ADR-0038, ADR-0040, ADR-0041, ADR-0044, ADR-0047, ADR-0048, ADR-0049, ADR-0052, ADR-0054, ADR-0055, ADR-0058, ADR-0063, ADR-0064, ADR-0068, ADR-0071, ADR-0072.
 
 ## Decision
@@ -84,7 +84,8 @@ The author's decisions of 2026-11-19, from the coverage scan of the data structu
     | The comment of `approval.reason` | stays required text (ADR-0055 rule 9) and gains `reject_reason_id`, allowed only on a rejection |
     | (none) | `return_reason_id` on the lines of `return_to_supplier`, `return_from_customer`, `sales_return` and `purchase_return` |
     | `production_issue_line.reason_code`, `operation_confirmation.scrap_reason_code`, `production_receipt.scrap_reason_code` (text, "company data") | `scrap_reason_id`, kind `scrap`; the kind covers over-issue and component scrap too |
-    | (new tables of ADR-0075) | `scrap_line.scrap_reason_id` (required while `documents.reason_required.scrap` is true) (review note, 2026-11-21), `stock_count_line.difference_reason_id`, `other_receipt_line.reason_id` (kind `other_receipt`) and `other_issue_line.reason_id` (kind `other_issue`); `inspection_lot_line.reason_id` (kinds `scrap` and `return`, for the dispositions `scrap` and `return_to_supplier`, which the quality executor copies to the line it drafts; ADR-0070 rule 15) (review note, 2026-11-21) (review note, 2026-11-21) |
+    | (new tables of ADR-0075) | `scrap_line.scrap_reason_id` (required while `documents.reason_required.scrap` is true) (review note, 2026-11-21), `stock_count_line.difference_reason_id`, `other_receipt_line.reason_id` (kind `other_receipt`) and `other_issue_line.reason_id` (kind `other_issue`) |
+    | (quality, ADR-0070) | `inspection_lot_line.reason_id` (kinds `scrap` and `return`, for the dispositions `scrap` and `return_to_supplier`, which the quality executor copies to the line it drafts; ADR-0070 rule 15) (review note, 2026-11-21) |
 
     The scan counted four production tables; the DDL has three scrap-reason columns, and `production_order_component` has none. The existing CHECKs keep their meaning: a scrap reason needs a scrap quantity.
 15. **What stays as it is:** the fixed system codes (`closed_reason`, `credit_note.reason` and `debit_note.reason`, `open_item_collection.payment_block_reason`, `demand_supply_line.hold_reasons`, `planning_exception.reason`), which logic reads; a person's required free text (`work_case.cancel_reason`, `operation_time_log.cancel_reason`, `nonconformance.cancel_reason`, `taint_clearance.reason`, `approval.reason`, `period_unlock_request.reason`); `stop_reason` and `defect_code`, which are catalogs with their own columns; `warehouse_task.shortage_reason` (a candidate for the `count_difference` kind later, an open question). The ADR-0064 mapping step's closed list of scrap reasons is the company's active reasons of kind `scrap`.

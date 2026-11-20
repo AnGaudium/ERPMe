@@ -1,6 +1,6 @@
 # ADR-0072: Costing sheet and cost component structure
 
-Status: proposed (2026-11-18) under ADR-0005 (builder Claude Opus 5.5).
+Status: accepted (2026-11-21) under ADR-0005, reviewed by Claude Fable 5.2 (builder Claude Opus 5.5; proposed 2026-11-18) after three review rounds, the fixes verified by Claude Opus 5.5.
 Design items: DS-53 (costing), DS-56 (configured product costing), DS-26 (reports), DS-34 (agents), DS-15 (roles). Related decisions: D6. Principles 6, 12, 13. ADR-0004, ADR-0006, ADR-0007, ADR-0008, ADR-0020, ADR-0022, ADR-0029, ADR-0033, ADR-0034, ADR-0035, ADR-0043, ADR-0045, ADR-0046, ADR-0051, ADR-0060, ADR-0062, ADR-0063, ADR-0064, ADR-0068, ADR-0069.
 
 ## Decision

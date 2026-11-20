@@ -1,6 +1,6 @@
 # ADR-0077: UI floorplans, annotation vocabulary and embedded agent interaction
 
-Status: proposed (2026-11-19) under ADR-0005 (builder Claude Opus 5.5). Design item: DS-30. Related decisions: D2, D8, D12, D14. Principles 1, 3, 6, 8, 12, 13. ADR-0002, ADR-0008, ADR-0016, ADR-0017, ADR-0022, ADR-0029, ADR-0040, ADR-0042, ADR-0043, ADR-0050, ADR-0051, ADR-0054, ADR-0055, ADR-0057, ADR-0060, ADR-0061, ADR-0063, ADR-0064, ADR-0065, ADR-0066, ADR-0067, ADR-0071, ADR-0073, ADR-0076.
+Status: accepted (2026-11-21) under ADR-0005, reviewed by Claude Fable 5.2 (builder Claude Opus 5.5; proposed 2026-11-19) after three review rounds, the fixes verified by Claude Opus 5.5. Design item: DS-30. Related decisions: D2, D8, D12, D14. Principles 1, 3, 6, 8, 12, 13. ADR-0002, ADR-0008, ADR-0016, ADR-0017, ADR-0022, ADR-0029, ADR-0040, ADR-0042, ADR-0043, ADR-0050, ADR-0051, ADR-0054, ADR-0055, ADR-0057, ADR-0060, ADR-0061, ADR-0063, ADR-0064, ADR-0065, ADR-0066, ADR-0067, ADR-0071, ADR-0073, ADR-0076.
 
 ## Decision
 
@@ -192,7 +192,7 @@ The UI is generated from metadata, not hand-built. Every screen is one of seven 
     - `purpose`: `ask`, `act`, `resolve_command` or `resolve_filter`;
     - `request_text`: up to 2,000 characters;
     - `language`: the language tag of the request;
-    - the context: `context_subject_table` and `context_subject_id`, up to 100 `selected_ids`, `active_filters` as JSON, and the `floorplan` code;
+    - the context: `context_subject_table` and `context_subject_id`, up to 100 `selected_ids` with `selected_table`, the table of the selected rows (required when `selected_ids` is not empty, null otherwise), `active_filters` as JSON, and the `floorplan` code (review note, 2026-11-21);
     - `requested_by_user_id`: the requesting user.
 
     **Personal data.** `request_text` is labeled personal (spec 17) and follows the routing switch as `analysis_question.question_text` does (ADR-0060 rule 21). It is blanked, which sets `erased_at`, when the requesting user's account is erased and by the retention job after `analysis_question_retention_days`, the same value as for analysis questions (ADR-0060 rule 21; no new setting). (review note, 2026-11-21)

@@ -75,7 +75,7 @@ Checks:
 
    Note ([ADR-0066](0066-work-cases.md), 2026-11-16 (proposed)): `work` also owns `work_case` and `work_case_link` and imports nothing new. `ListWorkCaseTimeline` is a query of `query` over views in schema `query`, and the consumer `work_case_opener` belongs to `automation`, which already imports the `configuration` and `work` contracts ([ADR-0066](0066-work-cases.md) rules 2, 6, 17).
 
-   Note ([ADR-0066](0066-work-cases.md), 2026-11-21): the system resolver of rule 15 lives in `automation` (layer 5), beside `work_case_opener`, not in `work`: `work` is layer 2 and may not read document states. The resolver reads the linked targets' states through their modules' contracts and runs the internal command `ResolveWorkCase` as `system` ([ADR-0066](0066-work-cases.md) rules 13, 15).
+   Note ([ADR-0066](0066-work-cases.md), 2026-11-21): the system resolver of rule 15 lives in `automation` (layer 5), beside `work_case_opener`, not in `work`: `work` is layer 2 and may not read document states. The resolver reads the linked targets' states through their modules' contracts and runs the command `ResolveWorkCase` as `system`. Beyond `configuration` and `work`, the resolver imports the contract of `documents` (layer 2), which owns both `document.state` and the `change_proposal` document type (ADR-0009 rule 4; ADR-0029) ([ADR-0066](0066-work-cases.md) rules 13, 15).
 
    Note ([ADR-0069](0069-business-unit-dimension.md), proposed 2026-11-17): `ledger` declares the hook `business_unit_defaults`; `master_data` registers it, so `ledger` reads the business unit defaults of master records without an import inside layer 3.
 

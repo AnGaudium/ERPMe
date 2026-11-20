@@ -1,6 +1,6 @@
 # ADR-0065: Deterministic auto-post gateway (maker-checker)
 
-Status: proposed (2026-11-16) under ADR-0005 (builder Claude Opus 5.5).
+Status: accepted (2026-11-21) under ADR-0005, reviewed by Claude Fable 5.2 (builder Claude Opus 5.5; proposed 2026-11-16) after three review rounds, the fixes verified by Claude Opus 5.5.
 Design items: DS-28 (policy), DS-34 (agent workflows and evidence), DS-04 (errors). Related decisions: D2, D12. Principles 2, 3, 12, 13. ADR-0004, ADR-0005, ADR-0007, ADR-0008, ADR-0013, ADR-0020, ADR-0022, ADR-0029, ADR-0041, ADR-0042, ADR-0043, ADR-0047, ADR-0048, ADR-0050, ADR-0051, ADR-0057, ADR-0058, ADR-0059, ADR-0063, ADR-0064; spec 03, 14.
 
 ## Decision
