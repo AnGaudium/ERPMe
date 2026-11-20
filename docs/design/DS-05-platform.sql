@@ -351,7 +351,7 @@ CREATE TABLE agent_budget_usage (
     reserved_amount  types.amount NOT NULL DEFAULT 0 CONSTRAINT ck_agent_budget_usage_reserved CHECK (reserved_amount >= 0),
     spent_amount     types.amount NOT NULL DEFAULT 0 CONSTRAINT ck_agent_budget_usage_spent CHECK (spent_amount >= 0),
     run_count        integer NOT NULL DEFAULT 0 CONSTRAINT ck_agent_budget_usage_run_count CHECK (run_count >= 0),
-    run_limit_count  integer,                              -- daily_max_runs, company and agent type rows only
+    run_limit_count  integer,                              -- a run count limit; Phase 1 sets none (ADR-0078 rule 7)
     currency         text NOT NULL DEFAULT 'USD' CONSTRAINT ck_agent_budget_usage_currency CHECK (currency = 'USD'),
     recorded_at      timestamptz NOT NULL,
     CONSTRAINT uq_agent_budget_usage_key UNIQUE NULLS NOT DISTINCT (scope_kind, company_id, agent_type_code, business_date),

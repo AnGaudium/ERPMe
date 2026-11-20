@@ -19,6 +19,7 @@ CREATE TABLE assist_request (                              -- the subject of an 
                              'worklist', 'overview', 'plan_panel', 'approval_view') OR floorplan ~ '^custom:[a-z][a-z0-9_]*$'),
     context_subject_table text,                                -- the record the panel was scoped to, if any
     context_subject_id   uuid,
+    selected_table       text,                                 -- the table of the selected rows
     selected_ids         uuid[] NOT NULL DEFAULT '{}' CONSTRAINT ck_assist_request_selected CHECK (cardinality(selected_ids) <= 100),
     active_filters       jsonb,                                -- the list's filters as sent to its query
     previous_request_id  uuid,                                 -- a follow-up names the request it follows
@@ -35,6 +36,7 @@ CREATE TABLE assist_request (                              -- the subject of an 
     FOREIGN KEY (company_id, agent_run_id) REFERENCES agent_run (company_id, id),
     FOREIGN KEY (company_id, previous_request_id) REFERENCES assist_request (company_id, id),
     CONSTRAINT ck_assist_request_context CHECK ((context_subject_table IS NULL) = (context_subject_id IS NULL)),
+    CONSTRAINT ck_assist_request_selected_table CHECK ((cardinality(selected_ids) = 0) = (selected_table IS NULL)),
     CONSTRAINT ck_assist_request_closed CHECK ((state = 'open') = (answered_at IS NULL)
         AND (state = 'failed') = (failure_reason IS NOT NULL)
         AND (state = 'answered' OR answer IS NULL)),

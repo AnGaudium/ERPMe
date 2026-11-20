@@ -29,6 +29,8 @@ No external semantic engine runs in the core, and agents still never export file
    - **Imports.** `query` imports `db`, `registry` and `agent_runs`, as before, and now also the `work` contract, to raise its two work item kinds (ADR-0042 rule 5). `work` is layer 2, so the import goes downward.
    - **`agents`** (layer 5) owns the `analysis` workflow (rules 20–25). It reaches `query` only through the dispatcher, as for every workflow; nothing in `agents` imports `query`.
    - **No external engine.** No semantic layer product (Cube, dbt Semantic Layer or the like) runs inside the core: it would duplicate record scope, owner scope, field classes and taint, which the views already enforce, and add a second security model. Exporting the catalog to such tools comes after Phase 1 (rule 38).
+
+   Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-19): the `analysis` agent is one of the six Phase 1 agent types, one declaration on the shared runtime and an internal type that draws on the reserve of ADR-0050 rule 22; the assistant routes questions that need figures to it, so there is one analysis path (ADR-0078 rules 1, 8).
 2. The catalog lives in `backend/nativeflows/query/analysis/catalog.py` beside the view declarations (ADR-0050 rule 45). It declares four kinds of object:
    - **Facts:** a semantic view of schema `query`, its grain (what one row is), its time dimensions, its scope columns as the view declares them, and whether it is owner-scoped (ADR-0054 rule 15). A fact view pre-joins every dimension column it offers along a declared many-to-one path, so the compiler never joins facts to dimension tables, except for member labels (rule 12).
    - **Measures:** rule 4.
@@ -339,6 +341,8 @@ No external semantic engine runs in the core, and agents still never export file
 
     Note ([ADR-0063](0063-configurable-policy-settings.md), proposed 2026-11-15): the 30 examples and the synthetic-only promotion are the settings `artifacts.analysis.min_verified_examples` and `artifacts.analysis.allow_synthetic_only_promotion` (default true) (rule 13).
 
+    Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-21): in Phase 1 there is no `shadow` mode (`check` refuses it). Where this rule says "shadow", the daily `RunAnalysisEvaluation` on the company's verified examples is `analysis`'s evaluation in use, and a version, or a catalog change that makes a new version, without a passing evaluation runs as `off` (ADR-0078 rule 6).
+
 **Saved analyses, KPIs and examples**
 
 26. Saved analyses:
@@ -415,7 +419,9 @@ No external semantic engine runs in the core, and agents still never export file
     The profit-and-loss measures exclude closing and migration entries; the ledger turnover measures exclude migration entries, as ADR-0049 rule 6's turnover does. `sales_net_amount` and `purchase_net_amount` are the lines' posted net amounts in company currency, as their journal lines carry them; `net_revenue` is the ledger's figure, which also holds manual entries and deductions, so "sales" is an ambiguous term between them (rule 2). `sales_line_amount` and `purchase_line_amount` are in the document's currency.
 34. The 22 dimensions of Phase 1 (catalog `analysis-dimensions.csv`): `posting_date`, `document_date`, `due_date`, `posting_period`; `partner`, `partner_group`, `salesperson`; `item`, `product`, `item_group`; `warehouse`, `branch`; `system_account`, `account`, `cost_center`, `project`; `currency`, `document_type`, `movement_type` (kind `catalog`); `overdue_bucket` (`not_due`, `days_1_30`, `days_31_60`, `days_61_90`, `days_over_90`, from days overdue at the business date), `variance_category` (kind `enum`); `production_order`.
 
-    Note ([ADR-0068](0068-sites-and-core-logistics-payment-master-data.md), proposed 2026-11-17): two further dimensions: `site` (entity, the parent of `warehouse`; transit and goods-sent warehouses take the site of their valuation warehouse) and `payment_method` (entity, on sales and purchase lines). In rule 5's hierarchy list, `warehouse` → `site` replaces `warehouse` → `branch`, as `catalogs/analysis-dimensions.csv` has it; `site` has no parent in the catalog. Note ([ADR-0068](0068-sites-and-core-logistics-payment-master-data.md), 2026-11-21).
+    Note ([ADR-0068](0068-sites-and-core-logistics-payment-master-data.md), proposed 2026-11-17): two further dimensions: `site` (entity, the parent of `warehouse`; transit and goods-sent warehouses take the site of their valuation warehouse) and `payment_method` (entity, on sales and purchase lines).
+
+    Note ([ADR-0068](0068-sites-and-core-logistics-payment-master-data.md), 2026-11-21): in rule 5's hierarchy list, `warehouse` → `site` replaces `warehouse` → `branch`, as `catalogs/analysis-dimensions.csv` has it; `site` has no parent in the catalog.
 
     Note ([ADR-0069](0069-business-unit-dimension.md), proposed 2026-11-17): a further dimension, `business_unit` (entity, a tree over `parent_id`), offered by `journal_line_overview` and `system_account_turnover`. It groups by the posted value only. With ADR-0068's two, the catalog holds 25 dimensions.
 

@@ -10,7 +10,7 @@ Tables per owner module, from the DDL drafts in `docs/design/*.sql` and the owne
 | --- | --- | --- |
 | `agent_runs` | 2 | 8 |
 | `attachments` | 2 | 9 |
-| `audit` | 2 | 4 |
+| `audit` | 2 | 9 |
 | `configuration` | 2 | 16 |
 | `documents` | 2 | 11 |
 | `outbox` | 2 | 4 |
@@ -32,7 +32,7 @@ Tables per owner module, from the DDL drafts in `docs/design/*.sql` and the owne
 | `agents` | 5 | 1 |
 | `query` | 5 | 4 |
 | `(no owner stated)` | — | 16 |
-| **total** | | **381** |
+| **total** | | **386** |
 
 ## `agent_runs`
 
@@ -68,7 +68,12 @@ Tables per owner module, from the DDL drafts in `docs/design/*.sql` and the owne
 | `audit_change` | field changes of change-tracked tables; partitioned by month on id (rules 3, 6) | Audit | `audit_record` | docs/design/DS-05-platform.sql:889 |
 | `audit_denial` | Rule 5: coalesced, written outside the refused transaction | Audit |  | docs/design/DS-05-platform.sql:906 |
 | `audit_record` | one per executed command or batch item; partitioned by month on id (rule 6) | Audit | `policy_decision` | docs/design/DS-05-platform.sql:841 |
+| `data_erasure_entry` | ADR-0079 rule 7; one row per rewritten row; names columns, holds no values; append-only (trigger below) | Erasure entries | `data_subject_request`, `document` | docs/design/DS-64-personal-data.sql:61 |
+| `data_subject_state` | ADR-0079 rule 4; one row per subject no longer active | Data subject state | `data_subject_request`, `document` | docs/design/DS-64-personal-data.sql:18 |
+| `personal_data_breach` | ADR-0079 rule 16; what an authority asks for; the case's kind is personal_data_breach (checked by the command) | Breach register | `work_case` | docs/design/DS-64-personal-data.sql:104 |
 | `personal_data_processing_log` | IDs and field names only, never values; append-only (trigger below) | Processing log |  | docs/design/DS-35-crm.sql:472 |
+| `personal_data_read_log` | ADR-0079 rule 12; query name, user, field names and row count, never values; append-only (trigger below) | Read log | `user_account` | docs/design/DS-64-personal-data.sql:85 |
+| `retention_rule` | ADR-0079 rule 9; seeded per company from the package's rules; the core seeds none | Retention rules |  | docs/design/DS-64-personal-data.sql:41 |
 
 ## `configuration`
 
@@ -156,7 +161,7 @@ Tables per owner module, from the DDL drafts in `docs/design/*.sql` and the owne
 | --- | --- | --- | --- | --- |
 | `company_setup_acknowledgement` | company data | Operating presets and setup acknowledgements | `user_account` | docs/design/DS-28-settings.sql:118 |
 | `extension_point` | installation data; declared by a module, written at startup; no runtime in Phase 1 | Extension points |  | docs/design/DS-28-settings.sql:213 |
-| `list_variant` | a saved view of one List<Noun> query, personal or shared with a role | List variants | `role`, `user_account` | docs/design/DS-30-ui.sql:47 |
+| `list_variant` | a saved view of one List<Noun> query, personal or shared with a role | List variants | `role`, `user_account` | docs/design/DS-30-ui.sql:49 |
 | `setting_definition` | installation data; one row per registered key, written at startup | Setting definitions |  | docs/design/DS-28-settings.sql:23 |
 | `setting_preset` | installation data; one row per preset version, written at startup | Operating presets and setup acknowledgements |  | docs/design/DS-28-settings.sql:85 |
 | `setting_preset_item` | installation data; one row per preset version, kind and key | Operating presets and setup acknowledgements | `setting_preset` | docs/design/DS-28-settings.sql:92 |
@@ -234,7 +239,7 @@ Tables per owner module, from the DDL drafts in `docs/design/*.sql` and the owne
 | --- | --- | --- | --- | --- |
 | `derivation_trace` | derivation_trace is owned by ledger. |  |  | docs/design/DS-06-universal-journal.sql:14 |
 | `fixed_asset` |  |  |  | docs/design/DS-06-universal-journal.sql:45 |
-| `opening_turnover` | ADR-0044 rule 10; ADR-0049 rule 14: year-to-date turnover before a mid-year cut-over, non-posting, read by statutory reports. |  | `account` | docs/design/DS-06-universal-journal.sql:450 |
+| `opening_turnover` | ADR-0044 rule 10; ADR-0049 rule 14: year-to-date turnover before a mid-year cut-over, non-posting, read by statutory reports. |  | `account` | docs/design/DS-06-universal-journal.sql:451 |
 | `payment_term` | ADR-0026: open-item core, owned by ledger. |  |  | docs/design/DS-06-universal-journal.sql:91 |
 
 ## `master_data`
@@ -469,16 +474,16 @@ Tables per owner module, from the DDL drafts in `docs/design/*.sql` and the owne
 
 | Table | Purpose | Section | Key references | Source |
 | --- | --- | --- | --- | --- |
-| `defect_code` | ADR-0070 rule 6; company data, change-tracked, master_data_change | Master data |  | docs/design/DS-58-quality.sql:113 |
-| `inspection_characteristic` | ADR-0070 rule 5; lines of a revision, immutable with it | Master data | `inspection_plan_revision`, `uom` | docs/design/DS-58-quality.sql:83 |
-| `inspection_lot` | ADR-0070 rule 7 | Inspection lots | `document`, `inspection_plan_revision`, `item`, `lot`, `partner`, `production_order`, `serial_number`, `warehouse` | docs/design/DS-58-quality.sql:127 |
-| `inspection_lot_execution` | ADR-0070 rule 15 | Inspection lots | `inspection_lot_line` | docs/design/DS-58-quality.sql:188 |
-| `inspection_lot_line` | ADR-0070 rule 12 | Inspection lots | `inspection_lot`, `serial_number` | docs/design/DS-58-quality.sql:171 |
-| `inspection_plan` | ADR-0070 rule 4; the header has no effect without a released revision | Master data | `item`, `item_group`, `site` | docs/design/DS-58-quality.sql:39 |
-| `inspection_plan_revision` | ADR-0070 rule 4; immutable once released, like bill_of_materials_revision | Master data | `inspection_plan`, `inspection_plan_revision`, `sampling_procedure` | docs/design/DS-58-quality.sql:60 |
-| `inspection_result` | ADR-0070 rule 10 | Results | `agent_run`, `defect_code`, `document_extraction`, `inspection_characteristic`, `inspection_lot`, `serial_number`, `user_account` | docs/design/DS-58-quality.sql:215 |
-| `nonconformance` | ADR-0070 rule 16 | Nonconformance | `defect_code`, `inspection_lot`, `item`, `lot`, `partner`, `serial_number`, `user_account` | docs/design/DS-58-quality.sql:268 |
-| `sampling_procedure` | ADR-0070 rule 3; company data, change-tracked, master_data_change | Master data |  | docs/design/DS-58-quality.sql:24 |
+| `defect_code` | ADR-0070 rule 6; company data, change-tracked, master_data_change | Master data |  | docs/design/DS-58-quality.sql:114 |
+| `inspection_characteristic` | ADR-0070 rule 5; lines of a revision, immutable with it | Master data | `inspection_plan_revision`, `uom` | docs/design/DS-58-quality.sql:84 |
+| `inspection_lot` | ADR-0070 rule 7 | Inspection lots | `document`, `inspection_plan_revision`, `item`, `lot`, `partner`, `production_order`, `serial_number`, `warehouse` | docs/design/DS-58-quality.sql:128 |
+| `inspection_lot_execution` | ADR-0070 rule 15 | Inspection lots | `inspection_lot_line` | docs/design/DS-58-quality.sql:194 |
+| `inspection_lot_line` | ADR-0070 rule 12 | Inspection lots | `inspection_lot`, `reason`, `serial_number` | docs/design/DS-58-quality.sql:172 |
+| `inspection_plan` | ADR-0070 rule 4; the header has no effect without a released revision | Master data | `item`, `item_group`, `site` | docs/design/DS-58-quality.sql:40 |
+| `inspection_plan_revision` | ADR-0070 rule 4; immutable once released, like bill_of_materials_revision | Master data | `inspection_plan`, `inspection_plan_revision`, `sampling_procedure` | docs/design/DS-58-quality.sql:61 |
+| `inspection_result` | ADR-0070 rule 10 | Results | `agent_run`, `defect_code`, `document_extraction`, `inspection_characteristic`, `inspection_lot`, `serial_number`, `user_account` | docs/design/DS-58-quality.sql:221 |
+| `nonconformance` | ADR-0070 rule 16 | Nonconformance | `defect_code`, `inspection_lot`, `item`, `lot`, `partner`, `serial_number`, `user_account` | docs/design/DS-58-quality.sql:274 |
+| `sampling_procedure` | ADR-0070 rule 3; company data, change-tracked, master_data_change | Master data |  | docs/design/DS-58-quality.sql:25 |
 
 ## `sales`
 
@@ -518,7 +523,7 @@ Tables per owner module, from the DDL drafts in `docs/design/*.sql` and the owne
 
 | Table | Purpose | Section | Key references | Source |
 | --- | --- | --- | --- | --- |
-| `account_period_balance` | Rule 18: period balance cache, written when a period's general area is locked. |  | `account`, `currency`, `posting_period` | docs/design/DS-06-universal-journal.sql:424 |
+| `account_period_balance` | Rule 18: period balance cache, written when a period's general area is locked. |  | `account`, `currency`, `posting_period` | docs/design/DS-06-universal-journal.sql:425 |
 | `auto_post_confirmation` | immutable (ADR-0029 rule 13; ADR-0043 rule 14) | Policy decisions and approvals | `policy_decision`, `user_account` | docs/design/DS-05-platform.sql:675 |
 | `document_installment` | The installment schedule of an invoice, part of its content (ADR-0047 rule 6; ADR-0026 rule 5) | Line content shared by every document type | `document` | docs/design/DS-22-09-42-commercial-inventory.sql:1464 |
 | `document_line_custom_text` | Free text for is_custom values (ADR-0046 rule 9; ADR-0045 rule 15): personal and untrusted. | Line content shared by every document type | `document`, `variant_attribute` | docs/design/DS-22-09-42-commercial-inventory.sql:1451 |
@@ -549,7 +554,7 @@ Foreign keys whose source and target tables have different stated owners. Foreig
 | `agent_type_setting` (agent_runs, 2) | `workflow_owner_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-05-platform.sql:201 |
 | `data_processing_permission` (agent_runs, 2) | `approved_by_user_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-36-document-intake.sql:238 |
 | `data_processing_permission` (agent_runs, 2) | `company_id,assessment_attachment_id` | `attachment` (attachments, 2) | same layer | docs/design/DS-36-document-intake.sql:252 |
-| `assist_request` (agents, 5) | `company_id,agent_run_id` | `agent_run` (agent_runs, 2) | down | docs/design/DS-30-ui.sql:35 |
+| `assist_request` (agents, 5) | `company_id,agent_run_id` | `agent_run` (agent_runs, 2) | down | docs/design/DS-30-ui.sql:36 |
 | `assist_request` (agents, 5) | `requested_by_user_id` | `user_account` (permissions, 2) | down | docs/design/DS-30-ui.sql:14 |
 | `attachment` (attachments, 2) | `company_id,generated_subject_document_id` | `document` (documents, 2) | same layer | docs/design/DS-05-platform.sql:960 |
 | `document_extraction` (attachments, 2) | `company_id,inbound_message_id` | `inbound_message` (crm, 4) | up | docs/design/DS-36-document-intake.sql:69 |
@@ -559,6 +564,12 @@ Foreign keys whose source and target tables have different stated owners. Foreig
 | `extraction_confirmation` (attachments, 2) | `confirmed_by_user_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-36-document-intake.sql:162 |
 | `extraction_field` (attachments, 2) | `company_id,agent_run_id` | `agent_run` (agent_runs, 2) | same layer | docs/design/DS-36-document-intake.sql:124 |
 | `extraction_field` (attachments, 2) | `entered_by_user_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-36-document-intake.sql:114 |
+| `data_erasure_entry` (audit, 2) | `company_id,data_subject_request_id` | `document` (documents, 2) | same layer | docs/design/DS-64-personal-data.sql:77 |
+| `data_erasure_entry` (audit, 2) | `data_subject_request_id` | `data_subject_request` (crm, 4) | up | docs/design/DS-64-personal-data.sql:72 |
+| `data_subject_state` (audit, 2) | `company_id,data_subject_request_id` | `document` (documents, 2) | same layer | docs/design/DS-64-personal-data.sql:32 |
+| `data_subject_state` (audit, 2) | `data_subject_request_id` | `data_subject_request` (crm, 4) | up | docs/design/DS-64-personal-data.sql:28 |
+| `personal_data_breach` (audit, 2) | `company_id,work_case_id` | `work_case` (work, 2) | same layer | docs/design/DS-64-personal-data.sql:125 |
+| `personal_data_read_log` (audit, 2) | `user_account_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-64-personal-data.sql:88 |
 | `bank_statement` (cash, 4) | `company_id,source_attachment_id` | `attachment` (attachments, 2) | down | docs/design/DS-05-platform.sql:1133 |
 | `bank_statement` (cash, 4) | `imported_by_user_id` | `user_account` (permissions, 2) | down | docs/design/DS-05-platform.sql:1127 |
 | `bank_statement_line` (cash, 4) | `company_id,matched_document_id` | `document` (documents, 2) | down | docs/design/DS-05-platform.sql:1180 |
@@ -995,30 +1006,31 @@ Foreign keys whose source and target tables have different stated owners. Foreig
 | `service_receipt` (purchasing, 4) | `company_id,partner_id` | `partner` (master_data, 3) | down | docs/design/DS-22-09-42-commercial-inventory.sql:808 |
 | `service_receipt_line` (purchasing, 4) | `output_lot_id` | `lot` (inventory, 3) | down | docs/design/DS-22-09-42-commercial-inventory.sql:826 |
 | `service_receipt_line` (purchasing, 4) | `uom_id` | `uom` (master_data, 3) | down | docs/design/DS-22-09-42-commercial-inventory.sql:818 |
-| `inspection_characteristic` (quality, 4) | `uom_id` | `uom` (master_data, 3) | down | docs/design/DS-58-quality.sql:91 |
-| `inspection_lot` (quality, 4) | `company_id,id` | `document` (documents, 2) | down | docs/design/DS-58-quality.sql:149 |
-| `inspection_lot` (quality, 4) | `company_id,item_id` | `item` (master_data, 3) | down | docs/design/DS-58-quality.sql:150 |
-| `inspection_lot` (quality, 4) | `company_id,partner_id` | `partner` (master_data, 3) | down | docs/design/DS-58-quality.sql:154 |
-| `inspection_lot` (quality, 4) | `company_id,production_order_id` | `production_order` (production, 3) | down | docs/design/DS-58-quality.sql:155 |
-| `inspection_lot` (quality, 4) | `company_id,source_document_id` | `document` (documents, 2) | down | docs/design/DS-58-quality.sql:153 |
-| `inspection_lot` (quality, 4) | `company_id,warehouse_id` | `warehouse` (master_data, 3) | down | docs/design/DS-58-quality.sql:151 |
-| `inspection_lot` (quality, 4) | `lot_id` | `lot` (inventory, 3) | down | docs/design/DS-58-quality.sql:133 |
-| `inspection_lot` (quality, 4) | `serial_number_id` | `serial_number` (inventory, 3) | down | docs/design/DS-58-quality.sql:134 |
-| `inspection_lot_line` (quality, 4) | `serial_number_id` | `serial_number` (inventory, 3) | down | docs/design/DS-58-quality.sql:178 |
-| `inspection_plan` (quality, 4) | `company_id,item_group_id` | `item_group` (master_data, 3) | down | docs/design/DS-58-quality.sql:55 |
-| `inspection_plan` (quality, 4) | `company_id,item_id` | `item` (master_data, 3) | down | docs/design/DS-58-quality.sql:54 |
-| `inspection_plan` (quality, 4) | `company_id,site_id` | `site` (master_data, 3) | down | docs/design/DS-58-quality.sql:56 |
-| `inspection_result` (quality, 4) | `company_id,agent_run_id` | `agent_run` (agent_runs, 2) | down | docs/design/DS-58-quality.sql:244 |
-| `inspection_result` (quality, 4) | `company_id,document_extraction_id` | `document_extraction` (attachments, 2) | down | docs/design/DS-58-quality.sql:245 |
-| `inspection_result` (quality, 4) | `confirmed_by_user_id` | `user_account` (permissions, 2) | down | docs/design/DS-58-quality.sql:236 |
-| `inspection_result` (quality, 4) | `recorded_by_user_id` | `user_account` (permissions, 2) | down | docs/design/DS-58-quality.sql:229 |
-| `inspection_result` (quality, 4) | `serial_number_id` | `serial_number` (inventory, 3) | down | docs/design/DS-58-quality.sql:222 |
-| `nonconformance` (quality, 4) | `company_id,item_id` | `item` (master_data, 3) | down | docs/design/DS-58-quality.sql:298 |
-| `nonconformance` (quality, 4) | `company_id,partner_id` | `partner` (master_data, 3) | down | docs/design/DS-58-quality.sql:299 |
-| `nonconformance` (quality, 4) | `containment_user_id` | `user_account` (permissions, 2) | down | docs/design/DS-58-quality.sql:285 |
-| `nonconformance` (quality, 4) | `corrective_user_id` | `user_account` (permissions, 2) | down | docs/design/DS-58-quality.sql:288 |
-| `nonconformance` (quality, 4) | `lot_id` | `lot` (inventory, 3) | down | docs/design/DS-58-quality.sql:275 |
-| `nonconformance` (quality, 4) | `serial_number_id` | `serial_number` (inventory, 3) | down | docs/design/DS-58-quality.sql:276 |
+| `inspection_characteristic` (quality, 4) | `uom_id` | `uom` (master_data, 3) | down | docs/design/DS-58-quality.sql:92 |
+| `inspection_lot` (quality, 4) | `company_id,id` | `document` (documents, 2) | down | docs/design/DS-58-quality.sql:150 |
+| `inspection_lot` (quality, 4) | `company_id,item_id` | `item` (master_data, 3) | down | docs/design/DS-58-quality.sql:151 |
+| `inspection_lot` (quality, 4) | `company_id,partner_id` | `partner` (master_data, 3) | down | docs/design/DS-58-quality.sql:155 |
+| `inspection_lot` (quality, 4) | `company_id,production_order_id` | `production_order` (production, 3) | down | docs/design/DS-58-quality.sql:156 |
+| `inspection_lot` (quality, 4) | `company_id,source_document_id` | `document` (documents, 2) | down | docs/design/DS-58-quality.sql:154 |
+| `inspection_lot` (quality, 4) | `company_id,warehouse_id` | `warehouse` (master_data, 3) | down | docs/design/DS-58-quality.sql:152 |
+| `inspection_lot` (quality, 4) | `lot_id` | `lot` (inventory, 3) | down | docs/design/DS-58-quality.sql:134 |
+| `inspection_lot` (quality, 4) | `serial_number_id` | `serial_number` (inventory, 3) | down | docs/design/DS-58-quality.sql:135 |
+| `inspection_lot_line` (quality, 4) | `company_id,reason_id,reason_kind` | `reason` (master_data, 3) | down | docs/design/DS-58-quality.sql:187 |
+| `inspection_lot_line` (quality, 4) | `serial_number_id` | `serial_number` (inventory, 3) | down | docs/design/DS-58-quality.sql:179 |
+| `inspection_plan` (quality, 4) | `company_id,item_group_id` | `item_group` (master_data, 3) | down | docs/design/DS-58-quality.sql:56 |
+| `inspection_plan` (quality, 4) | `company_id,item_id` | `item` (master_data, 3) | down | docs/design/DS-58-quality.sql:55 |
+| `inspection_plan` (quality, 4) | `company_id,site_id` | `site` (master_data, 3) | down | docs/design/DS-58-quality.sql:57 |
+| `inspection_result` (quality, 4) | `company_id,agent_run_id` | `agent_run` (agent_runs, 2) | down | docs/design/DS-58-quality.sql:250 |
+| `inspection_result` (quality, 4) | `company_id,document_extraction_id` | `document_extraction` (attachments, 2) | down | docs/design/DS-58-quality.sql:251 |
+| `inspection_result` (quality, 4) | `confirmed_by_user_id` | `user_account` (permissions, 2) | down | docs/design/DS-58-quality.sql:242 |
+| `inspection_result` (quality, 4) | `recorded_by_user_id` | `user_account` (permissions, 2) | down | docs/design/DS-58-quality.sql:235 |
+| `inspection_result` (quality, 4) | `serial_number_id` | `serial_number` (inventory, 3) | down | docs/design/DS-58-quality.sql:228 |
+| `nonconformance` (quality, 4) | `company_id,item_id` | `item` (master_data, 3) | down | docs/design/DS-58-quality.sql:304 |
+| `nonconformance` (quality, 4) | `company_id,partner_id` | `partner` (master_data, 3) | down | docs/design/DS-58-quality.sql:305 |
+| `nonconformance` (quality, 4) | `containment_user_id` | `user_account` (permissions, 2) | down | docs/design/DS-58-quality.sql:291 |
+| `nonconformance` (quality, 4) | `corrective_user_id` | `user_account` (permissions, 2) | down | docs/design/DS-58-quality.sql:294 |
+| `nonconformance` (quality, 4) | `lot_id` | `lot` (inventory, 3) | down | docs/design/DS-58-quality.sql:281 |
+| `nonconformance` (quality, 4) | `serial_number_id` | `serial_number` (inventory, 3) | down | docs/design/DS-58-quality.sql:282 |
 | `analysis_example` (query, 5) | `created_by_user_id` | `user_account` (permissions, 2) | down | docs/design/DS-33-analysis.sql:190 |
 | `analysis_example` (query, 5) | `released_by_user_id` | `user_account` (permissions, 2) | down | docs/design/DS-33-analysis.sql:191 |
 | `analysis_question` (query, 5) | `asked_by_user_id` | `user_account` (permissions, 2) | down | docs/design/DS-33-analysis.sql:25 |
@@ -1030,8 +1042,8 @@ Foreign keys whose source and target tables have different stated owners. Foreig
 | `company_setup_acknowledgement` (registry, 2) | `implementer_user_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-28-settings.sql:122 |
 | `company_setup_acknowledgement` (registry, 2) | `owner_user_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-28-settings.sql:121 |
 | `company_setup_acknowledgement` (registry, 2) | `revoked_by_user_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-28-settings.sql:126 |
-| `list_variant` (registry, 2) | `company_id,shared_role_id` | `role` (permissions, 2) | same layer | docs/design/DS-30-ui.sql:62 |
-| `list_variant` (registry, 2) | `owner_user_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-30-ui.sql:52 |
+| `list_variant` (registry, 2) | `company_id,shared_role_id` | `role` (permissions, 2) | same layer | docs/design/DS-30-ui.sql:64 |
+| `list_variant` (registry, 2) | `owner_user_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-30-ui.sql:54 |
 | `setting_value` (registry, 2) | `approved_by_user_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-28-settings.sql:176 |
 | `setting_value` (registry, 2) | `changed_by_user_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-28-settings.sql:174 |
 | `setting_value` (registry, 2) | `company_id,change_proposal_id` | `change_proposal` (documents, 2) | same layer | docs/design/DS-28-settings.sql:183 |
@@ -1155,14 +1167,14 @@ Foreign keys whose source and target tables have different stated owners. Foreig
 | `work_item` (work, 2) | `company_id,warehouse_id` | `warehouse` (master_data, 3) | up | docs/design/DS-05-platform.sql:89 |
 | `work_item` (work, 2) | `owner_user_id` | `user_account` (permissions, 2) | same layer | docs/design/DS-05-platform.sql:67 |
 
-613 cross-module foreign keys.
+620 cross-module foreign keys.
 
 ## Foreign keys to tables without a stated owner or without DDL
 
 | From | Column(s) | To | Target state | Source |
 | --- | --- | --- | --- | --- |
-| `account_period_balance` | `account_id` | `account` | lab stub | docs/design/DS-06-universal-journal.sql:427 |
-| `account_period_balance` | `posting_period_id` | `posting_period` | lab stub | docs/design/DS-06-universal-journal.sql:428 |
+| `account_period_balance` | `account_id` | `account` | lab stub | docs/design/DS-06-universal-journal.sql:428 |
+| `account_period_balance` | `posting_period_id` | `posting_period` | lab stub | docs/design/DS-06-universal-journal.sql:429 |
 | `activity_rate` | `posting_period_id` | `posting_period` | lab stub | docs/design/DS-43-54-planning-production.sql:1629 |
 | `approval` | `company_id,policy_decision_id,approval_pool_id` | `policy_decision` | no owner stated | docs/design/DS-05-platform.sql:666 |
 | `approval` | `company_id,policy_decision_id,document_version_id` | `policy_decision` | no owner stated | docs/design/DS-05-platform.sql:665 |
@@ -1190,7 +1202,7 @@ Foreign keys whose source and target tables have different stated owners. Foreig
 | `open_item` | `account_id` | `account` | lab stub | docs/design/DS-06-universal-journal.sql:115 |
 | `open_item` | `predecessor_open_item_id` | `open_item` | no owner stated | docs/design/DS-06-universal-journal.sql:142 |
 | `open_item_collection` | `company_id,open_item_id` | `open_item` | no owner stated | docs/design/DS-05-platform.sql:1333 |
-| `opening_turnover` | `account_id` | `account` | lab stub | docs/design/DS-06-universal-journal.sql:453 |
+| `opening_turnover` | `account_id` | `account` | lab stub | docs/design/DS-06-universal-journal.sql:454 |
 | `payment_line` | `account_id` | `account` | lab stub | docs/design/DS-05-platform.sql:1253 |
 | `payment_line` | `open_item_id` | `open_item` | no owner stated | docs/design/DS-05-platform.sql:1247 |
 | `pending_receipt_adjustment` | `clearing_journal_line_id` | `journal_line` | no owner stated | docs/design/DS-22-09-42-commercial-inventory.sql:1788 |
@@ -1227,15 +1239,18 @@ Column pairs `<x>_table` + `<x>_id` that point at any table. An FK scan cannot s
 | `automation_execution` | configuration | `subject_table`, `subject_id` | docs/design/DS-28-34-configuration-artifacts.sql:96 |
 | `change_proposal_item` | documents | `target_table`, `target_id` | docs/design/DS-05-platform.sql:736 |
 | `conversation` | work | `subject_table`, `subject_id` | docs/design/DS-63-messaging.sql:9 |
+| `data_erasure_entry` | audit | `subject_table`, `subject_id` | docs/design/DS-64-personal-data.sql:61 |
+| `data_subject_state` | audit | `subject_table`, `subject_id` | docs/design/DS-64-personal-data.sql:18 |
 | `document_line_price_step` | — | `source_table`, `source_id` | docs/design/DS-22-09-42-commercial-inventory.sql:1431 |
 | `event_delivery` | outbox | `subject_table`, `subject_id` | docs/design/DS-05-platform.sql:819 |
 | `event_subject` | outbox | `subject_table`, `subject_id` | docs/design/DS-05-platform.sql:777 |
 | `extraction_result_link` | attachments | `target_table`, `target_id` | docs/design/DS-36-document-intake.sql:168 |
 | `golden_case_label` | configuration | `case_table`, `case_id` | docs/design/DS-28-34-configuration-artifacts.sql:397 |
-| `inspection_lot_execution` | quality | `target_table`, `target_id` | docs/design/DS-58-quality.sql:188 |
-| `nonconformance` | quality | `source_table`, `source_id` | docs/design/DS-58-quality.sql:268 |
+| `inspection_lot_execution` | quality | `target_table`, `target_id` | docs/design/DS-58-quality.sql:194 |
+| `nonconformance` | quality | `source_table`, `source_id` | docs/design/DS-58-quality.sql:274 |
 | `outbox_event` | outbox | `subject_table`, `subject_id` | docs/design/DS-05-platform.sql:795 |
 | `personal_data_processing_log` | audit | `subject_table`, `subject_id` | docs/design/DS-35-crm.sql:472 |
+| `personal_data_read_log` | audit | `subject_table`, `subject_id` | docs/design/DS-64-personal-data.sql:85 |
 | `work_case` | work | `origin_table`, `origin_id` | docs/design/DS-05-platform.sql:134 |
 | `work_case_link` | work | `target_table`, `target_id` | docs/design/DS-05-platform.sql:175 |
 | `work_item` | work | `subject_table`, `subject_id` | docs/design/DS-05-platform.sql:58 |
@@ -1248,7 +1263,7 @@ Listed for the review; no owner is invented. Each needs an owner stated in its D
 | Table | Finding | Where |
 | --- | --- | --- |
 | `account` | lab stub only: no design DDL defines it yet (DS-05-platform.sql header; lab 00_stubs.sql). | docs/reviews/2026-11-14-design-validation/lab/00_stubs.sql |
-| `account_period_balance` | DS-06 states no owner module for this table in its comments (ADR-0022 rule 7 needs exactly one). | docs/design/DS-06-universal-journal.sql:424 |
+| `account_period_balance` | DS-06 states no owner module for this table in its comments (ADR-0022 rule 7 needs exactly one). | docs/design/DS-06-universal-journal.sql:425 |
 | `applied_rate` | lab stub only: no design DDL defines it yet (DS-05-platform.sql header; lab 00_stubs.sql). | docs/reviews/2026-11-14-design-validation/lab/00_stubs.sql |
 | `auto_post_confirmation` | its DDL section names two owner modules and the table names none (ADR-0022 rule 7 needs exactly one). Section owners: policy, documents. | docs/design/DS-05-platform.sql:675 |
 | `close_task` | lab stub only: no design DDL defines it yet (DS-05-platform.sql header; lab 00_stubs.sql). | docs/reviews/2026-11-14-design-validation/lab/00_stubs.sql |

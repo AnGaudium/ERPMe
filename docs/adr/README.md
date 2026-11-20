@@ -68,17 +68,18 @@ One file per decision, named `NNNN-short-title.md`, using [template.md](template
 | [ADR-0060](0060-agent-assisted-reporting-and-analysis.md) | Agent-assisted reporting and analysis (DS-33, DS-34) | Accepted (2026-11-15) |
 | [ADR-0063](0063-configurable-policy-settings.md) | Configurable policy settings (DS-28) | Accepted (2026-11-15) |
 | [ADR-0064](0064-production-agent.md) | Production agent (DS-57) | Accepted (2026-11-15) |
-| [ADR-0065](0065-deterministic-auto-post-gateway.md) | Deterministic auto-post gateway (maker-checker) (DS-28, DS-34) | Proposed (2026-11-16) |
-| [ADR-0066](0066-work-cases.md) | Work cases (DS-29, DS-30) | Proposed (2026-11-16) |
-| [ADR-0067](0067-quickflows-operating-presets.md) | QuickFlows mode: operating presets for small teams (DS-28, DS-30) | Proposed (2026-11-17) |
-| [ADR-0068](0068-sites-and-core-logistics-payment-master-data.md) | Sites and core logistics and payment master data (DS-20, DS-09, DS-22, DS-25, DS-51–54) | Proposed (2026-11-17) |
-| [ADR-0069](0069-business-unit-dimension.md) | Business unit dimension (DS-06, DS-20, DS-22, DS-28, DS-33) | Proposed (2026-11-17) |
-| [ADR-0070](0070-quality-management-core.md) | Quality management core (DS-58) | Proposed (2026-11-17) |
-| [ADR-0071](0071-work-orders-and-shop-floor-execution.md) | Work orders and shop-floor execution (DS-52, DS-31, DS-53) | Proposed (2026-11-17) |
-| [ADR-0072](0072-costing-sheet-and-cost-component-structure.md) | Costing sheet and cost component structure (DS-53, DS-56, DS-26) | Proposed (2026-11-18) |
-| [ADR-0073](0073-coding-pipeline-and-mechanical-assurance.md) | Coding pipeline and mechanical assurance (DS-18, DS-04, DS-16) | Proposed (2026-11-18) |
-| [ADR-0074](0074-core-data-structure-additions.md) | Core data-structure additions (DS-20, DS-22, DS-05, DS-21) | Proposed (2026-11-19) |
-| [ADR-0075](0075-stock-documents.md) | Stock documents (DS-09, DS-22, DS-42) | Proposed (2026-11-19) |
-| [ADR-0076](0076-internal-messaging-and-notifications.md) | Internal messaging and notifications (DS-63) | Proposed (2026-11-19) |
-| [ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md) | UI floorplans, annotation vocabulary and embedded agent interaction (DS-30) | Proposed (2026-11-19) |
+| [ADR-0065](0065-deterministic-auto-post-gateway.md) | Deterministic auto-post gateway (maker-checker) (DS-28, DS-34) | Accepted (2026-11-21) |
+| [ADR-0066](0066-work-cases.md) | Work cases (DS-29, DS-30) | Accepted (2026-11-21) |
+| [ADR-0067](0067-quickflows-operating-presets.md) | QuickFlows mode: operating presets for small teams (DS-28, DS-30) | Accepted (2026-11-21) |
+| [ADR-0068](0068-sites-and-core-logistics-payment-master-data.md) | Sites and core logistics and payment master data (DS-20, DS-09, DS-22, DS-25, DS-51–54) | Accepted (2026-11-21) |
+| [ADR-0069](0069-business-unit-dimension.md) | Business unit dimension (DS-06, DS-20, DS-22, DS-28, DS-33) | Accepted (2026-11-21) |
+| [ADR-0070](0070-quality-management-core.md) | Quality management core (DS-58) | Accepted (2026-11-21) |
+| [ADR-0071](0071-work-orders-and-shop-floor-execution.md) | Work orders and shop-floor execution (DS-52, DS-31, DS-53) | Accepted (2026-11-21) |
+| [ADR-0072](0072-costing-sheet-and-cost-component-structure.md) | Costing sheet and cost component structure (DS-53, DS-56, DS-26) | Accepted (2026-11-21) |
+| [ADR-0073](0073-coding-pipeline-and-mechanical-assurance.md) | Coding pipeline and mechanical assurance (DS-18, DS-04, DS-16) | Accepted (2026-11-21) |
+| [ADR-0074](0074-core-data-structure-additions.md) | Core data-structure additions (DS-20, DS-22, DS-05, DS-21) | Accepted (2026-11-21) |
+| [ADR-0075](0075-stock-documents.md) | Stock documents (DS-09, DS-22, DS-42) | Accepted (2026-11-21) |
+| [ADR-0076](0076-internal-messaging-and-notifications.md) | Internal messaging and notifications (DS-63) | Accepted (2026-11-21) |
+| [ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md) | UI floorplans, annotation vocabulary and embedded agent interaction (DS-30) | Accepted (2026-11-21) |
+| [ADR-0078](0078-agent-simplification-for-phase-1.md) | Agent scope and the common work model for Phase 1 (DS-32, DS-33, DS-34) | Proposed (2026-11-19) |
 | [ADR-0079](0079-personal-data-protection.md) | Personal data protection in the core (DS-64) | Proposed (2026-11-21) |

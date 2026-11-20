@@ -160,6 +160,8 @@ Every exception, pending approval and other piece of business work is one `work_
 15. An item raised by a tainted event, or by a tainted run, has `is_tainted`. A run started from it is tainted from its start (ADR-0029 rule 10), and its drafts are tainted versions.
 16. Agents never `ResolveWorkItem` a kind that needs a person's judgement. Each kind declares `is_agent_resolvable`, default false.
 
+   Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-21): the work model is stated in one place in ADR-0078 rules 11 and 12. The work item is the unit of work for people, deterministic code and agents; an agent run is one attempt at it and never resolves it (`is_agent_resolvable` is false for every Phase 1 kind). The kind is the contract between a domain module and whoever does the work: the module names no agent type, and at most one agent type declares a given kind.
+
 **What raises work items**
 
 17. Pending approvals and unconfirmed auto-posts are work items in Phase 1 (Principle 8):

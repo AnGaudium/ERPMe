@@ -1,6 +1,6 @@
 # ADR-0071: Work orders and shop-floor execution
 
-Status: proposed (2026-11-17) under ADR-0005 (builder Claude Opus 5.5).
+Status: accepted (2026-11-21) under ADR-0005, reviewed by Claude Fable 5.2 (builder Claude Opus 5.5; proposed 2026-11-17) after three review rounds, the fixes verified by Claude Opus 5.5.
 Design items: DS-52 (production orders and shop floor), DS-31 (shop-floor flows), DS-53 (costing), DS-34 (agents), DS-15 (roles). Related decisions: D6. Principles 2, 3, 12. ADR-0004, ADR-0006, ADR-0007, ADR-0008, ADR-0009, ADR-0013, ADR-0022, ADR-0023, ADR-0024, ADR-0027, ADR-0028, ADR-0029, ADR-0033, ADR-0034, ADR-0035, ADR-0040, ADR-0042, ADR-0063, ADR-0064, ADR-0066, ADR-0068, ADR-0070.
 
 ## Decision
@@ -37,14 +37,14 @@ The author's decision of 2026-11-17: production execution should feel like Odoo'
 2. Each of the four records may be posted any number of times per MO, each one a reversible internal document:
    - **Receipts** (ADR-0034 rule 13) and **issues and returns** (rule 11): unchanged.
    - **Time.** A confirmation with yield and scrap 0 and only activity quantities is valid (a time-only confirmation, for setup or a shift without finished parts). Rule 12 never forbade it; this rule states it. ADR-0064 rule 22's duplicate check treats two time-only confirmations as duplicates only when their activity quantities are equal too.
-   - **Scrap.** A confirmation with yield 0 and scrap above 0 records scrap alone. Component scrap is an issue line with a scrap `reason_code` (rule 11's column). Receipt scrap: rule 4. A confirmation with yield 0 creates no in-process inspection lot (ADR-0070 rule 8). (review note, 2026-11-21)
+   - **Scrap.** A confirmation with yield 0 and scrap above 0 records scrap alone. Component scrap is an issue line with a scrap `scrap_reason_id` (rule 11's column; rule 20). Receipt scrap: rule 4. A confirmation with yield 0 creates no in-process inspection lot (ADR-0070 rule 8). (review note, 2026-11-21)
 
     Note ([ADR-0074](0074-core-data-structure-additions.md), proposed 2026-11-19): the component-scrap and over-issue reason of an issue line and the confirmation's scrap reason are `scrap_reason_id` references to a reason of kind `scrap`, in place of the text codes (ADR-0074 rule 14).
 3. Issuing a component that is not on the MO, from the tablet's "issue extra component":
    - **On the order.** An issue above the open requirement keeps `issue_above_requirement` (ADR-0034 rule 11).
    - **Not on the order.** The client sends one command batch (ADR-0008 rule 20): the change order that adds the component line (ADR-0028 rule 4; ADR-0034 rule 8), then `CreateProductionIssue` and `PostProductionIssue`. The line's required quantity is 0 unless the person states one, so ADR-0035 rule 10 treats the consumption as above norms. When policy requires approval of the change, the batch fails as a whole and the issue waits for it.
 4. Receipt scrap, for an MO without internal operations:
-   - **Fields.** `production_receipt` gains `scrap_quantity` (main output, inventory unit, default 0) and `scrap_reason_code`. A receipt may hold only scrap and no lines; it then posts no material document, like a confirmation.
+   - **Fields.** `production_receipt` gains `scrap_quantity` (main output, inventory unit, default 0) and `scrap_reason_id` (a reason of kind `scrap`, rule 20). A receipt may hold only scrap and no lines; it then posts no material document, like a confirmation.
    - **Scope.** Refused with `receipt_scrap_not_allowed` when the MO has an internal operation (scrap belongs on the WO's confirmation, so it is never counted twice) or has no main output (disassembly).
    - **Backflush at receipt.** The progress share becomes max(R / G, (R + S) / Q), where R is cumulative net receipts of the main output and S cumulative net receipt scrap. With S = 0 this equals today's rule; planned assembly scrap is never consumed twice.
    - **Value.** Receipt scrap carries no value. Tolerance, completion and abnormal cost read receipts only, as today; the scrap variance reads it (ADR-0035; ADR-0064 rule 10).
