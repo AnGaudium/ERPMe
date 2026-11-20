@@ -12,8 +12,10 @@
 -- no crm table (ADR-0022 rule 2); the command checks that the document is a data subject request.
 -- Append-only tables use audit_refuse_change() of DS-35-crm.sql (owner audit). The erasure exception on posted documents,
 -- versions, the journal and append-only rows (ADR-0079 rule 7) is written with the ledger and document DDL in session S2.
--- The erasure journal outside the database holds one line per data_erasure_entry with the same id (ADR-0079 rule 7);
--- ReapplyErasures, a step of the restore procedure, re-inserts a missing entry with that id (rule 14).
+-- The erasure journal outside the database holds one line per data_erasure_entry with every column of the entry (id, subject,
+-- target table, row key, column names, action, cause, request, command, time; no values), appended by the journal consumer of
+-- the IDs-only event DataErasureRecorded that audit.contract emits with each insert (ADR-0079 rule 7); ReapplyErasures, a step
+-- of the restore procedure, re-inserts a missing entry from its line and applies it (rule 14).
 -- Nothing here holds a personal value: subjects and rows are named by table and ID, columns by name.
 
 -- ===== Data subject state [audit] (ADR-0079 rules 4-6) =====
@@ -91,8 +93,8 @@ CREATE TABLE personal_data_read_log (                      -- [audit] ADR-0079 r
     company_id               uuid NOT NULL REFERENCES company (id),
     user_account_id          uuid NOT NULL REFERENCES user_account (id),   -- the accountable person: the user, the run's human or the client's accountable user (ADR-0017)
     actor_kind               text NOT NULL CONSTRAINT ck_personal_data_read_log_actor_kind CHECK (actor_kind IN ('human', 'agent', 'integration', 'system')),
-    integration_client_id    uuid REFERENCES integration_client (id),
-    agent_run_id             uuid,
+    integration_client_id    uuid,                                -- no foreign key: audit imports neither access nor agent_runs, as audit_record (DS-05)
+    agent_run_id             uuid,                                -- no foreign key, as integration_client_id
     query_name               text NOT NULL CONSTRAINT ck_personal_data_read_log_query_name CHECK (query_name ~ '^[A-Z][A-Za-z0-9]*$'),   -- the registered query or export command
     read_kind                text NOT NULL CONSTRAINT ck_personal_data_read_log_read_kind CHECK (read_kind IN ('sensitive_field', 'blocked_subject', 'export')),
     subject_table            text CONSTRAINT ck_personal_data_read_log_subject_table CHECK (subject_table IN ('partner', 'contact', 'user_account')),
@@ -102,7 +104,6 @@ CREATE TABLE personal_data_read_log (                      -- [audit] ADR-0079 r
     read_at                  timestamptz NOT NULL,
     recorded_at              timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
-    FOREIGN KEY (company_id, agent_run_id) REFERENCES agent_run (company_id, id),
     CONSTRAINT ck_personal_data_read_log_subject CHECK ((subject_table IS NULL) = (subject_id IS NULL)),
     CONSTRAINT ck_personal_data_read_log_actor CHECK ((actor_kind = 'integration') = (integration_client_id IS NOT NULL)
         AND (actor_kind = 'agent') = (agent_run_id IS NOT NULL))

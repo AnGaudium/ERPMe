@@ -12,11 +12,14 @@ C: the catalog against the DDL (rule 2; INV-890): both files' headers and enum v
    hold only such columns; every column whose trailing comment says personal is in the catalog, except the
    allow-list below, each entry with its reason; every table with custom_values has a catalog row for it (ADR-0074 rule 8);
    frozen and append-only rows never rely on a partition drop; every keep row has a note; no blank action on a column of a
-   primary key, UNIQUE constraint or unique index (rule 1); the retention classes are the ten
+   primary key, UNIQUE constraint or unique index (rule 1); for every blank row, rule 1's result (NULL or the type's marker)
+   passes the CHECKs that name the column and a marker result is named in the note; a * exclusion lists the matching columns
+   it covers; the retention classes are the ten
    of rule 9, the same in the catalog, in DS-64's retention_rule CHECK and in the ADR.
 S: self-tests: broken variants fed to the same checker (a DDL column with a personal name and no catalog row, a catalog row
    naming a missing column, a pair in both files, a table with custom_values and no row, a new customer_note and driver_name
-   column, a blank action on a unique key column, a * exclusion of a table with catalog rows), each caught.
+   column, a blank action on a unique key column, a * exclusion of a table with catalog rows, a CHECK refusing both NULL and the
+   marker, a column added to a * table), each caught.
 K: the other catalogs and the field class (rules 5, 11, 15, 16): INV-890 to INV-894, EC-350 to EC-354, the work item kind
    personal_data_incident_suspected, the case kind personal_data_breach, the leaf blocked_personal_data at full for the owner
    template and none for every other, sensitive_personal suggested only to the owner template, sensitive_personal in the role
@@ -31,6 +34,10 @@ personal keys (clear_keys), one data_erasure_entry per rewritten row (INV-892 in
 Not covered: the trigger exception that lets the erasure command rewrite posted documents, versions and journal text columns
 (ADR-0079 rule 7): its DDL is written with the ledger and document DDL in session S2 (open question). Commands, the retention
 job, masking, the read log writers, the erasure journal outside the database and ReapplyErasures are not covered either.
+The blank check reads these CHECK forms only: nullness pairings "(x) = (col IS [NOT] NULL)", "col IS NOT NULL OR ...",
+num_nonnulls, coalesce(length(col), 0) > 0, length(col) > 0 or BETWEEN 1, col <> '', col ~ 'pattern', jsonb_typeof,
+jsonb_array_length or cardinality > 0, and the erasure flags erased_at and body_removed_at. Other forms (IN lists, comparisons
+with other columns, conditions across tables, triggers) are not evaluated; a ~ pattern is assumed to refuse ''.
 """
 import csv, glob, io, os, re, sys
 from datetime import date
@@ -83,7 +90,7 @@ SKIP = re.compile(r"^(CONSTRAINT|PRIMARY|UNIQUE|FOREIGN|CHECK|EXCLUDE|LIKE)\b", 
 
 
 # ======================================================================= the DDL parse
-def parse_ddl(files, uniques=None):
+def parse_ddl(files, uniques=None, details=None):
     """files: [(name, text)]. Returns {table: {column: (file, line, trailing comment)}} from the CREATE TABLE blocks.
     A trailing -- comment belongs to the item whose text ends on that line, or to the item that starts on it."""
     tables = {}
@@ -99,7 +106,7 @@ def parse_ddl(files, uniques=None):
             items, cur, depth, j, first, done = [], ["", i + 1, ""], 1, i, True, False
             while j < len(lines) and not done:
                 code, _, com = lines[j].partition("--")
-                code = re.sub(r"'[^']*'", "''", code)
+                code = re.sub(r"'[^']*'", lambda q: re.sub(r"[(),]", "_", q.group(0)), code)   # literals kept, without parens or commas
                 pos = code.index("(") + 1 if first else 0
                 first = False
                 flushed_here, tail_started = None, False
@@ -130,6 +137,17 @@ def parse_ddl(files, uniques=None):
                 j += 1
             for item, ln, com in items:
                 s = item.strip()
+                if details is not None:
+                    dt = details.setdefault(m.group(1), {"cols": {}, "checks": []})
+                    if re.match(r"(CONSTRAINT\s+\w+\s+)?CHECK\b", s, re.I):
+                        dt["checks"].append(re.sub(r"\s+", " ", s))
+                    elif s and not SKIP.match(s):
+                        cm = re.match(r'"?(\w+)"?\s+(.*)', s, re.S)
+                        if cm:
+                            dt["cols"].setdefault(cm.group(1), re.sub(r"\s+", " ", cm.group(2)))
+                            ck = re.search(r"\bCHECK\s*\(.*", cm.group(2), re.S)
+                            if ck:
+                                dt["checks"].append(re.sub(r"\s+", " ", ck.group(0)))
                 key = re.match(r"(?:CONSTRAINT\s+\w+\s+)?(?:UNIQUE(?:\s+NULLS\s+NOT\s+DISTINCT)?|PRIMARY\s+KEY)\s*\(([^)]*)\)", s, re.I)
                 if key and uniques is not None:
                     uniques.setdefault(m.group(1), []).append({w.strip() for w in key.group(1).split(",")})
@@ -163,7 +181,52 @@ def read_rows(text):
     return head, [(n, row) for n, row in enumerate(r, start=2) if row]
 
 
-def catalog_problems(tables, text1, text2, uniques=None):
+# Columns the destruction path sets in the same update as the blanking (rule 1): a CHECK disjunct "<flag> IS NOT NULL" holds
+# after erasure, and a pairing with "<flag> IS NULL" asks for NULL.
+ERASE_FLAGS = r"(erased_at|body_removed_at)"
+
+
+def blank_result(col, coltext, checks):
+    """Rule 1's result of blank for one column: ('null' | marker, reason) or (None, reason) when a CHECK refuses both.
+    coltext: the column's definition after its name; checks: the CHECK texts of its table. Forms read: nullness pairings
+    "(x) = (col IS [NOT] NULL)", "col IS NOT NULL OR ...", coalesce(length(col), 0) > 0, length(col) > 0 or BETWEEN 1,
+    col <> '', col ~ 'pattern', jsonb_typeof(col) = '...', jsonb_array_length / cardinality > 0, and the erasure flags."""
+    c = re.escape(col)
+    typ = coltext.split()[0].lower() if coltext.split() else ""
+    nullable = not re.search(r"\bNOT\s+NULL\b|\bPRIMARY\s+KEY\b", coltext, re.I)
+    mine = [k for k in checks if re.search(rf"\b{c}\b", k)]
+    null_refused, marker_refused, why = False, False, []
+    jtype = None
+    for k in mine:
+        jt = re.search(rf"jsonb_typeof\(\s*{c}\s*\)\s*=\s*'(\w+)'", k)
+        if jt:
+            jtype = jt.group(1)
+        if re.search(rf"\b{ERASE_FLAGS}\s+IS\s+NOT\s+NULL", k, re.I):
+            continue                                                   # holds once the flag is set
+        if re.search(rf"\(\s*{ERASE_FLAGS}\s+IS\s+NULL\s*\)\s*=\s*\(\s*{c}\s+IS\s+NOT\s+NULL\s*\)|{ERASE_FLAGS}\s+IS\s+NULL\s+OR\s+{c}\s+IS\s+NULL", k, re.I):
+            marker_refused = True; why.append("NULL once erased")
+            continue
+        if (re.search(rf"=\s*\(\s*{c}\s+IS\s+(NOT\s+)?NULL\s*\)|\(\s*{c}\s+IS\s+(NOT\s+)?NULL\s*\)\s*=", k, re.I)
+                or re.search(rf"\b{c}\s+IS\s+NOT\s+NULL\s+OR\b|\bOR\s+{c}\s+IS\s+NOT\s+NULL\b|CHECK\s*\(\s*{c}\s+IS\s+NOT\s+NULL\s*\)", k, re.I)
+                or re.search(rf"num_nonnulls\([^)]*\b{c}\b", k, re.I)):
+            null_refused = True; why.append("nullness tied")
+        if re.search(rf"coalesce\(\s*(length|char_length)\(\s*(btrim\(\s*)?{c}\b", k, re.I):
+            null_refused = marker_refused = True; why.append("non-empty when its condition holds")
+        elif re.search(rf"(length|char_length)\(\s*(btrim\(\s*)?{c}\s*\)\s*\)?\s*(>\s*0|>=\s*1|BETWEEN\s+1)|\b{c}\s*<>\s*''|\b{c}\s*~\s*'"
+                       rf"|(jsonb_array_length|cardinality)\(\s*{c}\s*\)\s*>\s*0", k, re.I):
+            marker_refused = True; why.append("non-empty")
+    if nullable and not null_refused:
+        return "null", why
+    if marker_refused:
+        return None, why
+    if typ == "jsonb":
+        return ("[]" if jtype == "array" else "{}"), why
+    if typ.endswith("[]"):
+        return "{}", why
+    return "''", why
+
+
+def catalog_problems(tables, text1, text2, uniques=None, details=None):
     """The check of rule 2 over parsed DDL and the two catalog texts; returns (problems, file-1 keys, file-2 keys).
     An exclusion with column_name * excludes a whole table that describes no person (rule 2)."""
     errors = []
@@ -210,13 +273,29 @@ def catalog_problems(tables, text1, text2, uniques=None):
         if t in whole:
             errors.append(f"in both files: ({t!r}, '*') excludes a table with a catalog row {t}.{c}")
     for t in sorted(whole):
+        cov = re.match(r"covers: ([a-z0-9_, ]+); \S", s2[(t, "*")])
+        covered = {w.strip() for w in cov.group(1).split(",")} if cov else set()
+        if not cov:
+            errors.append(f"* exclusion without 'covers: <columns>; <reason>': {t}")
         for c in tables.get(t, {}):
             if (t, c) in s2:
                 errors.append(f"in both files: ({t!r}, '*') and the exclusion {t}.{c}")
+            if RX.search(c) and c not in covered:
+                errors.append(f"personal name in neither file: {t}.{c} is not in the covers list of its * exclusion")
+        for c in sorted(covered - set(tables.get(t, {}))):
+            errors.append(f"not in DDL: {t}.{c} (covers list of a * exclusion)")
     if uniques is not None:
         for (t, c), d in s1.items():
             if d["erasure_action"] == "blank" and any(c in u for u in uniques.get(t, [])):
                 errors.append(f"blank on a unique key column: {t}.{c}")
+    if details is not None:
+        for (t, c), d in s1.items():
+            if d["erasure_action"] == "blank" and t in details and c in details[t]["cols"]:
+                res, why = blank_result(c, details[t]["cols"][c], details[t]["checks"])
+                if res is None:
+                    errors.append(f"blank refused by a CHECK (NULL and the marker): {t}.{c} ({'; '.join(why)})")
+                elif res != "null" and f"blank gives the marker {res}" not in d["note"]:
+                    errors.append(f"blank row whose note does not name its marker {res}: {t}.{c}")
     for t, cols in tables.items():
         for c, (f, ln, com) in cols.items():
             key = (t, c)
@@ -267,12 +346,14 @@ def retention_action(rule, start, today, has_open_item=False):
 FILES = ddl_files(DOCS)
 TABLES = parse_ddl(FILES)
 UNIQ = parse_uniques(FILES)
+DET = {}
+parse_ddl(FILES, None, DET)
 ncols = sum(len(c) for c in TABLES.values())
 check("P01 every design/*.sql file parses, DS-64-personal-data.sql among them, with the five tables of ADR-0079",
       len(FILES) >= 15 and "DS-64-personal-data.sql" in dict(FILES) and all(t in TABLES for t in DS64), f"{len(FILES)} files, {len(TABLES)} tables, {ncols} columns")
 F1 = open(os.path.join(DOCS, "catalogs", "personal-data-fields.csv"), encoding="utf-8").read()
 F2 = open(os.path.join(DOCS, "catalogs", "personal-data-exclusions.csv"), encoding="utf-8").read()
-errs, S1, S2 = catalog_problems(TABLES, F1, F2, UNIQ)
+errs, S1, S2 = catalog_problems(TABLES, F1, F2, UNIQ, DET)
 
 
 def errs_of(prefixes):
@@ -318,8 +399,25 @@ e1c, _, _ = catalog_problems(TABLES, F1.replace("partner_bank_account,account_nu
                                                 "partner_bank_account,account_number,partner,financial,personal,partner_is_person,master,blank,", 1), F2, UNIQ)
 check("S06 a blank action on a column of a unique key (partner_bank_account.account_number) is caught (rule 1)",
       "blank on a unique key column: partner_bank_account.account_number" in e1c, [e for e in e1c if "unique" in e])
+bad_ck = [(n, t.replace("CONSTRAINT ck_open_item_collection_dispute CHECK (is_disputed = (dispute_reason IS NOT NULL))",
+                         "CONSTRAINT ck_open_item_collection_dispute CHECK (is_disputed = (coalesce(length(btrim(dispute_reason)), 0) > 0))"))
+          for n, t in FILES]
+D2 = {}
+parse_ddl(bad_ck, None, D2)
+e1e, _, _ = catalog_problems(TABLES, F1, F2, UNIQ, D2)
+check("S08 a blank column whose CHECK refuses both NULL and the marker is caught (open_item_collection.dispute_reason made non-empty); "
+      "the forms read: nullness pairings, col IS NOT NULL OR ..., coalesce(length(col), 0) > 0, length > 0, <> '', ~ pattern, jsonb_typeof",
+      any("blank refused by a CHECK" in e and "open_item_collection.dispute_reason" in e for e in e1e)
+      and blank_result("x", "jsonb NOT NULL", ["CHECK (jsonb_typeof(x) = 'array')"])[0] == "[]"
+      and blank_result("x", "text", ["CONSTRAINT k CHECK ((a IS NULL) = (x IS NULL))"])[0] == "''"
+      and blank_result("x", "text", ["CONSTRAINT k CHECK ((erased_at IS NULL) = (x IS NOT NULL))"])[0] == "null",
+      [e for e in e1e if "dispute_reason" in e])
 e1d, _, _ = catalog_problems(TABLES, F1, F2.rstrip("\n") + "\ncontact,*,lab self-test\n")
 check("S07 a whole-table exclusion (*) of a table that has catalog rows is caught", any("('contact', '*')" in e for e in e1d), [e for e in e1d if "'*'" in e][:2])
+broken_ddl3 = [(n, t.replace("CREATE TABLE fixed_asset (\n", "CREATE TABLE fixed_asset (\n    custodian_name text,\n", 1)) for n, t in FILES]
+e1f, _, _ = catalog_problems(parse_ddl(broken_ddl3), F1, F2)
+check("S09 a column added later to a table excluded with * (fixed_asset.custodian_name) is caught: a * row covers only the columns it lists",
+      any("fixed_asset.custodian_name" in e for e in e1f) and any("CREATE TABLE fixed_asset (" in t for _, t in FILES), [e for e in e1f if "custodian" in e])
 e2, _, _ = catalog_problems(TABLES, F1.rstrip("\n") + "\npartner,nickname,partner,identity,personal,partner_is_person,master,tokenize,master_data,\n", F2)
 check("S02 a catalog row naming a missing column is caught", "not in DDL: partner.nickname" in e2, [e for e in e2 if "nickname" in e])
 e3, _, _ = catalog_problems(TABLES, F1, F2.rstrip("\n") + "\npartner,tax_id,lab self-test\n")

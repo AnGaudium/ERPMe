@@ -3,10 +3,10 @@ partner,name,partner,identity,personal,partner_is_person,master,tokenize,master_
 partner,legal_name,partner,identity,personal,partner_is_person,master,tokenize,master_data,
 partner,tax_id,partner,identity,personal,partner_is_person,master,blank,master_data,
 partner,custom_values,partner,free_text,personal,may_contain,master,clear_keys,master_data,jsonb; clear_keys removes the keys whose custom_field_definition has is_personal_data true (ADR-0074 rule 8; ADR-0079 rule 1)
-partner_address,address_lines,partner,contact,personal,partner_is_person,master,blank,master_data,NOT NULL column: fixed marker
+partner_address,address_lines,partner,contact,personal,partner_is_person,master,blank,master_data,blank gives the marker {} (rule 1)
 partner_address,subdivision_code,partner,contact,personal,partner_is_person,master,blank,master_data,
 partner_address,postal_code,partner,contact,personal,partner_is_person,master,blank,master_data,
-partner_bank_account,bank_name,partner,financial,personal,partner_is_person,master,blank,master_data,NOT NULL: blanked to the empty string (ADR-0079 rule 1)
+partner_bank_account,bank_name,partner,financial,personal,partner_is_person,master,blank,master_data,blank gives the marker '' (rule 1)
 partner_bank_account,bank_code,partner,financial,personal,partner_is_person,master,tokenize,master_data,"in the unique key (partner_id, bank_code, account_number): tokenized, never blanked (ADR-0079 rule 1)"
 partner_bank_account,account_number,partner,financial,personal,partner_is_person,master,tokenize,master_data,"in the unique key (partner_id, bank_code, account_number): tokenized, never blanked (ADR-0079 rule 1)"
 partner_bank_account,holder_name,partner,financial,personal,partner_is_person,master,tokenize,master_data,
@@ -22,110 +22,110 @@ item,custom_values,other,free_text,personal,may_contain,master,clear_keys,master
 user_account,login,user,online_identifier,personal,always,master,tokenize,access_account,
 user_account,display_name,user,identity,personal,always,master,tokenize,access_account,
 user_account,email,user,contact,personal,always,master,tokenize,access_account,
-user_account,password_hash,user,credential,personal,always,master,blank,access_account,credential of a person; not personal text but cleared with the account
-user_account,totp_secret,user,credential,personal,always,master,blank,access_account,
+user_account,password_hash,user,credential,personal,always,master,blank,access_account,credential of a person; not personal text but cleared with the account; blank gives the marker '' (rule 1)
+user_account,totp_secret,user,credential,personal,always,master,blank,access_account,blank gives the marker '' (rule 1)
 user_account,oidc_subject,user,online_identifier,personal,always,master,tokenize,access_account,"in the unique key (oidc_issuer, oidc_subject) with oidc_issuer; both are tokenized so ck_user_account_oidc and the key hold (ADR-0079 rule 1)"
 user_invitation,login,user,online_identifier,personal,always,master,tokenize,access_account,as typed by the company
 user_invitation,display_name,user,identity,personal,always,master,tokenize,access_account,as typed by the company
 user_invitation,email,user,contact,personal,always,master,tokenize,access_account,as typed by the company
-quotation,partner_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
+quotation,partner_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6); blank gives the marker '' (rule 1)
 quotation,partner_tax_id,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
 quotation,partner_address,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
-quotation,ship_to_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
+quotation,ship_to_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6); blank gives the marker '' (rule 1)
 quotation,ship_to_address,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
-quotation,bill_to_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
+quotation,bill_to_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6); blank gives the marker '' (rule 1)
 quotation,bill_to_tax_id,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
 quotation,bill_to_address,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
-quotation,payer_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
-sales_order,partner_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
+quotation,payer_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6); blank gives the marker '' (rule 1)
+sales_order,partner_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6); blank gives the marker '' (rule 1)
 sales_order,partner_tax_id,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
 sales_order,partner_address,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
-sales_order,ship_to_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
+sales_order,ship_to_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6); blank gives the marker '' (rule 1)
 sales_order,ship_to_address,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
-sales_order,bill_to_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
+sales_order,bill_to_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6); blank gives the marker '' (rule 1)
 sales_order,bill_to_tax_id,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
 sales_order,bill_to_address,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
-sales_order,payer_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
-purchase_order,partner_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
+sales_order,payer_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6); blank gives the marker '' (rule 1)
+purchase_order,partner_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6); blank gives the marker '' (rule 1)
 purchase_order,partner_tax_id,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
 purchase_order,partner_address,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
-purchase_order,invoicing_party_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
+purchase_order,invoicing_party_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6); blank gives the marker '' (rule 1)
 purchase_order,invoicing_party_tax_id,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
 purchase_order,invoicing_party_address,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
-purchase_order,payee_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
-goods_receipt,partner_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
+purchase_order,payee_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6); blank gives the marker '' (rule 1)
+goods_receipt,partner_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6); blank gives the marker '' (rule 1)
 goods_receipt,partner_tax_id,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
 goods_receipt,partner_address,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
-return_to_supplier,partner_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
+return_to_supplier,partner_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6); blank gives the marker '' (rule 1)
 return_to_supplier,partner_tax_id,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
 return_to_supplier,partner_address,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
-delivery,partner_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
+delivery,partner_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6); blank gives the marker '' (rule 1)
 delivery,partner_tax_id,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
 delivery,partner_address,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
-delivery,ship_to_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
+delivery,ship_to_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6); blank gives the marker '' (rule 1)
 delivery,ship_to_address,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
-return_from_customer,partner_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
+return_from_customer,partner_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6); blank gives the marker '' (rule 1)
 return_from_customer,partner_tax_id,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
 return_from_customer,partner_address,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
-service_receipt,partner_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
+service_receipt,partner_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6); blank gives the marker '' (rule 1)
 service_receipt,partner_tax_id,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
 service_receipt,partner_address,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
-sales_invoice,partner_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
+sales_invoice,partner_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6); blank gives the marker '' (rule 1)
 sales_invoice,partner_tax_id,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
 sales_invoice,partner_address,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
-sales_invoice,bill_to_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
+sales_invoice,bill_to_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6); blank gives the marker '' (rule 1)
 sales_invoice,bill_to_tax_id,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
 sales_invoice,bill_to_address,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
-sales_invoice,payer_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
-sales_return,partner_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
+sales_invoice,payer_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6); blank gives the marker '' (rule 1)
+sales_return,partner_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6); blank gives the marker '' (rule 1)
 sales_return,partner_tax_id,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
 sales_return,partner_address,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
-sales_return,bill_to_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
+sales_return,bill_to_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6); blank gives the marker '' (rule 1)
 sales_return,bill_to_tax_id,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
 sales_return,bill_to_address,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
-sales_return,payer_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
-credit_note,partner_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
+sales_return,payer_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6); blank gives the marker '' (rule 1)
+credit_note,partner_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6); blank gives the marker '' (rule 1)
 credit_note,partner_tax_id,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
 credit_note,partner_address,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
-credit_note,bill_to_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
+credit_note,bill_to_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6); blank gives the marker '' (rule 1)
 credit_note,bill_to_tax_id,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
 credit_note,bill_to_address,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
-credit_note,payer_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
-debit_note,partner_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
+credit_note,payer_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6); blank gives the marker '' (rule 1)
+debit_note,partner_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6); blank gives the marker '' (rule 1)
 debit_note,partner_tax_id,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
 debit_note,partner_address,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
-debit_note,bill_to_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
+debit_note,bill_to_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6); blank gives the marker '' (rule 1)
 debit_note,bill_to_tax_id,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
 debit_note,bill_to_address,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
-debit_note,payer_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
-purchase_invoice,partner_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
+debit_note,payer_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6); blank gives the marker '' (rule 1)
+purchase_invoice,partner_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6); blank gives the marker '' (rule 1)
 purchase_invoice,partner_tax_id,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
 purchase_invoice,partner_address,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
-purchase_invoice,invoicing_party_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
+purchase_invoice,invoicing_party_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6); blank gives the marker '' (rule 1)
 purchase_invoice,invoicing_party_tax_id,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
 purchase_invoice,invoicing_party_address,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
-purchase_invoice,payee_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
-purchase_return,partner_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
+purchase_invoice,payee_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6); blank gives the marker '' (rule 1)
+purchase_return,partner_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6); blank gives the marker '' (rule 1)
 purchase_return,partner_tax_id,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
 purchase_return,partner_address,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
-purchase_return,invoicing_party_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
+purchase_return,invoicing_party_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6); blank gives the marker '' (rule 1)
 purchase_return,invoicing_party_tax_id,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
 purchase_return,invoicing_party_address,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
-purchase_return,payee_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
-purchase_credit_note,partner_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
+purchase_return,payee_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6); blank gives the marker '' (rule 1)
+purchase_credit_note,partner_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6); blank gives the marker '' (rule 1)
 purchase_credit_note,partner_tax_id,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
 purchase_credit_note,partner_address,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
-purchase_credit_note,invoicing_party_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
+purchase_credit_note,invoicing_party_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6); blank gives the marker '' (rule 1)
 purchase_credit_note,invoicing_party_tax_id,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
 purchase_credit_note,invoicing_party_address,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
-purchase_credit_note,payee_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
-purchase_debit_note,partner_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
+purchase_credit_note,payee_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6); blank gives the marker '' (rule 1)
+purchase_debit_note,partner_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6); blank gives the marker '' (rule 1)
 purchase_debit_note,partner_tax_id,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
 purchase_debit_note,partner_address,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
-purchase_debit_note,invoicing_party_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
+purchase_debit_note,invoicing_party_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6); blank gives the marker '' (rule 1)
 purchase_debit_note,invoicing_party_tax_id,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
 purchase_debit_note,invoicing_party_address,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
-purchase_debit_note,payee_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
+purchase_debit_note,payee_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6); blank gives the marker '' (rule 1)
 quotation,custom_values,other,free_text,personal,may_contain,frozen_document,clear_keys,accounting_document,jsonb; clear_keys removes the keys whose custom_field_definition has is_personal_data true (ADR-0074 rule 8; ADR-0079 rule 1)
 sales_order,custom_values,other,free_text,personal,may_contain,frozen_document,clear_keys,accounting_document,jsonb; clear_keys removes the keys whose custom_field_definition has is_personal_data true (ADR-0074 rule 8; ADR-0079 rule 1)
 delivery,custom_values,other,free_text,personal,may_contain,frozen_document,clear_keys,accounting_document,jsonb; clear_keys removes the keys whose custom_field_definition has is_personal_data true (ADR-0074 rule 8; ADR-0079 rule 1)
@@ -160,7 +160,7 @@ other_issue,note,other,free_text,personal,may_contain,frozen_document,blank,acco
 opening_balance,note,other,free_text,personal,may_contain,frozen_document,blank,accounting_document,header note (ADR-0074 r16); blanked when the retention period ends (ADR-0079 rule 6)
 transfer_order,note,other,free_text,personal,may_contain,frozen_document,blank,accounting_document,header note (ADR-0074 r16); blanked when the retention period ends (ADR-0079 rule 6)
 document_version,content,partner,snapshot,personal,may_contain,frozen_document,clear_keys,accounting_document,jsonb snapshot of the header and lines; clear_keys blanks the keys that mirror the header's and lines' catalog columns and the custom_values keys with is_personal_data; the version gets erased_at and its stored hash is no longer compared (ADR-0079 rule 6)
-document_line_custom_text,text,partner,free_text,personal,always,frozen_document,blank,accounting_document,"free text for is_custom options; ADR-0046 rule 9 keeps it off the shared record so it can be erased; line of a posted document, confirm"
+document_line_custom_text,text,partner,free_text,personal,always,frozen_document,blank,accounting_document,"free text for is_custom options; ADR-0046 rule 9 keeps it off the shared record so it can be erased; line of a posted document, confirm; blank gives the marker '' (rule 1)"
 payment,partner_name,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
 payment,partner_tax_id,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
 payment,partner_address,partner,snapshot,personal,partner_is_person,frozen_document,blank,accounting_document,blanked when the retention period ends (ADR-0079 rule 6)
@@ -175,16 +175,16 @@ bank_statement_line,counterparty_bank_code,partner,financial,personal,partner_is
 bank_statement_line,counterparty_account_number,partner,financial,personal,partner_is_person,append_only,blank,accounting_document,"bank statement evidence, append-only; counterparty may be a person (ADR-0050 rule 9); blanked when the retention period ends (ADR-0079 rule 6)"
 bank_statement_line,description,partner,free_text,personal,may_contain,append_only,blank,accounting_document,"bank statement evidence, append-only; counterparty may be a person (ADR-0050 rule 9); blanked when the retention period ends (ADR-0079 rule 6)"
 bank_statement_line,suggested_payer_name_text,partner,identity,personal,may_contain,append_only,blank,accounting_document,"bank statement evidence, append-only; counterparty may be a person (ADR-0050 rule 9); blanked when the retention period ends (ADR-0079 rule 6)"
-work_item_note,body_text,other,free_text,personal,may_contain,append_only,blank,message,append-only note; erasure reaches work item notes (ADR-0052 rule 25)
+work_item_note,body_text,other,free_text,personal,may_contain,append_only,blank,message,append-only note; erasure reaches work item notes (ADR-0052 rule 25); blank gives the marker '' (rule 1)
 audit_change,before,other,snapshot,personal,may_contain,append_only,blank,audit,erasure replaces with a marker (ADR-0038 rule 4); personal fields are not stored at creation
 audit_change,after,other,snapshot,personal,may_contain,append_only,blank,audit,erasure replaces with a marker (ADR-0038 rule 4)
 audit_record,reason,other,free_text,personal,may_contain,append_only,blank,audit,masked by erasure (ADR-0038 rule 4); must not hold personal data by schema rule
 agent_run_step,request_body,other,snapshot,personal,may_contain,expiring,blank,agent_log,LLM prompt as sent; also dropped with its partition after agent_run_step_retention_days (ADR-0050 rule 19)
 agent_run_step,response_body,other,snapshot,personal,may_contain,expiring,blank,agent_log,LLM response; also dropped with its partition (ADR-0050 rule 19)
-change_proposal,plan,other,snapshot,personal,may_contain,append_only,blank,audit,"simulated plan of the batch, holds field values; no erasure path stated (ADR-0029); confirm; blanked when the retention period ends (ADR-0079 rule 6)"
-change_proposal_item,payload,other,snapshot,personal,may_contain,append_only,blank,audit,command payload (e.g. partner or bank account change); blanked when the retention period ends (ADR-0079 rule 6)
-change_proposal_item,field_changes,other,snapshot,personal,may_contain,append_only,blank,audit,before and after per field; blanked when the retention period ends (ADR-0079 rule 6)
-automation_execution,condition_results,other,snapshot,personal,may_contain,append_only,blank,audit,"the HMAC of a small personal value can be guessed, so the column is blanked at destruction (ADR-0079 rule 6)"
+change_proposal,plan,other,snapshot,personal,may_contain,append_only,blank,audit,"simulated plan of the batch, holds field values; no erasure path stated (ADR-0029); confirm; blanked when the retention period ends (ADR-0079 rule 6); blank gives the marker {} (rule 1)"
+change_proposal_item,payload,other,snapshot,personal,may_contain,append_only,blank,audit,command payload (e.g. partner or bank account change); blanked when the retention period ends (ADR-0079 rule 6); blank gives the marker {} (rule 1)
+change_proposal_item,field_changes,other,snapshot,personal,may_contain,append_only,blank,audit,before and after per field; blanked when the retention period ends (ADR-0079 rule 6); blank gives the marker [] (rule 1)
+automation_execution,condition_results,other,snapshot,personal,may_contain,append_only,blank,audit,"the HMAC of a small personal value can be guessed, so the column is blanked at destruction (ADR-0079 rule 6); blank gives the marker [] (rule 1)"
 partner_email_domain,domain,partner,contact,personal,partner_is_person,master,delete_row,crm_interaction,"in the unique key (partner_id, domain); no table references the row, so the row is deleted (ADR-0079 rule 1)"
 interaction,subject,contact,free_text,personal,may_contain,append_only,blank,crm_interaction,blanked only for interactions the subject wrote
 interaction_content,body_text,contact,free_text,personal,always,append_only,blank,crm_interaction,untrusted when the interaction is
@@ -194,8 +194,8 @@ inbound_message,message_id,contact,online_identifier,personal,always,append_only
 inbound_message,sender_address,contact,contact,personal,always,append_only,blank,crm_interaction,
 inbound_message,sender_display_name,contact,identity,personal,always,append_only,blank,crm_interaction,
 inbound_message,sender_domain,contact,contact,personal,always,append_only,blank,crm_interaction,
-inbound_message,sender_authentication,contact,online_identifier,personal,always,append_only,blank,crm_interaction,DDL comment: personal
-inbound_message,parse_notes,contact,free_text,personal,may_contain,append_only,blank,crm_interaction,
+inbound_message,sender_authentication,contact,online_identifier,personal,always,append_only,blank,crm_interaction,DDL comment: personal; blank gives the marker {} (rule 1)
+inbound_message,parse_notes,contact,free_text,personal,may_contain,append_only,blank,crm_interaction,blank gives the marker {} (rule 1)
 complaint,title,contact,free_text,personal,may_contain,append_only,blank,crm_interaction,
 complaint,resolution_note,contact,free_text,personal,may_contain,append_only,blank,crm_interaction,
 interaction_summary,summary_text,contact,free_text,personal,may_contain,append_only,blank,crm_interaction,LLM summary
@@ -213,25 +213,25 @@ data_subject_request_content,requester_email,requester,contact,personal,always,a
 data_subject_request_content,requester_phone,requester,contact,personal,always,append_only,blank,data_subject_request,kept while the request is open; blanked at closing erasure
 data_subject_request_content,outcome_note,requester,free_text,personal,may_contain,append_only,blank,data_subject_request,
 data_subject_request_content,identity_proof_hash,requester,identity,personal,always,append_only,keep,data_subject_request,SHA-256 of the evidence checked; kept as proof the requester was verified (ADR-0052 rule 25; retention period is an open question)
-extraction_field,value_raw,other,free_text,personal,may_contain,append_only,blank,intake,extracted value; accounting fields of linked documents stay (ADR-0057 rule 19)
+extraction_field,value_raw,other,free_text,personal,may_contain,append_only,blank,intake,extracted value; accounting fields of linked documents stay (ADR-0057 rule 19); blank gives the marker '' (rule 1)
 extraction_field,value_normalized,other,free_text,personal,may_contain,append_only,blank,intake,accounting fields of linked documents stay (ADR-0057 rule 19)
-extraction_field,evidence,other,snapshot,personal,may_contain,append_only,blank,intake,"jsonb; replaced by {""erased"": true}"
-extraction_word,text,other,free_text,personal,always,append_only,blank,intake,OCR word text; personal and untrusted with its extraction
-message,body,user,free_text,personal,always,expiring,blank,message,"cleared by retention, withdrawal or erasure; row stays (ADR-0076 rule 10)"
+extraction_field,evidence,other,snapshot,personal,may_contain,append_only,blank,intake,"jsonb; replaced by {""erased"": true}; blank gives the marker {} (rule 1)"
+extraction_word,text,other,free_text,personal,always,append_only,blank,intake,OCR word text; personal and untrusted with its extraction; blank gives the marker '' (rule 1)
+message,body,user,free_text,personal,always,expiring,blank,message,"cleared by retention, withdrawal or erasure; row stays (ADR-0076 rule 10); blank gives the marker '' (rule 1)"
 assist_request,request_text,user,free_text,personal,always,expiring,blank,analysis_text,DDL comment: personal; null once erased
 analysis_question,question_text,user,free_text,personal,always,expiring,blank,analysis_text,blanked after analysis_question_retention_days or at erasure
 analysis_question,feedback_note,user,free_text,personal,always,expiring,blank,analysis_text,DDL comment: personal
 analysis_example,question_text,user,free_text,personal,always,append_only,tokenize,analysis_text,DDL comment: personal; NOT NULL with a non-empty CHECK: tokenized (ADR-0079 rule 1)
 analysis_example,normalized_question,user,free_text,personal,always,append_only,tokenize,analysis_text,the normalized form of question_text; part of a unique key
-saved_analysis_version,trigger_questions,user,free_text,personal,always,append_only,blank,analysis_text,DDL comment: personal; text[]; no erasure path stated; confirm
-nonconformance,description,other,free_text,personal,may_contain,master,blank,master_data,may name a supplier contact or employee
-nonconformance,close_note,other,free_text,personal,may_contain,master,blank,master_data,
+saved_analysis_version,trigger_questions,user,free_text,personal,always,append_only,blank,analysis_text,DDL comment: personal; text[]; no erasure path stated; confirm; blank gives the marker {} (rule 1)
+nonconformance,description,other,free_text,personal,may_contain,master,blank,master_data,may name a supplier contact or employee; blank gives the marker '' (rule 1)
+nonconformance,close_note,other,free_text,personal,may_contain,master,tokenize,master_data,"ck_nonconformance_closed needs a non-empty value when its condition holds, so NULL and the marker are both refused: tokenized (ADR-0079 rule 1)"
 user_account,oidc_issuer,user,online_identifier,personal,always,master,tokenize,access_account,tokenized with oidc_subject so ck_user_account_oidc and the unique key hold (ADR-0079 rule 1)
 print_profile,signature_attachment_id,other,identity,personal,always,master,blank,master_data,the signature image of a named officer; subject kind other: changed by editing the record (ADR-0079 rule 4)
-attachment,storage_key,other,free_text,personal,may_contain,expiring,keep,accounting_document,the bytes behind the key are released when the last link ends and deleted after attachments.delete_grace_days (ADR-0038 rule 15); the key is a content address that identifies nobody; an attachment that is accounting evidence follows that class
+attachment,storage_key,other,online_identifier,personal,may_contain,expiring,keep,accounting_document,the bytes behind the key are released when the last link ends and deleted after attachments.delete_grace_days (ADR-0038 rule 15); the key is a content address that identifies nobody; an attachment that is accounting evidence follows that class
 approval,reason,other,free_text,personal,may_contain,append_only,tokenize,audit,NOT NULL with a non-empty CHECK: tokenized (ADR-0079 rule 1)
 document,canceled_note,other,free_text,personal,may_contain,frozen_document,blank,accounting_document,
-open_item_collection,dispute_reason,other,free_text,personal,may_contain,master,blank,accounting_document,
+open_item_collection,dispute_reason,other,free_text,personal,may_contain,master,blank,accounting_document,blank gives the marker '' (rule 1)
 credit_note_line,description,other,free_text,personal,may_contain,frozen_document,blank,accounting_document,
 debit_note_line,description,other,free_text,personal,may_contain,frozen_document,blank,accounting_document,
 payment_line,description,other,free_text,personal,may_contain,frozen_document,blank,accounting_document,
@@ -248,24 +248,24 @@ other_issue_line,reason_note,other,free_text,personal,may_contain,frozen_documen
 other_receipt_line,reason_note,other,free_text,personal,may_contain,frozen_document,blank,accounting_document,
 scrap_line,reason_note,other,free_text,personal,may_contain,frozen_document,blank,accounting_document,
 operation_time_log,note,other,free_text,personal,may_contain,master,blank,accounting_document,
-operation_time_log,cancel_reason,other,free_text,personal,may_contain,master,blank,accounting_document,
+operation_time_log,cancel_reason,other,free_text,personal,may_contain,master,tokenize,accounting_document,"ck_operation_time_log_canceled needs a non-empty value when its condition holds, so NULL and the marker are both refused: tokenized (ADR-0079 rule 1)"
 operation_execution,block_note,other,free_text,personal,may_contain,master,blank,accounting_document,
 inspection_result,note,other,free_text,personal,may_contain,master,blank,master_data,
-delegation,reason,other,free_text,personal,may_contain,master,blank,access_account,NOT NULL: blanked to the empty string
-work_case,cancel_reason,other,free_text,personal,may_contain,master,blank,audit,
-period_unlock_request,reason,other,free_text,personal,may_contain,append_only,blank,audit,NOT NULL: blanked to the empty string
+delegation,reason,other,free_text,personal,may_contain,master,blank,access_account,blank gives the marker '' (rule 1)
+work_case,cancel_reason,other,free_text,personal,may_contain,master,blank,audit,blank gives the marker '' (rule 1)
+period_unlock_request,reason,other,free_text,personal,may_contain,append_only,blank,audit,blank gives the marker '' (rule 1)
 posting_intent,plan,other,free_text,personal,may_contain,frozen_document,clear_keys,accounting_document,jsonb prospective journal; clear_keys blanks the note and description keys of its entries and lines
 notification_email,failure_reason,other,free_text,personal,may_contain,expiring,blank,message,a mail server reply may quote an address
 artifact_transition,reason,other,free_text,personal,may_contain,append_only,blank,audit,
-change_proposal,reason,other,free_text,personal,may_contain,append_only,blank,audit,NOT NULL: blanked to the empty string
+change_proposal,reason,other,free_text,personal,may_contain,append_only,blank,audit,blank gives the marker '' (rule 1)
 company_setup_acknowledgement,reason,other,free_text,personal,may_contain,append_only,tokenize,audit,NOT NULL with a non-empty CHECK: tokenized
 credit_hold,release_reason,other,free_text,personal,may_contain,master,tokenize,accounting_document,ck_credit_hold_manual_release needs a non-empty reason on a manual release: tokenized (ADR-0079 rule 1)
-forecast_adjustment,reason,other,free_text,personal,may_contain,master,blank,master_data,NOT NULL: blanked to the empty string
+forecast_adjustment,reason,other,free_text,personal,may_contain,master,blank,master_data,blank gives the marker '' (rule 1)
 gr_ir_write_off,reason,other,free_text,personal,may_contain,frozen_document,tokenize,accounting_document,NOT NULL with a non-empty CHECK: tokenized
-inspection_lot,deviation_reason,other,free_text,personal,may_contain,master,blank,master_data,
-nonconformance,cancel_reason,other,free_text,personal,may_contain,master,blank,master_data,
+inspection_lot,deviation_reason,other,free_text,personal,may_contain,master,tokenize,master_data,"ck_inspection_lot_deviation needs a non-empty value when its condition holds, so NULL and the marker are both refused: tokenized (ADR-0079 rule 1)"
+nonconformance,cancel_reason,other,free_text,personal,may_contain,master,tokenize,master_data,"ck_nonconformance_closed needs a non-empty value when its condition holds, so NULL and the marker are both refused: tokenized (ADR-0079 rule 1)"
 setting_value,reason,other,free_text,personal,may_contain,append_only,tokenize,audit,NOT NULL with a non-empty CHECK: tokenized
 taint_clearance,reason,other,free_text,personal,may_contain,append_only,tokenize,audit,NOT NULL with a non-empty CHECK: tokenized
-warehouse_task,shortage_reason,other,free_text,personal,may_contain,master,blank,master_data,
-document_extraction,canceled_reason,other,free_text,personal,may_contain,append_only,blank,intake,a person's reason or a system code (ADR-0057 rule 25)
-bank_statement_line,ignore_reason,other,free_text,personal,may_contain,append_only,blank,accounting_document,
+warehouse_task,shortage_reason,other,free_text,personal,may_contain,master,tokenize,master_data,"ck_warehouse_task_confirmed needs a non-empty value when its condition holds, so NULL and the marker are both refused: tokenized (ADR-0079 rule 1)"
+document_extraction,canceled_reason,other,free_text,personal,may_contain,append_only,blank,intake,a person's reason or a system code (ADR-0057 rule 25); blank gives the marker '' (rule 1)
+bank_statement_line,ignore_reason,other,free_text,personal,may_contain,append_only,blank,accounting_document,blank gives the marker '' (rule 1)

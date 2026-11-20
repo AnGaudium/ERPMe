@@ -82,50 +82,50 @@ item_manufacturer_part,normalized_manufacturer_name,"a manufacturer, a legal ent
 product,name,describes a product
 product,description,describes a product
 routing_operation,description,describes a routing operation
-activity_type,*,a code or configuration table that describes no person
-agent_type,*,a code or configuration table that describes no person
-approval_pool,*,a code or configuration table that describes no person
-approval_procedure,*,a code or configuration table that describes no person
-approval_stage,*,a code or configuration table that describes no person
-bill_of_materials,*,a code or configuration table that describes no person
-business_unit,*,a code or configuration table that describes no person
-classification_scheme,*,a code or configuration table that describes no person
-classification_value,*,a code or configuration table that describes no person
-configuration_model,*,a code or configuration table that describes no person
-cost_center,*,a code or configuration table that describes no person
-cost_component_detail,*,a code or configuration table that describes no person
-cost_object,*,a code or configuration table that describes no person
-costing_sheet,*,a code or configuration table that describes no person
-defect_code,*,a code or configuration table that describes no person
-demand_event,*,a code or configuration table that describes no person
-fixed_asset,*,a code or configuration table that describes no person
-handling_unit_type,*,a code or configuration table that describes no person
-incoterm,*,a code or configuration table that describes no person
-inspection_characteristic,*,a code or configuration table that describes no person
-inspection_plan,*,a code or configuration table that describes no person
-item_group,*,a code or configuration table that describes no person
-item_tax_group,*,a code or configuration table that describes no person
-movement_type,*,a code or configuration table that describes no person
-partner_group,*,a code or configuration table that describes no person
-partner_tax_group,*,a code or configuration table that describes no person
-payment_method,*,a code or configuration table that describes no person
-payment_term,*,a code or configuration table that describes no person
-price_list,*,a code or configuration table that describes no person
-processing_purpose,*,a code or configuration table that describes no person
-product_category,*,a code or configuration table that describes no person
-reason,*,a code or configuration table that describes no person
-resource_group,*,a code or configuration table that describes no person
-role,*,a code or configuration table that describes no person
-routing,*,a code or configuration table that describes no person
-sampling_procedure,*,a code or configuration table that describes no person
-stop_reason,*,a code or configuration table that describes no person
-storage_condition,*,a code or configuration table that describes no person
-team,*,a code or configuration table that describes no person
-uom,*,a code or configuration table that describes no person
-valuation_class,*,a code or configuration table that describes no person
-variant_attribute,*,a code or configuration table that describes no person
-variant_attribute_value,*,a code or configuration table that describes no person
-work_center,*,a code or configuration table that describes no person
-working_calendar,*,a code or configuration table that describes no person
-working_calendar_holiday,*,a code or configuration table that describes no person
-zone,*,a code or configuration table that describes no person
+activity_type,*,covers: name; a code or configuration table that describes no person
+agent_type,*,covers: name; a code or configuration table that describes no person
+approval_pool,*,covers: name; a code or configuration table that describes no person
+approval_procedure,*,covers: name; a code or configuration table that describes no person
+approval_stage,*,covers: name; a code or configuration table that describes no person
+bill_of_materials,*,covers: name; a code or configuration table that describes no person
+business_unit,*,covers: name; a code or configuration table that describes no person
+classification_scheme,*,covers: name; a code or configuration table that describes no person
+classification_value,*,covers: name; a code or configuration table that describes no person
+configuration_model,*,covers: name; a code or configuration table that describes no person
+cost_center,*,covers: name; a code or configuration table that describes no person
+cost_component_detail,*,covers: name; a code or configuration table that describes no person
+cost_object,*,covers: name; a code or configuration table that describes no person
+costing_sheet,*,covers: name; a code or configuration table that describes no person
+defect_code,*,covers: name; a code or configuration table that describes no person
+demand_event,*,covers: name; a code or configuration table that describes no person
+fixed_asset,*,covers: name; a code or configuration table that describes no person
+handling_unit_type,*,covers: name; a code or configuration table that describes no person
+incoterm,*,covers: name; a code or configuration table that describes no person
+inspection_characteristic,*,covers: name; a code or configuration table that describes no person
+inspection_plan,*,covers: name; a code or configuration table that describes no person
+item_group,*,covers: name; a code or configuration table that describes no person
+item_tax_group,*,covers: name; a code or configuration table that describes no person
+movement_type,*,covers: name; a code or configuration table that describes no person
+partner_group,*,covers: name; a code or configuration table that describes no person
+partner_tax_group,*,covers: name; a code or configuration table that describes no person
+payment_method,*,covers: name; a code or configuration table that describes no person
+payment_term,*,covers: name; a code or configuration table that describes no person
+price_list,*,covers: name; a code or configuration table that describes no person
+processing_purpose,*,covers: name; a code or configuration table that describes no person
+product_category,*,covers: name; a code or configuration table that describes no person
+reason,*,covers: name; a code or configuration table that describes no person
+resource_group,*,covers: name; a code or configuration table that describes no person
+role,*,covers: name; a code or configuration table that describes no person
+routing,*,covers: name; a code or configuration table that describes no person
+sampling_procedure,*,covers: name; a code or configuration table that describes no person
+stop_reason,*,covers: name; a code or configuration table that describes no person
+storage_condition,*,covers: name; a code or configuration table that describes no person
+team,*,covers: name; a code or configuration table that describes no person
+uom,*,covers: name; a code or configuration table that describes no person
+valuation_class,*,covers: name; a code or configuration table that describes no person
+variant_attribute,*,covers: name; a code or configuration table that describes no person
+variant_attribute_value,*,covers: name; a code or configuration table that describes no person
+work_center,*,covers: name; a code or configuration table that describes no person
+working_calendar,*,covers: name; a code or configuration table that describes no person
+working_calendar_holiday,*,covers: name; a code or configuration table that describes no person
+zone,*,covers: name; a code or configuration table that describes no person
