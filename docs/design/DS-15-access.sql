@@ -230,7 +230,7 @@ CREATE TABLE role_assignment (
     integration_client_id  uuid REFERENCES integration_client (id),
     owner_scope_read       text,                               -- users only
     owner_scope_edit       text,
-    field_classes          text[] NOT NULL DEFAULT '{}' CONSTRAINT ck_role_assignment_field_classes CHECK (field_classes <@ ARRAY['cost', 'margin']::text[]),
+    field_classes          text[] NOT NULL DEFAULT '{}' CONSTRAINT ck_role_assignment_field_classes CHECK (field_classes <@ ARRAY['cost', 'margin', 'sensitive_personal']::text[]),   -- sensitive_personal: ADR-0079 rule 11
     valid_from             date NOT NULL,
     valid_to               date,                               -- inclusive; null is open (ADR-0027 rule 12)
     granted_by_user_id     uuid REFERENCES user_account (id),  -- null only for the bootstrap owner (ADR-0017 rule 7)

@@ -27,6 +27,8 @@ The retention periods and the strictness of scanning are flagged for the author.
    - **Not written** for queries or idempotent replays (ADR-0008 rule 18).
    - **Batches.** One record per batch item. `batch_id` is the idempotency record's ID for the batch. It is not a foreign key, because idempotency records are deleted after their retention (ADR-0008 rule 19).
    - **The result.** The dispatch result carries `audit_record_id` per item, outside the plan and `plan_hash`, so a change proposal's execution can store them (ADR-0029 rule 3). It is null in simulate mode, because the row rolls back (DS-04 response fields; ADR-0008 rule 21).
+
+   Note ([ADR-0079](0079-personal-data-protection.md), proposed 2026-11-21): queries still write no audit record, but a read that returns a `sensitive_personal` column or a blocked subject's unmasked data, and every export with a personal column, writes a `personal_data_read_log` row with no values (ADR-0079 rule 12).
 2. Columns:
    - **Identity:** `id` (UUID version 7), `company_id` (null for installation scope), `recorded_at`, `business_date`. Committed rows are always from execute mode, so the record has no `mode` column.
    - **Command:** `command_type`, `schema_version`, and `effect_class` with `is_human_only` and `is_proposal_bound` as registered at the time, so old rows are judged by the rules then in force (INV-81, INV-86). Also `idempotency_key`, `request_id`, `batch_id`, `batch_item_index`, and `reason` when the command carries one (approvals, period state changes, ADR-0012 rule 9). `reason` is free text that must not hold personal data; the command schemas say so, and erasure masks it under rule 4.
@@ -53,6 +55,8 @@ The retention periods and the strictness of scanning are flagged for the author.
    - **Finding the rows.** An index on (`subject_table`, `row_id`).
 
    Note ([ADR-0074](0074-core-data-structure-additions.md), 2026-11-21): erasure of a record also clears the keys of its `custom_values` whose `custom_field_definition.is_personal_data` is true, and masks the `audit_change` images of those keys. Values frozen in posted document versions follow the rule for personal data on posted documents (see the personal-data ADR of the S1 additions).
+
+   Note ([ADR-0079](0079-personal-data-protection.md), proposed 2026-11-21): the erasure exception extends to posted documents, document versions and the journal's text columns (`journal_entry.note`, `journal_line.description`), limited to the catalog columns of each table; every rewrite appends a `data_erasure_entry` and, after commit, an erasure journal line outside the database (ADR-0079 rules 6-7). The erasure commands are two: `EraseDataSubject` and `DestroyRetainedPersonalData`. Each module destroys its own tables in its consumer of their events, in the consumer's own transaction, inside an erasure scope opened through `audit.contract` with the originating command's ID; the trigger accepts the marker when a committed erasure command with that ID exists, not only one in the same transaction, and `audit.contract` binds the scope to that command's subject and due classes, so no consumer rewrites rows of another subject or class under that ID.
 5. Denial records, `audit_denial`:
    - **When.** A command or query refused with one of these codes writes a denial record, in simulate and execute mode alike: `permission_denied`, `human_only`, `proposal_required`, `policy_denied`, `outbound_content_out_of_scope` and `segregation_of_duties`. The dispatcher classifies by error code, wherever the error was raised.
    - **Columns.**
@@ -96,6 +100,8 @@ The retention periods and the strictness of scanning are flagged for the author.
    - **Enabling unverified regime rules.** Audited as tracked changes of regime settings (rule 3; ADR-0016).
    - **Exports and erasures.** Write both an audit record and an entry in the personal data processing log (ADR-0019 rule 11). The breach notification procedure belongs to DS-40 under the existing open question on Law 91/2025; audit and denial records are its evidence. The processing log is owned by `audit` ([ADR-0052](0052-minimal-crm.md) rule 26).
    - **`nativeflows-check` against production** (DS-16) may run, only with the read-only role, on a standby replica or with `statement_timeout`, and never with write rights.
+
+   Note ([ADR-0079](0079-personal-data-protection.md), proposed 2026-11-21): breach handling has its mechanism: the signals raise `personal_data_incident_suspected`, a person opens a work case of kind `personal_data_breach`, and the `personal_data_breach` row holds what an authority asks for; deadlines are package rules (ADR-0079 rules 15-16).
 
 **Observability**
 

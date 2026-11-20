@@ -1,5 +1,5 @@
 template,name,is_totp_required,suggested_owner_scope_read,suggested_owner_scope_edit,suggested_field_classes,added_in,meaning
-owner,Owner,true,company,company,cost;margin,0.1.0,"Every permission and capability (ADR-0017 rule 6 interim); approves everywhere."
+owner,Owner,true,company,company,cost;margin;sensitive_personal,0.1.0,"Every permission and capability (ADR-0017 rule 6 interim); approves everywhere."
 chief_accountant,Chief accountant,true,company,company,cost;margin,0.1.0,"Finance and Banking full; supplier documents and sales corrections full; files statutory reports and tax returns; policy administration; payments approved, not posted; partner bank accounts read; other areas read; approves."
 accountant,Accountant,false,company,company,cost;margin,0.1.0,"Finance and Banking post; invoices post; payments drafted and approved, not posted; partners read; posting periods and the chart read; approves."
 cashier,Cashier,false,company,own,,0.1.0,"Cash receipts, payments and counts post; bank payments post; other bank documents read; no reports (book queries cannot be narrowed to the cash book)."

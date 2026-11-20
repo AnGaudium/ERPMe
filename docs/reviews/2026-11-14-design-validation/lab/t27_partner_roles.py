@@ -254,7 +254,7 @@ if "--load" in sys.argv:
     check("X24 an object of custom values is stored on a header", True)
     # ---- custom field definitions
     def cfd(cx, **o):
-        v = dict(id=new(), company_id=I["co"], target_table="partner", code="region", label="Region", data_type="choice"); v.update(o)
+        v = dict(id=new(), company_id=I["co"], target_table="partner", code="region", label="Region", data_type="choice", is_personal_data=False); v.update(o)   # no default since ADR-0079 rule 2
         ins(cx, "custom_field_definition", **v)
     cfd(c)
     trial("X25 one definition per company, table and code", lambda cx: cfd(cx), "custom_field_definition_company_id_target_table_")
