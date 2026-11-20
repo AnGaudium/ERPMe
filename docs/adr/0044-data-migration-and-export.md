@@ -162,6 +162,8 @@ The migration period is then locked.
     - **Proposals.** Human-run import batches are outside the change proposal carrier (ADR-0029 rule 4).
 
     The workflow is [ADR-0051](0051-agent-workflows.md) rules 26–28; draft batches are edited with `UpdateImportBatch`.
+
+    Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-19): the data migration agent moves to Phase 2. In Phase 1 the staged import uses stored mappings and deterministic fuzzy matching, which do the bulk of the mapping. The assistant's help is bounded: an `act` run is tainted and reads its request, the batch row as context subject and at most 100 selected import rows, so it may draft mappings for the selected rows only and proposes no merges against existing records. Every batch is still simulated and checked (ADR-0078 rule 2).
 16. Data:
     - **Location.** Pilot data never enters the repository or CI.
     - **Personal data.** Contacts in import files are personal and go to a local model when an agent reads them (spec 17).

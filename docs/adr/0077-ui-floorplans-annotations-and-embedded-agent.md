@@ -188,6 +188,8 @@ The UI is generated from metadata, not hand-built. Every screen is one of seven 
     - **Grouping.** The assistant has three modes of use, named once here: ask, act and resolve. Resolve has two purposes, `resolve_command` and `resolve_filter`, so `assist_request.purpose` has four values. The evaluation set counts these three. The assist panel of rule 17 has three panel modes of its own (ask, act, proactive), and the resolve purposes serve the command bar and natural-language filters (rule 18). (review note, 2026-11-21)
     - **Evaluation.** Spec 17 requires every pair of seat and model to pass an evaluation. The set for the seats of rule 14 has about 50 tasks across the three modes: read answers with correct citations, drafts with correct field diffs, refusals outside its scope, and taint handling, pasted untrusted text included. It is built with the assistant and is a step 5 gate item.
 
+    Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-21): Phase 1 has no per-agent-type budget settings, so the assistant's budgets are the company's daily cap and the ceilings of its declaration; `assist.max_cost_per_run` (bounds 0.01 to 0.50, lower is tighter) may only lower the cost ceiling (ADR-0078 rules 1, 7).
+
 14. Typed text reaches the agent through one row, as `analysis_question` does for the analysis agent (ADR-0060). `CreateAssistRequest` is `human_only` and writes an `assist_request` with these columns:
     - `purpose`: `ask`, `act`, `resolve_command` or `resolve_filter`;
     - `request_text`: up to 2,000 characters;
@@ -202,6 +204,8 @@ The UI is generated from metadata, not hand-built. Every screen is one of seven 
     The UI then sends `StartAgentRun` with the row as subject. The run writes its answer to the row through `UpdateAssistAnswer`, registered `is_draft_only` and called only by workflow code, as `UpdateAnalysisAnswer` is (ADR-0050 rule 26 note); its drafts link to its `agent_task` work item (ADR-0042), and a live update tells the panel (ADR-0040 rule 13).
 
     Runs are asynchronous, and there is no multi-turn dialogue. A follow-up is a new request that names the previous one.
+
+    Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-21): a follow-up names a previous request of the same person (a key in DS-30); only an untainted run reads it (ADR-0078 rule 11).
 
     The DDL is in [DS-30-ui.sql](../design/DS-30-ui.sql) (owner `agents`). The leaf `agent_assistant`, its seed and `assist.max_cost_per_run` are in the catalogs.
 
@@ -229,6 +233,8 @@ The UI is generated from metadata, not hand-built. Every screen is one of seven 
       - **Proactive.** The panel never starts a run unasked. Proactive outputs come from the scheduled and triggered agents of ADR-0051 as work items.
     - **Annotations.** `x-nativeflows-assist` on a declaration lists suggested question keys (i18n keys) and the `is_draft_only` commands offered as agent actions. `ai-fillable` marks the fields an `act` run may fill.
 
+    Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-21): the budget shown is the remaining daily agent budget of the company, not a per-agent-type budget (ADR-0078 rule 7).
+
 18. Inline affordances and the command bar:
     - **Fill from document.** Dropping a PDF or photo on a form uploads an attachment and calls `RequestDocumentExtraction` with the form's purpose. The intake ladder of ADR-0057 produces the extraction, and its verification follows ADR-0057 rule 22. Once verified, the resulting draft opens in the form. Fields filled from the document show their provenance (rule 15), and only `ai-fillable` fields are filled.
     - **AI suggestions in value help.** Value help may list candidates that an agent or intake already stored on the draft, such as matching candidates. They are marked AI and never selected automatically. No language model is called per keystroke.
@@ -238,6 +244,8 @@ The UI is generated from metadata, not hand-built. Every screen is one of seven 
       - Typed names match commands, queries, lists and records as before.
       - Other text becomes a request with `purpose` `resolve_command`. Its answer is a proposed invocation: a registered command or query type, with a payload validated against its schema.
       - The bar shows the resolved command and its parameters. It opens the command's form prefilled, with provenance on the filled fields, and runs simulate before anything executes. It never executes by itself.
+
+    Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-21): in Phase 1 a photo is attached to a draft or sent through document intake's deterministic ladder (ADR-0057), and text goes to the assistant; the capture agent of ADR-0064 moves to Phase 2 (ADR-0078 rule 2).
 
 **Component library and tokens**
 
@@ -319,6 +327,8 @@ The UI is generated from metadata, not hand-built. Every screen is one of seven 
     - **Renderer v1** (ADR-0040 rule 19, step 1) renders the list report (with variants), object page, create and edit form (with `line_grid`) and plan panel. It is the test harness during the headless steps 0–5.
     - **Later floorplans.** The worklist and approval view follow with the work queue at step 5. The overview follows with the Centers.
     - **The `assistant` agent**, the assist panel, natural-language filters and the command bar's `resolve_command` arrive at step 5, with the work queue; the evaluation set of rule 13 is a step 5 gate item ([steps-5-9.md](../runbook/steps-5-9.md)).
+
+    Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-19, reworked 2026-11-21): the assistant is one of the six Phase 1 agent types (`assistant`, `analysis`, `bank_matching`, `purchase_invoice`, `document_reader`, `planning`); it routes questions that need figures to `analysis` and drafts what the deferred agents would help with, such as gateway settings (no advisor in Phase 1), mappings and artifacts, on request (ADR-0078 rules 1, 8).
 
 24. The eight open questions of this ADR were decided by the chief architect on the author's delegation of 2026-11-19 and are applied above: the start leaf (rule 13), the taint of typed text (rule 13), `ai-fillable` as a hint (rule 9), the cost cap and DDL (rules 13, 14), voice (rule 18), the line grid without AG Grid (rules 5, 20), user-saved variants (rule 10a) and the evaluation set (rule 13).
 

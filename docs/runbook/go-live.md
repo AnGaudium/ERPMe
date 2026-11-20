@@ -6,7 +6,7 @@ No parallel run with the old software; the pilot goes live fully on NativeFlows,
 
 ## Step 10 · Platform completion (months 10–12)
 
-**Entry criteria:** step 9 gate passed; all four agents built ([steps-5-9.md](steps-5-9.md#agents)).
+**Entry criteria:** step 9 gate passed; the six Phase 1 agents built ([steps-5-9.md](steps-5-9.md#agents)).
 
 **Design items first:** DS-36 operations dashboard; DS-37 deployment and operations; DS-38 localization skill and basic US package; DS-39 TT133 regime. TT133 status and B03 are verified before this gate ([ADR-0003](../adr/0003-build-operating-rules.md) R10).
 
@@ -34,7 +34,7 @@ No parallel run with the old software; the pilot goes live fully on NativeFlows,
 - every DS item DS-01 to DS-39 is done by the [design/README.md](../design/README.md) rule;
 - every open question needed by steps 0–10 is closed; a rule still flagged is listed and is not one the pilot will use ([ADR-0003](../adr/0003-build-operating-rules.md) R11);
 - every Phase 1 item of the Lean scope in [10-roadmap.md](../spec/10-roadmap.md#lean-scope-for-phases-0-and-1) exists, and nothing from "After Phase 1" was built beyond reserved schema room;
-- the four agents pass their evaluation suites; every operation works with LLMs off (Principle 12);
+- the six Phase 1 agents pass their evaluation suites; every operation works with LLMs off (Principle 12);
 - [risks.md](../risks.md) reviewed.
 
 **Exit gate (verbatim):**
@@ -59,14 +59,14 @@ No parallel run with the old software; the pilot goes live fully on NativeFlows,
 
 1. **Pilot selection** by the [pilot selection criteria](../spec/10-roadmap.md): trading business of 10–50 people (first pilot only, not a market limit), imports and foreign-currency transactions allowed, chief accountant willing to switch fully, owner who commits time, regular incoming e-invoices, agreement to share anonymized data for agent evaluation outside the repository. The author selects; written commitment only now.
 2. **Go-live date:** the start of an accounting period, preferably a quarter.
-3. **Reader** for the pilot's current system if none exists (e.g. MISA), using the data migration agent and the DS-21 batch format (D16).
+3. **Reader** for the pilot's current system if none exists (e.g. MISA), using the staged import with stored mappings, the assistant's drafted mappings for selected rows and the DS-21 batch format (D16; the data migration agent is in Phase 2, [ADR-0078](../adr/0078-agent-simplification-for-phase-1.md) rule 2).
 4. **Load real data on staging** (author-operated servers in Vietnam, author-only access; real data deleted within 7 days after the rehearsal, [ADR-0003](../adr/0003-build-operating-rules.md) R12): master data, opening balances, AR/AP open items per invoice, inventory per warehouse, lots and serials with opening cost, each as a simulated command batch, never an SQL script ([15-migration-ux-docs.md](../spec/15-migration-ux-docs.md)).
 5. **Rehearsal:** replay the pilot's latest month on staging; compare with their books in the current system; classify every difference (reader mapping, NativeFlows defect, error in the old books) and resolve it.
 6. **Schema freeze** 4 weeks before go-live (B8). After the freeze, a schema change needs the author's approval and a tested migration.
 7. User accounts, roles and segregation of duties for the pilot's team; the customer decides the routing switch (D12) and who is recorded as accountable.
 8. Training with the shipped Vietnamese UI and user guides.
 
-**How agents are used:** the data migration agent proposes mappings and duplicate merges; drafts only, the batch is simulated and checked against the old books' totals before execution. Agents never see pilot data in the repository or in CI.
+**How agents are used:** the assistant in `act` mode may draft mappings on draft import batches, bounded: an `act` run is tainted and reads its request, the batch row as context subject and at most 100 selected import rows, so it drafts mappings for the selected rows only and proposes no merges against existing records, and the bulk of the mapping is stored mappings and deterministic fuzzy matching; drafts only, the batch is simulated and checked against the old books' totals before execution. Agents never see pilot data in the repository or in CI.
 
 Before the gate, every localization rule the pilot's transactions use is verified; rules it does not use stay flagged and are disabled for its company ([ADR-0003](../adr/0003-build-operating-rules.md) R11).
 
@@ -101,7 +101,7 @@ DS-40 turns this outline into the checklist. Order on cut-over:
 
 - Each month: the close checklist (DS-12) run with the chief accountant; unconfirmed agent auto-posts block the close ([03-agent-safety.md](../spec/03-agent-safety.md), rule 6); stock count, partner confirmations and bank statements reconciled; the period locked by a human, never by an agent.
 - The VAT return for the first tax period is generated from NativeFlows (01/GTGT) and filed by the customer.
-- Agents start in shadow mode on the pilot's real transactions; an agent gains auto-posting only after its accuracy exceeds the threshold ([14-agent-workflows.md](../spec/14-agent-workflows.md)). Anonymized pilot data for evaluation stays outside the repository.
+- Agents start `assisted` after passing their offline evaluation, and reach `active` for a document type only from in-use draft acceptance (ADR-0065 rule 11) ([ADR-0078](../adr/0078-agent-simplification-for-phase-1.md) rules 5, 6); live agent shadow on the pilot's real transactions returns in Phase 2; an agent gains auto-posting only after its accuracy exceeds the threshold ([14-agent-workflows.md](../spec/14-agent-workflows.md)). Anonymized pilot data for evaluation stays outside the repository.
 - Every defect found in production becomes a synthetic regression scenario reproduced with fictional data, never with pilot data.
 
 ## Support mode

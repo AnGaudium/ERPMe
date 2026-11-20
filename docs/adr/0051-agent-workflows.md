@@ -14,6 +14,10 @@ Six agent types are designed now, each as a code-orchestrated workflow on the ru
 
 Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): a further agent type `assistant` serves the UI's assist panel and command bar. It reads through its tool list and writes only through `is_draft_only` commands, within the user's permission intersection and the `agents.assistant.*` budgets. Its DDL, catalog rows, leaf, seed and cost cap are in DS-30-ui.sql and the catalogs; it arrives at step 5, and its evaluation set of about 50 tasks is a step 5 gate item (ADR-0077 rules 13, 14, 23).
 
+Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-19, reworked 2026-11-21): Phase 1 has six agent types on one runtime: `assistant`, `analysis`, `bank_matching`, `purchase_invoice`, `document_reader` and `planning`; `planning` (rules 23–25) starts after the manual path of planning with multi-level MRP is built and has passed its gate (after step 5; ADR-0024 rule 26, ADR-0032 rule 7). The runbook does not place that work yet (open question). `customer_onboarding`, `quotation`, `data_migration` and `auto_post_advisor` move to Phase 2 with their designs kept; at step 11 migration uses the staged import with stored mappings, and the assistant may draft mappings (ADR-0078 rules 1, 2).
+
+Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-21): the `agents.assistant.*` budget settings named by the ADR-0077 note above do not exist in Phase 1: the nine per-agent-type budget settings are removed, and the assistant's budgets are the company's daily cap and the ceilings of its declaration (ADR-0078 rule 7).
+
 **Deterministic first.** Each step tries stored rules and mappings, then lookups, then fuzzy matching with a deterministic score, and only then an LLM. The LLM never computes a price, tax, quantity, account, match or score. It reads, chooses among candidates that code gave it, and writes text. Code checks every output. A resolution the LLM contributes is proposed as a stored mapping or rule, so the next case is deterministic.
 
 **People decide.** Agents draft documents and change proposals. People submit, approve, post and send. Only the deterministic bank cascade may ever auto-post, under an enabled policy rule with shadow evidence.
@@ -46,6 +50,8 @@ Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed
    Note ([ADR-0059](0059-ai-tuning-and-development-of-deterministic-functions.md), proposed 2026-11-15): the same ladder, generalized to configuration and decision artifacts, is rule 12 there.
 
    Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), proposed 2026-11-15): the `analysis` agent type is a second stated exception: it drafts nothing a person resolves, so its promotion evidence is the version's CI evaluation report and, from 30 verified examples, the shadow evaluation over them; below 30 examples the CI report alone is flagged for the author (rule 25).
+
+   Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-19): in Phase 1 the modes are `off`, `assisted`, and `active` only as the gateway uses it; promotion to `assisted` uses the offline evaluation result (run with the real provider per pair of seat and model) and replay, not shadow evaluation rows. A change of the behavior hash (version, constants, promoted parameter set or seat model) whose evaluation passed keeps a company `assisted`; a hash without a passing result drops the effective mode to `off`, not `shadow`. `active` does not carry over a change of the hash (ADR-0078 rules 5, 6).
 5. Quality monitor:
    - **The job.** `RunAgentQualityCheck` (daily system job, `agents`) computes, per company and assisted agent type, the 30-day share of drafts accepted unedited and of drafts rejected or canceled (rule 6).
    - **The signal.** When agreement falls 10 points below the workflow's threshold, it raises `agent_quality_below_threshold` (owner `company_owner`) with the figures. It does not demote by itself; a person decides.
@@ -53,6 +59,8 @@ Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed
    Note ([ADR-0059](0059-ai-tuning-and-development-of-deterministic-functions.md), proposed 2026-11-15): for agent types the monitor keeps only signalling, while artifacts are demoted automatically to the version in force before (rule 21).
 
    Note ([ADR-0063](0063-configurable-policy-settings.md), proposed 2026-11-15): the response beyond the signal is the setting `agents.<agent_type>.drift_action` (`signal`, the default, `pause_new_runs`, `demote_to_shadow`) (rule 12).
+
+   Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-21): in Phase 1, with no live shadow, the measure of `RunAgentQualityCheck` is the comparison with what people did: each workflow's existing comparator applied to what the agent produced in `assisted` mode against what the person finally did on the same work item: `bank_matching` by rule 19, `purchase_invoice` by rule 22, `planning` by rule 25, `document_reader` by the field agreement of ADR-0057 rule 34, and the daily evaluation for `analysis`. The comparator needs no shadow run, because the agent's output and the person's result are both stored. For the assistant's `act` drafts there is no comparator: the share canceled is shown on the operations dashboard and raises nothing (ADR-0078 rule 15).
 6. Policy and posting:
    - **Agents never submit, post, issue or send** (ADR-0050 rule 30). People submit agent drafts, and the company's policy table applies at their `Submit` and `Post` (DS-28); agents set no discount or manual price.
    - **Tainted drafts** are posted only by a person (ADR-0043 rule 9, floor 3).
@@ -105,6 +113,8 @@ Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed
    Note ([ADR-0064](0064-production-agent.md), proposed 2026-11-15): `production` 10 LLM calls, 120 tool calls, 200,000 input and 10,000 output tokens, USD 1.00, 600 seconds, 10,000 rows, USD 15 and 400 runs a day; `production_capture` 6, 30, 80,000, 5,000, USD 0.40, 180 seconds, 500 rows, USD 10 and 500 runs; `production_variance` 14, 40, 140,000, 12,000, USD 0.95, 180 seconds, 2,000 rows, USD 10 and 100 runs (rule 28).
 
    Note (Design hardening, 2026-11-16): these values are the core defaults of the company settings `agents.<agent_type>.daily_max_cost` and `agents.<agent_type>.daily_max_runs` and the ceilings of the per-run settings. A company lowers any of them at once and raises a daily value, or a per-run value up to its ceiling, by a proposal another person approves ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 22 note). "Every daily cost stays below the company cap of USD 50" holds for the defaults; the company cap and the reserve pool still bind every run.
+
+   Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-19): these per-run values become the ceilings of each agent type's declaration; the per-agent-type daily budgets are removed, and the company's daily cap is the only daily tier, so the daily columns of this table are not used in Phase 1 (ADR-0078 rules 3, 7).
 
 10. The literal read scope (ADR-0050 rule 27; ADR-0029 rule 14) in these workflows:
     - **Tainted runs choose among related items only.** A tainted `quotation` run reads items only through the partner's `partner_item_overview` rows and its earlier document lines. A tainted `purchase_invoice` run reads the supplier's `partner_item` and `supplier_item` rows and its open purchase order lines. Lines that need anything else stay unresolved and go to a person.
@@ -266,6 +276,8 @@ Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed
     - **Failures.** No candidate: explanation only, outcome `no_action`.
 
     Note (flow review, 2026-11-15): correction of "a planner other than the human the run acted for approves it": the approver is an eligible person of the current stage of the proposal's pool (`general` by default) who holds `ApproveChangeProposal` and the target permissions ([ADR-0055](0055-approval-pools-and-stages.md) rule 7; ADR-0043 rule 12), that is `edit` on `planned_order` for the planned-order commands. Under the seed these are the production planner, the purchasing manager and the owner (ADR-0055 rule 5 note); accountants and chief accountants read planning only. The human the run acted for stays excluded.
+
+    Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-21): the planning agent is a Phase 1 agent type, started after the manual path of planning with multi-level MRP is built and has passed its gate (after step 5; ADR-0024 rule 26, ADR-0032 rule 7). The runbook does not place that work yet (open question). Its shadow comparator is used in Phase 1 on stored output (no shadow run), and it is promoted by its evaluation set at the golden-set threshold of 90% in the table of rule 7 (the size of the set is fixed with the declaration); its quality in use is that comparator against what the planner did (ADR-0078 rules 1, 6, 15).
 
 **Data migration** (spec 14 workflow 2; ADR-0044 rule 15)
 

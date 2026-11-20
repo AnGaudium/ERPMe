@@ -81,3 +81,4 @@ One file per decision, named `NNNN-short-title.md`, using [template.md](template
 | [ADR-0075](0075-stock-documents.md) | Stock documents (DS-09, DS-22, DS-42) | Accepted (2026-11-21) |
 | [ADR-0076](0076-internal-messaging-and-notifications.md) | Internal messaging and notifications (DS-63) | Accepted (2026-11-21) |
 | [ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md) | UI floorplans, annotation vocabulary and embedded agent interaction (DS-30) | Accepted (2026-11-21) |
+| [ADR-0078](0078-agent-simplification-for-phase-1.md) | Agent scope and the common work model for Phase 1 (DS-32, DS-33, DS-34) | Accepted (2026-11-21) |
