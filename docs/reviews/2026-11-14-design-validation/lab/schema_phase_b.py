@@ -28,12 +28,15 @@ What it does to every CREATE TABLE of docs/design/*.sql (partitions inherit from
    company_id is nullable or absent stay single-column (gen_overview.COMPANY_KEY_ALLOWLIST). The script stops on a key
    it cannot convert safely: a target column other than id, or ON DELETE / ON UPDATE SET NULL or SET DEFAULT without a
    column list (it would null company_id).
-4. The recorded_at trigger: each file ends with one section that defines set_recorded_at() and runs one DO block, which
-   attaches `trg_<table>_set_recorded_at` (BEFORE UPDATE) to every table of the file except its append-only tables. The
-   phase A CREATE TRIGGER ... set_recorded_at statements and the function definitions at the top of the files are
-   removed. Append-only: tables whose guard trigger refuses every update outside an erasure (ALWAYS_REFUSE, or
-   platform_check_append_only / crm_check_append_only with no mutable column but recorded_at and no set-once column),
-   and the pure logs in gen_overview.PURE_LOGS.
+4. The generated sections (gen_overview.render_sections, S2 adversarial review S2, N1, N4): each file ends with a section
+   that defines set_recorded_at() and refuse_truncate() and runs one DO block, which attaches `trg_<table>_set_recorded_at`
+   to every table of the file (BEFORE INSERT OR UPDATE; BEFORE INSERT only on its append-only tables) and
+   `trg_<table>_refuse_truncate` (BEFORE TRUNCATE) to its append-only and delete-guarded tables without a TRUNCATE trigger of
+   their own; and a row-level security section with the company policies of every table with company_id (default
+   partitions included; gen_overview.RLS_ALLOWLIST aside). The phase A CREATE TRIGGER ... set_recorded_at statements and the
+   function definitions at the top of the files are removed. Append-only: tables whose guard trigger refuses every update
+   outside an erasure (ALWAYS_REFUSE, or platform_check_append_only / crm_check_append_only with no mutable column but
+   recorded_at and no set-once column), and the pure logs in gen_overview.PURE_LOGS.
 
 gen_overview.py --check verifies the result (check_keys_and_recorded_at); this script only writes.
 """
@@ -46,8 +49,8 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
-from gen_overview import KEY_ALLOWLIST, PURE_LOGS, RECORDED_AT_END as SECTION_END, RECORDED_AT_SECTION as SECTION_START  # noqa: E402
-from gen_overview import UNIQUE_ELEMENT_RE, classify, company_scan, mask_sql as mask, table_spans  # noqa: E402
+from gen_overview import KEY_ALLOWLIST, design_context, design_texts, generated_start, render_file  # noqa: E402
+from gen_overview import UNIQUE_ELEMENT_RE, company_scan, file_plan, mask_sql as mask, table_spans  # noqa: E402
 
 REGISTRIES = {"setting_definition", "setting_preset", "setting_preset_item", "extension_point", "event_consumer",
               "public_mail_domain"}   # E2 (ADR-0006 rule 1 note)
@@ -94,7 +97,7 @@ def check_actions(where, actions):
                          "name the column, e.g. ON DELETE SET NULL (x_id)")
 
 
-def convert_file(path, append_only, company=None, need_uq=None):
+def convert_file(path, ctx, company=None, need_uq=None):
     need_uq = need_uq or {}
     company = company or {}
     text = open(path, encoding="utf-8").read()
@@ -102,8 +105,7 @@ def convert_file(path, append_only, company=None, need_uq=None):
     # drop the phase A trigger statements and the function definitions; the end section replaces them
     text = re.sub(r"^CREATE TRIGGER trg_\w+_set_recorded_at BEFORE UPDATE ON \w+\n\s+FOR EACH ROW EXECUTE FUNCTION set_recorded_at\(\);\n",
                   "", text, flags=re.M)
-    if SECTION_START in text:
-        text = text[:text.index(SECTION_START)].rstrip("\n") + "\n"
+    text = text[:generated_start(text)].rstrip("\n") + "\n"
     text = re.sub(r"^CREATE OR REPLACE FUNCTION set_recorded_at\(\) RETURNS trigger .*?\nEND \$\$;\n", "", text, flags=re.M | re.S)
     masked = mask(text)
     edits, report, tables = [], [], []
@@ -263,80 +265,31 @@ def convert_file(path, append_only, company=None, need_uq=None):
             raise SystemExit(f"{name}: overlapping edits at {s}")
         text = text[:s] + new + text[e:]
         last = s
-    # --- the end section
-    ao = sorted(t for t in tables if t in append_only)
-    text = text.rstrip("\n") + "\n\n" + section(tables, ao, append_only) + "\n"
-    return text, report, tables, ao
-
-
-def wrap_array(names, indent):
-    lines, cur = [], ""
-    for n in names:
-        item = f"'{n}', "
-        if len(indent) + len(cur) + len(item) > 124:
-            lines.append(cur.rstrip()); cur = ""
-        cur += item
-    lines.append(cur.rstrip().rstrip(","))
-    return ("\n" + indent).join(lines)
-
-
-def section(tables, ao, append_only):
-    pad = " " * 8
-    reasons = sorted({append_only[t] for t in ao})
-    return "\n".join([
-        SECTION_START,
-        "-- Every table of this file has recorded_at timestamptz NOT NULL DEFAULT now(). The DO block attaches the trigger",
-        "-- trg_<table>_set_recorded_at (BEFORE UPDATE, function set_recorded_at) to every table of v_tables except v_append_only,",
-        "-- so recorded_at is the instant of the last write (ADR-0007 rule 9 note). Append-only tables are those whose guard",
-        "-- trigger refuses every update outside an erasure, and pure logs; they need no trigger"
-        + (f" (here: {', '.join(reasons)})." if reasons else "."),
-        "-- Row guards without UPDATE OF on in-place tables sort before set_recorded_at, so they compare rows before it runs.",
-        "-- v_tables lists the file's tables in file order; lab gen_overview.py --check verifies both lists against the table",
-        "-- definitions of the file, and schema_phase_b.py writes the section. The function is defined in every file because the",
-        "-- labs load subsets.",
-        "CREATE OR REPLACE FUNCTION set_recorded_at() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$",
-        "BEGIN",
-        "    NEW.recorded_at := now();",
-        "    RETURN NEW;",
-        "END $$;",
-        "DO $$",
-        "DECLARE",
-        f"    v_tables       text[] := ARRAY[{wrap_array(tables, pad)}];",
-        f"    v_append_only  text[] := ARRAY[{wrap_array(ao, pad)}]::text[];",
-        "    v_table        text;",
-        "BEGIN",
-        "    FOREACH v_table IN ARRAY v_tables LOOP",
-        "        CONTINUE WHEN v_table = ANY (v_append_only) OR to_regclass(v_table) IS NULL;",
-        "        EXECUTE format('CREATE OR REPLACE TRIGGER %I BEFORE UPDATE ON %I FOR EACH ROW EXECUTE FUNCTION set_recorded_at()',",
-        "                       'trg_' || v_table || '_set_recorded_at', v_table);",
-        "    END LOOP;",
-        "END $$;",
-        SECTION_END,
-    ])
+    # --- the generated end sections (gen_overview.render_sections)
+    text = render_file(name, text, ctx)
+    return text, report, tables, file_plan(name, text, ctx)
 
 
 def main():
-    from load_all import split_statements
     ap = argparse.ArgumentParser()
     ap.add_argument("--docs", default=os.path.join(HERE, "..", "..", ".."))
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args()
     files = sorted(glob.glob(os.path.join(os.path.abspath(a.docs), "design", "*.sql")))
-    stmts = []
-    for p in files:
-        stmts += [re.sub(r"--[^\n]*", "", s) for s, _ in split_statements(open(p, encoding="utf-8").read(), os.path.basename(p))[0]]
-    append_only = classify(stmts)
+    ctx = design_context(design_texts(os.path.join(os.path.abspath(a.docs), "design")))
     company, need_uq = company_plan(files)
-    n_tables = n_ao = 0
+    n = dict(tables=0, ao=0, trunc=0, rls=0, nullable=0)
     for p in files:
-        new, report, tables, ao = convert_file(p, append_only, company, need_uq)
-        n_tables += len(tables); n_ao += len(ao)
+        new, report, tables, (_, ao, trunc, rls, nullable) = convert_file(p, ctx, company, need_uq)
+        for k, v in (("tables", tables), ("ao", ao), ("trunc", trunc), ("rls", rls), ("nullable", nullable)):
+            n[k] += len(v)
         for r in report:
             print(f"{os.path.basename(p)}: {r}")
         if not a.dry_run:
             open(p, "w", encoding="utf-8").write(new)
-    print(f"{n_tables} tables, {n_ao} append-only, {n_tables - n_ao} with the trigger")
-
+    print(f"{n['tables']} tables: {n['tables'] - n['ao']} with set_recorded_at on insert and update, {n['ao']} append-only on insert "
+          f"only; {n['trunc']} generated TRUNCATE guards; row-level security on {n['rls']} tables and partitions "
+          f"({n['nullable']} with a nullable company_id)")
 
 if __name__ == "__main__":
     main()

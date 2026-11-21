@@ -253,7 +253,7 @@ CREATE TABLE module_activation (                           -- company data, upda
 CREATE TRIGGER trg_setting_value_immutable BEFORE UPDATE OR DELETE ON setting_value
     FOR EACH ROW EXECUTE FUNCTION platform_reject_change('{reason}');
 -- Whether value a is looser than value b under a direction (rule 3). Lists compare as sets.
-CREATE FUNCTION setting_is_looser(p_direction text, p_order text[], a jsonb, b jsonb) RETURNS boolean LANGUAGE sql IMMUTABLE AS $$
+CREATE FUNCTION setting_is_looser(p_direction text, p_order text[], a jsonb, b jsonb) RETURNS boolean LANGUAGE sql IMMUTABLE SET search_path = nativeflows, pg_temp AS $$
     SELECT CASE p_direction
         WHEN 'higher_tighter' THEN (a #>> '{}')::numeric < (b #>> '{}')::numeric
         WHEN 'lower_tighter' THEN (a #>> '{}')::numeric > (b #>> '{}')::numeric
@@ -380,49 +380,72 @@ $$;
 CREATE TRIGGER trg_setting_value_check_insert BEFORE INSERT ON setting_value
     FOR EACH ROW EXECUTE FUNCTION setting_value_check_insert();
 
--- ===== Row-level security (ADR-0017 rule 19; ADR-0022 rule 8) =====
--- rls_v1: the company policy, compared as text and failing closed; null-company (installation) rows only under the setting
--- value installation; and the read-only company_ids policy for registered cross-company queries. Company sessions read
--- installation maxima only through setting_installation_value (ADR-0063 rule 1).
-ALTER TABLE setting_value ENABLE ROW LEVEL SECURITY;
-ALTER TABLE setting_value FORCE ROW LEVEL SECURITY;
-CREATE POLICY company_policy ON setting_value USING (company_id::text = current_setting('nativeflows.company_id', true)
-    OR (company_id IS NULL AND current_setting('nativeflows.company_id', true) = 'installation'));
-CREATE POLICY company_ids_policy ON setting_value FOR SELECT USING (company_id::text = ANY (string_to_array(current_setting('nativeflows.company_ids', true), ',')));
-ALTER TABLE company_setup_acknowledgement ENABLE ROW LEVEL SECURITY;
-ALTER TABLE company_setup_acknowledgement FORCE ROW LEVEL SECURITY;
-CREATE POLICY company_policy ON company_setup_acknowledgement USING (company_id::text = current_setting('nativeflows.company_id', true));
-CREATE POLICY company_ids_policy ON company_setup_acknowledgement FOR SELECT USING (company_id::text = ANY (string_to_array(current_setting('nativeflows.company_ids', true), ',')));
-ALTER TABLE module_activation ENABLE ROW LEVEL SECURITY;
-ALTER TABLE module_activation FORCE ROW LEVEL SECURITY;
-CREATE POLICY company_policy ON module_activation USING (company_id::text = current_setting('nativeflows.company_id', true));
-CREATE POLICY company_ids_policy ON module_activation FOR SELECT USING (company_id::text = ANY (string_to_array(current_setting('nativeflows.company_ids', true), ',')));
-
--- ===== recorded_at on update (ADR-0007 rules 9, 16 and their notes) =====
+-- ===== recorded_at on insert and update; TRUNCATE refused (ADR-0007 rules 9, 16 and their notes) =====
 -- Every table of this file has recorded_at timestamptz NOT NULL DEFAULT now(). The DO block attaches the trigger
--- trg_<table>_set_recorded_at (BEFORE UPDATE, function set_recorded_at) to every table of v_tables except v_append_only,
--- so recorded_at is the instant of the last write (ADR-0007 rule 9 note). Append-only tables are those whose guard
--- trigger refuses every update outside an erasure, and pure logs; they need no trigger (here: platform_reject_change).
--- Row guards without UPDATE OF on in-place tables sort before set_recorded_at, so they compare rows before it runs.
--- v_tables lists the file's tables in file order; lab gen_overview.py --check verifies both lists against the table
--- definitions of the file, and schema_phase_b.py writes the section. The function is defined in every file because the
--- labs load subsets.
+-- trg_<table>_set_recorded_at (function set_recorded_at) to every table of v_tables: BEFORE INSERT OR UPDATE on tables
+-- updated in place, BEFORE INSERT on the append-only tables of v_append_only. recorded_at is so the instant of the last
+-- write, set by the system and never taken from a client (ADR-0007 rule 9 and its notes; S2 adversarial review S2).
+-- Append-only tables are those whose guard trigger refuses every update outside an erasure, and pure logs (here: platform_reject_change).
+-- Row guards without UPDATE OF on in-place tables sort before set_recorded_at, so they compare rows before it runs; a
+-- BEFORE INSERT trigger whose function reads NEW.recorded_at sorts after it, so it sees the system's value.
+-- TRUNCATE skips row triggers, so every append-only table and every table with a BEFORE DELETE guard, unless it has a
+-- TRUNCATE trigger of its own, is listed in v_refuse_truncate (default partitions with their parent) and gets
+-- trg_<table>_refuse_truncate (BEFORE TRUNCATE, function refuse_truncate; S2 adversarial review N4).
+-- Lab gen_overview.py --check compares this section with what schema_phase_b.py writes from the table definitions and
+-- triggers of the design files. The functions are defined in every file because the labs load subsets.
 CREATE OR REPLACE FUNCTION set_recorded_at() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 BEGIN
     NEW.recorded_at := now();
     RETURN NEW;
 END $$;
+CREATE OR REPLACE FUNCTION refuse_truncate() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
+BEGIN
+    RAISE EXCEPTION '% is never truncated (append-only or guarded rows)', TG_TABLE_NAME USING ERRCODE = 'restrict_violation';
+END $$;
 DO $$
 DECLARE
-    v_tables       text[] := ARRAY['setting_definition', 'setting_preset', 'setting_preset_item', 'company_setup_acknowledgement', 'setting_value',
+    v_tables            text[] := ARRAY['setting_definition', 'setting_preset', 'setting_preset_item', 'company_setup_acknowledgement', 'setting_value',
         'extension_point', 'module_activation'];
-    v_append_only  text[] := ARRAY['setting_value']::text[];
-    v_table        text;
+    v_append_only       text[] := ARRAY['setting_value']::text[];
+    v_refuse_truncate   text[] := ARRAY['company_setup_acknowledgement', 'setting_value']::text[];
+    v_table             text;
 BEGIN
     FOREACH v_table IN ARRAY v_tables LOOP
-        CONTINUE WHEN v_table = ANY (v_append_only) OR to_regclass(v_table) IS NULL;
-        EXECUTE format('CREATE OR REPLACE TRIGGER %I BEFORE UPDATE ON %I FOR EACH ROW EXECUTE FUNCTION set_recorded_at()',
-                       'trg_' || v_table || '_set_recorded_at', v_table);
+        CONTINUE WHEN to_regclass(v_table) IS NULL;
+        EXECUTE format('CREATE OR REPLACE TRIGGER %I BEFORE ' || CASE WHEN v_table = ANY (v_append_only) THEN 'INSERT' ELSE 'INSERT OR UPDATE' END
+                       || ' ON %I FOR EACH ROW EXECUTE FUNCTION set_recorded_at()', 'trg_' || v_table || '_set_recorded_at', v_table);
+    END LOOP;
+    FOREACH v_table IN ARRAY v_refuse_truncate LOOP
+        CONTINUE WHEN to_regclass(v_table) IS NULL;
+        EXECUTE format('CREATE OR REPLACE TRIGGER %I BEFORE TRUNCATE ON %I FOR EACH STATEMENT EXECUTE FUNCTION refuse_truncate()',
+                       'trg_' || v_table || '_refuse_truncate', v_table);
     END LOOP;
 END $$;
--- ===== end of recorded_at on update =====
+-- ===== end of recorded_at and TRUNCATE =====
+
+-- ===== Row-level security, generated (ADR-0017 rule 19; the rls_v1 helper of ADR-0022 rule 8) =====
+-- Every table of this file with company_id gets ENABLE and FORCE ROW LEVEL SECURITY, the company policy company_policy
+-- (company_id compared as text with nativeflows.company_id, failing closed) and the read-only company_ids_policy for
+-- registered cross-company queries (ADR-0017 rule 19). Tables whose company_id is nullable (v_nullable) show their null
+-- rows only under the setting value installation. Default partitions are listed with their parent. Exceptions are in
+-- lab gen_overview.RLS_ALLOWLIST with their reasons; this file has none.
+-- Lab gen_overview.py --check compares this section with what schema_phase_b.py writes.
+DO $$
+DECLARE
+    v_tables    text[] := ARRAY['company_setup_acknowledgement', 'setting_value', 'module_activation'];
+    v_nullable  text[] := ARRAY['setting_value']::text[];
+    v_table     text;
+BEGIN
+    FOREACH v_table IN ARRAY v_tables LOOP
+        EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', v_table);
+        EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', v_table);
+        IF v_table = ANY (v_nullable) THEN
+            EXECUTE format('CREATE POLICY company_policy ON %I USING (company_id::text = current_setting(''nativeflows.company_id'', true)'
+                           ' OR (company_id IS NULL AND current_setting(''nativeflows.company_id'', true) = ''installation''))', v_table);
+        ELSE
+            EXECUTE format('CREATE POLICY company_policy ON %I USING (company_id::text = current_setting(''nativeflows.company_id'', true))', v_table);
+        END IF;
+        EXECUTE format('CREATE POLICY company_ids_policy ON %I FOR SELECT USING (company_id::text = ANY (string_to_array(current_setting(''nativeflows.company_ids'', true), '','')))', v_table);
+    END LOOP;
+END $$;
+-- ===== end of row-level security =====

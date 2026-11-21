@@ -613,7 +613,7 @@ CREATE TABLE product_uom (                                 -- other units of one
 );
 -- INV-603 reads created_at as the start of validity, so it never changes (S2 schema review note N2). The factor stays
 -- correctable while nothing uses the row (ADR-0056 rule 5); that check needs other rows and is a command check.
-CREATE FUNCTION product_uom_check_created_at() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION product_uom_check_created_at() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 BEGIN
     IF NEW.created_at IS DISTINCT FROM OLD.created_at THEN
         RAISE EXCEPTION 'product_uom.created_at is set once at insert (INV-603; ADR-0056 rule 4 note)' USING ERRCODE = 'restrict_violation';
@@ -1047,12 +1047,12 @@ CREATE TABLE gs1_company_prefix (                          -- the company's GS1 
 );
 CREATE UNIQUE INDEX ux_gs1_company_prefix_generation ON gs1_company_prefix (company_id) WHERE is_generation_prefix;
 -- GS1 mod-10 check over the whole key, check digit included: weights 3, 1, 3, ... from the rightmost data digit (rule 4).
-CREATE FUNCTION gs1_check_digit_valid(digits text) RETURNS boolean LANGUAGE sql IMMUTABLE AS $$
+CREATE FUNCTION gs1_check_digit_valid(digits text) RETURNS boolean LANGUAGE sql IMMUTABLE SET search_path = nativeflows, pg_temp AS $$
     SELECT digits ~ '^[0-9]{8,18}$' AND (SELECT sum(substr(digits, i, 1)::int * CASE WHEN (length(digits) - i) % 2 = 1 THEN 3 ELSE 1 END)
                                            FROM generate_series(1, length(digits)) AS i) % 10 = 0
 $$;
 -- The normalized form (rule 7): GTIN-8, GTIN-12 and GTIN-13 padded to 14 digits; other digits as they are; letters upper case.
-CREATE FUNCTION barcode_normalize(value text) RETURNS text LANGUAGE sql IMMUTABLE AS $$
+CREATE FUNCTION barcode_normalize(value text) RETURNS text LANGUAGE sql IMMUTABLE SET search_path = nativeflows, pg_temp AS $$
     SELECT CASE WHEN value ~ '^([0-9]{8}|[0-9]{12}|[0-9]{13})$' THEN lpad(value, 14, '0') WHEN value ~ '^[0-9]+$' THEN value ELSE upper(value) END
 $$;
 -- AFTER trigger of every typed table: TG_ARGV[0] is the barcode type, TG_ARGV[1] the column, TG_ARGV[2] the owner column
@@ -1060,7 +1060,7 @@ $$;
 -- is_barcoded (rule 9); every other table must store the normalized form. A row with is_legacy_barcode registers a
 -- legacy code: upper case, never padded or checked as a GTIN (rule 8); the flag never changes. A code retired from the
 -- same type and owner comes back to it; any other collision is barcode_taken (rule 7).
-CREATE FUNCTION barcode_register() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION barcode_register() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 DECLARE
     v_type   text := TG_ARGV[0];
     v_col    text := TG_ARGV[1];
@@ -1168,10 +1168,10 @@ CREATE TABLE external_id_map (                             -- [master_data] ADR-
 );
 CREATE INDEX ix_external_id_map_entity_id ON external_id_map (company_id, entity_id);
 -- The lookup of ADR-0074 rule 7: the entity of an external key, and the external key of an entity, within one source system.
-CREATE FUNCTION external_id_resolve(p_company_id uuid, p_source_system text, p_table_name text, p_external_key text) RETURNS uuid LANGUAGE sql STABLE AS $$
+CREATE FUNCTION external_id_resolve(p_company_id uuid, p_source_system text, p_table_name text, p_external_key text) RETURNS uuid LANGUAGE sql STABLE SET search_path = nativeflows, pg_temp AS $$
     SELECT entity_id FROM external_id_map WHERE company_id = p_company_id AND source_system = p_source_system AND table_name = p_table_name AND external_key = p_external_key
 $$;
-CREATE FUNCTION external_key_of(p_company_id uuid, p_source_system text, p_table_name text, p_entity_id uuid) RETURNS text LANGUAGE sql STABLE AS $$
+CREATE FUNCTION external_key_of(p_company_id uuid, p_source_system text, p_table_name text, p_entity_id uuid) RETURNS text LANGUAGE sql STABLE SET search_path = nativeflows, pg_temp AS $$
     SELECT external_key FROM external_id_map WHERE company_id = p_company_id AND source_system = p_source_system AND table_name = p_table_name AND entity_id = p_entity_id
 $$;
 
@@ -1207,23 +1207,31 @@ CREATE TABLE reason (                                      -- [master_data] ADR-
     UNIQUE (company_id, id, kind)                          -- a column that takes one kind names it, so the key holds the kind
 );
 
--- ===== recorded_at on update (ADR-0007 rules 9, 16 and their notes) =====
+-- ===== recorded_at on insert and update; TRUNCATE refused (ADR-0007 rules 9, 16 and their notes) =====
 -- Every table of this file has recorded_at timestamptz NOT NULL DEFAULT now(). The DO block attaches the trigger
--- trg_<table>_set_recorded_at (BEFORE UPDATE, function set_recorded_at) to every table of v_tables except v_append_only,
--- so recorded_at is the instant of the last write (ADR-0007 rule 9 note). Append-only tables are those whose guard
--- trigger refuses every update outside an erasure, and pure logs; they need no trigger.
--- Row guards without UPDATE OF on in-place tables sort before set_recorded_at, so they compare rows before it runs.
--- v_tables lists the file's tables in file order; lab gen_overview.py --check verifies both lists against the table
--- definitions of the file, and schema_phase_b.py writes the section. The function is defined in every file because the
--- labs load subsets.
+-- trg_<table>_set_recorded_at (function set_recorded_at) to every table of v_tables: BEFORE INSERT OR UPDATE on tables
+-- updated in place, BEFORE INSERT on the append-only tables of v_append_only. recorded_at is so the instant of the last
+-- write, set by the system and never taken from a client (ADR-0007 rule 9 and its notes; S2 adversarial review S2).
+-- Append-only tables are those whose guard trigger refuses every update outside an erasure, and pure logs.
+-- Row guards without UPDATE OF on in-place tables sort before set_recorded_at, so they compare rows before it runs; a
+-- BEFORE INSERT trigger whose function reads NEW.recorded_at sorts after it, so it sees the system's value.
+-- TRUNCATE skips row triggers, so every append-only table and every table with a BEFORE DELETE guard, unless it has a
+-- TRUNCATE trigger of its own, is listed in v_refuse_truncate (default partitions with their parent) and gets
+-- trg_<table>_refuse_truncate (BEFORE TRUNCATE, function refuse_truncate; S2 adversarial review N4).
+-- Lab gen_overview.py --check compares this section with what schema_phase_b.py writes from the table definitions and
+-- triggers of the design files. The functions are defined in every file because the labs load subsets.
 CREATE OR REPLACE FUNCTION set_recorded_at() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 BEGIN
     NEW.recorded_at := now();
     RETURN NEW;
 END $$;
+CREATE OR REPLACE FUNCTION refuse_truncate() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
+BEGIN
+    RAISE EXCEPTION '% is never truncated (append-only or guarded rows)', TG_TABLE_NAME USING ERRCODE = 'restrict_violation';
+END $$;
 DO $$
 DECLARE
-    v_tables       text[] := ARRAY['currency', 'company_currency_activation', 'uom', 'uom_conversion', 'uom_alias', 'company', 'branch',
+    v_tables            text[] := ARRAY['currency', 'company_currency_activation', 'uom', 'uom_conversion', 'uom_alias', 'company', 'branch',
         'print_profile', 'business_unit', 'cost_center', 'working_calendar', 'working_calendar_holiday', 'site',
         'data_translation', 'partner_group', 'partner_tax_group', 'item_group', 'valuation_class', 'item_tax_group',
         'partner', 'project', 'partner_role', 'payment_method', 'incoterm', 'delivery_method', 'price_list',
@@ -1234,13 +1242,56 @@ DECLARE
         'classification_scheme', 'classification_value', 'product_classification', 'warehouse', 'zone', 'bin', 'lot',
         'serial_number', 'price_list_entry', 'price_list_option_extra', 'barcode', 'gs1_company_prefix',
         'partner_relationship', 'external_id_map', 'custom_field_definition', 'reason'];
-    v_append_only  text[] := ARRAY[]::text[];
-    v_table        text;
+    v_append_only       text[] := ARRAY[]::text[];
+    v_refuse_truncate   text[] := ARRAY[]::text[];
+    v_table             text;
 BEGIN
     FOREACH v_table IN ARRAY v_tables LOOP
-        CONTINUE WHEN v_table = ANY (v_append_only) OR to_regclass(v_table) IS NULL;
-        EXECUTE format('CREATE OR REPLACE TRIGGER %I BEFORE UPDATE ON %I FOR EACH ROW EXECUTE FUNCTION set_recorded_at()',
-                       'trg_' || v_table || '_set_recorded_at', v_table);
+        CONTINUE WHEN to_regclass(v_table) IS NULL;
+        EXECUTE format('CREATE OR REPLACE TRIGGER %I BEFORE ' || CASE WHEN v_table = ANY (v_append_only) THEN 'INSERT' ELSE 'INSERT OR UPDATE' END
+                       || ' ON %I FOR EACH ROW EXECUTE FUNCTION set_recorded_at()', 'trg_' || v_table || '_set_recorded_at', v_table);
+    END LOOP;
+    FOREACH v_table IN ARRAY v_refuse_truncate LOOP
+        CONTINUE WHEN to_regclass(v_table) IS NULL;
+        EXECUTE format('CREATE OR REPLACE TRIGGER %I BEFORE TRUNCATE ON %I FOR EACH STATEMENT EXECUTE FUNCTION refuse_truncate()',
+                       'trg_' || v_table || '_refuse_truncate', v_table);
     END LOOP;
 END $$;
--- ===== end of recorded_at on update =====
+-- ===== end of recorded_at and TRUNCATE =====
+
+-- ===== Row-level security, generated (ADR-0017 rule 19; the rls_v1 helper of ADR-0022 rule 8) =====
+-- Every table of this file with company_id gets ENABLE and FORCE ROW LEVEL SECURITY, the company policy company_policy
+-- (company_id compared as text with nativeflows.company_id, failing closed) and the read-only company_ids_policy for
+-- registered cross-company queries (ADR-0017 rule 19). Tables whose company_id is nullable (v_nullable) show their null
+-- rows only under the setting value installation. Default partitions are listed with their parent. Exceptions are in
+-- lab gen_overview.RLS_ALLOWLIST with their reasons (here: uom).
+-- Lab gen_overview.py --check compares this section with what schema_phase_b.py writes.
+DO $$
+DECLARE
+    v_tables    text[] := ARRAY['company_currency_activation', 'uom_alias', 'branch', 'print_profile', 'business_unit', 'cost_center',
+        'working_calendar', 'working_calendar_holiday', 'site', 'data_translation', 'partner_group', 'partner_tax_group',
+        'item_group', 'valuation_class', 'item_tax_group', 'partner', 'project', 'partner_role', 'payment_method',
+        'delivery_method', 'price_list', 'customer_profile', 'supplier_profile', 'employee_profile', 'partner_address',
+        'partner_bank_account', 'contact', 'product_category', 'storage_condition', 'handling_unit_type', 'product',
+        'product_uom', 'variant_attribute', 'variant_attribute_value', 'product_variant_attribute',
+        'product_attribute_value', 'item', 'item_variant_value', 'item_barcode', 'partner_item', 'item_manufacturer_part',
+        'code_series', 'product_category_requirement', 'classification_scheme', 'classification_value',
+        'product_classification', 'warehouse', 'zone', 'bin', 'lot', 'serial_number', 'price_list_entry',
+        'price_list_option_extra', 'barcode', 'gs1_company_prefix', 'partner_relationship', 'external_id_map',
+        'custom_field_definition', 'reason'];
+    v_nullable  text[] := ARRAY[]::text[];
+    v_table     text;
+BEGIN
+    FOREACH v_table IN ARRAY v_tables LOOP
+        EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', v_table);
+        EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', v_table);
+        IF v_table = ANY (v_nullable) THEN
+            EXECUTE format('CREATE POLICY company_policy ON %I USING (company_id::text = current_setting(''nativeflows.company_id'', true)'
+                           ' OR (company_id IS NULL AND current_setting(''nativeflows.company_id'', true) = ''installation''))', v_table);
+        ELSE
+            EXECUTE format('CREATE POLICY company_policy ON %I USING (company_id::text = current_setting(''nativeflows.company_id'', true))', v_table);
+        END IF;
+        EXECUTE format('CREATE POLICY company_ids_policy ON %I FOR SELECT USING (company_id::text = ANY (string_to_array(current_setting(''nativeflows.company_ids'', true), '','')))', v_table);
+    END LOOP;
+END $$;
+-- ===== end of row-level security =====

@@ -166,7 +166,7 @@ CREATE TABLE price_list_characteristic_rate (
 );
 
 -- ===== Immutability (ADR-0046 rules 4, 9) =====
-CREATE FUNCTION configuration_revision_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION configuration_revision_guard() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 BEGIN
     IF OLD.state = 'released' THEN RAISE EXCEPTION 'revision_released'; END IF;
     IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
@@ -174,11 +174,11 @@ BEGIN
 END $$;
 CREATE TRIGGER trg_configuration_model_revision_guard BEFORE UPDATE OR DELETE ON configuration_model_revision
     FOR EACH ROW EXECUTE FUNCTION configuration_revision_guard();
-CREATE FUNCTION configuration_revision_of(j jsonb) RETURNS uuid LANGUAGE sql STABLE AS $$
+CREATE FUNCTION configuration_revision_of(j jsonb) RETURNS uuid LANGUAGE sql STABLE SET search_path = nativeflows, pg_temp AS $$
     SELECT coalesce((j ->> 'configuration_model_revision_id')::uuid,
                     (SELECT t.configuration_model_revision_id FROM configuration_table t WHERE t.id = (j ->> 'configuration_table_id')::uuid))
 $$;
-CREATE FUNCTION configuration_revision_content_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION configuration_revision_content_guard() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 BEGIN
     -- an update checks the revision the row leaves as well as the one it joins
     IF TG_OP IN ('UPDATE', 'DELETE') AND (SELECT r.state FROM configuration_model_revision r WHERE r.id = configuration_revision_of(to_jsonb(OLD))) = 'released' THEN
@@ -200,7 +200,7 @@ CREATE TRIGGER trg_configuration_table_row_guard BEFORE INSERT OR UPDATE OR DELE
     FOR EACH ROW EXECUTE FUNCTION configuration_revision_content_guard();
 CREATE TRIGGER trg_configuration_default_guard BEFORE INSERT OR UPDATE OR DELETE ON configuration_default
     FOR EACH ROW EXECUTE FUNCTION configuration_revision_content_guard();
-CREATE FUNCTION product_configuration_immutable() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION product_configuration_immutable() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 BEGIN
     IF TG_OP = 'INSERT' THEN
         -- values may be added only in the transaction that created the configuration
@@ -216,32 +216,76 @@ CREATE TRIGGER trg_product_configuration_immutable BEFORE UPDATE OR DELETE ON pr
 CREATE TRIGGER trg_product_configuration_value_immutable BEFORE INSERT OR UPDATE OR DELETE ON product_configuration_value
     FOR EACH ROW EXECUTE FUNCTION product_configuration_immutable();
 
--- ===== recorded_at on update (ADR-0007 rules 9, 16 and their notes) =====
+-- ===== recorded_at on insert and update; TRUNCATE refused (ADR-0007 rules 9, 16 and their notes) =====
 -- Every table of this file has recorded_at timestamptz NOT NULL DEFAULT now(). The DO block attaches the trigger
--- trg_<table>_set_recorded_at (BEFORE UPDATE, function set_recorded_at) to every table of v_tables except v_append_only,
--- so recorded_at is the instant of the last write (ADR-0007 rule 9 note). Append-only tables are those whose guard
--- trigger refuses every update outside an erasure, and pure logs; they need no trigger (here: product_configuration_immutable).
--- Row guards without UPDATE OF on in-place tables sort before set_recorded_at, so they compare rows before it runs.
--- v_tables lists the file's tables in file order; lab gen_overview.py --check verifies both lists against the table
--- definitions of the file, and schema_phase_b.py writes the section. The function is defined in every file because the
--- labs load subsets.
+-- trg_<table>_set_recorded_at (function set_recorded_at) to every table of v_tables: BEFORE INSERT OR UPDATE on tables
+-- updated in place, BEFORE INSERT on the append-only tables of v_append_only. recorded_at is so the instant of the last
+-- write, set by the system and never taken from a client (ADR-0007 rule 9 and its notes; S2 adversarial review S2).
+-- Append-only tables are those whose guard trigger refuses every update outside an erasure, and pure logs (here: product_configuration_immutable).
+-- Row guards without UPDATE OF on in-place tables sort before set_recorded_at, so they compare rows before it runs; a
+-- BEFORE INSERT trigger whose function reads NEW.recorded_at sorts after it, so it sees the system's value.
+-- TRUNCATE skips row triggers, so every append-only table and every table with a BEFORE DELETE guard, unless it has a
+-- TRUNCATE trigger of its own, is listed in v_refuse_truncate (default partitions with their parent) and gets
+-- trg_<table>_refuse_truncate (BEFORE TRUNCATE, function refuse_truncate; S2 adversarial review N4).
+-- Lab gen_overview.py --check compares this section with what schema_phase_b.py writes from the table definitions and
+-- triggers of the design files. The functions are defined in every file because the labs load subsets.
 CREATE OR REPLACE FUNCTION set_recorded_at() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 BEGIN
     NEW.recorded_at := now();
     RETURN NEW;
 END $$;
+CREATE OR REPLACE FUNCTION refuse_truncate() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
+BEGIN
+    RAISE EXCEPTION '% is never truncated (append-only or guarded rows)', TG_TABLE_NAME USING ERRCODE = 'restrict_violation';
+END $$;
 DO $$
 DECLARE
-    v_tables       text[] := ARRAY['configuration_model', 'configuration_model_revision', 'configuration_rule', 'configuration_table',
+    v_tables            text[] := ARRAY['configuration_model', 'configuration_model_revision', 'configuration_rule', 'configuration_table',
         'configuration_table_column', 'configuration_table_row', 'configuration_default', 'product_configuration',
         'product_configuration_value', 'price_list_characteristic_rate'];
-    v_append_only  text[] := ARRAY['product_configuration', 'product_configuration_value']::text[];
-    v_table        text;
+    v_append_only       text[] := ARRAY['product_configuration', 'product_configuration_value']::text[];
+    v_refuse_truncate   text[] := ARRAY['configuration_model_revision', 'configuration_rule', 'configuration_table', 'configuration_table_column',
+        'configuration_table_row', 'configuration_default', 'product_configuration', 'product_configuration_value']::text[];
+    v_table             text;
 BEGIN
     FOREACH v_table IN ARRAY v_tables LOOP
-        CONTINUE WHEN v_table = ANY (v_append_only) OR to_regclass(v_table) IS NULL;
-        EXECUTE format('CREATE OR REPLACE TRIGGER %I BEFORE UPDATE ON %I FOR EACH ROW EXECUTE FUNCTION set_recorded_at()',
-                       'trg_' || v_table || '_set_recorded_at', v_table);
+        CONTINUE WHEN to_regclass(v_table) IS NULL;
+        EXECUTE format('CREATE OR REPLACE TRIGGER %I BEFORE ' || CASE WHEN v_table = ANY (v_append_only) THEN 'INSERT' ELSE 'INSERT OR UPDATE' END
+                       || ' ON %I FOR EACH ROW EXECUTE FUNCTION set_recorded_at()', 'trg_' || v_table || '_set_recorded_at', v_table);
+    END LOOP;
+    FOREACH v_table IN ARRAY v_refuse_truncate LOOP
+        CONTINUE WHEN to_regclass(v_table) IS NULL;
+        EXECUTE format('CREATE OR REPLACE TRIGGER %I BEFORE TRUNCATE ON %I FOR EACH STATEMENT EXECUTE FUNCTION refuse_truncate()',
+                       'trg_' || v_table || '_refuse_truncate', v_table);
     END LOOP;
 END $$;
--- ===== end of recorded_at on update =====
+-- ===== end of recorded_at and TRUNCATE =====
+
+-- ===== Row-level security, generated (ADR-0017 rule 19; the rls_v1 helper of ADR-0022 rule 8) =====
+-- Every table of this file with company_id gets ENABLE and FORCE ROW LEVEL SECURITY, the company policy company_policy
+-- (company_id compared as text with nativeflows.company_id, failing closed) and the read-only company_ids_policy for
+-- registered cross-company queries (ADR-0017 rule 19). Tables whose company_id is nullable (v_nullable) show their null
+-- rows only under the setting value installation. Default partitions are listed with their parent. Exceptions are in
+-- lab gen_overview.RLS_ALLOWLIST with their reasons; this file has none.
+-- Lab gen_overview.py --check compares this section with what schema_phase_b.py writes.
+DO $$
+DECLARE
+    v_tables    text[] := ARRAY['configuration_model', 'configuration_model_revision', 'configuration_rule', 'configuration_table',
+        'configuration_table_column', 'configuration_table_row', 'configuration_default', 'product_configuration',
+        'product_configuration_value', 'price_list_characteristic_rate'];
+    v_nullable  text[] := ARRAY[]::text[];
+    v_table     text;
+BEGIN
+    FOREACH v_table IN ARRAY v_tables LOOP
+        EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', v_table);
+        EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', v_table);
+        IF v_table = ANY (v_nullable) THEN
+            EXECUTE format('CREATE POLICY company_policy ON %I USING (company_id::text = current_setting(''nativeflows.company_id'', true)'
+                           ' OR (company_id IS NULL AND current_setting(''nativeflows.company_id'', true) = ''installation''))', v_table);
+        ELSE
+            EXECUTE format('CREATE POLICY company_policy ON %I USING (company_id::text = current_setting(''nativeflows.company_id'', true))', v_table);
+        END IF;
+        EXECUTE format('CREATE POLICY company_ids_policy ON %I FOR SELECT USING (company_id::text = ANY (string_to_array(current_setting(''nativeflows.company_ids'', true), '','')))', v_table);
+    END LOOP;
+END $$;
+-- ===== end of row-level security =====

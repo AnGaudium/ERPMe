@@ -30,7 +30,7 @@ PLATFORM = os.environ.get("NATIVEFLOWS_PLATFORM_DDL", os.path.join(DESIGN, "DS-0
 DS22 = os.environ.get("NATIVEFLOWS_DS22", os.path.join(DESIGN, "DS-22-09-42-commercial-inventory.sql"))
 DS43 = os.environ.get("NATIVEFLOWS_DS43", os.path.join(DESIGN, "DS-43-54-planning-production.sql"))
 sys.path.insert(0, LAB)
-from lab import RESULTS, conn, erasure_marker, new, ins_system_account, ins_account, ins_fiscal_year, ins_posting_period, ins_area_state  # noqa: E402
+from lab import RESULTS, conn, erasure_marker, insert_aged, new, ins_system_account, ins_account, ins_fiscal_year, ins_posting_period, ins_area_state  # noqa: E402
 
 RLS_ROLE = "nativeflows_lab_rls"
 
@@ -166,7 +166,7 @@ for t_, d_ in sorted(DS05_STUBS.items()):
 check(f"A02b the {len(DS05_STUBS)} lab stubs of DS-05 tables have the design columns, types and NOT NULLs", len(DS05_STUBS) == 5 and drift == [],
       sorted(DS05_STUBS) if drift == [] else drift)
 
-tables = re.findall(r"^CREATE TABLE (\w+)", platform, flags=re.M)
+tables = re.findall(r"^CREATE TABLE (\w+) \(", platform, flags=re.M)   # default partitions (PARTITION OF) follow their parent; A09 checks them
 INSTALLATION = {"event_subject", "event_consumer", "agent_type", "agent_type_version", "regime_setting", "tax_code"}
 NULLABLE = {"outbox_event", "event_delivery", "audit_record", "audit_change", "audit_denial", "agent_budget_usage", "idempotency_record"}
 
@@ -256,10 +256,14 @@ def doc(cx, did, dtype, state="draft", by="uAcc", co="co", partner=None, number=
 
 def version(cx, did, v, content, actor_kind="human", actor="uAcc", tainted=False, run=None, origin=None, derived=None, co="co", at=None, vid=None):
     vid = vid or new()
-    cx.execute("""insert into document_version (id, company_id, document_id, version, content, version_hash, actor_kind, actor_id, on_behalf_of_id,
-                  agent_run_id, origin_agent_run_id, is_tainted, derived_from_version_id, recorded_at) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
-               (vid, I[co], did, v, json.dumps(content), sha(content), actor_kind, I[actor] if actor in I else actor,
-                I[actor] if actor_kind == "human" else I["uChief"], run, origin, tainted, derived, at or NOW))
+    sql = """insert into document_version (id, company_id, document_id, version, content, version_hash, actor_kind, actor_id, on_behalf_of_id,
+             agent_run_id, origin_agent_run_id, is_tainted, derived_from_version_id, recorded_at) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"""
+    params = (vid, I[co], did, v, json.dumps(content), sha(content), actor_kind, I[actor] if actor in I else actor,
+              I[actor] if actor_kind == "human" else I["uChief"], run, origin, tainted, derived, at or NOW)
+    if at:      # recorded_at is the system's time (ADR-0007 rule 9); a fixture that names its time of writing keeps it (lab-only insert_aged)
+        insert_aged(cx.execute, "document_version", sql, params)
+    else:
+        cx.execute(sql, params)
     return vid
 
 
@@ -314,6 +318,23 @@ c.execute("ROLLBACK")
 c.close()
 check("A10 as a role without BYPASSRLS: no setting shows no document, the company setting shows its own only, installation shows none of the company rows",
       counts[0] == 0 and counts[1] >= 1 and counts[2] == 0 and counts[3] == 0, counts)
+
+# A11 (S2 adversarial review N1): the role reproduced there updated another company's partner rows, which had no policy. Every
+# company table of every design file now has the generated policies (t31 part Z checks the whole catalog).
+X(f"GRANT UPDATE ON partner TO {RLS_ROLE}")
+
+
+def other_company_partner_update(cx):
+    cx.execute(f"SET LOCAL ROLE {RLS_ROLE}")
+    cx.execute("select set_config('nativeflows.company_id', %s, true)", (str(I["co2"]),))
+    n = cx.execute("update partner set name = name where company_id = %s", (I["co"],)).rowcount
+    own = cx.execute("select count(*) from partner where company_id = %s", (I["co"],)).fetchone()[0]
+    if n or own:
+        raise RuntimeError(f"company 2 saw {own} and updated {n} partner rows of company 1")
+
+
+trial("A11 as a role without BYPASSRLS under company 2, company 1's partner rows are neither visible nor updated (DS-20 has the policies)",
+      other_company_partner_update, False)
 
 # ======================================================================= B: documents and versions
 D1 = doc(X0, new(), "purchase_order", partner=I["p1"])

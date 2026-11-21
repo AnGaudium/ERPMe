@@ -110,6 +110,20 @@ def erasure_marker(X, scope="EraseDataSubject", company_id=None):
     return rid
 
 
+def insert_aged(X, table, sql, params=()):
+    """Lab only: runs one INSERT into `table` that keeps the recorded_at the fixture gives, for the few labs that need a row
+    written in the past (t15 E04: a version written before its run was tainted). The design sets recorded_at on every
+    INSERT and UPDATE (trg_<table>_set_recorded_at; ADR-0007 rule 9; S2 adversarial review S2), so this helper disables
+    that one named trigger for the statement (ALTER TABLE ... DISABLE TRIGGER; the lab role owns the tables) and enables it
+    again, also when the INSERT fails. Every other trigger of the table still fires. Never a pattern for product code."""
+    trg = f"trg_{table}_set_recorded_at"
+    X(f"ALTER TABLE {table} DISABLE TRIGGER {trg}")
+    try:
+        return X(sql, params)
+    finally:
+        X(f"ALTER TABLE {table} ENABLE TRIGGER {trg}")
+
+
 COMPANY_KEY_SQL = """
 with fk as (
   select r.relname src, f.relname tgt,

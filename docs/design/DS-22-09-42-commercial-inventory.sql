@@ -1658,7 +1658,7 @@ CREATE INDEX ix_stock_reservation_demand_supply_line_id ON stock_reservation (de
 ALTER TABLE stock_reservation ADD CONSTRAINT fk_stock_reservation_transferred_from FOREIGN KEY (company_id, transferred_from_reservation_id) REFERENCES stock_reservation (company_id, id);
 -- reservation_transfer_invalid: a transferred row has its source's company, item, warehouse and lot; the link never changes after
 -- insert, so a transfer chain has no cycle; item, warehouse and lot never change on a row that has or is a source (ADR-0064 rule 24).
-CREATE FUNCTION stock_reservation_transfer_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION stock_reservation_transfer_guard() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 DECLARE src stock_reservation%ROWTYPE;
 BEGIN
     IF TG_OP = 'UPDATE' THEN
@@ -1855,7 +1855,7 @@ ALTER TABLE demand_supply_line ADD CONSTRAINT fk_demand_supply_line_purchase_req
     FOREIGN KEY (company_id, purchase_request_line_id) REFERENCES purchase_request_line (company_id, id);
 
 -- ===== Append-only rows (ADR-0020 rule 3; ADR-0023 rule 8; ADR-0047 rule 13) =====
-CREATE FUNCTION inventory_reject_change() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION inventory_reject_change() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 BEGIN
     RAISE EXCEPTION '% rows are append-only (ADR-0020 rule 3; ADR-0023 rule 8; ADR-0047 rule 13)', TG_TABLE_NAME
         USING ERRCODE = 'restrict_violation';
@@ -2334,23 +2334,31 @@ CREATE INDEX ix_transfer_order_line_company_id_item_id ON transfer_order_line (c
 ALTER TABLE demand_supply_line ADD CONSTRAINT fk_demand_supply_line_transfer_order_line
     FOREIGN KEY (company_id, transfer_order_line_id) REFERENCES transfer_order_line (company_id, id);
 
--- ===== recorded_at on update (ADR-0007 rules 9, 16 and their notes) =====
+-- ===== recorded_at on insert and update; TRUNCATE refused (ADR-0007 rules 9, 16 and their notes) =====
 -- Every table of this file has recorded_at timestamptz NOT NULL DEFAULT now(). The DO block attaches the trigger
--- trg_<table>_set_recorded_at (BEFORE UPDATE, function set_recorded_at) to every table of v_tables except v_append_only,
--- so recorded_at is the instant of the last write (ADR-0007 rule 9 note). Append-only tables are those whose guard
--- trigger refuses every update outside an erasure, and pure logs; they need no trigger (here: inventory_reject_change).
--- Row guards without UPDATE OF on in-place tables sort before set_recorded_at, so they compare rows before it runs.
--- v_tables lists the file's tables in file order; lab gen_overview.py --check verifies both lists against the table
--- definitions of the file, and schema_phase_b.py writes the section. The function is defined in every file because the
--- labs load subsets.
+-- trg_<table>_set_recorded_at (function set_recorded_at) to every table of v_tables: BEFORE INSERT OR UPDATE on tables
+-- updated in place, BEFORE INSERT on the append-only tables of v_append_only. recorded_at is so the instant of the last
+-- write, set by the system and never taken from a client (ADR-0007 rule 9 and its notes; S2 adversarial review S2).
+-- Append-only tables are those whose guard trigger refuses every update outside an erasure, and pure logs (here: inventory_reject_change).
+-- Row guards without UPDATE OF on in-place tables sort before set_recorded_at, so they compare rows before it runs; a
+-- BEFORE INSERT trigger whose function reads NEW.recorded_at sorts after it, so it sees the system's value.
+-- TRUNCATE skips row triggers, so every append-only table and every table with a BEFORE DELETE guard, unless it has a
+-- TRUNCATE trigger of its own, is listed in v_refuse_truncate (default partitions with their parent) and gets
+-- trg_<table>_refuse_truncate (BEFORE TRUNCATE, function refuse_truncate; S2 adversarial review N4).
+-- Lab gen_overview.py --check compares this section with what schema_phase_b.py writes from the table definitions and
+-- triggers of the design files. The functions are defined in every file because the labs load subsets.
 CREATE OR REPLACE FUNCTION set_recorded_at() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 BEGIN
     NEW.recorded_at := now();
     RETURN NEW;
 END $$;
+CREATE OR REPLACE FUNCTION refuse_truncate() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
+BEGIN
+    RAISE EXCEPTION '% is never truncated (append-only or guarded rows)', TG_TABLE_NAME USING ERRCODE = 'restrict_violation';
+END $$;
 DO $$
 DECLARE
-    v_tables       text[] := ARRAY['movement_type', 'promotion', 'quotation', 'quotation_line', 'sales_order', 'sales_order_line', 'credit_hold',
+    v_tables            text[] := ARRAY['movement_type', 'promotion', 'quotation', 'quotation_line', 'sales_order', 'sales_order_line', 'credit_hold',
         'purchase_request', 'purchase_request_line', 'purchase_order', 'purchase_order_line', 'handling_unit',
         'goods_receipt', 'goods_receipt_line', 'return_to_supplier', 'return_to_supplier_line', 'delivery',
         'delivery_line', 'return_from_customer', 'return_from_customer_line', 'service_receipt', 'service_receipt_line',
@@ -2364,14 +2372,60 @@ DECLARE
         'stock_transfer', 'stock_transfer_line', 'stock_count', 'stock_count_line', 'scrap', 'scrap_line',
         'internal_consumption', 'internal_consumption_line', 'other_receipt', 'other_receipt_line', 'other_issue',
         'other_issue_line', 'opening_balance', 'opening_balance_line', 'transfer_order', 'transfer_order_line'];
-    v_append_only  text[] := ARRAY['material_document', 'material_document_line', 'purchase_order_line_gr_ir_layer',
+    v_append_only       text[] := ARRAY['material_document', 'material_document_line', 'purchase_order_line_gr_ir_layer',
         'purchase_order_line_gr_ir_posting', 'warehouse_movement']::text[];
-    v_table        text;
+    v_refuse_truncate   text[] := ARRAY['material_document', 'warehouse_movement', 'purchase_order_line_gr_ir_layer', 'purchase_order_line_gr_ir_posting']::text[];
+    v_table             text;
 BEGIN
     FOREACH v_table IN ARRAY v_tables LOOP
-        CONTINUE WHEN v_table = ANY (v_append_only) OR to_regclass(v_table) IS NULL;
-        EXECUTE format('CREATE OR REPLACE TRIGGER %I BEFORE UPDATE ON %I FOR EACH ROW EXECUTE FUNCTION set_recorded_at()',
-                       'trg_' || v_table || '_set_recorded_at', v_table);
+        CONTINUE WHEN to_regclass(v_table) IS NULL;
+        EXECUTE format('CREATE OR REPLACE TRIGGER %I BEFORE ' || CASE WHEN v_table = ANY (v_append_only) THEN 'INSERT' ELSE 'INSERT OR UPDATE' END
+                       || ' ON %I FOR EACH ROW EXECUTE FUNCTION set_recorded_at()', 'trg_' || v_table || '_set_recorded_at', v_table);
+    END LOOP;
+    FOREACH v_table IN ARRAY v_refuse_truncate LOOP
+        CONTINUE WHEN to_regclass(v_table) IS NULL;
+        EXECUTE format('CREATE OR REPLACE TRIGGER %I BEFORE TRUNCATE ON %I FOR EACH STATEMENT EXECUTE FUNCTION refuse_truncate()',
+                       'trg_' || v_table || '_refuse_truncate', v_table);
     END LOOP;
 END $$;
--- ===== end of recorded_at on update =====
+-- ===== end of recorded_at and TRUNCATE =====
+
+-- ===== Row-level security, generated (ADR-0017 rule 19; the rls_v1 helper of ADR-0022 rule 8) =====
+-- Every table of this file with company_id gets ENABLE and FORCE ROW LEVEL SECURITY, the company policy company_policy
+-- (company_id compared as text with nativeflows.company_id, failing closed) and the read-only company_ids_policy for
+-- registered cross-company queries (ADR-0017 rule 19). Tables whose company_id is nullable (v_nullable) show their null
+-- rows only under the setting value installation. Default partitions are listed with their parent. Exceptions are in
+-- lab gen_overview.RLS_ALLOWLIST with their reasons; this file has none.
+-- Lab gen_overview.py --check compares this section with what schema_phase_b.py writes.
+DO $$
+DECLARE
+    v_tables    text[] := ARRAY['promotion', 'quotation', 'quotation_line', 'sales_order', 'sales_order_line', 'credit_hold', 'purchase_request',
+        'purchase_request_line', 'purchase_order', 'purchase_order_line', 'handling_unit', 'goods_receipt',
+        'goods_receipt_line', 'return_to_supplier', 'return_to_supplier_line', 'delivery', 'delivery_line',
+        'return_from_customer', 'return_from_customer_line', 'service_receipt', 'service_receipt_line', 'sales_invoice',
+        'sales_invoice_line', 'sales_return', 'sales_return_line', 'credit_note', 'credit_note_line', 'debit_note',
+        'debit_note_line', 'purchase_invoice', 'purchase_invoice_line', 'purchase_return', 'purchase_return_line',
+        'purchase_credit_note', 'purchase_credit_note_line', 'purchase_debit_note', 'purchase_debit_note_line',
+        'gr_ir_write_off', 'gr_ir_write_off_line', 'document_line_price_step', 'document_line_custom_text',
+        'document_installment', 'material_document', 'material_document_line', 'stock_value', 'stock_quantity',
+        'preliminary_price', 'stock_reservation', 'warehouse_task', 'warehouse_movement',
+        'purchase_order_line_gr_ir_layer', 'purchase_order_line_gr_ir_posting', 'pending_receipt_adjustment',
+        'stock_transfer', 'stock_transfer_line', 'stock_count', 'stock_count_line', 'scrap', 'scrap_line',
+        'internal_consumption', 'internal_consumption_line', 'other_receipt', 'other_receipt_line', 'other_issue',
+        'other_issue_line', 'opening_balance', 'opening_balance_line', 'transfer_order', 'transfer_order_line'];
+    v_nullable  text[] := ARRAY[]::text[];
+    v_table     text;
+BEGIN
+    FOREACH v_table IN ARRAY v_tables LOOP
+        EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', v_table);
+        EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', v_table);
+        IF v_table = ANY (v_nullable) THEN
+            EXECUTE format('CREATE POLICY company_policy ON %I USING (company_id::text = current_setting(''nativeflows.company_id'', true)'
+                           ' OR (company_id IS NULL AND current_setting(''nativeflows.company_id'', true) = ''installation''))', v_table);
+        ELSE
+            EXECUTE format('CREATE POLICY company_policy ON %I USING (company_id::text = current_setting(''nativeflows.company_id'', true))', v_table);
+        END IF;
+        EXECUTE format('CREATE POLICY company_ids_policy ON %I FOR SELECT USING (company_id::text = ANY (string_to_array(current_setting(''nativeflows.company_ids'', true), '','')))', v_table);
+    END LOOP;
+END $$;
+-- ===== end of row-level security =====

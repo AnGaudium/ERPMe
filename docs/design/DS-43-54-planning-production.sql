@@ -1775,7 +1775,7 @@ CREATE TABLE production_order_period_cost_detail (         -- [production] ADR-0
 -- order's period cost from the function behind GetProductionOrderVariance; read by query.production_variance_overview.
 
 -- ===== Revision immutability (ADR-0033 rules 3, 9; ADR-0035 rule 14) =====
-CREATE FUNCTION production_revision_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION production_revision_guard() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 BEGIN
     IF OLD.state = 'released' THEN RAISE EXCEPTION 'revision_released' USING ERRCODE = 'check_violation'; END IF;
     IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
@@ -1789,7 +1789,7 @@ CREATE TRIGGER trg_cost_estimate_guard BEFORE UPDATE OR DELETE ON cost_estimate
     FOR EACH ROW EXECUTE FUNCTION production_revision_guard();
 -- Content rows of a released parent never change: TG_ARGV[0] is the parent table, TG_ARGV[1] the parent key column.
 -- An update checks the parent the row leaves as well as the one it joins.
-CREATE FUNCTION production_revision_content_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION production_revision_content_guard() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 DECLARE v_state text;
 BEGIN
     IF TG_OP IN ('UPDATE', 'DELETE') THEN
@@ -1821,7 +1821,7 @@ CREATE TRIGGER trg_cost_estimate_sheet_row_guard BEFORE INSERT OR UPDATE OR DELE
 -- proposal item, a routing revision with an unstated setup or run time, and an estimate with a gap or without a
 -- production version are never released, whether updated from draft or inserted as released. The commands refuse
 -- first with the same codes.
-CREATE FUNCTION production_release_readiness_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION production_release_readiness_guard() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 BEGIN
     IF NEW.state = 'released' AND (TG_OP = 'INSERT' OR OLD.state = 'draft') THEN
         IF TG_TABLE_NAME = 'bill_of_materials_revision' THEN
@@ -1848,7 +1848,7 @@ CREATE TRIGGER trg_routing_revision_readiness BEFORE INSERT OR UPDATE ON routing
 CREATE TRIGGER trg_cost_estimate_readiness BEFORE INSERT OR UPDATE ON cost_estimate
     FOR EACH ROW EXECUTE FUNCTION production_release_readiness_guard();
 -- A header names a proposal item only while every revision of it is a draft (ADR-0062 rule 14).
-CREATE FUNCTION bill_of_materials_proposal_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION bill_of_materials_proposal_guard() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 BEGIN
     IF NEW.proposed_change_proposal_item_id IS NOT NULL
        AND EXISTS (SELECT 1 FROM bill_of_materials_revision r WHERE r.bill_of_materials_id = NEW.id AND r.state <> 'draft') THEN
@@ -1872,23 +1872,31 @@ ALTER TABLE production_order ADD CONSTRAINT fk_production_order_cost_object FORE
 --     lot_id; its generated component lines live in operation_progress_component above.
 --   stock_reservation (DS-42): destination_bin_id and release_sequence passed by production (ADR-0034 rule 9).
 
--- ===== recorded_at on update (ADR-0007 rules 9, 16 and their notes) =====
+-- ===== recorded_at on insert and update; TRUNCATE refused (ADR-0007 rules 9, 16 and their notes) =====
 -- Every table of this file has recorded_at timestamptz NOT NULL DEFAULT now(). The DO block attaches the trigger
--- trg_<table>_set_recorded_at (BEFORE UPDATE, function set_recorded_at) to every table of v_tables except v_append_only,
--- so recorded_at is the instant of the last write (ADR-0007 rule 9 note). Append-only tables are those whose guard
--- trigger refuses every update outside an erasure, and pure logs; they need no trigger.
--- Row guards without UPDATE OF on in-place tables sort before set_recorded_at, so they compare rows before it runs.
--- v_tables lists the file's tables in file order; lab gen_overview.py --check verifies both lists against the table
--- definitions of the file, and schema_phase_b.py writes the section. The function is defined in every file because the
--- labs load subsets.
+-- trg_<table>_set_recorded_at (function set_recorded_at) to every table of v_tables: BEFORE INSERT OR UPDATE on tables
+-- updated in place, BEFORE INSERT on the append-only tables of v_append_only. recorded_at is so the instant of the last
+-- write, set by the system and never taken from a client (ADR-0007 rule 9 and its notes; S2 adversarial review S2).
+-- Append-only tables are those whose guard trigger refuses every update outside an erasure, and pure logs.
+-- Row guards without UPDATE OF on in-place tables sort before set_recorded_at, so they compare rows before it runs; a
+-- BEFORE INSERT trigger whose function reads NEW.recorded_at sorts after it, so it sees the system's value.
+-- TRUNCATE skips row triggers, so every append-only table and every table with a BEFORE DELETE guard, unless it has a
+-- TRUNCATE trigger of its own, is listed in v_refuse_truncate (default partitions with their parent) and gets
+-- trg_<table>_refuse_truncate (BEFORE TRUNCATE, function refuse_truncate; S2 adversarial review N4).
+-- Lab gen_overview.py --check compares this section with what schema_phase_b.py writes from the table definitions and
+-- triggers of the design files. The functions are defined in every file because the labs load subsets.
 CREATE OR REPLACE FUNCTION set_recorded_at() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 BEGIN
     NEW.recorded_at := now();
     RETURN NEW;
 END $$;
+CREATE OR REPLACE FUNCTION refuse_truncate() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
+BEGIN
+    RAISE EXCEPTION '% is never truncated (append-only or guarded rows)', TG_TABLE_NAME USING ERRCODE = 'restrict_violation';
+END $$;
 DO $$
 DECLARE
-    v_tables       text[] := ARRAY['planning_setting', 'planning_run', 'planning_state', 'production_structure', 'transfer_route',
+    v_tables            text[] := ARRAY['planning_setting', 'planning_run', 'planning_state', 'production_structure', 'transfer_route',
         'item_warehouse_planning', 'supplier_item', 'supplier_purchasing_term', 'supplier_item_lead_time', 'sales_history',
         'demand_event', 'demand_event_window', 'forecast_run', 'forecast_line', 'forecast_adjustment',
         'demand_supply_line', 'activity_type', 'stop_reason', 'resource_group', 'work_center', 'work_center_activity',
@@ -1906,13 +1914,65 @@ DECLARE
         'cost_estimate_sheet_row', 'cost_estimate_gap', 'activity_rate', 'pool_allocation_rule', 'normal_capacity',
         'production_cost_settlement', 'production_cost_settlement_line', 'production_order_period_cost',
         'production_order_period_cost_detail'];
-    v_append_only  text[] := ARRAY[]::text[];
-    v_table        text;
+    v_append_only       text[] := ARRAY[]::text[];
+    v_refuse_truncate   text[] := ARRAY['bill_of_materials_revision', 'bill_of_materials_component', 'bill_of_materials_output', 'routing_revision',
+        'routing_operation', 'routing_operation_activity', 'cost_estimate', 'cost_estimate_line',
+        'cost_estimate_sheet_row', 'cost_estimate_gap']::text[];
+    v_table             text;
 BEGIN
     FOREACH v_table IN ARRAY v_tables LOOP
-        CONTINUE WHEN v_table = ANY (v_append_only) OR to_regclass(v_table) IS NULL;
-        EXECUTE format('CREATE OR REPLACE TRIGGER %I BEFORE UPDATE ON %I FOR EACH ROW EXECUTE FUNCTION set_recorded_at()',
-                       'trg_' || v_table || '_set_recorded_at', v_table);
+        CONTINUE WHEN to_regclass(v_table) IS NULL;
+        EXECUTE format('CREATE OR REPLACE TRIGGER %I BEFORE ' || CASE WHEN v_table = ANY (v_append_only) THEN 'INSERT' ELSE 'INSERT OR UPDATE' END
+                       || ' ON %I FOR EACH ROW EXECUTE FUNCTION set_recorded_at()', 'trg_' || v_table || '_set_recorded_at', v_table);
+    END LOOP;
+    FOREACH v_table IN ARRAY v_refuse_truncate LOOP
+        CONTINUE WHEN to_regclass(v_table) IS NULL;
+        EXECUTE format('CREATE OR REPLACE TRIGGER %I BEFORE TRUNCATE ON %I FOR EACH STATEMENT EXECUTE FUNCTION refuse_truncate()',
+                       'trg_' || v_table || '_refuse_truncate', v_table);
     END LOOP;
 END $$;
--- ===== end of recorded_at on update =====
+-- ===== end of recorded_at and TRUNCATE =====
+
+-- ===== Row-level security, generated (ADR-0017 rule 19; the rls_v1 helper of ADR-0022 rule 8) =====
+-- Every table of this file with company_id gets ENABLE and FORCE ROW LEVEL SECURITY, the company policy company_policy
+-- (company_id compared as text with nativeflows.company_id, failing closed) and the read-only company_ids_policy for
+-- registered cross-company queries (ADR-0017 rule 19). Tables whose company_id is nullable (v_nullable) show their null
+-- rows only under the setting value installation. Default partitions are listed with their parent. Exceptions are in
+-- lab gen_overview.RLS_ALLOWLIST with their reasons; this file has none.
+-- Lab gen_overview.py --check compares this section with what schema_phase_b.py writes.
+DO $$
+DECLARE
+    v_tables    text[] := ARRAY['planning_setting', 'planning_run', 'planning_state', 'production_structure', 'transfer_route',
+        'item_warehouse_planning', 'supplier_item', 'supplier_purchasing_term', 'supplier_item_lead_time', 'sales_history',
+        'demand_event', 'demand_event_window', 'forecast_run', 'forecast_line', 'forecast_adjustment',
+        'demand_supply_line', 'activity_type', 'stop_reason', 'resource_group', 'work_center', 'work_center_activity',
+        'bill_of_materials', 'bill_of_materials_revision', 'bill_of_materials_component', 'bill_of_materials_output',
+        'routing', 'routing_revision', 'routing_operation', 'routing_operation_activity', 'production_version',
+        'item_production_setting', 'item_low_level_code', 'planned_order', 'planned_order_component',
+        'planned_order_operation', 'planned_order_pegging', 'planning_action_message', 'planning_exception',
+        'replenishment_request', 'replenishment_request_line', 'production_order', 'production_order_component',
+        'production_order_output', 'production_order_operation', 'production_order_operation_activity',
+        'operation_execution', 'operation_assignment', 'operation_time_log', 'production_order_output_serial',
+        'production_issue', 'production_issue_line', 'operation_confirmation', 'operation_confirmation_activity',
+        'operation_confirmation_time_log', 'production_receipt', 'production_receipt_line', 'operation_progress_component',
+        'cost_component_detail', 'cost_component_detail_mapping', 'costing_sheet', 'costing_sheet_row',
+        'costing_sheet_base_member', 'costing_sheet_rate', 'site_costing_sheet', 'cost_estimate', 'cost_estimate_line',
+        'cost_estimate_sheet_row', 'cost_estimate_gap', 'activity_rate', 'pool_allocation_rule', 'normal_capacity',
+        'production_cost_settlement', 'production_cost_settlement_line', 'production_order_period_cost',
+        'production_order_period_cost_detail'];
+    v_nullable  text[] := ARRAY[]::text[];
+    v_table     text;
+BEGIN
+    FOREACH v_table IN ARRAY v_tables LOOP
+        EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', v_table);
+        EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', v_table);
+        IF v_table = ANY (v_nullable) THEN
+            EXECUTE format('CREATE POLICY company_policy ON %I USING (company_id::text = current_setting(''nativeflows.company_id'', true)'
+                           ' OR (company_id IS NULL AND current_setting(''nativeflows.company_id'', true) = ''installation''))', v_table);
+        ELSE
+            EXECUTE format('CREATE POLICY company_policy ON %I USING (company_id::text = current_setting(''nativeflows.company_id'', true))', v_table);
+        END IF;
+        EXECUTE format('CREATE POLICY company_ids_policy ON %I FOR SELECT USING (company_id::text = ANY (string_to_array(current_setting(''nativeflows.company_ids'', true), '','')))', v_table);
+    END LOOP;
+END $$;
+-- ===== end of row-level security =====

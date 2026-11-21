@@ -36,10 +36,13 @@ E: the erasure exception of rule 7 in the DDL text: every refusing trigger that 
    only uncovered guarded tables are the five with guard functions of their own (a follow-up).
 With --load, the exception (S2): a posted document and its version change only catalog columns (and erased_at), only under
 the erasure marker, never by delete; the journal triggers pass note and description; journal_reject_change,
-document_check_frozen and platform_reject_change behave so on a scratch table.
-Not covered: the check that the marker names a committed EraseDataSubject or DestroyRetainedPersonalData (no idempotency
-table in the DDL yet; DS-36). Commands, the retention job, masking, the read log writers, the erasure journal outside the
-database and ReapplyErasures are not covered either.
+document_check_frozen and platform_reject_change behave so on a scratch table. The marker must name an erasure command's
+idempotency record of this transaction and of the changed row's company (X55 to X62, X71 to X73, X84 to X87); a key list
+forbids a whole blank (X81 to X83); recorded_at is the system's on insert (X88).
+Z (with --load, S2 adversarial review S3, N1, N3, N4): the conventions on the catalog of the full load: recorded_at, the id key,
+the set_recorded_at triggers, forced row-level security with both policies, TRUNCATE guards, pinned search_path.
+Not covered: who may run an erasure (the command layer's permission check). Commands, the retention job, masking, the read
+log writers, the erasure journal outside the database and ReapplyErasures are not covered either.
 The blank check reads these CHECK forms only: nullness pairings "(x) = (col IS [NOT] NULL)", "col IS NOT NULL OR ...",
 num_nonnulls, coalesce(length(col), 0) > 0, length(col) > 0 or BETWEEN 1, col <> '', col ~ 'pattern', jsonb_typeof,
 jsonb_array_length or cardinality > 0, and the erasure flags erased_at and body_removed_at. Other forms (IN lists, comparisons
@@ -837,6 +840,106 @@ if "--load" in sys.argv:
                                "and p.proname = any(%s) and not coalesce(p.proconfig, '{}') @> array['search_path=nativeflows, pg_temp']", (list(fns),)).fetchall()]
     nfound = X("select count(distinct p.proname) from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'nativeflows' and p.proname = any(%s)", (list(fns),)).fetchone()[0]
     check("X80 R2-N5: the erasure guard functions and journal_entry_check_period pin search_path to nativeflows, pg_temp", not unpinned and nfound == len(fns), (unpinned, nfound))
+
+    # ---- S2 adversarial review B1: where the trigger gives a key list, only the listed keys may go; a whole blank is refused.
+    # Every column of every trigger that passes a key list (today document_version.content) is tried with each whole blank.
+    keyed = []
+    for rel, args in X("select c.relname, t.tgargs from pg_trigger t join pg_class c on c.oid = t.tgrelid join pg_proc p on p.oid = t.tgfoid "
+                       "where p.proname = 'document_version_check_change' and t.tgnargs > 1 and not t.tgisinternal").fetchall():
+        keyed += [(rel, col) for col in bytes(args).split(b"\x00")[0].decode().strip("{}").split(",") if col]
+    check("X81 B1 (adversarial): the columns with a key list are found (document_version.content)", ("document_version", "content") in keyed, keyed)
+    for rel, col in keyed:
+        for blank in ("'{}'::jsonb", "'[]'::jsonb", "'null'::jsonb"):
+            trial(f"X82 B1 (adversarial): under a valid marker {rel}.{col} = {blank} (a whole blank of a posted version) is refused",
+                  lambda cx, rel=rel, col=col, blank=blank: (erasing(cx), cx.execute(f"update {rel} set {col} = {blank} where id=%s", (ver,))), "never updated")
+    trial("X83 B1 (adversarial): under a valid marker the listed key alone is removed, the unlisted ones stay (rolled back afterwards)",
+          lambda cx: (erasing(cx), cx.execute("update document_version set content = content - 'partner_name' where id=%s", (ver,)),
+                      cx.execute("select 1/0")), "division by zero")
+
+    # ---- S2 adversarial review S1: the erasure record's company must be the changed row's company, not only the session's
+    def erasing_other(cx):      # an erasure record of company 2, with the session set to company 2 (the lab role bypasses RLS)
+        erasure_marker(cx.execute, company_id=I["co2"])
+    trial("X84 S1 (adversarial): an erasure record of company 2 does not erase company 1's posted payment",
+          lambda cx: (erasing_other(cx), cx.execute("update payment set counterparty_name = null where id=%s", (pay,))), "immutable")
+    trial("X85 S1 (adversarial): an erasure record of company 2 does not open company 1's version content",
+          lambda cx: (erasing_other(cx), cx.execute("update document_version set content = content - 'partner_name' where id=%s", (ver,))), "never updated")
+
+    def ao_company(cx, fn):
+        cx.execute("create temp table lab_ao_co (id uuid primary key, company_id uuid, reason text) on commit drop")
+        cx.execute(f"create trigger lab_ao_co_guard before update or delete on lab_ao_co for each row execute function {fn}('{{}}', '{{}}', '{{reason}}')")
+        cx.execute("insert into lab_ao_co values (%s, %s, 'Sample Person')", (new(), I["co"]))
+    for fn in ("platform_check_append_only", "crm_check_append_only"):
+        trial(f"X86 S1 (adversarial): {fn}: an erasure record of company 2 does not open company 1's erasure-only column",
+              lambda cx, fn=fn: (ao_company(cx, fn), erasing_other(cx), cx.execute("update lab_ao_co set reason = null")), "append-only")
+        trial(f"X87 S1 (adversarial): {fn}: the row's own company's record does (rolled back afterwards)",
+              lambda cx, fn=fn: (ao_company(cx, fn), erasing(cx), cx.execute("update lab_ao_co set reason = null"), cx.execute("select 1/0")), "division by zero")
+
+    # ---- S2 adversarial review S2: recorded_at is set by the system on INSERT too (ADR-0007 rule 9); a client value is not kept
+    d_old, v_old = new(), new()
+    ins(c, "document", id=d_old, company_id=I["co"], document_type="sales_order", state="draft", version=1, partner_id=I["sold"], document_date="2026-11-10",
+        created_by_user_id=I["user"], recorded_at="2001-01-01T00:00:00+00")
+    ins(c, "document_version", id=v_old, company_id=I["co"], document_id=d_old, version=1, content='{"lines": []}', version_hash="0" * 64,
+        actor_kind="human", actor_id=I["user"], is_tainted=False, recorded_at="2001-01-01T00:00:00+00")
+    got = X("select (select recorded_at > now() - interval '1 hour' from document where id=%s), (select recorded_at > now() - interval '1 hour' from document_version where id=%s)",
+            (d_old, v_old)).fetchone()
+    check("X88 S2 (adversarial): a document (in place) and a version (append-only) inserted with recorded_at 2001 store the system time", got == (True, True), got)
+
+    # ---- Z: the conventions on the catalog of the full load, which no DDL syntax can evade (S2 adversarial review S3, N1,
+    # N3, N4; the text guard of gen_overview.py reads the files, these read pg_catalog). Partitions follow their parent.
+    from gen_overview import KEY_ALLOWLIST, RLS_ALLOWLIST
+    rels = X("""select c.relname, c.relispartition, c.relrowsecurity, c.relforcerowsecurity,
+                       (select a.attnotnull from pg_attribute a where a.attrelid = c.oid and a.attname = 'company_id' and not a.attisdropped),
+                       (select p.relname from pg_inherits i join pg_class p on p.oid = i.inhparent where i.inhrelid = c.oid)
+                  from pg_class c join pg_namespace n on n.oid = c.relnamespace
+                 where n.nspname = 'nativeflows' and c.relkind in ('r', 'p') order by 1""").fetchall()
+    tops = [r[0] for r in rels if not r[1]]
+    bad = [r[0] for r in X("""select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
+              left join pg_attribute a on a.attrelid = c.oid and a.attname = 'recorded_at' and not a.attisdropped
+              left join pg_attrdef d on d.adrelid = c.oid and d.adnum = a.attnum
+             where n.nspname = 'nativeflows' and c.relkind in ('r', 'p') and not c.relispartition
+               and not (a.atttypid = 'timestamptz'::regtype and a.attnotnull and pg_get_expr(d.adbin, d.adrelid) = 'now()')""").fetchall()]
+    check(f"Z01 every one of the {len(tops)} loaded tables has recorded_at timestamptz NOT NULL DEFAULT now() (ADR-0007 rule 9)", not bad and len(tops) > 390, bad)
+    pk = dict(X("""select c.relname, (select array_agg(a.attname::text || ':' || format_type(a.atttypid, a.atttypmod)) from unnest(k.conkey) u(x)
+                    join pg_attribute a on a.attrelid = c.oid and a.attnum = u.x)
+                  from pg_class c join pg_namespace n on n.oid = c.relnamespace left join pg_constraint k on k.conrelid = c.oid and k.contype = 'p'
+                 where n.nspname = 'nativeflows' and c.relkind in ('r', 'p') and not c.relispartition""").fetchall())
+    bad = sorted(t for t in tops if (pk.get(t) == ["id:uuid"]) == (t in KEY_ALLOWLIST))
+    check(f"Z02 every table has the single primary key id uuid, except the {len(KEY_ALLOWLIST)} of KEY_ALLOWLIST (ADR-0006 rule 1)", not bad, bad)
+    trg = X("""select c.relname, t.tgname, t.tgtype from pg_trigger t join pg_class c on c.oid = t.tgrelid join pg_namespace n on n.oid = c.relnamespace
+              where n.nspname = 'nativeflows' and not t.tgisinternal""").fetchall()
+    ROW, BEFORE, INS, DEL, UPD, TRUNC = 1, 2, 4, 8, 16, 32
+    by = {}
+    for rel, name, typ in trg:
+        by.setdefault(rel, []).append((name, typ))
+    bad = []
+    for t in tops:
+        mine = dict(by.get(t, []))
+        typ = mine.get(f"trg_{t}_set_recorded_at")
+        guarded = any(ty & ROW and ty & BEFORE and ty & UPD for n_, ty in mine.items() if n_ != f"trg_{t}_set_recorded_at")
+        if typ is None or not (typ & ROW and typ & BEFORE and typ & INS) or not (typ & UPD or guarded):
+            bad.append(t)
+    check("Z03 every table has trg_<table>_set_recorded_at BEFORE INSERT, also on UPDATE unless an append-only guard refuses updates (S2 adversarial review S2)", not bad, bad[:8])
+    want_rls = [r for r in rels if r[4] is not None and (r[5] or r[0]) not in RLS_ALLOWLIST]
+    pol = {}
+    for rel, name, qual in X("select tablename, policyname, qual from pg_policies where schemaname = 'nativeflows'").fetchall():
+        pol.setdefault(rel, {})[name] = qual
+    bad = [r[0] for r in want_rls if not (r[2] and r[3] and set(pol.get(r[0], {})) >= {"company_policy", "company_ids_policy"}
+                                         and ("installation" in pol[r[0]]["company_policy"]) == (r[4] is False))]
+    check(f"Z04 every one of the {len(want_rls)} tables and partitions with company_id has forced row-level security, company_policy (the installation "
+          f"variant exactly where company_id is nullable) and company_ids_policy; exceptions only in RLS_ALLOWLIST ({', '.join(RLS_ALLOWLIST)})",
+          not bad and len(want_rls) > 370, bad[:8])
+    need = {t for t in tops if any(ty & BEFORE and ty & DEL for n_, ty in by.get(t, []))
+            or (dict(by.get(t, [])).get(f"trg_{t}_set_recorded_at", UPD) & UPD) == 0}
+    need |= {r[0] for r in rels if r[1] and r[5] in need}
+    bad = sorted(t for t in need if not any(ty & BEFORE and ty & TRUNC for n_, ty in by.get(t, [])))
+    check(f"Z05 every one of the {len(need)} append-only or delete-guarded tables (and their partitions) refuses TRUNCATE with a BEFORE TRUNCATE trigger "
+          "(S2 adversarial review N4)", not bad and len(need) > 90, bad[:8])
+    bad = [r[0] for r in X("""select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+              where n.nspname = 'nativeflows' and not exists (select 1 from pg_depend d where d.classid = 'pg_proc'::regclass and d.objid = p.oid and d.deptype = 'e')
+                and not coalesce(p.proconfig, '{}') @> array['search_path=nativeflows, pg_temp']""").fetchall()]
+    check("Z06 every function of the design pins search_path = nativeflows, pg_temp (S2 adversarial review N3; extension functions aside)", not bad, bad[:8])
+    for t in ("audit_record", "document_version", "approval"):
+        trial(f"Z07 TRUNCATE {t} is refused (S2 adversarial review N4)", lambda cx, t=t: cx.execute(f"truncate {t} cascade"), "never truncated")
     c.close()
 
 passed = sum(1 for ok_, *_ in RESULTS if ok_)

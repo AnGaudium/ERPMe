@@ -26,8 +26,8 @@ the stubs drop the schema, so no transaction needs more locks than max_locks_per
 After the DDL, the lab-only stand-in for the command layer of S2 schema phase B runs: lab.id_default_shim_sql() gives
 id the default uuidv7() on the tables that gained it in phase B, whose fixtures insert without an id (lab README).
 
-Tables of DS-05-platform.sql get FORCE ROW LEVEL SECURITY; a role without BYPASSRLS (or not the superuser) must set
-nativeflows.company_id before it reads or writes them (ADR-0017 rule 19).
+Every table with company_id gets FORCE ROW LEVEL SECURITY (the generated section of each design file; uom aside); a role
+without BYPASSRLS (or not the superuser) must set nativeflows.company_id before it reads or writes them (ADR-0017 rule 19).
 """
 import glob
 import os

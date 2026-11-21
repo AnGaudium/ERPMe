@@ -12,13 +12,15 @@
 -- Functions of DS-05 used here: erasure_update_allowed (journal_reject_change, only under the erasure marker).
 -- IDs of journal rows come from context.new_id (ADR-0014 rule 14), so there are no ID defaults.
 -- Owner module of each table in brackets on its CREATE TABLE line (ADR-0022 rules 2, 7).
--- recorded_at convention (ADR-0007 rules 9, 16 and the rule 16 note): every table of every design file has recorded_at timestamptz NOT NULL
--- DEFAULT now(); a table whose rows are updated in place also gets the trigger trg_<table>_set_recorded_at, BEFORE UPDATE,
--- which runs the shared function set_recorded_at(), so recorded_at is the instant of the last write. Append-only tables
--- (a guard trigger refuses every update outside an erasure, or a pure log) need no trigger. The last section of each design
--- file defines the function with CREATE OR REPLACE (the labs load subsets of the files) and attaches the trigger in one DO
--- block to every table of the file except its listed append-only tables (S2 schema phase B; lab schema_phase_b.py writes it,
--- gen_overview.py --check verifies it).
+-- recorded_at convention (ADR-0007 rules 9, 16 and their notes): every table of every design file has recorded_at timestamptz
+-- NOT NULL DEFAULT now() and the trigger trg_<table>_set_recorded_at, which runs the shared function set_recorded_at(), so
+-- recorded_at is the instant of the last write, set by the system and never kept from a client: BEFORE INSERT OR UPDATE on a
+-- table whose rows are updated in place, BEFORE INSERT on an append-only table (a guard trigger refuses every update outside
+-- an erasure, or a pure log). A BEFORE INSERT trigger that reads NEW.recorded_at sorts after it (S2 adversarial review S2).
+-- The generated sections at the end of each design file define the functions with CREATE OR REPLACE (the labs load subsets
+-- of the files), attach these triggers in one DO block, refuse TRUNCATE on append-only and delete-guarded tables, and write
+-- the row-level security of every table with company_id (ADR-0017 rule 19); lab schema_phase_b.py writes them and
+-- gen_overview.py --check compares them with the files and refuses DDL it cannot read.
 -- Key convention (ADR-0006 rule 1 and its note of 2026-11-21): every table's primary key is the single column id uuid; a former
 -- natural or composite key is the named unique constraint uq_<table>_<columns> (uq_<table>_key where that name would exceed
 -- 63 bytes), and foreign keys to it keep working. Only currency and incoterm (E1) keep their natural code key.
@@ -135,8 +137,8 @@ CREATE TRIGGER trg_account_posted_immutable
 
 -- ===== Applied rates [ledger] (ADR-0011 rules 3, 9-10, 12; ADR-0048 rule 12) =====
 -- One conversion that journal lines used; the lines of one document share it (rule 3). Written at posting (rule 1) and
--- never updated or deleted: trg_applied_rate_append_only refuses both, so it has no recorded_at trigger (S2 schema review
--- finding S3). Company data; row-level security in the last section.
+-- never updated or deleted: trg_applied_rate_append_only refuses both, so its recorded_at trigger fires on INSERT only (S2 schema
+-- review finding S3; adversarial review S2). Company data; row-level security in the last section.
 CREATE TABLE applied_rate (                                -- [ledger] ADR-0011 rule 3
     id                       uuid PRIMARY KEY,
     company_id               uuid NOT NULL REFERENCES company (id),
@@ -398,7 +400,7 @@ CREATE INDEX ix_journal_line_company_id_business_unit_id_posting_period_id
 -- ADR-0079 rule 7: under a valid erasure marker an update may blank the argument's catalog columns (erasure_update_allowed
 -- of DS-05, which checks the marker with erasure_marker_valid). The function is called only when the marker is set, so a
 -- load of this file without DS-05 still loads and refuses every erasure.
-CREATE FUNCTION journal_reject_change() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION journal_reject_change() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 BEGIN
     IF TG_OP = 'UPDATE' AND TG_NARGS > 0 AND coalesce(current_setting('nativeflows.erasure_command_id', true), '') <> '' THEN
         IF erasure_update_allowed(TG_RELID, to_jsonb(OLD), to_jsonb(NEW), TG_ARGV[0]::text[]) THEN
@@ -448,7 +450,7 @@ CREATE TRIGGER trg_journal_entry_check_period
     FOR EACH ROW EXECUTE FUNCTION journal_entry_check_period();
 
 -- Rule 1: the creating transaction is set by the database, never by a client.
-CREATE FUNCTION journal_entry_set_transaction() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION journal_entry_set_transaction() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 BEGIN
     NEW.database_transaction_number := pg_current_xact_id();
     RETURN NEW;
@@ -461,7 +463,7 @@ CREATE TRIGGER trg_journal_entry_set_transaction
 -- Rule 12: checks on every line insert.
 -- ADR-0069 rules 5 and 14 (a business unit on profit-and-loss lines only; ledger.business_unit.required_on_profit_and_loss)
 -- are posting logic, not this trigger, like the control-account setting.
-CREATE FUNCTION journal_line_check_insert() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION journal_line_check_insert() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 DECLARE
     v_entry          journal_entry%ROWTYPE;
     v_account        account%ROWTYPE;
@@ -597,7 +599,7 @@ CREATE TRIGGER trg_journal_line_check_insert
     FOR EACH ROW EXECUTE FUNCTION journal_line_check_insert();
 
 -- Rule 11: once per entry, at commit or at SET CONSTRAINTS ALL IMMEDIATE.
-CREATE FUNCTION journal_entry_check_balance() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION journal_entry_check_balance() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 DECLARE
     v_lines         int;
     v_group_nulls   int;
@@ -679,7 +681,7 @@ ALTER TABLE open_item ADD CONSTRAINT fk_open_item_origin_journal_line_id_journal
     FOREIGN KEY (company_id, origin_journal_line_id) REFERENCES journal_line (company_id, id) DEFERRABLE INITIALLY DEFERRED;
 
 -- ADR-0026 rules 1 and 4: identity of an open item is immutable; a referring line matches its item.
-CREATE FUNCTION open_item_identity_immutable() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION open_item_identity_immutable() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 BEGIN
     IF (NEW.company_id, NEW.partner_id, NEW.account_id, NEW.open_item_kind, NEW.natural_side,
         NEW.transaction_currency, NEW.origin_document_id, NEW.origin_journal_line_id)
@@ -693,7 +695,7 @@ END $$;
 CREATE TRIGGER trg_open_item_identity_immutable
     BEFORE UPDATE ON open_item FOR EACH ROW EXECUTE FUNCTION open_item_identity_immutable();
 
-CREATE FUNCTION journal_line_check_open_item() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION journal_line_check_open_item() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 DECLARE v open_item%ROWTYPE;
 BEGIN
     IF NEW.open_item_id IS NOT NULL THEN
@@ -708,51 +710,75 @@ END $$;
 CREATE TRIGGER trg_journal_line_check_open_item
     BEFORE INSERT ON journal_line FOR EACH ROW EXECUTE FUNCTION journal_line_check_open_item();
 
--- ===== Row-level security (ADR-0017 rule 19 and its note; ADR-0022 rule 8) =====
--- rls_v1 as in DS-05-platform.sql: the company policy, compared as text and failing closed, and the read-only company_ids
--- policy for registered cross-company queries. Every company table of this file is listed; system_account and
--- transaction_key are global catalogs without company_id.
-DO $$
-DECLARE
-    v_table text;
-BEGIN
-    FOREACH v_table IN ARRAY ARRAY[
-        'derivation_trace', 'account', 'applied_rate', 'cost_object', 'fixed_asset', 'subledger_activation', 'journal_entry',
-        'payment_term', 'payment_term_line', 'open_item', 'journal_line', 'account_period_balance', 'opening_turnover'] LOOP
-        EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', v_table);
-        EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', v_table);
-        EXECUTE format('CREATE POLICY company_policy ON %I USING (company_id::text = current_setting(''nativeflows.company_id'', true))', v_table);
-        EXECUTE format('CREATE POLICY company_ids_policy ON %I FOR SELECT USING (company_id::text = ANY (string_to_array(current_setting(''nativeflows.company_ids'', true), '','')))', v_table);
-    END LOOP;
-END
-$$;
-
--- ===== recorded_at on update (ADR-0007 rules 9, 16 and their notes) =====
+-- ===== recorded_at on insert and update; TRUNCATE refused (ADR-0007 rules 9, 16 and their notes) =====
 -- Every table of this file has recorded_at timestamptz NOT NULL DEFAULT now(). The DO block attaches the trigger
--- trg_<table>_set_recorded_at (BEFORE UPDATE, function set_recorded_at) to every table of v_tables except v_append_only,
--- so recorded_at is the instant of the last write (ADR-0007 rule 9 note). Append-only tables are those whose guard
--- trigger refuses every update outside an erasure, and pure logs; they need no trigger (here: journal_reject_change).
--- Row guards without UPDATE OF on in-place tables sort before set_recorded_at, so they compare rows before it runs.
--- v_tables lists the file's tables in file order; lab gen_overview.py --check verifies both lists against the table
--- definitions of the file, and schema_phase_b.py writes the section. The function is defined in every file because the
--- labs load subsets.
+-- trg_<table>_set_recorded_at (function set_recorded_at) to every table of v_tables: BEFORE INSERT OR UPDATE on tables
+-- updated in place, BEFORE INSERT on the append-only tables of v_append_only. recorded_at is so the instant of the last
+-- write, set by the system and never taken from a client (ADR-0007 rule 9 and its notes; S2 adversarial review S2).
+-- Append-only tables are those whose guard trigger refuses every update outside an erasure, and pure logs (here: journal_reject_change).
+-- Row guards without UPDATE OF on in-place tables sort before set_recorded_at, so they compare rows before it runs; a
+-- BEFORE INSERT trigger whose function reads NEW.recorded_at sorts after it, so it sees the system's value.
+-- TRUNCATE skips row triggers, so every append-only table and every table with a BEFORE DELETE guard, unless it has a
+-- TRUNCATE trigger of its own, is listed in v_refuse_truncate (default partitions with their parent) and gets
+-- trg_<table>_refuse_truncate (BEFORE TRUNCATE, function refuse_truncate; S2 adversarial review N4).
+-- Lab gen_overview.py --check compares this section with what schema_phase_b.py writes from the table definitions and
+-- triggers of the design files. The functions are defined in every file because the labs load subsets.
 CREATE OR REPLACE FUNCTION set_recorded_at() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 BEGIN
     NEW.recorded_at := now();
     RETURN NEW;
 END $$;
+CREATE OR REPLACE FUNCTION refuse_truncate() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
+BEGIN
+    RAISE EXCEPTION '% is never truncated (append-only or guarded rows)', TG_TABLE_NAME USING ERRCODE = 'restrict_violation';
+END $$;
 DO $$
 DECLARE
-    v_tables       text[] := ARRAY['derivation_trace', 'system_account', 'transaction_key', 'account', 'applied_rate', 'cost_object', 'fixed_asset',
+    v_tables            text[] := ARRAY['derivation_trace', 'system_account', 'transaction_key', 'account', 'applied_rate', 'cost_object', 'fixed_asset',
         'subledger_activation', 'journal_entry', 'payment_term', 'payment_term_line', 'open_item', 'journal_line',
         'account_period_balance', 'opening_turnover'];
-    v_append_only  text[] := ARRAY['applied_rate', 'derivation_trace', 'journal_entry', 'journal_line', 'subledger_activation']::text[];
-    v_table        text;
+    v_append_only       text[] := ARRAY['applied_rate', 'derivation_trace', 'journal_entry', 'journal_line', 'subledger_activation']::text[];
+    v_refuse_truncate   text[] := ARRAY['derivation_trace', 'applied_rate', 'subledger_activation']::text[];
+    v_table             text;
 BEGIN
     FOREACH v_table IN ARRAY v_tables LOOP
-        CONTINUE WHEN v_table = ANY (v_append_only) OR to_regclass(v_table) IS NULL;
-        EXECUTE format('CREATE OR REPLACE TRIGGER %I BEFORE UPDATE ON %I FOR EACH ROW EXECUTE FUNCTION set_recorded_at()',
-                       'trg_' || v_table || '_set_recorded_at', v_table);
+        CONTINUE WHEN to_regclass(v_table) IS NULL;
+        EXECUTE format('CREATE OR REPLACE TRIGGER %I BEFORE ' || CASE WHEN v_table = ANY (v_append_only) THEN 'INSERT' ELSE 'INSERT OR UPDATE' END
+                       || ' ON %I FOR EACH ROW EXECUTE FUNCTION set_recorded_at()', 'trg_' || v_table || '_set_recorded_at', v_table);
+    END LOOP;
+    FOREACH v_table IN ARRAY v_refuse_truncate LOOP
+        CONTINUE WHEN to_regclass(v_table) IS NULL;
+        EXECUTE format('CREATE OR REPLACE TRIGGER %I BEFORE TRUNCATE ON %I FOR EACH STATEMENT EXECUTE FUNCTION refuse_truncate()',
+                       'trg_' || v_table || '_refuse_truncate', v_table);
     END LOOP;
 END $$;
--- ===== end of recorded_at on update =====
+-- ===== end of recorded_at and TRUNCATE =====
+
+-- ===== Row-level security, generated (ADR-0017 rule 19; the rls_v1 helper of ADR-0022 rule 8) =====
+-- Every table of this file with company_id gets ENABLE and FORCE ROW LEVEL SECURITY, the company policy company_policy
+-- (company_id compared as text with nativeflows.company_id, failing closed) and the read-only company_ids_policy for
+-- registered cross-company queries (ADR-0017 rule 19). Tables whose company_id is nullable (v_nullable) show their null
+-- rows only under the setting value installation. Default partitions are listed with their parent. Exceptions are in
+-- lab gen_overview.RLS_ALLOWLIST with their reasons; this file has none.
+-- Lab gen_overview.py --check compares this section with what schema_phase_b.py writes.
+DO $$
+DECLARE
+    v_tables    text[] := ARRAY['derivation_trace', 'account', 'applied_rate', 'cost_object', 'fixed_asset', 'subledger_activation',
+        'journal_entry', 'payment_term', 'payment_term_line', 'open_item', 'journal_line', 'account_period_balance',
+        'opening_turnover'];
+    v_nullable  text[] := ARRAY[]::text[];
+    v_table     text;
+BEGIN
+    FOREACH v_table IN ARRAY v_tables LOOP
+        EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', v_table);
+        EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', v_table);
+        IF v_table = ANY (v_nullable) THEN
+            EXECUTE format('CREATE POLICY company_policy ON %I USING (company_id::text = current_setting(''nativeflows.company_id'', true)'
+                           ' OR (company_id IS NULL AND current_setting(''nativeflows.company_id'', true) = ''installation''))', v_table);
+        ELSE
+            EXECUTE format('CREATE POLICY company_policy ON %I USING (company_id::text = current_setting(''nativeflows.company_id'', true))', v_table);
+        END IF;
+        EXECUTE format('CREATE POLICY company_ids_policy ON %I FOR SELECT USING (company_id::text = ANY (string_to_array(current_setting(''nativeflows.company_ids'', true), '','')))', v_table);
+    END LOOP;
+END $$;
+-- ===== end of row-level security =====

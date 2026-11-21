@@ -15,10 +15,10 @@
 -- convention in migrations (ADR-0004 rule 15); IDs are UUIDv7 from context.new_id (ADR-0006 rule 3), no ID defaults;
 -- references between company tables are composite on (company_id, id); recorded_at on every row (ADR-0007 rule 9).
 -- Every table follows the one convention of the ADR-0007 rule 16 note (DS-06-universal-journal.sql header): recorded_at
--- timestamptz NOT NULL DEFAULT now(), and the trigger trg_<table>_set_recorded_at on tables updated in place, attached in the
--- last section of this file.
--- Every table with company_id gets FORCE ROW LEVEL SECURITY and the company policy of ADR-0017 rule 19; the last
--- section writes them as the rls_v1 helper would (ADR-0022 rule 8). Tables whose company_id is nullable
+-- timestamptz NOT NULL DEFAULT now(), and the trigger trg_<table>_set_recorded_at (on insert, and on update for tables updated
+-- in place), attached in the generated sections at the end of this file.
+-- Every table with company_id gets FORCE ROW LEVEL SECURITY and the company policy of ADR-0017 rule 19; the generated last
+-- section writes them as the rls_v1 helper would (ADR-0022 rule 8), the default partitions included. Tables whose company_id is nullable
 -- (outbox_event, event_delivery, audit_record, audit_change, audit_denial, agent_budget_usage, idempotency_record) show their
 -- null rows only under the setting value `installation` (ADR-0017 rule 19; ADR-0013 rule 14; ADR-0008 rule 16).
 -- Installation tables, without company_id: event_subject, event_consumer, agent_type, agent_type_version, regime_setting,
@@ -1361,7 +1361,7 @@ CREATE TABLE open_item_collection (                        -- change-tracked (AD
 CREATE INDEX ix_open_item_collection_held ON open_item_collection (company_id) WHERE is_payment_blocked OR is_disputed;
 -- ADR-0063 rule 27 note: a settle line of an outgoing payment (cash_payment, bank_payment) never names an open item blocked
 -- for payment. Post of these types repeats the check, so a block set after the draft also holds. Receipts are not held.
-CREATE FUNCTION payment_line_check_payment_block() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION payment_line_check_payment_block() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 BEGIN
     IF NEW.line_kind = 'settle' AND EXISTS (
         SELECT 1 FROM open_item_collection oc JOIN payment p ON p.id = NEW.payment_id
@@ -1552,7 +1552,11 @@ ALTER TABLE interaction_summary ADD CONSTRAINT fk_interaction_summary_agent_run_
 -- temporary table of the same name cannot stand in for it. A load without idempotency_record refuses every marker. The
 -- record must belong to the current company (nativeflows.company_id; null company only under 'installation'), so a marker
 -- of company A never validates under company B, even when nativeflows.company_ids lists A (S2 schema review round 2, R2-N1).
-CREATE FUNCTION erasure_marker_valid() RETURNS boolean LANGUAGE plpgsql STABLE SET search_path = nativeflows, pg_temp AS $$
+-- p_row is the row being changed (to_jsonb(OLD)): when it has company_id, the record's company must also be the row's
+-- (null only for a null-company row), so a marker of company B never changes a row of company A, even for a role that
+-- bypasses row-level security (S2 adversarial review S1). What the database proves is only that an erasure command's
+-- record of this company exists in this transaction; who may run an erasure is the command layer's permission check.
+CREATE FUNCTION erasure_marker_valid(p_row jsonb DEFAULT NULL) RETURNS boolean LANGUAGE plpgsql STABLE SET search_path = nativeflows, pg_temp AS $$
 DECLARE
     v_marker  text := coalesce(current_setting('nativeflows.erasure_command_id', true), '');
     v_found   boolean;
@@ -1566,8 +1570,9 @@ BEGIN
     EXECUTE 'SELECT EXISTS (SELECT 1 FROM nativeflows.idempotency_record WHERE id = $1::uuid'
             ' AND scope IN (''EraseDataSubject'', ''DestroyRetainedPersonalData'') AND transaction_id = pg_current_xact_id()'
             ' AND (company_id::text = current_setting(''nativeflows.company_id'', true)'
-            '      OR (company_id IS NULL AND current_setting(''nativeflows.company_id'', true) = ''installation'')))'
-        INTO v_found USING v_marker;
+            '      OR (company_id IS NULL AND current_setting(''nativeflows.company_id'', true) = ''installation''))'
+            ' AND ($2 IS NULL OR NOT $2 ? ''company_id'' OR company_id IS NOT DISTINCT FROM ($2 ->> ''company_id'')::uuid))'
+        INTO v_found USING v_marker, p_row;
     RETURN v_found;
 END
 $$;
@@ -1594,7 +1599,7 @@ BEGIN
         CONTINUE WHEN v_key = ANY (v_mutable);
         CONTINUE WHEN v_key = ANY (v_set_once) AND jsonb_typeof(v_old -> v_key) = 'null';
         IF v_key = ANY (v_erasure_only) THEN
-            v_is_erasing := v_is_erasing OR erasure_marker_valid();
+            v_is_erasing := v_is_erasing OR erasure_marker_valid(v_old);
             CONTINUE WHEN v_is_erasing AND erasure_column_change_allowed(v_key, v_old -> v_key, v_new -> v_key);
         END IF;
         RAISE EXCEPTION '%.% is append-only', TG_TABLE_NAME, v_key USING ERRCODE = 'restrict_violation';
@@ -1612,7 +1617,8 @@ $$;
 -- subjects (a version names a partner and a contact). No catalog columns: false. p_relid is the trigger's TG_RELID.
 -- clear_keys (R2-N4): p_keys, passed by the trigger like the column list, names the keys an erasure may remove from a JSON
 -- object column, or blank to an erasure result, at any depth (erasure_json_reduced); nothing else of the object may change,
--- and no key is added. Without p_keys a JSON object is only blanked whole.
+-- and no key is added. Without p_keys a JSON object is only blanked whole. With p_keys, a JSON object or array column is
+-- never blanked whole: only the listed keys may go (S2 adversarial review B1; '{}', '[]' and JSON null are refused).
 CREATE FUNCTION erasure_value_is_erased(p_value jsonb) RETURNS boolean LANGUAGE sql IMMUTABLE SET search_path = nativeflows, pg_temp AS $$
     SELECT p_value IS NULL OR jsonb_typeof(p_value) = 'null' OR p_value IN ('""', '[]', '{}')
         OR (jsonb_typeof(p_value) = 'string' AND (p_value #>> '{}') ~ '^erased-[0-9a-f]{12,64}$')
@@ -1661,6 +1667,9 @@ BEGIN
     IF erasure_value_is_erased(p_old) THEN
         RETURN false;
     END IF;
+    IF p_keys IS NOT NULL AND jsonb_typeof(p_old) IN ('object', 'array') THEN
+        RETURN jsonb_typeof(p_new) = jsonb_typeof(p_old) AND erasure_json_reduced(p_old, p_new, p_keys);
+    END IF;
     RETURN erasure_value_is_erased(p_new)
         OR (jsonb_typeof(p_old) = 'object' AND jsonb_typeof(p_new) = 'object' AND erasure_json_reduced(p_old, p_new, coalesce(p_keys, '{}')));
 END
@@ -1674,7 +1683,7 @@ BEGIN
     IF coalesce(cardinality(p_columns), 0) = 0 OR coalesce(current_setting('nativeflows.erasure_command_id', true), '') = '' THEN
         RETURN false;
     END IF;
-    IF NOT erasure_marker_valid() THEN
+    IF NOT erasure_marker_valid(p_old) THEN
         RETURN false;
     END IF;
     SELECT coalesce(array_agg(attname::text), '{}') INTO v_generated
@@ -1692,7 +1701,7 @@ BEGIN
 END
 $$;
 -- Optional argument: the table's catalog columns, which an erasure may rewrite (ADR-0079 rule 7).
-CREATE FUNCTION platform_reject_change() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION platform_reject_change() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 BEGIN
     IF TG_OP = 'UPDATE' AND TG_NARGS > 0 AND erasure_update_allowed(TG_RELID, to_jsonb(OLD), to_jsonb(NEW), TG_ARGV[0]::text[]) THEN
         RETURN NEW;
@@ -1703,7 +1712,7 @@ $$;
 
 -- ADR-0009 rule 14: a document row in a final state never changes, except Reverse moving posted to reversed and nothing
 -- else; only a draft is deleted (rule 4). Identity columns never change, and a number once given stays.
-CREATE FUNCTION document_check_row_change() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION document_check_row_change() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 BEGIN
     IF TG_OP = 'DELETE' THEN
         IF OLD.state <> 'draft' THEN
@@ -1732,7 +1741,7 @@ $$;
 -- ADR-0009 rule 14; ADR-0028 rule 6; ADR-0052 rule 27: header, line and content rows of a document in a final state, or
 -- in the frozen states issuing and sending, never change. The argument names the column holding the document ID; the
 -- optional second argument is the table's catalog columns, which an erasure may rewrite (ADR-0079 rule 7).
-CREATE FUNCTION document_check_frozen() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION document_check_frozen() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 DECLARE
     v_ids    uuid[] := ARRAY[]::uuid[];
     v_state  text;
@@ -1753,7 +1762,7 @@ $$;
 -- dispatcher sets nativeflows.document_delete_id to that document's ID for Delete alone (the pattern of DS-35). An erasure
 -- may clear catalog keys of content and set erased_at (ADR-0079 rules 6-7; the argument is the catalog columns).
 -- The optional second argument is the keys clear_keys may remove from content (R2-N4).
-CREATE FUNCTION document_version_check_change() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION document_version_check_change() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 BEGIN
     IF TG_OP = 'UPDATE' AND TG_NARGS > 0 AND erasure_update_allowed(TG_RELID, to_jsonb(OLD), to_jsonb(NEW), TG_ARGV[0]::text[],
                                                                     CASE WHEN TG_NARGS > 1 THEN TG_ARGV[1]::text[] END) THEN
@@ -1770,7 +1779,7 @@ $$;
 -- ADR-0029 rules 8-9 and INV-88: a version is written tainted when a run tainted at that time wrote it (directly or as the
 -- origin of a consumer chain), or when the version it derives from was effectively tainted when it was written. It
 -- derives from derived_from_version_id when set, else from the previous version.
-CREATE FUNCTION document_version_check_taint() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION document_version_check_taint() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 BEGIN
     IF NEW.is_tainted THEN
         RETURN NEW;
@@ -1792,7 +1801,7 @@ END
 $$;
 -- ADR-0055 rules 6-9: a stage approval names a stage of the plan its decision recorded, and a decision with a plan is
 -- approved only at stages.
-CREATE FUNCTION approval_check_plan() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION approval_check_plan() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 DECLARE
     v_plan  jsonb;
 BEGIN
@@ -1806,7 +1815,7 @@ BEGIN
 END
 $$;
 -- ADR-0028 rule 7: an intent's frozen plan never changes; only a pending intent ends, once.
-CREATE FUNCTION posting_intent_check_change() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION posting_intent_check_change() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 BEGIN
     IF TG_OP = 'DELETE' OR OLD.state <> 'pending'
        OR (to_jsonb(NEW) - 'state' - 'ended_at' - 'e_invoice_record_id') <> (to_jsonb(OLD) - 'state' - 'ended_at' - 'e_invoice_record_id')
@@ -1817,7 +1826,7 @@ BEGIN
 END
 $$;
 -- ADR-0042 rules 2, 5: identity never changes; taint is an OR over raises and never drops; the first origin run is kept.
-CREATE FUNCTION work_item_check_change() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION work_item_check_change() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 BEGIN
     IF TG_OP = 'DELETE' THEN
         RAISE EXCEPTION 'work items are never deleted (ADR-0042 rule 12)' USING ERRCODE = 'restrict_violation';
@@ -1834,7 +1843,7 @@ BEGIN
 END
 $$;
 -- ADR-0066 rule 2: a case is never deleted; identity and origin never change; resolved and canceled are final.
-CREATE FUNCTION work_case_check_change() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION work_case_check_change() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 BEGIN
     IF TG_OP = 'DELETE' THEN
         RAISE EXCEPTION 'work cases are never deleted (ADR-0066 rule 2)' USING ERRCODE = 'restrict_violation';
@@ -1848,7 +1857,7 @@ BEGIN
 END
 $$;
 -- ADR-0038 rule 6: audit_denial moves only denial_count and last_at, upward.
-CREATE FUNCTION audit_denial_check_change() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION audit_denial_check_change() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 BEGIN
     IF TG_OP = 'DELETE' OR (to_jsonb(NEW) - 'denial_count' - 'last_at') <> (to_jsonb(OLD) - 'denial_count' - 'last_at')
        OR NEW.denial_count < OLD.denial_count OR NEW.last_at < OLD.last_at THEN
@@ -1859,7 +1868,7 @@ END
 $$;
 -- ADR-0027 rule 2; ADR-0038 rules 14-15; ADR-0049 rule 28: scan state moves only from pending_scan; accounting evidence is
 -- never unset; generated columns never change; a second creation keeps the stricter label and contains_untrusted.
-CREATE FUNCTION attachment_check_change() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION attachment_check_change() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 DECLARE
     v_labels text[] := ARRAY['public', 'internal', 'personal', 'sensitive_personal'];
 BEGIN
@@ -1879,7 +1888,7 @@ END
 $$;
 -- ADR-0048 rule 8 and INV-95 as amended by the flows review (A9): a line becomes matched only to a posted document, and
 -- for a payment only to one of the line's money account.
-CREATE FUNCTION bank_statement_line_check_match() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION bank_statement_line_check_match() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 BEGIN
     IF NEW.match_state = 'matched' AND (TG_OP = 'INSERT' OR OLD.matched_document_id IS DISTINCT FROM NEW.matched_document_id) THEN
         IF NOT EXISTS (SELECT 1 FROM document d WHERE d.id = NEW.matched_document_id AND d.state = 'posted') THEN
@@ -1894,7 +1903,7 @@ BEGIN
 END
 $$;
 -- ADR-0048 rule 8: opening balance plus the lines equals the closing balance, at commit (bank_statement_unbalanced).
-CREATE FUNCTION bank_statement_check_balance() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION bank_statement_check_balance() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 DECLARE
     v_id  uuid;
 BEGIN
@@ -1930,7 +1939,9 @@ CREATE TRIGGER trg_document_check_row_change BEFORE UPDATE OR DELETE ON document
 -- lines content mirrors (catalogs/personal-data-fields.csv; ADR-0079 rule 6), custom_values excluded (S2 closure entry).
 CREATE TRIGGER trg_document_version_check_change BEFORE UPDATE OR DELETE ON document_version FOR EACH ROW EXECUTE FUNCTION document_version_check_change('{content}',
     '{bill_to_address,bill_to_name,bill_to_tax_id,canceled_note,counterparty_name,description,difference_note,invoicing_party_address,invoicing_party_name,invoicing_party_tax_id,note,partner_address,partner_name,partner_tax_id,payee_name,payer_name,reason,reason_note,ship_to_address,ship_to_name,supplier_name,supplier_tax_id,text}');
-CREATE TRIGGER trg_document_version_check_taint BEFORE INSERT ON document_version FOR EACH ROW EXECUTE FUNCTION document_version_check_taint();
+-- The taint trigger reads NEW.recorded_at, so its name sorts after trg_document_version_set_recorded_at (BEFORE INSERT): it
+-- compares with the system's time, never a client's (S2 adversarial review S2; it was trg_document_version_check_taint).
+CREATE TRIGGER trg_document_version_taint_check BEFORE INSERT ON document_version FOR EACH ROW EXECUTE FUNCTION document_version_check_taint();
 CREATE TRIGGER trg_taint_clearance_immutable BEFORE UPDATE OR DELETE ON taint_clearance FOR EACH ROW EXECUTE FUNCTION platform_reject_change('{reason}');
 CREATE TRIGGER trg_policy_decision_immutable BEFORE UPDATE OR DELETE ON policy_decision FOR EACH ROW EXECUTE FUNCTION platform_reject_change();
 CREATE TRIGGER trg_approval_immutable BEFORE UPDATE OR DELETE ON approval FOR EACH ROW EXECUTE FUNCTION platform_reject_change('{reason}');
@@ -1973,7 +1984,7 @@ CREATE CONSTRAINT TRIGGER trg_bank_statement_line_balance AFTER INSERT ON bank_s
 -- version (its human actor, its on_behalf_of, the on_behalf_of of its run or origin run) and the humans who submitted
 -- it. Stage eligibility (condition 5) and INV-225 read the writers; the reference implementation is this query.
 CREATE FUNCTION document_actor(p_document_id uuid) RETURNS TABLE (user_account_id uuid, actor_role text)
-    LANGUAGE sql STABLE AS $$
+    LANGUAGE sql STABLE SET search_path = nativeflows, pg_temp AS $$
     SELECT DISTINCT u, 'writer' FROM (
         SELECT CASE WHEN v.actor_kind = 'human' THEN v.actor_id END AS u FROM document_version v WHERE v.document_id = p_document_id
         UNION ALL SELECT v.on_behalf_of_id FROM document_version v WHERE v.document_id = p_document_id
@@ -1987,69 +1998,44 @@ CREATE FUNCTION document_actor(p_document_id uuid) RETURNS TABLE (user_account_i
      WHERE u IS NOT NULL
 $$;
 
--- ===== Partitions and row-level security (ADR-0006 rules 22-23; ADR-0022 rule 8; ADR-0017 rule 19) =====
+-- ===== Partitions (ADR-0006 rules 22-23; ADR-0022 rule 8) =====
 -- The daily job of ADR-0022 creates monthly partitions three months ahead; the default partition catches the rest
 -- (ADR-0038 rule 6). Partitions are named <table>_<yyyy>_<mm> (ADR-0004 rule 16); the default is <table>_default.
-DO $$
-DECLARE
-    v_table text;
-BEGIN
-    FOREACH v_table IN ARRAY ARRAY['outbox_event', 'audit_record', 'audit_change', 'agent_run_step'] LOOP
-        EXECUTE format('CREATE TABLE %I PARTITION OF %I DEFAULT', v_table || '_default', v_table);
-    END LOOP;
-END
-$$;
--- rls_v1 as ADR-0022 rule 8 describes it: the company policy, compared as text and failing closed; null-company rows
--- only under the setting value installation; and the read-only company_ids policy for registered cross-company queries.
-DO $$
-DECLARE
-    v_table     text;
-    v_nullable  text[] := ARRAY['outbox_event', 'event_delivery', 'audit_record', 'audit_change', 'audit_denial', 'agent_budget_usage',
-                                'idempotency_record'];
-BEGIN
-    FOREACH v_table IN ARRAY ARRAY[
-        'work_item', 'work_item_link', 'work_item_note', 'work_case', 'work_case_link', 'agent_type_setting', 'agent_run', 'agent_run_step', 'agent_budget_usage',
-        'approval_procedure', 'policy_rule', 'policy_rule_version', 'numbering_configuration', 'numbering_series', 'document',
-        'document_version', 'taint_clearance', 'policy_decision', 'approval', 'auto_post_confirmation', 'period_unlock_request',
-        'posting_intent', 'change_proposal', 'change_proposal_item', 'change_proposal_execution', 'change_proposal_execution_item',
-        'outbox_event', 'event_delivery', 'audit_record', 'audit_change', 'audit_denial', 'attachment', 'attachment_link',
-        'document_line_tax', 'tax_line', 'tax_line_adjustment', 'agent_promotion_evidence', 'money_account', 'bank_statement',
-        'bank_statement_line', 'payment', 'payment_line', 'open_item_collection', 'payment_method_money_account',
-        'business_date_override', 'idempotency_record', 'fiscal_year', 'posting_period', 'posting_period_area_state', 'close_task'] LOOP
-        EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', v_table);
-        EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', v_table);
-        IF v_table = ANY (v_nullable) THEN
-            EXECUTE format('CREATE POLICY company_policy ON %I USING (company_id::text = current_setting(''nativeflows.company_id'', true)'
-                           ' OR (company_id IS NULL AND current_setting(''nativeflows.company_id'', true) = ''installation''))', v_table);
-        ELSE
-            EXECUTE format('CREATE POLICY company_policy ON %I USING (company_id::text = current_setting(''nativeflows.company_id'', true))', v_table);
-        END IF;
-        EXECUTE format('CREATE POLICY company_ids_policy ON %I FOR SELECT USING (company_id::text = ANY (string_to_array(current_setting(''nativeflows.company_ids'', true), '','')))', v_table);
-    END LOOP;
-END
-$$;
+-- Row-level security and the TRUNCATE guard of each default partition are in the generated sections at the end.
+CREATE TABLE outbox_event_default PARTITION OF outbox_event DEFAULT;
+CREATE TABLE audit_record_default PARTITION OF audit_record DEFAULT;
+CREATE TABLE audit_change_default PARTITION OF audit_change DEFAULT;
+CREATE TABLE agent_run_step_default PARTITION OF agent_run_step DEFAULT;
 -- The company's barcode registry (DS-20, ADR-0061 rule 9): the number of a barcoded document is registered in upper case
 -- when it is set, so it is unique across every barcode type of the company.
 CREATE TRIGGER trg_document_register AFTER INSERT OR UPDATE OF number, is_barcoded OR DELETE ON document
     FOR EACH ROW EXECUTE FUNCTION barcode_register('document', 'number', 'id');
 
--- ===== recorded_at on update (ADR-0007 rules 9, 16 and their notes) =====
+-- ===== recorded_at on insert and update; TRUNCATE refused (ADR-0007 rules 9, 16 and their notes) =====
 -- Every table of this file has recorded_at timestamptz NOT NULL DEFAULT now(). The DO block attaches the trigger
--- trg_<table>_set_recorded_at (BEFORE UPDATE, function set_recorded_at) to every table of v_tables except v_append_only,
--- so recorded_at is the instant of the last write (ADR-0007 rule 9 note). Append-only tables are those whose guard
--- trigger refuses every update outside an erasure, and pure logs; they need no trigger (here: document_version_check_change, platform_check_append_only, platform_reject_change).
--- Row guards without UPDATE OF on in-place tables sort before set_recorded_at, so they compare rows before it runs.
--- v_tables lists the file's tables in file order; lab gen_overview.py --check verifies both lists against the table
--- definitions of the file, and schema_phase_b.py writes the section. The function is defined in every file because the
--- labs load subsets.
+-- trg_<table>_set_recorded_at (function set_recorded_at) to every table of v_tables: BEFORE INSERT OR UPDATE on tables
+-- updated in place, BEFORE INSERT on the append-only tables of v_append_only. recorded_at is so the instant of the last
+-- write, set by the system and never taken from a client (ADR-0007 rule 9 and its notes; S2 adversarial review S2).
+-- Append-only tables are those whose guard trigger refuses every update outside an erasure, and pure logs (here: document_version_check_change, platform_check_append_only, platform_reject_change).
+-- Row guards without UPDATE OF on in-place tables sort before set_recorded_at, so they compare rows before it runs; a
+-- BEFORE INSERT trigger whose function reads NEW.recorded_at sorts after it, so it sees the system's value.
+-- TRUNCATE skips row triggers, so every append-only table and every table with a BEFORE DELETE guard, unless it has a
+-- TRUNCATE trigger of its own, is listed in v_refuse_truncate (default partitions with their parent) and gets
+-- trg_<table>_refuse_truncate (BEFORE TRUNCATE, function refuse_truncate; S2 adversarial review N4).
+-- Lab gen_overview.py --check compares this section with what schema_phase_b.py writes from the table definitions and
+-- triggers of the design files. The functions are defined in every file because the labs load subsets.
 CREATE OR REPLACE FUNCTION set_recorded_at() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 BEGIN
     NEW.recorded_at := now();
     RETURN NEW;
 END $$;
+CREATE OR REPLACE FUNCTION refuse_truncate() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
+BEGIN
+    RAISE EXCEPTION '% is never truncated (append-only or guarded rows)', TG_TABLE_NAME USING ERRCODE = 'restrict_violation';
+END $$;
 DO $$
 DECLARE
-    v_tables       text[] := ARRAY['agent_type', 'agent_type_version', 'work_item', 'work_item_link', 'work_item_note', 'work_case', 'work_case_link',
+    v_tables            text[] := ARRAY['agent_type', 'agent_type_version', 'work_item', 'work_item_link', 'work_item_note', 'work_case', 'work_case_link',
         'agent_type_setting', 'agent_run', 'agent_run_step', 'agent_budget_usage', 'approval_procedure', 'policy_rule',
         'policy_rule_version', 'numbering_configuration', 'numbering_series', 'document', 'document_version',
         'taint_clearance', 'policy_decision', 'approval', 'auto_post_confirmation', 'period_unlock_request',
@@ -2060,16 +2046,66 @@ DECLARE
         'bank_statement', 'bank_statement_line', 'payment', 'payment_line', 'open_item_collection',
         'business_date_override', 'idempotency_record', 'regime_setting', 'fiscal_year', 'posting_period',
         'posting_period_area_state', 'close_task'];
-    v_append_only  text[] := ARRAY['agent_promotion_evidence', 'agent_run_step', 'agent_type_version', 'approval', 'audit_change', 'audit_record',
+    v_append_only       text[] := ARRAY['agent_promotion_evidence', 'agent_run_step', 'agent_type_version', 'approval', 'audit_change', 'audit_record',
         'auto_post_confirmation', 'bank_statement', 'change_proposal_execution', 'change_proposal_execution_item',
         'document_version', 'outbox_event', 'policy_decision', 'taint_clearance', 'tax_line', 'tax_line_adjustment',
         'work_item_note']::text[];
-    v_table        text;
+    v_refuse_truncate   text[] := ARRAY['agent_type_version', 'work_item', 'work_item_note', 'work_case', 'work_case_link', 'agent_run', 'agent_run_step',
+        'policy_rule_version', 'document', 'document_version', 'taint_clearance', 'policy_decision', 'approval',
+        'auto_post_confirmation', 'period_unlock_request', 'posting_intent', 'change_proposal', 'change_proposal_item',
+        'change_proposal_execution', 'change_proposal_execution_item', 'outbox_event', 'audit_record', 'audit_change',
+        'audit_denial', 'attachment', 'document_line_tax', 'tax_line', 'tax_line_adjustment', 'agent_promotion_evidence',
+        'bank_statement', 'bank_statement_line', 'payment', 'payment_line', 'outbox_event_default', 'audit_record_default',
+        'audit_change_default', 'agent_run_step_default']::text[];
+    v_table             text;
 BEGIN
     FOREACH v_table IN ARRAY v_tables LOOP
-        CONTINUE WHEN v_table = ANY (v_append_only) OR to_regclass(v_table) IS NULL;
-        EXECUTE format('CREATE OR REPLACE TRIGGER %I BEFORE UPDATE ON %I FOR EACH ROW EXECUTE FUNCTION set_recorded_at()',
-                       'trg_' || v_table || '_set_recorded_at', v_table);
+        CONTINUE WHEN to_regclass(v_table) IS NULL;
+        EXECUTE format('CREATE OR REPLACE TRIGGER %I BEFORE ' || CASE WHEN v_table = ANY (v_append_only) THEN 'INSERT' ELSE 'INSERT OR UPDATE' END
+                       || ' ON %I FOR EACH ROW EXECUTE FUNCTION set_recorded_at()', 'trg_' || v_table || '_set_recorded_at', v_table);
+    END LOOP;
+    FOREACH v_table IN ARRAY v_refuse_truncate LOOP
+        CONTINUE WHEN to_regclass(v_table) IS NULL;
+        EXECUTE format('CREATE OR REPLACE TRIGGER %I BEFORE TRUNCATE ON %I FOR EACH STATEMENT EXECUTE FUNCTION refuse_truncate()',
+                       'trg_' || v_table || '_refuse_truncate', v_table);
     END LOOP;
 END $$;
--- ===== end of recorded_at on update =====
+-- ===== end of recorded_at and TRUNCATE =====
+
+-- ===== Row-level security, generated (ADR-0017 rule 19; the rls_v1 helper of ADR-0022 rule 8) =====
+-- Every table of this file with company_id gets ENABLE and FORCE ROW LEVEL SECURITY, the company policy company_policy
+-- (company_id compared as text with nativeflows.company_id, failing closed) and the read-only company_ids_policy for
+-- registered cross-company queries (ADR-0017 rule 19). Tables whose company_id is nullable (v_nullable) show their null
+-- rows only under the setting value installation. Default partitions are listed with their parent. Exceptions are in
+-- lab gen_overview.RLS_ALLOWLIST with their reasons; this file has none.
+-- Lab gen_overview.py --check compares this section with what schema_phase_b.py writes.
+DO $$
+DECLARE
+    v_tables    text[] := ARRAY['work_item', 'work_item_link', 'work_item_note', 'work_case', 'work_case_link', 'agent_type_setting', 'agent_run',
+        'agent_run_step', 'agent_budget_usage', 'approval_procedure', 'policy_rule', 'policy_rule_version',
+        'numbering_configuration', 'numbering_series', 'document', 'document_version', 'taint_clearance',
+        'policy_decision', 'approval', 'auto_post_confirmation', 'period_unlock_request', 'posting_intent',
+        'change_proposal', 'change_proposal_item', 'change_proposal_execution', 'change_proposal_execution_item',
+        'outbox_event', 'event_delivery', 'audit_record', 'audit_change', 'audit_denial', 'attachment', 'attachment_link',
+        'document_line_tax', 'tax_line', 'tax_line_adjustment', 'agent_promotion_evidence', 'money_account',
+        'payment_method_money_account', 'bank_statement', 'bank_statement_line', 'payment', 'payment_line',
+        'open_item_collection', 'business_date_override', 'idempotency_record', 'fiscal_year', 'posting_period',
+        'posting_period_area_state', 'close_task', 'outbox_event_default', 'audit_record_default', 'audit_change_default',
+        'agent_run_step_default'];
+    v_nullable  text[] := ARRAY['agent_budget_usage', 'outbox_event', 'event_delivery', 'audit_record', 'audit_change', 'audit_denial',
+        'idempotency_record', 'outbox_event_default', 'audit_record_default', 'audit_change_default']::text[];
+    v_table     text;
+BEGIN
+    FOREACH v_table IN ARRAY v_tables LOOP
+        EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', v_table);
+        EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', v_table);
+        IF v_table = ANY (v_nullable) THEN
+            EXECUTE format('CREATE POLICY company_policy ON %I USING (company_id::text = current_setting(''nativeflows.company_id'', true)'
+                           ' OR (company_id IS NULL AND current_setting(''nativeflows.company_id'', true) = ''installation''))', v_table);
+        ELSE
+            EXECUTE format('CREATE POLICY company_policy ON %I USING (company_id::text = current_setting(''nativeflows.company_id'', true))', v_table);
+        END IF;
+        EXECUTE format('CREATE POLICY company_ids_policy ON %I FOR SELECT USING (company_id::text = ANY (string_to_array(current_setting(''nativeflows.company_ids'', true), '','')))', v_table);
+    END LOOP;
+END $$;
+-- ===== end of row-level security =====

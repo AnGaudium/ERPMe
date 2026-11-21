@@ -262,20 +262,20 @@ Tables per owner module, from the DDL drafts in `docs/design/*.sql` and the owne
 
 | Table | Purpose | Section | Key references | Source |
 | --- | --- | --- | --- | --- |
-| `account` | ADR-0010 rule 10 | Operational accounts | `account`, `currency`, `system_account` | docs/design/DS-06-universal-journal.sql:96 |
-| `account_period_balance` | ADR-0014 rule 18 | Subledgers, journal and open items | `account`, `currency`, `posting_period` | docs/design/DS-06-universal-journal.sql:635 |
-| `applied_rate` | ADR-0011 rule 3 | Applied rates | `currency` | docs/design/DS-06-universal-journal.sql:140 |
-| `derivation_trace` | ADR-0027 rule 3 |  |  | docs/design/DS-06-universal-journal.sql:28 |
-| `fixed_asset` | ADR-0025 rule 2; a stub until the assets module | Subledgers, journal and open items |  | docs/design/DS-06-universal-journal.sql:179 |
-| `journal_entry` | ADR-0014 rule 1 | Subledgers, journal and open items | `close_task`, `derivation_trace`, `document`, `fiscal_year`, `posting_period` | docs/design/DS-06-universal-journal.sql:203 |
-| `journal_line` | ADR-0014 rule 5 | Subledgers, journal and open items | `account`, `applied_rate`, `branch`, `business_unit`, `cost_center`, `cost_object`, `currency`, `derivation_trace` … | docs/design/DS-06-universal-journal.sql:309 |
-| `open_item` | ADR-0026 rule 1 | Subledgers, journal and open items | `account`, `currency`, `document`, `open_item`, `partner`, `payment_term` | docs/design/DS-06-universal-journal.sql:258 |
-| `opening_turnover` | ADR-0044 rule 10 | Subledgers, journal and open items | `account` | docs/design/DS-06-universal-journal.sql:663 |
-| `payment_term` | ADR-0026 rule 5 | Subledgers, journal and open items |  | docs/design/DS-06-universal-journal.sql:234 |
-| `payment_term_line` | ADR-0026 rule 5 | Subledgers, journal and open items | `payment_term` | docs/design/DS-06-universal-journal.sql:244 |
-| `subledger_activation` | ADR-0025 rule 4 | Subledgers, journal and open items | `document` | docs/design/DS-06-universal-journal.sql:191 |
-| `system_account` | ADR-0010 rule 1; global catalog, uuid5 IDs | System chart of accounts | `system_account` | docs/design/DS-06-universal-journal.sql:50 |
-| `transaction_key` | ADR-0015 rule 1; global catalog, uuid5 IDs | Transaction keys |  | docs/design/DS-06-universal-journal.sql:76 |
+| `account` | ADR-0010 rule 10 | Operational accounts | `account`, `currency`, `system_account` | docs/design/DS-06-universal-journal.sql:98 |
+| `account_period_balance` | ADR-0014 rule 18 | Subledgers, journal and open items | `account`, `currency`, `posting_period` | docs/design/DS-06-universal-journal.sql:637 |
+| `applied_rate` | ADR-0011 rule 3 | Applied rates | `currency` | docs/design/DS-06-universal-journal.sql:142 |
+| `derivation_trace` | ADR-0027 rule 3 |  |  | docs/design/DS-06-universal-journal.sql:30 |
+| `fixed_asset` | ADR-0025 rule 2; a stub until the assets module | Subledgers, journal and open items |  | docs/design/DS-06-universal-journal.sql:181 |
+| `journal_entry` | ADR-0014 rule 1 | Subledgers, journal and open items | `close_task`, `derivation_trace`, `document`, `fiscal_year`, `posting_period` | docs/design/DS-06-universal-journal.sql:205 |
+| `journal_line` | ADR-0014 rule 5 | Subledgers, journal and open items | `account`, `applied_rate`, `branch`, `business_unit`, `cost_center`, `cost_object`, `currency`, `derivation_trace` … | docs/design/DS-06-universal-journal.sql:311 |
+| `open_item` | ADR-0026 rule 1 | Subledgers, journal and open items | `account`, `currency`, `document`, `open_item`, `partner`, `payment_term` | docs/design/DS-06-universal-journal.sql:260 |
+| `opening_turnover` | ADR-0044 rule 10 | Subledgers, journal and open items | `account` | docs/design/DS-06-universal-journal.sql:665 |
+| `payment_term` | ADR-0026 rule 5 | Subledgers, journal and open items |  | docs/design/DS-06-universal-journal.sql:236 |
+| `payment_term_line` | ADR-0026 rule 5 | Subledgers, journal and open items | `payment_term` | docs/design/DS-06-universal-journal.sql:246 |
+| `subledger_activation` | ADR-0025 rule 4 | Subledgers, journal and open items | `document` | docs/design/DS-06-universal-journal.sql:193 |
+| `system_account` | ADR-0010 rule 1; global catalog, uuid5 IDs | System chart of accounts | `system_account` | docs/design/DS-06-universal-journal.sql:52 |
+| `transaction_key` | ADR-0015 rule 1; global catalog, uuid5 IDs | Transaction keys |  | docs/design/DS-06-universal-journal.sql:78 |
 
 ## `master_data`
 
@@ -372,7 +372,7 @@ Tables per owner module, from the DDL drafts in `docs/design/*.sql` and the owne
 | `cost_estimate_gap` | what a draft estimate could not price: listed, never zero, never released (ADR-0062 rule 12) | Costing | `activity_type`, `bill_of_materials_component`, `cost_estimate`, `costing_sheet`, `item`, `routing_operation`, `work_center` | docs/design/DS-43-54-planning-production.sql:1628 |
 | `cost_estimate_line` | rolled up level by level from released estimates of made components (rule 14) | Costing | `activity_type`, `cost_center`, `cost_estimate`, `item` | docs/design/DS-43-54-planning-production.sql:1574 |
 | `cost_estimate_sheet_row` | ADR-0072 rule 8; the production rows as costed; estimate content, frozen at release | Costing | `cost_center`, `cost_component_detail`, `cost_estimate` | docs/design/DS-43-54-planning-production.sql:1604 |
-| `cost_object` | ADR-0025 rule 2; ADR-0035 rule 1 | Subledgers, journal and open items | `cost_center`, `production_order` | docs/design/DS-06-universal-journal.sql:160 |
+| `cost_object` | ADR-0025 rule 2; ADR-0035 rule 1 | Subledgers, journal and open items | `cost_center`, `production_order` | docs/design/DS-06-universal-journal.sql:162 |
 | `costing_sheet` | ADR-0072 rule 6; company data, master_data_change, change-tracked, proposal-bound | Costing |  | docs/design/DS-43-54-planning-production.sql:1436 |
 | `costing_sheet_base_member` | ADR-0072 rule 6; a posting component or a detail of a base row | Costing | `cost_component_detail` | docs/design/DS-43-54-planning-production.sql:1487 |
 | `costing_sheet_rate` | ADR-0072 rule 7; by effective dates, then the most specific condition set | Costing | `costing_sheet`, `costing_sheet_row`, `item_group`, `site`, `valuation_class` | docs/design/DS-43-54-planning-production.sql:1503 |
@@ -823,34 +823,34 @@ Foreign keys whose source and target tables have different stated owners. Foreig
 | `warehouse_task` (inventory, 3) | `company_id,warehouse_id` | `warehouse` (master_data, 3) | same layer | docs/design/DS-22-09-42-commercial-inventory.sql:1709 |
 | `warehouse_task` (inventory, 3) | `uom_id` | `uom` (master_data, 3) | same layer | docs/design/DS-22-09-42-commercial-inventory.sql:1695 |
 | `zone` (inventory, 3) | `company_id,warehouse_id` | `warehouse` (master_data, 3) | same layer | docs/design/DS-20-master-data.sql:894 |
-| `account` (ledger, 3) | `currency` | `currency` (master_data, 3) | same layer | docs/design/DS-06-universal-journal.sql:104 |
-| `account_period_balance` (ledger, 3) | `company_id,posting_period_id` | `posting_period` (periods, 2) | down | docs/design/DS-06-universal-journal.sql:656 |
-| `account_period_balance` (ledger, 3) | `transaction_currency` | `currency` (master_data, 3) | same layer | docs/design/DS-06-universal-journal.sql:640 |
-| `applied_rate` (ledger, 3) | `from_currency` | `currency` (master_data, 3) | same layer | docs/design/DS-06-universal-journal.sql:143 |
-| `applied_rate` (ledger, 3) | `to_currency` | `currency` (master_data, 3) | same layer | docs/design/DS-06-universal-journal.sql:144 |
-| `journal_entry` (ledger, 3) | `company_id,close_task_id` | `close_task` (periods, 2) | down | docs/design/DS-06-universal-journal.sql:223 |
-| `journal_entry` (ledger, 3) | `company_id,document_id` | `document` (documents, 2) | down | docs/design/DS-06-universal-journal.sql:222 |
-| `journal_entry` (ledger, 3) | `company_id,fiscal_year_id` | `fiscal_year` (periods, 2) | down | docs/design/DS-06-universal-journal.sql:221 |
-| `journal_entry` (ledger, 3) | `company_id,fiscal_year_id,posting_period_id` | `posting_period` (periods, 2) | down | docs/design/DS-06-universal-journal.sql:220 |
-| `journal_line` (ledger, 3) | `company_currency` | `currency` (master_data, 3) | same layer | docs/design/DS-06-universal-journal.sql:324 |
-| `journal_line` (ledger, 3) | `company_id,branch_id` | `branch` (master_data, 3) | same layer | docs/design/DS-06-universal-journal.sql:366 |
-| `journal_line` (ledger, 3) | `company_id,business_unit_id` | `business_unit` (master_data, 3) | same layer | docs/design/DS-06-universal-journal.sql:354 |
-| `journal_line` (ledger, 3) | `company_id,cost_center_id` | `cost_center` (master_data, 3) | same layer | docs/design/DS-06-universal-journal.sql:370 |
-| `journal_line` (ledger, 3) | `company_id,cost_object_id` | `cost_object` (production, 3) | same layer | docs/design/DS-06-universal-journal.sql:377 |
-| `journal_line` (ledger, 3) | `company_id,fiscal_year_id` | `fiscal_year` (periods, 2) | down | docs/design/DS-06-universal-journal.sql:362 |
-| `journal_line` (ledger, 3) | `company_id,item_id` | `item` (master_data, 3) | same layer | docs/design/DS-06-universal-journal.sql:368 |
-| `journal_line` (ledger, 3) | `company_id,partner_id` | `partner` (master_data, 3) | same layer | docs/design/DS-06-universal-journal.sql:367 |
-| `journal_line` (ledger, 3) | `company_id,posting_period_id` | `posting_period` (periods, 2) | down | docs/design/DS-06-universal-journal.sql:361 |
-| `journal_line` (ledger, 3) | `company_id,project_id` | `project` (master_data, 3) | same layer | docs/design/DS-06-universal-journal.sql:371 |
-| `journal_line` (ledger, 3) | `company_id,salesperson_id` | `partner` (master_data, 3) | same layer | docs/design/DS-06-universal-journal.sql:372 |
-| `journal_line` (ledger, 3) | `company_id,warehouse_id` | `warehouse` (master_data, 3) | same layer | docs/design/DS-06-universal-journal.sql:369 |
-| `journal_line` (ledger, 3) | `group_currency` | `currency` (master_data, 3) | same layer | docs/design/DS-06-universal-journal.sql:326 |
-| `journal_line` (ledger, 3) | `tax_code_id` | `tax_code` (tax, 3) | same layer | docs/design/DS-06-universal-journal.sql:339 |
-| `journal_line` (ledger, 3) | `transaction_currency` | `currency` (master_data, 3) | same layer | docs/design/DS-06-universal-journal.sql:322 |
-| `open_item` (ledger, 3) | `company_id,origin_document_id` | `document` (documents, 2) | down | docs/design/DS-06-universal-journal.sql:300 |
-| `open_item` (ledger, 3) | `company_id,partner_id` | `partner` (master_data, 3) | same layer | docs/design/DS-06-universal-journal.sql:299 |
-| `open_item` (ledger, 3) | `transaction_currency` | `currency` (master_data, 3) | same layer | docs/design/DS-06-universal-journal.sql:265 |
-| `subledger_activation` (ledger, 3) | `company_id,reclassification_document_id` | `document` (documents, 2) | down | docs/design/DS-06-universal-journal.sql:199 |
+| `account` (ledger, 3) | `currency` | `currency` (master_data, 3) | same layer | docs/design/DS-06-universal-journal.sql:106 |
+| `account_period_balance` (ledger, 3) | `company_id,posting_period_id` | `posting_period` (periods, 2) | down | docs/design/DS-06-universal-journal.sql:658 |
+| `account_period_balance` (ledger, 3) | `transaction_currency` | `currency` (master_data, 3) | same layer | docs/design/DS-06-universal-journal.sql:642 |
+| `applied_rate` (ledger, 3) | `from_currency` | `currency` (master_data, 3) | same layer | docs/design/DS-06-universal-journal.sql:145 |
+| `applied_rate` (ledger, 3) | `to_currency` | `currency` (master_data, 3) | same layer | docs/design/DS-06-universal-journal.sql:146 |
+| `journal_entry` (ledger, 3) | `company_id,close_task_id` | `close_task` (periods, 2) | down | docs/design/DS-06-universal-journal.sql:225 |
+| `journal_entry` (ledger, 3) | `company_id,document_id` | `document` (documents, 2) | down | docs/design/DS-06-universal-journal.sql:224 |
+| `journal_entry` (ledger, 3) | `company_id,fiscal_year_id` | `fiscal_year` (periods, 2) | down | docs/design/DS-06-universal-journal.sql:223 |
+| `journal_entry` (ledger, 3) | `company_id,fiscal_year_id,posting_period_id` | `posting_period` (periods, 2) | down | docs/design/DS-06-universal-journal.sql:222 |
+| `journal_line` (ledger, 3) | `company_currency` | `currency` (master_data, 3) | same layer | docs/design/DS-06-universal-journal.sql:326 |
+| `journal_line` (ledger, 3) | `company_id,branch_id` | `branch` (master_data, 3) | same layer | docs/design/DS-06-universal-journal.sql:368 |
+| `journal_line` (ledger, 3) | `company_id,business_unit_id` | `business_unit` (master_data, 3) | same layer | docs/design/DS-06-universal-journal.sql:356 |
+| `journal_line` (ledger, 3) | `company_id,cost_center_id` | `cost_center` (master_data, 3) | same layer | docs/design/DS-06-universal-journal.sql:372 |
+| `journal_line` (ledger, 3) | `company_id,cost_object_id` | `cost_object` (production, 3) | same layer | docs/design/DS-06-universal-journal.sql:379 |
+| `journal_line` (ledger, 3) | `company_id,fiscal_year_id` | `fiscal_year` (periods, 2) | down | docs/design/DS-06-universal-journal.sql:364 |
+| `journal_line` (ledger, 3) | `company_id,item_id` | `item` (master_data, 3) | same layer | docs/design/DS-06-universal-journal.sql:370 |
+| `journal_line` (ledger, 3) | `company_id,partner_id` | `partner` (master_data, 3) | same layer | docs/design/DS-06-universal-journal.sql:369 |
+| `journal_line` (ledger, 3) | `company_id,posting_period_id` | `posting_period` (periods, 2) | down | docs/design/DS-06-universal-journal.sql:363 |
+| `journal_line` (ledger, 3) | `company_id,project_id` | `project` (master_data, 3) | same layer | docs/design/DS-06-universal-journal.sql:373 |
+| `journal_line` (ledger, 3) | `company_id,salesperson_id` | `partner` (master_data, 3) | same layer | docs/design/DS-06-universal-journal.sql:374 |
+| `journal_line` (ledger, 3) | `company_id,warehouse_id` | `warehouse` (master_data, 3) | same layer | docs/design/DS-06-universal-journal.sql:371 |
+| `journal_line` (ledger, 3) | `group_currency` | `currency` (master_data, 3) | same layer | docs/design/DS-06-universal-journal.sql:328 |
+| `journal_line` (ledger, 3) | `tax_code_id` | `tax_code` (tax, 3) | same layer | docs/design/DS-06-universal-journal.sql:341 |
+| `journal_line` (ledger, 3) | `transaction_currency` | `currency` (master_data, 3) | same layer | docs/design/DS-06-universal-journal.sql:324 |
+| `open_item` (ledger, 3) | `company_id,origin_document_id` | `document` (documents, 2) | down | docs/design/DS-06-universal-journal.sql:302 |
+| `open_item` (ledger, 3) | `company_id,partner_id` | `partner` (master_data, 3) | same layer | docs/design/DS-06-universal-journal.sql:301 |
+| `open_item` (ledger, 3) | `transaction_currency` | `currency` (master_data, 3) | same layer | docs/design/DS-06-universal-journal.sql:267 |
+| `subledger_activation` (ledger, 3) | `company_id,reclassification_document_id` | `document` (documents, 2) | down | docs/design/DS-06-universal-journal.sql:201 |
 | `company` (master_data, 3) | `fiscal_calendar_owner_id` | `user_account` (permissions, 2) | down | docs/design/DS-20-master-data.sql:88 |
 | `customer_profile` (master_data, 3) | `company_id,payment_term_id` | `payment_term` (ledger, 3) | same layer | docs/design/DS-20-master-data.sql:391 |
 | `customer_profile` (master_data, 3) | `company_id,receivable_account_id` | `account` (ledger, 3) | same layer | docs/design/DS-20-master-data.sql:390 |
@@ -935,7 +935,7 @@ Foreign keys whose source and target tables have different stated owners. Foreig
 | `cost_estimate_line` (production, 3) | `company_id,component_item_id` | `item` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1592 |
 | `cost_estimate_line` (production, 3) | `company_id,credited_cost_center_id` | `cost_center` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1594 |
 | `cost_estimate_sheet_row` (production, 3) | `company_id,credited_cost_center_id` | `cost_center` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1621 |
-| `cost_object` (production, 3) | `company_id,cost_center_id` | `cost_center` (master_data, 3) | same layer | docs/design/DS-06-universal-journal.sql:174 |
+| `cost_object` (production, 3) | `company_id,cost_center_id` | `cost_center` (master_data, 3) | same layer | docs/design/DS-06-universal-journal.sql:176 |
 | `costing_sheet_rate` (production, 3) | `company_id,item_group_id` | `item_group` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1521 |
 | `costing_sheet_rate` (production, 3) | `company_id,site_id` | `site` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1520 |
 | `costing_sheet_rate` (production, 3) | `company_id,valuation_class_id` | `valuation_class` (master_data, 3) | same layer | docs/design/DS-43-54-planning-production.sql:1533 |

@@ -462,7 +462,7 @@ ALTER TABLE parameter_set ADD CONSTRAINT fk_parameter_set_shadow_version
 -- shadow (demotion), or to retired; never back to draft, never out of retired. A version in force is demoted only after
 -- the pointer moved off it. Leaving shadow clears a shadow pointer that names the version; retiring clears both pointers.
 -- Only drafts are deleted. Arguments: the identity table and the version's column naming it.
-CREATE FUNCTION artifact_version_check_insert() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION artifact_version_check_insert() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 BEGIN
     IF NEW.state <> 'draft' THEN
         RAISE EXCEPTION '% rows are inserted only as drafts, not % (artifact_version_not_eligible)', TG_TABLE_NAME, NEW.state USING ERRCODE = 'check_violation';
@@ -470,7 +470,7 @@ BEGIN
     RETURN NEW;
 END
 $$;
-CREATE FUNCTION artifact_version_check_change() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION artifact_version_check_change() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 DECLARE
     v_rank     jsonb := '{"draft": 0, "backtested": 1, "shadow": 2, "assisted": 3, "active": 4}';
     v_mutable  text[] := ARRAY['state', 'effective_from', 'change_proposal_id'];
@@ -531,7 +531,7 @@ $$;
 -- force never pins anything else. One change proposal may raise the table version and then the rule version in one
 -- transaction (rule 24 note). A pinned version is neither retired nor demoted to shadow while a current or shadow rule
 -- version pins it.
-CREATE FUNCTION automation_rule_version_check_pins() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION automation_rule_version_check_pins() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 DECLARE
     v_bad uuid;
 BEGIN
@@ -557,7 +557,7 @@ BEGIN
     RETURN NEW;
 END
 $$;
-CREATE FUNCTION decision_table_version_check_in_use() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION decision_table_version_check_in_use() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 BEGIN
     IF NEW.state IS DISTINCT FROM OLD.state AND (NEW.state = 'retired' OR (NEW.state = 'shadow' AND OLD.state IN ('assisted', 'active'))) AND EXISTS (
         SELECT 1 FROM automation_rule_version v JOIN automation_rule r ON r.id = v.automation_rule_id
@@ -568,7 +568,7 @@ BEGIN
 END
 $$;
 -- ADR-0058 rule 9: the scope count only rises; rows are never deleted.
-CREATE FUNCTION automation_scope_skip_check_change() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION automation_scope_skip_check_change() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 BEGIN
     IF TG_OP = 'DELETE' OR NEW.automation_rule_id <> OLD.automation_rule_id OR NEW.business_date <> OLD.business_date
        OR NEW.company_id <> OLD.company_id OR NEW.skipped_count < OLD.skipped_count THEN
@@ -579,7 +579,7 @@ END
 $$;
 -- Child rows (decision table rows, parameter values) change only while their version is a draft.
 -- Arguments: the version table and the child's column naming it.
-CREATE FUNCTION artifact_child_check_frozen() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION artifact_child_check_frozen() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 DECLARE
     v_ids    uuid[];
     v_id     uuid;
@@ -602,7 +602,7 @@ END
 $$;
 -- ADR-0059 rule 12: the current pointer names a version in state assisted or active, the shadow pointer one in shadow.
 -- Argument: the version table.
-CREATE FUNCTION artifact_pointer_check() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION artifact_pointer_check() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 DECLARE
     v_state  text;
 BEGIN
@@ -653,54 +653,80 @@ CREATE TRIGGER trg_artifact_monitor_snapshot_immutable BEFORE UPDATE OR DELETE O
 CREATE TRIGGER trg_golden_case_label_append_only BEFORE UPDATE OR DELETE ON golden_case_label FOR EACH ROW
     EXECUTE FUNCTION platform_check_append_only('{}', '{retired_at}', '{}');
 
--- ===== Row-level security (ADR-0017 rule 19; ADR-0022 rule 8) =====
--- rls_v1 as DS-05-platform.sql writes it: the company policy, compared as text and failing closed, and the read-only
--- company_ids policy for registered cross-company queries. No table here has installation-scoped rows.
-DO $$
-DECLARE
-    v_table text;
-BEGIN
-    FOREACH v_table IN ARRAY ARRAY[
-        'automation_rule', 'automation_rule_version', 'automation_execution', 'automation_scope_skip', 'configuration_state', 'decision_table',
-        'decision_table_version', 'decision_table_row', 'parameter_set', 'parameter_set_version', 'parameter_set_value',
-        'artifact_promotion_evidence', 'artifact_transition', 'artifact_shadow_outcome', 'golden_case_label',
-        'artifact_monitor_snapshot'] LOOP
-        EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', v_table);
-        EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', v_table);
-        EXECUTE format('CREATE POLICY company_policy ON %I USING (company_id::text = current_setting(''nativeflows.company_id'', true))', v_table);
-        EXECUTE format('CREATE POLICY company_ids_policy ON %I FOR SELECT USING (company_id::text = ANY (string_to_array(current_setting(''nativeflows.company_ids'', true), '','')))', v_table);
-    END LOOP;
-END
-$$;
-
--- ===== recorded_at on update (ADR-0007 rules 9, 16 and their notes) =====
+-- ===== recorded_at on insert and update; TRUNCATE refused (ADR-0007 rules 9, 16 and their notes) =====
 -- Every table of this file has recorded_at timestamptz NOT NULL DEFAULT now(). The DO block attaches the trigger
--- trg_<table>_set_recorded_at (BEFORE UPDATE, function set_recorded_at) to every table of v_tables except v_append_only,
--- so recorded_at is the instant of the last write (ADR-0007 rule 9 note). Append-only tables are those whose guard
--- trigger refuses every update outside an erasure, and pure logs; they need no trigger (here: platform_reject_change).
--- Row guards without UPDATE OF on in-place tables sort before set_recorded_at, so they compare rows before it runs.
--- v_tables lists the file's tables in file order; lab gen_overview.py --check verifies both lists against the table
--- definitions of the file, and schema_phase_b.py writes the section. The function is defined in every file because the
--- labs load subsets.
+-- trg_<table>_set_recorded_at (function set_recorded_at) to every table of v_tables: BEFORE INSERT OR UPDATE on tables
+-- updated in place, BEFORE INSERT on the append-only tables of v_append_only. recorded_at is so the instant of the last
+-- write, set by the system and never taken from a client (ADR-0007 rule 9 and its notes; S2 adversarial review S2).
+-- Append-only tables are those whose guard trigger refuses every update outside an erasure, and pure logs (here: platform_reject_change).
+-- Row guards without UPDATE OF on in-place tables sort before set_recorded_at, so they compare rows before it runs; a
+-- BEFORE INSERT trigger whose function reads NEW.recorded_at sorts after it, so it sees the system's value.
+-- TRUNCATE skips row triggers, so every append-only table and every table with a BEFORE DELETE guard, unless it has a
+-- TRUNCATE trigger of its own, is listed in v_refuse_truncate (default partitions with their parent) and gets
+-- trg_<table>_refuse_truncate (BEFORE TRUNCATE, function refuse_truncate; S2 adversarial review N4).
+-- Lab gen_overview.py --check compares this section with what schema_phase_b.py writes from the table definitions and
+-- triggers of the design files. The functions are defined in every file because the labs load subsets.
 CREATE OR REPLACE FUNCTION set_recorded_at() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 BEGIN
     NEW.recorded_at := now();
     RETURN NEW;
 END $$;
+CREATE OR REPLACE FUNCTION refuse_truncate() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
+BEGIN
+    RAISE EXCEPTION '% is never truncated (append-only or guarded rows)', TG_TABLE_NAME USING ERRCODE = 'restrict_violation';
+END $$;
 DO $$
 DECLARE
-    v_tables       text[] := ARRAY['automation_rule', 'automation_rule_version', 'automation_execution', 'automation_scope_skip',
+    v_tables            text[] := ARRAY['automation_rule', 'automation_rule_version', 'automation_execution', 'automation_scope_skip',
         'configuration_state', 'decision_table', 'decision_table_version', 'decision_table_row', 'parameter_set',
         'parameter_set_version', 'parameter_set_value', 'artifact_promotion_evidence', 'artifact_transition',
         'artifact_shadow_outcome', 'golden_case_label', 'artifact_monitor_snapshot'];
-    v_append_only  text[] := ARRAY['artifact_monitor_snapshot', 'artifact_promotion_evidence', 'artifact_shadow_outcome', 'artifact_transition',
+    v_append_only       text[] := ARRAY['artifact_monitor_snapshot', 'artifact_promotion_evidence', 'artifact_shadow_outcome', 'artifact_transition',
         'automation_execution']::text[];
-    v_table        text;
+    v_refuse_truncate   text[] := ARRAY['automation_rule_version', 'automation_execution', 'automation_scope_skip', 'decision_table_version',
+        'decision_table_row', 'parameter_set_version', 'parameter_set_value', 'artifact_promotion_evidence',
+        'artifact_transition', 'artifact_shadow_outcome', 'golden_case_label', 'artifact_monitor_snapshot']::text[];
+    v_table             text;
 BEGIN
     FOREACH v_table IN ARRAY v_tables LOOP
-        CONTINUE WHEN v_table = ANY (v_append_only) OR to_regclass(v_table) IS NULL;
-        EXECUTE format('CREATE OR REPLACE TRIGGER %I BEFORE UPDATE ON %I FOR EACH ROW EXECUTE FUNCTION set_recorded_at()',
-                       'trg_' || v_table || '_set_recorded_at', v_table);
+        CONTINUE WHEN to_regclass(v_table) IS NULL;
+        EXECUTE format('CREATE OR REPLACE TRIGGER %I BEFORE ' || CASE WHEN v_table = ANY (v_append_only) THEN 'INSERT' ELSE 'INSERT OR UPDATE' END
+                       || ' ON %I FOR EACH ROW EXECUTE FUNCTION set_recorded_at()', 'trg_' || v_table || '_set_recorded_at', v_table);
+    END LOOP;
+    FOREACH v_table IN ARRAY v_refuse_truncate LOOP
+        CONTINUE WHEN to_regclass(v_table) IS NULL;
+        EXECUTE format('CREATE OR REPLACE TRIGGER %I BEFORE TRUNCATE ON %I FOR EACH STATEMENT EXECUTE FUNCTION refuse_truncate()',
+                       'trg_' || v_table || '_refuse_truncate', v_table);
     END LOOP;
 END $$;
--- ===== end of recorded_at on update =====
+-- ===== end of recorded_at and TRUNCATE =====
+
+-- ===== Row-level security, generated (ADR-0017 rule 19; the rls_v1 helper of ADR-0022 rule 8) =====
+-- Every table of this file with company_id gets ENABLE and FORCE ROW LEVEL SECURITY, the company policy company_policy
+-- (company_id compared as text with nativeflows.company_id, failing closed) and the read-only company_ids_policy for
+-- registered cross-company queries (ADR-0017 rule 19). Tables whose company_id is nullable (v_nullable) show their null
+-- rows only under the setting value installation. Default partitions are listed with their parent. Exceptions are in
+-- lab gen_overview.RLS_ALLOWLIST with their reasons; this file has none.
+-- Lab gen_overview.py --check compares this section with what schema_phase_b.py writes.
+DO $$
+DECLARE
+    v_tables    text[] := ARRAY['automation_rule', 'automation_rule_version', 'automation_execution', 'automation_scope_skip',
+        'configuration_state', 'decision_table', 'decision_table_version', 'decision_table_row', 'parameter_set',
+        'parameter_set_version', 'parameter_set_value', 'artifact_promotion_evidence', 'artifact_transition',
+        'artifact_shadow_outcome', 'golden_case_label', 'artifact_monitor_snapshot'];
+    v_nullable  text[] := ARRAY[]::text[];
+    v_table     text;
+BEGIN
+    FOREACH v_table IN ARRAY v_tables LOOP
+        EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', v_table);
+        EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', v_table);
+        IF v_table = ANY (v_nullable) THEN
+            EXECUTE format('CREATE POLICY company_policy ON %I USING (company_id::text = current_setting(''nativeflows.company_id'', true)'
+                           ' OR (company_id IS NULL AND current_setting(''nativeflows.company_id'', true) = ''installation''))', v_table);
+        ELSE
+            EXECUTE format('CREATE POLICY company_policy ON %I USING (company_id::text = current_setting(''nativeflows.company_id'', true))', v_table);
+        END IF;
+        EXECUTE format('CREATE POLICY company_ids_policy ON %I FOR SELECT USING (company_id::text = ANY (string_to_array(current_setting(''nativeflows.company_ids'', true), '','')))', v_table);
+    END LOOP;
+END $$;
+-- ===== end of row-level security =====

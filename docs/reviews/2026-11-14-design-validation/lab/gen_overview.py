@@ -30,12 +30,15 @@ is invented for them. An acknowledged table that later gets an owner also fails,
 
 Keys and recorded_at (findings 1 and 2; check_keys_and_recorded_at): the script also fails (exit 2) on a table without
 `recorded_at timestamptz NOT NULL DEFAULT now()`, on a primary key other than the single column `id uuid` unless the table
-is in KEY_ALLOWLIST, and on a design file whose recorded_at trigger section (the DO block of schema_phase_b.py) does not
-list exactly the file's tables, lists an append-only table without a guard trigger (outside PURE_LOGS), or leaves an
-in-place table with a BEFORE UPDATE guard that sorts after its set_recorded_at trigger. Company keys (check_company_keys):
-it fails on a foreign key between two company tables (company_id NOT NULL on both) without company_id, on a key
-to or from a table with a nullable company_id that COMPANY_KEY_ALLOWLIST does not list, and on a lab stub that a composite
-company key targets without UNIQUE (company_id, id).
+is in KEY_ALLOWLIST, on a design file whose generated sections (render_sections: set_recorded_at on insert and update,
+refuse_truncate, row-level security) differ from what schema_phase_b.py writes, on an append-only table without a guard
+trigger (outside PURE_LOGS), on an in-place table with a BEFORE UPDATE guard that sorts after its set_recorded_at trigger,
+and on a BEFORE INSERT trigger that reads NEW.recorded_at and sorts before it. The syntax guard (syntax_errors) fails on any
+statement it cannot read: a CREATE TABLE, ALTER, REFERENCES, trigger, policy, DROP or DO outside the one form it parses, DDL
+inside a function body, and a function that does not pin search_path (S2 adversarial review S3, N3; R5-N2). Company keys
+(check_company_keys): it fails on a foreign key between two company tables (company_id NOT NULL on both) without
+company_id, on a key to or from a table with a nullable company_id that COMPANY_KEY_ALLOWLIST does not list, and on a lab
+stub that a composite company key targets without UNIQUE (company_id, id). --check also runs the mutation self-tests.
 
 Usage:  python3 gen_overview.py [--docs DIR]          write the files
         python3 gen_overview.py --check [--docs DIR]  exit 1 if a generated file differs from what is committed
@@ -73,14 +76,30 @@ KEY_ALLOWLIST = {
 # Append-only tables without a guard trigger (pure logs); every other append-only table must have a BEFORE UPDATE trigger.
 # Empty since the S2 schema review (note N6): outbox_event and derivation_trace got guards.
 PURE_LOGS = set()
-RECORDED_AT_SECTION = "-- ===== recorded_at on update (ADR-0007 rules 9, 16 and their notes) ====="
-RECORDED_AT_END = "-- ===== end of recorded_at on update ====="
+RECORDED_AT_SECTION = "-- ===== recorded_at on insert and update; TRUNCATE refused (ADR-0007 rules 9, 16 and their notes) ====="
+RECORDED_AT_END = "-- ===== end of recorded_at and TRUNCATE ====="
+RLS_SECTION = "-- ===== Row-level security, generated (ADR-0017 rule 19; the rls_v1 helper of ADR-0022 rule 8) ====="
+RLS_END = "-- ===== end of row-level security ====="
+# Headers of earlier versions of the generated sections; schema_phase_b.py strips from the first header found to the end.
+GENERATED_HEADS = (RECORDED_AT_SECTION, RLS_SECTION, "-- ===== recorded_at on update (ADR-0007 rules 9, 16 and their notes) =====")
 RECORDED_AT_COLUMN = "recorded_at timestamptz NOT NULL DEFAULT now()"
+# Row-level security (ADR-0017 rule 19): every table with company_id gets the generated section's policies, unless it is
+# listed here with its reason; an entry that no longer has company_id fails. Partitions follow their parent.
+RLS_ALLOWLIST = {
+    "uom": "core units (company_id null, ADR-0018 rule 8) are read by every company; the nullable policy would show them only "
+           "under installation, so the read rule for installation rows is a design decision (S2 adversarial review N1; open question)",
+}
 # A top-level trigger statement: name, timing, events, table (schema prefix allowed; finding S5 of the S2 schema review).
 TRIGGER_RE = re.compile(r"^CREATE (?:OR REPLACE )?(?:CONSTRAINT )?TRIGGER (\w+)\s+(BEFORE|AFTER|INSTEAD OF)\s+([A-Za-z_, \n]+?)\s+ON\s+(?:\w+\.)?(\w+)\b",
                         re.M)
-# The one trigger statement allowed inside a DO block: the generated set_recorded_at trigger of schema_phase_b.py.
-GENERATED_TRIGGER = "CREATE OR REPLACE TRIGGER %I BEFORE UPDATE ON %I FOR EACH ROW EXECUTE FUNCTION set_recorded_at()"
+# A default partition, the one form of CREATE TABLE ... PARTITION OF the design files use (ADR-0006 rules 22-23).
+PARTITION_RE = re.compile(r"^CREATE TABLE (\w+) PARTITION OF (\w+) DEFAULT;", re.M)
+
+
+def generated_start(text):
+    """Index of the first generated section of a design file (the file's length when it has none)."""
+    found = [text.index(h) for h in GENERATED_HEADS if h in text]
+    return min(found) if found else len(text)
 
 
 def mask_sql(text):
@@ -276,27 +295,232 @@ def check_company_keys(docs):
     return errors, {"company_keys": composite, "company_key_exceptions": single}
 
 
-def design_statements(design):
-    """Comment-free statements of every design/*.sql file."""
+def split_sql(text, name):
     sys.path.insert(0, HERE)
     from load_all import split_statements
+    return split_statements(text, name)[0]
+
+
+def design_texts(design):
+    """[(file name, full text)] of every design/*.sql file, sorted."""
+    return [(f, read(os.path.join(design, f))) for f in sorted(os.listdir(design)) if f.endswith(".sql")]
+
+
+def design_statements(design):
+    """Comment-free statements of every design/*.sql file, without the generated sections."""
     stmts = []
-    for f in sorted(os.listdir(design)):
-        if f.endswith(".sql"):
-            stmts += [re.sub(r"--[^\n]*", "", st) for st, _ in split_statements(read(os.path.join(design, f)), f)[0]]
+    for f, text in design_texts(design):
+        stmts += [re.sub(r"--[^\n]*", "", st) for st, _ in split_sql(text[:generated_start(text)], f)]
     return stmts
 
 
+def design_context(named):
+    """What the generated sections of every design file depend on, read from the hand-written part of all files (the
+    text before generated_start): append-only tables, company status, triggers, default partitions, and the functions
+    that read NEW.recorded_at."""
+    pre = [(f, t[:generated_start(t)]) for f, t in named]
+    stmts = []
+    for f, t in pre:
+        stmts += [re.sub(r"--[^\n]*", "", st) for st, _ in split_sql(t, f)]
+    tables, _ = company_scan(pre)
+    triggers, partitions, reads_recorded = [], {}, set()
+    for f, t in pre:
+        masked = mask_sql(t)
+        for m in TRIGGER_RE.finditer(masked):
+            end = masked.find(";", m.end())
+            fm = re.search(r"EXECUTE FUNCTION (?:\w+\.)?(\w+)", masked[m.end():end])
+            triggers.append({"file": f, "start": m.start(), "name": m.group(1), "timing": m.group(2),
+                             "events": " ".join(m.group(3).split()), "table": m.group(4), "fn": fm.group(1) if fm else None})
+        for m in PARTITION_RE.finditer(masked):
+            partitions[m.group(1)] = (m.group(2), f)
+    for code in stmts:
+        fm = re.match(r"\s*CREATE (?:OR REPLACE )?FUNCTION (?:\w+\.)?(\w+)\(", code)
+        if fm and re.search(r"\bNEW\.recorded_at\b(?!\s*:=)", code):
+            reads_recorded.add(fm.group(1))
+    append_only = classify(stmts)
+    need = set(append_only) | {g["table"] for g in triggers if g["timing"] == "BEFORE" and re.search(r"\bDELETE\b", g["events"])}
+    hand_truncate = {g["table"] for g in triggers if re.search(r"\bTRUNCATE\b", g["events"])}
+    return {"company": {t: v["company"] for t, v in tables.items()}, "append_only": append_only, "triggers": triggers,
+            "partitions": partitions, "reads_recorded": reads_recorded, "truncate_need": need, "hand_truncate": hand_truncate}
+
+
+def wrap_array(names, indent):
+    lines, cur = [], ""
+    for n in names:
+        item = f"'{n}', "
+        if len(indent) + len(cur) + len(item) > 124:
+            lines.append(cur.rstrip()); cur = ""
+        cur += item
+    lines.append(cur.rstrip().rstrip(","))
+    return ("\n" + indent).join(lines)
+
+
+def file_plan(fname, text, ctx):
+    """The lists of a design file's generated sections: (tables, append-only, refuse-truncate, RLS tables, RLS nullable)."""
+    pre = text[:generated_start(text)]
+    tables = [name for name, _, _, _ in table_spans(pre, mask_sql(pre))]
+    parts = [p for p, (_, f) in ctx["partitions"].items() if f == fname]
+    parent = lambda t: ctx["partitions"][t][0] if t in ctx["partitions"] else t
+    company = lambda t: ctx["company"].get(parent(t))
+    ao = sorted(t for t in tables if t in ctx["append_only"])
+    trunc = [t for t in tables + parts if parent(t) in ctx["truncate_need"] and t not in ctx["hand_truncate"]]
+    rls = [t for t in tables + parts if company(t) and parent(t) not in RLS_ALLOWLIST]
+    nullable = [t for t in rls if company(t) == "null"]
+    return tables, ao, trunc, rls, nullable
+
+
+def render_sections(fname, text, ctx):
+    """The generated end sections of a design file (empty for a file without tables). schema_phase_b.py writes them and
+    check_keys_and_recorded_at compares them with the file, character for character."""
+    tables, ao, trunc, rls, nullable = file_plan(fname, text, ctx)
+    if not tables:
+        return ""
+    pad = " " * 8
+    reasons = sorted({ctx["append_only"][t] for t in ao})
+    out = [
+        RECORDED_AT_SECTION,
+        "-- Every table of this file has recorded_at timestamptz NOT NULL DEFAULT now(). The DO block attaches the trigger",
+        "-- trg_<table>_set_recorded_at (function set_recorded_at) to every table of v_tables: BEFORE INSERT OR UPDATE on tables",
+        "-- updated in place, BEFORE INSERT on the append-only tables of v_append_only. recorded_at is so the instant of the last",
+        "-- write, set by the system and never taken from a client (ADR-0007 rule 9 and its notes; S2 adversarial review S2).",
+        "-- Append-only tables are those whose guard trigger refuses every update outside an erasure, and pure logs"
+        + (f" (here: {', '.join(reasons)})." if reasons else "."),
+        "-- Row guards without UPDATE OF on in-place tables sort before set_recorded_at, so they compare rows before it runs; a",
+        "-- BEFORE INSERT trigger whose function reads NEW.recorded_at sorts after it, so it sees the system's value.",
+        "-- TRUNCATE skips row triggers, so every append-only table and every table with a BEFORE DELETE guard, unless it has a",
+        "-- TRUNCATE trigger of its own, is listed in v_refuse_truncate (default partitions with their parent) and gets",
+        "-- trg_<table>_refuse_truncate (BEFORE TRUNCATE, function refuse_truncate; S2 adversarial review N4).",
+        "-- Lab gen_overview.py --check compares this section with what schema_phase_b.py writes from the table definitions and",
+        "-- triggers of the design files. The functions are defined in every file because the labs load subsets.",
+        "CREATE OR REPLACE FUNCTION set_recorded_at() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$",
+        "BEGIN",
+        "    NEW.recorded_at := now();",
+        "    RETURN NEW;",
+        "END $$;",
+        "CREATE OR REPLACE FUNCTION refuse_truncate() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$",
+        "BEGIN",
+        "    RAISE EXCEPTION '% is never truncated (append-only or guarded rows)', TG_TABLE_NAME USING ERRCODE = 'restrict_violation';",
+        "END $$;",
+        "DO $$",
+        "DECLARE",
+        f"    v_tables            text[] := ARRAY[{wrap_array(tables, pad)}];",
+        f"    v_append_only       text[] := ARRAY[{wrap_array(ao, pad)}]::text[];",
+        f"    v_refuse_truncate   text[] := ARRAY[{wrap_array(trunc, pad)}]::text[];",
+        "    v_table             text;",
+        "BEGIN",
+        "    FOREACH v_table IN ARRAY v_tables LOOP",
+        "        CONTINUE WHEN to_regclass(v_table) IS NULL;",
+        "        EXECUTE format('CREATE OR REPLACE TRIGGER %I BEFORE ' || CASE WHEN v_table = ANY (v_append_only) THEN 'INSERT' ELSE 'INSERT OR UPDATE' END",
+        "                       || ' ON %I FOR EACH ROW EXECUTE FUNCTION set_recorded_at()', 'trg_' || v_table || '_set_recorded_at', v_table);",
+        "    END LOOP;",
+        "    FOREACH v_table IN ARRAY v_refuse_truncate LOOP",
+        "        CONTINUE WHEN to_regclass(v_table) IS NULL;",
+        "        EXECUTE format('CREATE OR REPLACE TRIGGER %I BEFORE TRUNCATE ON %I FOR EACH STATEMENT EXECUTE FUNCTION refuse_truncate()',",
+        "                       'trg_' || v_table || '_refuse_truncate', v_table);",
+        "    END LOOP;",
+        "END $$;",
+        RECORDED_AT_END,
+    ]
+    if rls:
+        exceptions = sorted(t for t in tables if ctx["company"].get(t) and t in RLS_ALLOWLIST)
+        out += [
+            "",
+            RLS_SECTION,
+            "-- Every table of this file with company_id gets ENABLE and FORCE ROW LEVEL SECURITY, the company policy company_policy",
+            "-- (company_id compared as text with nativeflows.company_id, failing closed) and the read-only company_ids_policy for",
+            "-- registered cross-company queries (ADR-0017 rule 19). Tables whose company_id is nullable (v_nullable) show their null",
+            "-- rows only under the setting value installation. Default partitions are listed with their parent. Exceptions are in",
+            "-- lab gen_overview.RLS_ALLOWLIST with their reasons" + (f" (here: {', '.join(exceptions)})." if exceptions else "; this file has none.")
+            ,
+            "-- Lab gen_overview.py --check compares this section with what schema_phase_b.py writes.",
+            "DO $$",
+            "DECLARE",
+            f"    v_tables    text[] := ARRAY[{wrap_array(rls, pad)}];",
+            f"    v_nullable  text[] := ARRAY[{wrap_array(nullable, pad)}]::text[];",
+            "    v_table     text;",
+            "BEGIN",
+            "    FOREACH v_table IN ARRAY v_tables LOOP",
+            "        EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', v_table);",
+            "        EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', v_table);",
+            "        IF v_table = ANY (v_nullable) THEN",
+            "            EXECUTE format('CREATE POLICY company_policy ON %I USING (company_id::text = current_setting(''nativeflows.company_id'', true)'",
+            "                           ' OR (company_id IS NULL AND current_setting(''nativeflows.company_id'', true) = ''installation''))', v_table);",
+            "        ELSE",
+            "            EXECUTE format('CREATE POLICY company_policy ON %I USING (company_id::text = current_setting(''nativeflows.company_id'', true))', v_table);",
+            "        END IF;",
+            "        EXECUTE format('CREATE POLICY company_ids_policy ON %I FOR SELECT USING (company_id::text = ANY (string_to_array(current_setting(''nativeflows.company_ids'', true), '','')))', v_table);",
+            "    END LOOP;",
+            "END $$;",
+            RLS_END,
+        ]
+    return "\n\n" + "\n".join(out) + "\n"
+
+
+def render_file(fname, text, ctx):
+    """The design file with its generated sections rewritten."""
+    return text[:generated_start(text)].rstrip("\n") + render_sections(fname, text, ctx)
+
+
+# The syntax guard (S2 adversarial review S3; R5-N2 of the S2 schema review): the checks above read tables, keys and triggers
+# from one written form each. Every statement that could create or change a table, a key, a trigger or a policy must be in
+# that form, or the guard fails; nothing it cannot read is skipped silently. The catalog check of lab t31 (part Z) holds the
+# same rules on the loaded database, whatever the syntax.
+TABLE_WORD_RE = re.compile(r"CREATE\s+(?:(?:GLOBAL|LOCAL|TEMP|TEMPORARY|UNLOGGED|FOREIGN)\s+)*TABLE\b", re.I)
+BODY_DDL_RE = re.compile(r"\b(?:CREATE|ALTER|DROP)\s+(?:(?:GLOBAL|LOCAL|TEMP|TEMPORARY|UNLOGGED|OR\s+REPLACE|CONSTRAINT)\s+)*"
+                         r"(?:TABLE|TRIGGER|POLICY|FUNCTION)\b|\bROW\s+LEVEL\s+SECURITY\b|\b(?:DISABLE|ENABLE)\s+TRIGGER\b", re.I)
+ALTER_OK_RE = re.compile(r"ALTER TABLE \w+ ADD (?:CONSTRAINT \w+ )?(?:FOREIGN KEY|UNIQUE|CHECK|EXCLUDE)\b")
+
+
+def syntax_errors(fname, pre):
+    """Errors for statements of the hand-written part of a design file that the guard cannot read."""
+    errors = []
+    for stmt, line in split_sql(pre, fname):
+        where = f"design/{fname}:{line}"
+        code = " ".join(mask_sql(stmt).split())
+        if TABLE_WORD_RE.match(code):
+            m = re.match(r"CREATE TABLE \w+ \(", code)
+            ok = bool(PARTITION_RE.match(code)) or (m and table_spans(code, code)
+                                                    and re.fullmatch(r"\s*(?:PARTITION BY RANGE \(id\))?\s*;?\s*",
+                                                                     code[table_spans(code, code)[0][2] + 1:]))
+            if not ok:
+                errors.append(f"{where}: CREATE TABLE statement the guard cannot parse (write CREATE TABLE <name> (...) or "
+                              "CREATE TABLE <name> PARTITION OF <parent> DEFAULT; no IF NOT EXISTS, schema, UNLOGGED, AS or lowercase)")
+        elif re.match(r"ALTER\b", code, re.I):
+            if not ALTER_OK_RE.match(code):
+                errors.append(f"{where}: ALTER statement the guard cannot read; only ALTER TABLE <name> ADD [CONSTRAINT <name>] "
+                              "FOREIGN KEY | UNIQUE | CHECK | EXCLUDE is allowed (no DROP, ALTER COLUMN or ADD PRIMARY KEY)")
+        elif re.match(r"(?:DROP|DO|TRUNCATE)\b", code, re.I):
+            errors.append(f"{where}: {code.split()[0]} statement outside the generated sections, which the guard cannot check")
+        if re.search(r"\bROW\s+LEVEL\s+SECURITY\b|\bCREATE\s+POLICY\b", code, re.I):
+            errors.append(f"{where}: row-level security outside the generated section (schema_phase_b.py writes it)")
+        for m in re.finditer(r"\bREFERENCES\b", code, re.I):
+            if not re.match(r"REFERENCES \w+ \((?!\s*\))", code[m.start():]):
+                errors.append(f"{where}: REFERENCES the guard cannot parse (write REFERENCES <table> (<columns>): uppercase, "
+                              "no schema, a space before the column list)")
+        if re.match(r"CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\b", code, re.I) and \
+                not re.match(r"CREATE (?:OR REPLACE )?FUNCTION [^$]*? SET search_path = nativeflows, pg_temp AS \$", code):
+            errors.append(f"{where}: function without SET search_path = nativeflows, pg_temp before AS (S2 adversarial review N3)")
+        for m in re.finditer(r"\$(\w*)\$(.*?)\$\1\$", re.sub(r"--[^\n]*", "", stmt), re.S):
+            if BODY_DDL_RE.search(m.group(2)):
+                errors.append(f"{where}: DDL inside a function body or DO block, which the guard cannot check")
+    return errors
+
+
 def check_keys_and_recorded_at(docs):
-    """Errors for findings 1 and 2 (exact rules in KEY_ALLOWLIST's comment), and the counts for the summary."""
-    errors, n_tables, attached, append_only, seen_allow = [], 0, 0, 0, set()
+    """Errors for findings 1 and 2 and the generated sections (exact rules in KEY_ALLOWLIST's comment and render_sections),
+    and the counts for the summary."""
+    errors, seen_allow = [], set()
+    counts = defaultdict(int)
     design = os.path.join(docs, "design")
-    expected_ao = classify(design_statements(design))
-    for fname in sorted(f for f in os.listdir(design) if f.endswith(".sql")):
-        text = read(os.path.join(design, fname))
-        masked = mask_sql(text)
+    named = design_texts(design)
+    ctx = design_context(named)
+    seen_rls = set()
+    for fname, text in named:
+        start = generated_start(text)
+        pre = text[:start]
+        masked = mask_sql(pre)
         tables = []
-        for name, _, _, spans in table_spans(text, masked):
+        for name, _, _, spans in table_spans(pre, masked):
             tables.append(name)
             where = f"design/{fname}:{text.count(chr(10), 0, spans[0][0]) + 1}"
             codes = [" ".join(masked[s:e].split()) for s, e in spans]
@@ -316,65 +540,61 @@ def check_keys_and_recorded_at(docs):
             elif not pk_ok:
                 errors.append(f"{where}: table {name} has the primary key ({', '.join(pk) or 'none'}), not id uuid "
                               "(ADR-0006 rule 1; exceptions only in KEY_ALLOWLIST)")
-        n_tables += len(tables)
-        # the recorded_at trigger section of the file
-        count = text.count(RECORDED_AT_SECTION)
-        if tables and count != 1:
-            errors.append(f"design/{fname}: {count} recorded_at trigger sections; expected one (schema_phase_b.py writes it)")
-            continue
-        explicit = re.findall(r"^CREATE (?:OR REPLACE )?TRIGGER (\w+_set_recorded_at)", masked, re.M)
+            if name in RLS_ALLOWLIST:
+                seen_rls.add(name)
+                if not ctx["company"].get(name):
+                    errors.append(f"RLS_ALLOWLIST names {name}, which has no company_id; remove it")
+        errors += syntax_errors(fname, pre)
+        # the generated sections, character for character
+        if text != render_file(fname, text, ctx):
+            errors.append(f"design/{fname}: the generated sections differ from what schema_phase_b.py writes (run it)")
+        explicit = re.findall(r"^CREATE (?:OR REPLACE )?TRIGGER (\w+_set_recorded_at|\w+_refuse_truncate)", masked, re.M)
         if explicit:
-            errors.append(f"design/{fname}: set_recorded_at triggers outside the DO block: {', '.join(explicit)}")
+            errors.append(f"design/{fname}: generated triggers written by hand: {', '.join(explicit)}")
         if not tables:
             continue
-        sec = text[text.index(RECORDED_AT_SECTION):]
-        arrays = {k: re.findall(r"'(\w+)'", v) for k, v in re.findall(r"(v_tables|v_append_only)\s+text\[\] := ARRAY\[(.*?)\]", sec, re.S)}
-        listed, ao = arrays.get("v_tables", []), arrays.get("v_append_only", [])
-        if sorted(listed) != sorted(tables):
-            errors.append(f"design/{fname}: v_tables differs from the file's tables: missing {sorted(set(tables) - set(listed))}, "
-                          f"extra {sorted(set(listed) - set(tables))}")
-        if not set(ao) <= set(tables):
-            errors.append(f"design/{fname}: v_append_only names tables of no CREATE TABLE here: {sorted(set(ao) - set(tables))}")
-        befores = defaultdict(list)       # table -> names of its row-level BEFORE UPDATE triggers (not UPDATE OF)
+        _, ao, trunc, rls, nullable = file_plan(fname, text, ctx)
+        befores, inserts = defaultdict(list), defaultdict(list)
         parsed = set()
-        for m in TRIGGER_RE.finditer(masked):
-            parsed.add(m.start())
-            if m.group(2) == "BEFORE" and re.search(r"\bUPDATE\b(?! OF)", m.group(3)):
-                befores[m.group(4)].append(m.group(1))
-        # finding S5: every trigger statement must be one the guard reads. A top-level statement the pattern above misses,
-        # or a trigger created in a DO block other than the generated set_recorded_at one, is an error, not a silent skip.
-        for m in re.finditer(r"CREATE\s+(?:OR\s+REPLACE\s+)?(?:CONSTRAINT\s+)?TRIGGER\b", text):
-            line = text.count("\n", 0, m.start()) + 1
-            if masked[m.start():m.end()] == text[m.start():m.end()]:      # code, not a comment or string
-                if m.start() not in parsed:
-                    errors.append(f"design/{fname}:{line}: trigger statement the guard cannot parse (write it as "
-                                  "CREATE TRIGGER <name> BEFORE|AFTER <events> ON [schema.]<table>)")
-            elif "--" not in text[text.rfind("\n", 0, m.start()) + 1:m.start()] and \
-                    not text.startswith(GENERATED_TRIGGER, m.start()):
-                errors.append(f"design/{fname}:{line}: trigger created inside a DO block or string, which the guard cannot "
-                              "check; create it as a top-level statement")
-        want = sorted(t for t in tables if t in expected_ao)
-        if sorted(ao) != want:
-            errors.append(f"design/{fname}: v_append_only differs from the guards' classification: listed but not append-only "
-                          f"{sorted(set(ao) - set(want))}, append-only but not listed {sorted(set(want) - set(ao))} "
-                          "(run schema_phase_b.py)")
+        for g in ctx["triggers"]:
+            if g["file"] != fname:
+                continue
+            parsed.add(g["start"])
+            if g["timing"] == "BEFORE" and re.search(r"\bUPDATE\b(?! OF)", g["events"]):
+                befores[g["table"]].append(g["name"])
+            if g["timing"] == "BEFORE" and re.search(r"\bINSERT\b", g["events"]) and g["fn"] in ctx["reads_recorded"]:
+                inserts[g["table"]].append(g["name"])
+        # finding S5: every trigger statement must be one the guard reads; a top-level statement the pattern misses is an error.
+        for m in re.finditer(r"CREATE\s+(?:OR\s+REPLACE\s+)?(?:CONSTRAINT\s+)?TRIGGER\b", masked, re.I):
+            if m.start() not in parsed:
+                errors.append(f"design/{fname}:{text.count(chr(10), 0, m.start()) + 1}: trigger statement the guard cannot parse "
+                              "(write it as CREATE TRIGGER <name> BEFORE|AFTER <events> ON [schema.]<table>)")
         for t in ao:
             if t not in PURE_LOGS and not befores.get(t):
                 errors.append(f"design/{fname}: append-only table {t} has no BEFORE UPDATE guard and is not in PURE_LOGS")
         for t in tables:
-            if t in ao:
-                continue
-            late = [g for g in befores.get(t, []) if g > f"trg_{t}_set_recorded_at"]
+            late = [g for g in befores.get(t, []) if g > f"trg_{t}_set_recorded_at"] if t not in ao else []
             if late:
                 errors.append(f"design/{fname}: guard {', '.join(late)} on {t} sorts after trg_{t}_set_recorded_at and would see "
                               "the refreshed recorded_at; rename it")
-        attached += len(tables) - len(ao)
-        append_only += len(ao)
+            early = [g for g in inserts.get(t, []) if g < f"trg_{t}_set_recorded_at"]
+            if early:
+                errors.append(f"design/{fname}: BEFORE INSERT trigger {', '.join(early)} on {t} reads NEW.recorded_at but sorts "
+                              f"before trg_{t}_set_recorded_at, so it would see a client's value; rename it")
+        counts["tables"] += len(tables)
+        counts["insert_update"] += len(tables) - len(ao)
+        counts["append_only"] += len(ao)
+        counts["truncate"] += len(trunc)
+        counts["rls"] += len(rls)
+        counts["rls_nullable"] += len(nullable)
+    counts["hand_truncate"] = len(ctx["hand_truncate"])
     for name in sorted(set(KEY_ALLOWLIST) - seen_allow):
         errors.append(f"KEY_ALLOWLIST names {name}, which no design file defines")
+    for name in sorted(set(RLS_ALLOWLIST) - seen_rls):
+        errors.append(f"RLS_ALLOWLIST names {name}, which no design file defines")
     company_errors, company_counts = check_company_keys(docs)
     errors += company_errors
-    return errors, {"tables": n_tables, "allowlist": len(KEY_ALLOWLIST), "triggers": attached, "append_only": append_only,
+    return errors, {**counts, "allowlist": len(KEY_ALLOWLIST), "triggers": counts["tables"], "rls_exceptions": len(RLS_ALLOWLIST),
                     **company_counts}
 
 CREATE_RE = re.compile(r"^CREATE TABLE (\w+)\s*\(")
@@ -1054,16 +1274,17 @@ def build(docs):
 
 # Mutation self-tests of the guard (finding S5 of the S2 schema review): each mutation of a copy of design/ must raise an
 # error containing the given text. --check runs them; a mutation the guard misses fails the check.
+_DS30 = "CREATE UNIQUE INDEX ux_list_variant_default_shared ON list_variant"   # insertion point of the syntax self-tests
 SELFTESTS = (
     ("guard on a schema-qualified table renamed to sort after set_recorded_at", "DS-06-universal-journal.sql",
      "CREATE TRIGGER trg_account_posted_immutable", "CREATE TRIGGER trg_account_zz_immutable", "sorts after trg_account_set_recorded_at"),
     ("an in-place table with a schema-qualified guard listed as append-only", "DS-06-universal-journal.sql",
-     "v_append_only  text[] := ARRAY[", "v_append_only  text[] := ARRAY['account', ",
-     "listed but not append-only ['account']"),
+     "v_append_only       text[] := ARRAY[", "v_append_only       text[] := ARRAY['account', ",
+     "the generated sections differ"),
     ("a guard trigger created inside a DO block", "DS-06-universal-journal.sql",
-     "-- ===== end of recorded_at on update =====",
-     "-- ===== end of recorded_at on update =====\nDO $$ BEGIN EXECUTE 'CREATE TRIGGER trg_x BEFORE UPDATE ON account FOR EACH "
-     "ROW EXECUTE FUNCTION journal_reject_change()'; END $$;", "inside a DO block"),
+     "CREATE TRIGGER trg_account_posted_immutable\n",
+     "DO $$ BEGIN EXECUTE 'CREATE TRIGGER trg_x BEFORE UPDATE ON account FOR EACH "
+     "ROW EXECUTE FUNCTION journal_reject_change()'; END $$;\nCREATE TRIGGER trg_account_posted_immutable\n", "DDL inside a function body or DO block"),
     ("a top-level trigger statement the pattern cannot read", "DS-06-universal-journal.sql",
      "CREATE TRIGGER trg_account_posted_immutable\n", "CREATE TRIGGER \"trg_account_posted_immutable\"\n",
      "cannot parse"),
@@ -1086,6 +1307,48 @@ SELFTESTS = (
      "FOREIGN KEY (company_id, policy_rule_id, policy_rule_version) REFERENCES policy_rule_version (company_id, policy_rule_id, version)",
      "FOREIGN KEY (policy_rule_id, policy_rule_version) REFERENCES policy_rule_version (policy_rule_id, version)",
      "multi-column foreign key between company tables without company_id, policy_decision (policy_rule_id, policy_rule_version)"),
+    # S2 adversarial review S3 and R5-N2: syntaxes the guard cannot read fail loudly (each inserted into DS-30-ui.sql)
+    *((f"syntax: {label}", "DS-30-ui.sql", _DS30, stmt + "\n" + _DS30, expect) for label, stmt, expect in (
+        ("CREATE TABLE IF NOT EXISTS", "CREATE TABLE IF NOT EXISTS lab_x (code text PRIMARY KEY);", "CREATE TABLE statement the guard cannot parse"),
+        ("a schema-qualified CREATE TABLE", "CREATE TABLE nativeflows.lab_x (code text PRIMARY KEY);", "CREATE TABLE statement the guard cannot parse"),
+        ("CREATE UNLOGGED TABLE", "CREATE UNLOGGED TABLE lab_x (code text PRIMARY KEY);", "CREATE TABLE statement the guard cannot parse"),
+        ("a lowercase create table", "create table lab_x (code text primary key);", "CREATE TABLE statement the guard cannot parse"),
+        ("CREATE TABLE AS", "CREATE TABLE lab_x AS SELECT 1 AS id;", "CREATE TABLE statement the guard cannot parse"),
+        ("a table created by EXECUTE in a DO block", "DO $$ BEGIN EXECUTE 'CREATE TABLE lab_x (code text PRIMARY KEY)'; END $$;",
+         "DDL inside a function body or DO block"),
+        ("ALTER COLUMN recorded_at DROP DEFAULT", "ALTER TABLE list_variant ALTER COLUMN recorded_at DROP DEFAULT;", "ALTER statement the guard cannot read"),
+        ("ALTER COLUMN recorded_at DROP NOT NULL", "ALTER TABLE list_variant ALTER COLUMN recorded_at DROP NOT NULL;", "ALTER statement the guard cannot read"),
+        ("DROP COLUMN recorded_at", "ALTER TABLE list_variant DROP COLUMN recorded_at;", "ALTER statement the guard cannot read"),
+        ("DROP CONSTRAINT of the primary key", "ALTER TABLE list_variant DROP CONSTRAINT list_variant_pkey;", "ALTER statement the guard cannot read"),
+        ("ADD PRIMARY KEY", "ALTER TABLE list_variant ADD PRIMARY KEY (company_id, id);", "ALTER statement the guard cannot read"),
+        ("a lowercase alter table", "alter table list_variant add constraint ck_lab check (true);", "ALTER statement the guard cannot read"),
+        ("a schema-qualified REFERENCES", "ALTER TABLE list_variant ADD CONSTRAINT fk_lab FOREIGN KEY (owner_user_id) REFERENCES nativeflows.user_account (id);",
+         "REFERENCES the guard cannot parse"),
+        ("REFERENCES without a space before the column list", "ALTER TABLE list_variant ADD CONSTRAINT fk_lab FOREIGN KEY (owner_user_id) REFERENCES user_account(id);",
+         "REFERENCES the guard cannot parse"),
+        ("REFERENCES without a column list", "ALTER TABLE list_variant ADD CONSTRAINT fk_lab FOREIGN KEY (owner_user_id) REFERENCES user_account;",
+         "REFERENCES the guard cannot parse"),
+        ("a lowercase references", "ALTER TABLE list_variant ADD CONSTRAINT fk_lab FOREIGN KEY (owner_user_id) references user_account (id);",
+         "REFERENCES the guard cannot parse"),
+        ("a DROP statement", "DROP TRIGGER trg_list_variant_set_recorded_at ON list_variant;", "DROP statement outside the generated sections"),
+        ("a hand-written policy", "CREATE POLICY lab_open ON list_variant USING (true);", "row-level security outside the generated section"),
+        ("a function that does not pin search_path", "CREATE FUNCTION lab_f() RETURNS integer LANGUAGE sql AS $$ SELECT 1 $$;",
+         "function without SET search_path"),
+        ("a lowercase trigger statement", "create trigger trg_lab before update on list_variant for each row execute function set_recorded_at();",
+         "trigger statement the guard cannot parse"),
+    )),
+    ("a company table left out of the row-level security section", "DS-30-ui.sql",
+     "    v_tables    text[] := ARRAY['assist_request', 'list_variant'];", "    v_tables    text[] := ARRAY['assist_request'];",
+     "DS-30-ui.sql: the generated sections differ"),
+    ("an append-only table left out of the TRUNCATE guards", "DS-05-platform.sql",
+     "v_refuse_truncate   text[] := ARRAY['agent_type_version', ", "v_refuse_truncate   text[] := ARRAY[",
+     "DS-05-platform.sql: the generated sections differ"),
+    ("an append-only table given the update trigger", "DS-05-platform.sql",
+     "v_append_only       text[] := ARRAY['agent_promotion_evidence', ", "v_append_only       text[] := ARRAY[",
+     "DS-05-platform.sql: the generated sections differ"),
+    ("a BEFORE INSERT trigger reading NEW.recorded_at that sorts before set_recorded_at", "DS-05-platform.sql",
+     "CREATE TRIGGER trg_document_version_taint_check BEFORE INSERT", "CREATE TRIGGER trg_document_version_check_taint BEFORE INSERT",
+     "reads NEW.recorded_at but sorts before trg_document_version_set_recorded_at"),
 )
 
 
@@ -1139,8 +1402,10 @@ def main():
             sys.exit(1)
         k = summary["keys"]
         print(f"ok: {len(files)} files current; {summary['tables']} tables, {summary['events']} events; keys and recorded_at: "
-              f"{k['tables']} tables, {k['allowlist']} key exceptions, {k['triggers']} set_recorded_at triggers, {k['append_only']} append-only; "
-              f"{k['company_keys']} composite company keys, {k['company_key_exceptions']} single-column keys to or from "
+              f"{k['tables']} tables, {k['allowlist']} key exceptions, {k['triggers']} set_recorded_at triggers ({k['insert_update']} on "
+              f"insert and update, {k['append_only']} append-only on insert); {k['truncate']} generated and {k['hand_truncate']} "
+              f"hand-written TRUNCATE guards; row-level security on {k['rls']} tables and partitions ({k['rls_nullable']} nullable, "
+              f"{k['rls_exceptions']} exception); {k['company_keys']} composite company keys, {k['company_key_exceptions']} single-column keys to or from "
               f"installation-or-company tables ({len(COMPANY_KEY_ALLOWLIST)} allowlisted tables); {len(SELFTESTS)} guard self-tests pass")
     else:
         os.makedirs(out_dir, exist_ok=True)
