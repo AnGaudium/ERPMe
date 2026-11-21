@@ -46,7 +46,7 @@ Build step(s): <n, …>    Generated from index: <git commit of docs/design/gene
 | 8 | `## UI annotations` | The annotations of ADR-0077 the module's declarations carry: floorplan per route, titles, facets, field annotations, work item kinds, tiles. Headless modules write `None (headless step)`. | 5% |
 | 9 | `## Conflicts` | Every `CONFLICT <rule id>: <resolution>` (rule of compiling 2), also those found by the extractor's conflict flag that proved harmless: `FALSE-POSITIVE <note id>`. | 3% |
 | 10 | `## Proposed (not law)` | Rules of proposed ADRs, or none. | as needed |
-| 11 | `## Trace` | Table `Source | Where`: one row per source rule and note ID of the module in the rule index, `Where` is one or more of the spec's R-numbers, a section name, or `not applicable: <reason>` (never empty; any other value is a lint warning) (only for notes and sections, never for a rule; for non-normative text such as review credits or history). No ID may be missing; none may be invented. | 10% |
+| 11 | `## Trace` | Table `Source | Where`: one row per source rule and note ID of the module in the rule index, `Where` is one or more of the spec's R-numbers, a section name, or `not applicable: <reason>` or `ref: <module> R-<n>` / `ref: ADR-nnnn.Rn` for law that another module's spec states (never empty; any other value is a lint warning) (only for notes and sections, never for a rule; for non-normative text such as review credits or history). No ID may be missing; none may be invented. | 10% |
 
 Heading levels: `#` title, `##` sections above, `###` topics inside. Lint chunks by `## ` headings.
 
@@ -74,4 +74,4 @@ Heading levels: `#` title, `##` sections above, `###` topics inside. Lint chunks
 1. `doc_lint.py <file> --module <m>` prints `LINT PASS`.
 2. A reviewer on a different model spot-checks **20 rules** drawn by seed from the trace table: each statement is
    what the source rules and notes say, and nothing in the spec lacks a source.
-3. Every `CONFLICT` and `OPEN` entry has been seen by the chief architect; an `OPEN` entry has an open question.
+3. The lint's REVIEW LIST (every `CONFLICT`, `FALSE-POSITIVE` and `OPEN` entry with its reason) has been read by the chief architect; every `CONFLICT` and `OPEN` entry is accepted by them; an `OPEN` entry has an open question.

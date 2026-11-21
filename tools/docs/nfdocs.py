@@ -8,6 +8,7 @@ copied, so the tools and the generated module cards cannot disagree.
 
 import csv
 import glob
+import hashlib
 import importlib
 import io
 import os
@@ -72,6 +73,7 @@ ADR_REF_RE = re.compile(
     r"ADR-(\d{4})(?:\]\([^)]*\))?(?:'s)?,?"
     r"(?:\s+(?:rules?\s+(\d{1,3}[a-z]?\b(?:" + _SEP + r"\d{1,3}[a-z]?\b)*)"
     r"|(R\d+(?:" + _SEP + r"R\d+)*)\b))?")
+RULE_OF_ADR_RE = re.compile(r"\brules?\s+(\d{1,3}[a-z]?\b(?:" + _SEP + r"\d{1,3}[a-z]?\b)*)\s+of\s+\[?ADR-(\d{4})")
 OTHER_REFS = {"inv": re.compile(r"\bINV-(\d+)\b"), "ec": re.compile(r"\bEC-(\d+)\b"),
               "ds": re.compile(r"\bDS-(\d+)\b"), "oq": re.compile(r"\bOQ-(\d+)\b")}
 STEP_RE = re.compile(r"\b(?:[Bb]uild )?[Ss]teps? (\d+[ab]?)\b")
@@ -442,6 +444,12 @@ def expand_list(spec):
     return out
 
 
+def stable_key(text):
+    """First 12 hex of sha1 over the unit's text with whitespace collapsed (S3 review R2-S4): note IDs are positional
+    and shift when a note is inserted before others; the key lets a trace row name the text it was compiled from."""
+    return hashlib.sha1(" ".join(text.split()).encode("utf-8")).hexdigest()[:12]
+
+
 def rule_sort_key(uid):
     return [int(p) if p.isdigit() else p for p in re.split(r"(\d+)", uid)]
 
@@ -455,7 +463,10 @@ def find_refs(text):
         if spec:
             for r in expand_list(spec):
                 rules.add(f"ADR-{m.group(1)}.R{r[1:] if r.startswith('R') else r}")
-    other = {k: sorted({f"{k.upper()}-{n}" for n in rx.findall(text)}, key=rule_sort_key) for k, rx in OTHER_REFS.items()}
+    for m in RULE_OF_ADR_RE.finditer(text):   # 'rule 12 of ADR-0070', 'rules 3 and 4 of [ADR-0033](...)'
+        for r in expand_list(m.group(1)):
+            rules.add(f"ADR-{m.group(2)}.R{r}")
+    other ={k: sorted({f"{k.upper()}-{n}" for n in rx.findall(text)}, key=rule_sort_key) for k, rx in OTHER_REFS.items()}
     return sorted(adrs), sorted(rules, key=rule_sort_key), other
 
 

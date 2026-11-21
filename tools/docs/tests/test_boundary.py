@@ -52,6 +52,16 @@ class Boundary(unittest.TestCase):
         self.assertEqual(self.by["ADR-0002.R2.N2"]["relation"], "supersedes")
         self.assertEqual(nfdocs.find_phrases("the line becomes the origin", nfdocs.SUPERSEDES_PHRASES), [])
 
+    def test_rule_of_adr_forms(self):
+        self.assertEqual(nfdocs.find_refs("rule 12 of ADR-0070; rules 3 and 4 of [ADR-0033](x); ADR-0070, rule 9")[1],
+                         ["ADR-0033.R3", "ADR-0033.R4", "ADR-0070.R9", "ADR-0070.R12"])
+
+    def test_stable_key(self):
+        n = self.by["ADR-0001.R10.N2"]
+        self.assertEqual(nfdocs.stable_key(n["text"]), nfdocs.stable_key("  " + n["text"].replace(" ", "  ")))
+        self.assertRegex(nfdocs.stable_key(n["text"]), r"^[0-9a-f]{12}$")
+        self.assertNotEqual(nfdocs.stable_key(n["text"]), nfdocs.stable_key(self.by["ADR-0001.R10.N1"]["text"]))
+
     def test_coverage(self):
         for a in self.parsed:
             self.assertEqual(a["coverage"]["uncovered"], [], a["file"])

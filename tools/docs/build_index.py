@@ -21,7 +21,7 @@ import nfdocs  # noqa: E402
 
 INDEX_FIELDS = ["id", "kind", "adr", "status", "primary_module", "modules", "modules_all", "tables", "catalog_rows",
                 "xrefs_rules", "build_step", "relation", "superseded_by", "conflict_flag", "conflict_phrases",
-                "conflict_markers", "parent", "source_file", "line_start", "line_end"]
+                "conflict_markers", "parent", "stable_key", "source_file", "line_start", "line_end"]
 LIST_FIELDS = ("primary_module", "modules", "modules_all", "tables", "catalog_rows", "xrefs_rules", "superseded_by",
                "conflict_phrases")
 
@@ -99,7 +99,7 @@ def build(docs):
             "xrefs_rules": ";".join(u["xrefs_rules"]), "build_step": step or adr_step.get(u["adr"], ""),
             "relation": u["relation"] or "", "conflict_flag": "1" if u["conflict"] else "",
             "conflict_phrases": ";".join(u["conflict_phrases"]), "conflict_markers": str(u["conflict_markers"] or ""),
-            "parent": u["parent"] or "", "source_file": u["source_file"], "line_start": str(u["line_start"]),
+            "parent": u["parent"] or "", "stable_key": nfdocs.stable_key(u["text"]), "source_file": u["source_file"], "line_start": str(u["line_start"]),
             "line_end": str(u["line_end"])})
     rows.sort(key=lambda r: (r["adr"], int(r["line_start"]), nfdocs.rule_sort_key(r["id"])))
     info = {"units": units, "parsed": parsed, "dangling": dangling, "modules": modules, "owners": owners,
