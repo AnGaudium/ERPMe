@@ -2,7 +2,7 @@ Read-only review record of 2026-11-21 by Claude Opus 5.5: the costing design com
 
 # Costing design against SAP practice (audit, 2026-11-21)
 
-Scope: read-only audit of `~/Projects/NativeFlows-s2c`, branch `s2-leftovers`. Sources read: ADR-0020 (all rules and
+Scope: read-only audit of branch `s2-leftovers`. Sources read: ADR-0020 (all rules and
 notes), ADR-0021, ADR-0035, ADR-0072, ADR-0068 (valuation parts), ADR-0011 (rules 6, 11, 16-18), ADR-0012 (rules 4,
 10-16), ADR-0018 rule 3, ADR-0030 rules 1-4, ADR-0037 (costing parts), ADR-0044 rule 9, ADR-0009 rule 20,
 ADR-0075 rule 2, `docs/catalogs/movement-types.csv`, spec 05, spec 08 "Costing", D6, and the open entries of
