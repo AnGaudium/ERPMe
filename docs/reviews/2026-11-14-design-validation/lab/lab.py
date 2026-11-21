@@ -1,7 +1,17 @@
 """Lab helpers (not product code)."""
 import os, uuid, psycopg
 DSN = os.environ.get("NATIVEFLOWS_LAB_DSN", "host=127.0.0.1 port=5561 dbname=nativeflows_lab user=lab") + " options=-csearch_path=nativeflows"
-def new(): return uuid.uuid7() if hasattr(uuid, "uuid7") else uuid.UUID(bytes=uuid.uuid4().bytes)
+_last_v7 = [0]
+def new():
+    """A UUIDv7, increasing within this process (ADR-0006 rule 3, as context.new_id): 48-bit Unix milliseconds, then a counter
+    and random bits; the next ID is always greater than the last, as the setting_value tie-breaker needs (DS-28, S2 closure)."""
+    import os as _os, time as _time
+    v = (int(_time.time() * 1000) << 74) | (int.from_bytes(_os.urandom(10), "big") >> 6)   # 48 + 74 bits
+    v = max(v, _last_v7[0] + (1 << 20))       # monotonic: step past the last value, keeping random low bits fresh
+    _last_v7[0] = v
+    ms, rand = v >> 74, v & ((1 << 74) - 1)
+    rand_a, rand_b = rand >> 62, rand & ((1 << 62) - 1)
+    return uuid.UUID(int=(ms << 80) | (0x7 << 76) | (rand_a << 64) | (0b10 << 62) | rand_b)
 def conn(): return psycopg.connect(DSN)
 RESULTS = []
 def expect(name, fn, should_fail, match=None):
@@ -102,11 +112,16 @@ def erasure_marker(X, scope="EraseDataSubject", company_id=None):
     nativeflows.company_id set to the record's company ('installation' for none). Returns the id.
     X is a connection's or cursor's execute; call it inside the transaction that erases."""
     rid = new()
-    X("insert into idempotency_record (id, company_id, actor_kind, actor_id, scope, idempotency_key, request_hash)"
-      " values (%s, %s, 'human', %s, %s, %s, %s)", (rid, company_id, new(), scope, "lab-" + str(rid), "0" * 64))
-    X("select set_config('nativeflows.erasure_command_id', %s, true)", (str(rid),))
     # the record must belong to the current company (S2 schema review round 2, R2-N1), as the dispatcher sets it
     X("select set_config('nativeflows.company_id', %s, true)", (str(company_id) if company_id else "installation",))
+    # the two erasure scopes are written only by erasure_command_record() where the load has it (DS-05; S2 closure)
+    has_fn = X("select to_regprocedure('nativeflows.erasure_command_record(uuid,text,uuid,text,text,text)') is not null").fetchone()[0]
+    if has_fn and scope in ("EraseDataSubject", "DestroyRetainedPersonalData"):
+        X("select erasure_command_record(%s, 'human', %s, %s, %s, %s)", (rid, new(), scope, "lab-" + str(rid), "0" * 64))
+    else:
+        X("insert into idempotency_record (id, company_id, actor_kind, actor_id, scope, idempotency_key, request_hash)"
+          " values (%s, %s, 'human', %s, %s, %s, %s)", (rid, company_id, new(), scope, "lab-" + str(rid), "0" * 64))
+    X("select set_config('nativeflows.erasure_command_id', %s, true)", (str(rid),))
     return rid
 
 

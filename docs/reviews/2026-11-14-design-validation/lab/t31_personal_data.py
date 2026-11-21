@@ -39,6 +39,10 @@ the erasure marker, never by delete; the journal triggers pass note and descript
 document_check_frozen and platform_reject_change behave so on a scratch table. The marker must name an erasure command's
 idempotency record of this transaction and of the changed row's company (X55 to X62, X71 to X73, X84 to X87); a key list
 forbids a whole blank (X81 to X83); recorded_at is the system's on insert (X88).
+Y (with --load, S2 closure of 2026-11-21): the five entries the adversarial fixes left: (a) uom's shared-reference policies
+   (Y01 to Y05), (d) the company table's policies on id (Y06), (b) a CHECK beside every composite key from a table whose
+   company_id can be null (Y07 to Y11), (c) the setting_value tie-breaker by id (Y12, Y13), (e) only erasure_command_record()
+   writes the two erasure scopes of idempotency_record (Y14 to Y19).
 Z (with --load, S2 adversarial review S3, N1, N3, N4): the conventions on the catalog of the full load: recorded_at, the id key,
 the set_recorded_at triggers, forced row-level security with both policies, TRUNCATE guards, pinned search_path.
 Not covered: who may run an erasure (the command layer's permission check). Commands, the retention job, masking, the read
@@ -884,6 +888,118 @@ if "--load" in sys.argv:
             (d_old, v_old)).fetchone()
     check("X88 S2 (adversarial): a document (in place) and a version (append-only) inserted with recorded_at 2001 store the system time", got == (True, True), got)
 
+    # ---- Y: the five entries left by the adversarial fixes, closed in the S2 closure of 2026-11-21 (chief architect)
+    ROLE = "nativeflows_lab_rls"
+    if not X("select 1 from pg_roles where rolname=%s", (ROLE,)).fetchone():
+        X(f"CREATE ROLE {ROLE} NOLOGIN NOSUPERUSER NOBYPASSRLS")
+    X(f"GRANT USAGE ON SCHEMA nativeflows, types TO {ROLE}")
+    X(f"GRANT SELECT, INSERT, UPDATE, DELETE ON uom, company, idempotency_record TO {ROLE}")
+    u_core, u_own1, u_own2 = new(), new(), new()
+    X("insert into uom (id, code, name, quantity_kind, decimal_places) values (%s,%s,'Core','count',0)", (u_core, "YC" + I["t"]))
+    X("insert into uom (id, company_id, code, name, quantity_kind, decimal_places) values (%s,%s,%s,'Own 1','count',0)", (u_own1, I["co"], "x-y1" + I["t"]))
+    X("insert into uom (id, company_id, code, name, quantity_kind, decimal_places) values (%s,%s,%s,'Own 2','count',0)", (u_own2, I["co2"], "x-y2" + I["t"]))
+
+    def as_role(cx, company):
+        cx.execute(f"set local role {ROLE}")
+        cx.execute("select set_config('nativeflows.company_id', %s, true)", (company,))
+
+    def seen(company, sql, params=()):
+        cx = conn()
+        try:
+            with cx.transaction():
+                as_role(cx, company)
+                return cx.execute(sql, params).fetchall()
+        finally:
+            cx.close()
+    ids = {r[0] for r in seen(str(I["co"]), "select id from uom where id = any(%s)", ([u_core, u_own1, u_own2],))}
+    check("Y01 (a) uom, shared reference variant: under company 1 a role without BYPASSRLS reads the core unit and its own unit, not company 2's",
+          ids == {u_core, u_own1}, ids)
+    trial("Y02 (a) under company 1 a core unit (company_id null) cannot be inserted", lambda cx: (as_role(cx, str(I["co"])), cx.execute(
+        "insert into uom (id, code, name, quantity_kind, decimal_places) values (%s,%s,'Forged','count',0)", (new(), "YF" + I["t"]))), "row-level security")
+    upd = seen(str(I["co"]), "update uom set name = 'changed' where id = %s returning id", (u_core,))
+    check("Y03 (a) under company 1 a core unit is not updated (no row passes the write policy)", upd == [], upd)
+    trial("Y04 (a) under installation a core unit is inserted (rolled back afterwards)", lambda cx: (as_role(cx, "installation"), cx.execute(
+        "insert into uom (id, code, name, quantity_kind, decimal_places) values (%s,%s,'Core 2','count',0)", (new(), "YD" + I["t"])), cx.execute("select 1/0")), "division by zero")
+    pol = {r[0] for r in X("select tablename from pg_policies where schemaname = 'nativeflows' and policyname = 'shared_read_policy'").fetchall()}
+    check("Y05 (a) shared_read_policy is on exactly uom, tax_code and tax_rate, the reference catalogs with a nullable company_id", pol == {"uom", "tax_code", "tax_rate"}, sorted(pol))
+    cos = {r[0] for r in seen(str(I["co"]), "select id from company where id = any(%s)", ([I["co"], I["co2"]],))}
+    cx_ = conn()
+    with cx_.transaction():
+        as_role(cx_, str(I["co"]))
+        cx_.execute("select set_config('nativeflows.company_ids', %s, true)", (f"{I['co']},{I['co2']}",))
+        both = {r[0] for r in cx_.execute("select id from company where id = any(%s)", ([I["co"], I["co2"]],)).fetchall()}
+    cx_.close()
+    check("Y06 (d) company: its policies compare its own id; a session sees its own company, a cross-company query the companies it lists",
+          cos == {I["co"]} and both == {I["co"], I["co2"]}, (cos, both))
+    # (b) composite keys from tables whose company_id can be null
+    trial("Y07 (b) an installation erasure entry (user account subject) names no request: the composite key is unchecked while company_id is null",
+          lambda cx: entry(cx, company_id=None, subject_table="user_account", subject_id=new(), target_table="user_account", data_subject_request_id=new()),
+          "ck_data_erasure_entry_request_company")
+    trial("Y08 (b) a data subject state naming a request carries the request's company", lambda cx: state(
+        cx, company_id=None, subject_table="user_account", subject_id=new(), data_subject_request_id=new()), "ck_data_subject_state_request_company")
+    X("""insert into setting_definition (id, setting_key, area, scopes, storage, value_type, default_kind, core_default, allowed_values, direction, leaf_code,
+         change_effect, outdates, source, registry_version) values (%s,'lab.y_installation','lab','{installation}','setting_value','boolean','value','false',
+         '{true,false}','neutral','operator','immediate','none','lab','0.1.0')""", (new(),))
+    trial("Y09 (b) an installation setting value names no company proposal", lambda cx: cx.execute(
+        """insert into setting_value (id, company_id, setting_key, scope_kind, value, reason, effective_from, changed_by_user_id, change_proposal_id, registry_version)
+           values (%s,null,'lab.y_installation','installation','true','x','2026-11-21',%s,%s,'0.1.0')""", (new(), I["user"], new())), "ck_setting_value_company_keys")
+    trial("Y10 (b) an installation audit record names no policy decision", lambda cx: cx.execute(
+        """insert into audit_record (id, company_id, business_date, command_type, schema_version, effect_class, is_human_only, is_proposal_bound, is_draft_only,
+           is_internal_only, actor_kind, actor_id, causation_chain_id, causation_depth, policy_decision_id) values (%s,null,'2026-11-21','CreateCompany',1,'other',
+           false,false,false,false,'system',%s,%s,0,%s)""", (new(), new(), new(), new())), "ck_audit_record_policy_decision_company")
+    fk_null = X("""select r.relname, k.conname, (select array_agg(a.attname::text) from pg_attribute a where a.attrelid = r.oid and a.attnum = any (k.conkey))
+                   from pg_constraint k join pg_class r on r.oid = k.conrelid join pg_namespace n on n.oid = r.relnamespace
+                   join pg_attribute ca on ca.attrelid = r.oid and ca.attname = 'company_id' and not ca.attnotnull
+                  where n.nspname = 'nativeflows' and k.contype = 'f' and cardinality(k.conkey) > 1 and ca.attnum = any (k.conkey) and not r.relispartition""").fetchall()
+    unguarded = []
+    for rel, con, cols in fk_null:
+        other = [x for x in cols if x != "company_id"]
+        checks = [d for (d,) in X("""select pg_get_constraintdef(k.oid) from pg_constraint k join pg_class r on r.oid = k.conrelid
+                                     where r.relname = %s and r.relnamespace = 'nativeflows'::regnamespace and k.contype = 'c'""", (rel,)).fetchall()]
+        if not all(any(x in d and ("company_id IS NOT NULL" in d or f"(company_id IS NULL) = ({x} IS NULL)" in d) for d in checks) for x in other):
+            unguarded.append((rel, con))
+    check(f"Y11 (b) every one of the {len(fk_null)} composite keys from a table whose company_id can be null has a CHECK that sets company_id with its column",
+          not unguarded and len(fk_null) >= 5, unguarded)
+    # (c) the setting_value tie-breaker is the id, never recorded_at (ADR-0007 rule 10)
+    X("""insert into setting_definition (id, setting_key, area, scopes, storage, value_type, default_kind, core_default, allowed_values, direction, leaf_code,
+         change_effect, outdates, source, registry_version) values (%s,'lab.y_order','lab','{company}','setting_value','boolean','value','false','{true,false}',
+         'neutral','company_setting','immediate','none','lab','0.1.0') on conflict do nothing""", (new(),))
+
+    def sv(cx, vid, value):
+        cx.execute("""insert into setting_value (id, company_id, setting_key, scope_kind, value, reason, effective_from, changed_by_user_id, registry_version)
+                      values (%s,%s,'lab.y_order','company',%s,'lab','2026-11-21',%s,'0.1.0')""", (vid, I["co"], value, I["user"]))
+    first, second = new(), new()
+    with c.transaction():
+        sv(c, first, "true")
+        sv(c, second, "false")       # same transaction, so the same recorded_at
+    got = X("""select value from setting_value where company_id = %s and setting_key = 'lab.y_order'
+               order by effective_from desc, id desc limit 1""", (I["co"],)).fetchone()[0]
+    src = open(os.path.join(DOCS, "design", "DS-28-settings.sql"), encoding="utf-8").read()
+    check("Y12 (c) two values of one key and date written in one transaction: the later id is in force, and no lookup orders by recorded_at",
+          got is False and "recorded_at DESC" not in src, got)
+    trial("Y13 (c) a value whose id does not follow the ids already written for the key and date is refused", lambda cx: sv(cx, first.__class__(int=first.int - 1), "true"),
+          "does not follow the ids")
+    # (e) only erasure_command_record() writes the two erasure scopes
+    def idem(cx, scope):
+        cx.execute("insert into idempotency_record (id, company_id, actor_kind, actor_id, scope, idempotency_key, request_hash) values (%s,%s,'human',%s,%s,%s,%s)",
+                   (new(), I["co"], new(), scope, "y-" + str(new()), "0" * 64))
+    trial("Y14 (e) a role without BYPASSRLS cannot insert an EraseDataSubject record directly", lambda cx: (as_role(cx, str(I["co"])), idem(cx, "EraseDataSubject")),
+          "written only by erasure_command_record")
+    trial("Y15 (e) ... nor a DestroyRetainedPersonalData record", lambda cx: (as_role(cx, str(I["co"])), idem(cx, "DestroyRetainedPersonalData")),
+          "written only by erasure_command_record")
+    trial("Y16 (e) the same role writes it through erasure_command_record(), for its session's company, and the marker validates (rolled back afterwards)",
+          lambda cx: (as_role(cx, str(I["co"])), cx.execute("select erasure_command_record(%s, 'human', %s, 'EraseDataSubject', %s, %s)",
+                                                           (new(), new(), "y-" + str(new()), "0" * 64)),
+                      cx.execute("select 1/0 where (select company_id from idempotency_record where scope = 'EraseDataSubject' and transaction_id = pg_current_xact_id()) = %s",
+                                 (I["co"],))), "division by zero")
+    trial("Y17 (e) erasure_command_record() writes no other scope", lambda cx: (as_role(cx, str(I["co"])), cx.execute(
+        "select erasure_command_record(%s, 'human', %s, 'PostSalesInvoice', 'k', %s)", (new(), new(), "0" * 64))), "only the two erasure scopes")
+    trial("Y18 (e) another scope is still inserted directly by the role (rolled back afterwards)", lambda cx: (as_role(cx, str(I["co"])), idem(cx, "PostSalesInvoice"),
+                                                                                                        cx.execute("select 1/0")), "division by zero")
+    trial("Y19 (e) a record's scope never changes into an erasure scope", lambda cx: (idem(cx, "PostSalesInvoice"), as_role(cx, str(I["co"])), cx.execute(
+        "update idempotency_record set scope = 'EraseDataSubject' where scope = 'PostSalesInvoice' and transaction_id = pg_current_xact_id()")),
+          "written only by erasure_command_record")
+
     # ---- Z: the conventions on the catalog of the full load, which no DDL syntax can evade (S2 adversarial review S3, N1,
     # N3, N4; the text guard of gen_overview.py reads the files, these read pg_catalog). Partitions follow their parent.
     from gen_overview import KEY_ALLOWLIST, RLS_ALLOWLIST
@@ -926,7 +1042,7 @@ if "--load" in sys.argv:
     bad = [r[0] for r in want_rls if not (r[2] and r[3] and set(pol.get(r[0], {})) >= {"company_policy", "company_ids_policy"}
                                          and ("installation" in pol[r[0]]["company_policy"]) == (r[4] is False))]
     check(f"Z04 every one of the {len(want_rls)} tables and partitions with company_id has forced row-level security, company_policy (the installation "
-          f"variant exactly where company_id is nullable) and company_ids_policy; exceptions only in RLS_ALLOWLIST ({', '.join(RLS_ALLOWLIST)})",
+          f"variant exactly where company_id is nullable) and company_ids_policy; exceptions only in RLS_ALLOWLIST ({', '.join(RLS_ALLOWLIST) or 'none'})",
           not bad and len(want_rls) > 370, bad[:8])
     need = {t for t in tops if any(ty & BEFORE and ty & DEL for n_, ty in by.get(t, []))
             or (dict(by.get(t, [])).get(f"trg_{t}_set_recorded_at", UPD) & UPD) == 0}

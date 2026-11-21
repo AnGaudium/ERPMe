@@ -7,8 +7,9 @@
 -- Tables live in schema `nativeflows` (ADR-0022 rule 7); domains in schema `types` (ADR-0006 rule 8). Keys are shown inline;
 -- in migrations they get names from the MetaData naming convention (ADR-0004 rule 15). btree_gist is installed (ADR-0022 rule 8).
 -- Every table carries company_id, FORCE ROW LEVEL SECURITY and the generated company policy (ADR-0022 rule 8), except
--- the global catalogs currency, uom (core rows have a null company_id and are readable by all), uom_conversion, incoterm, and
--- company itself, whose policy compares its own id. The lab checks this list (ADR-0045 rule 14).
+-- the global catalogs currency, uom_conversion and incoterm; uom, whose core rows have a null company_id, takes the generated
+-- shared-reference variant (every company reads core units, a company writes only its own); and company itself, whose
+-- generated policies compare its own id (S2 closure, 2026-11-21). The lab checks this list (ADR-0045 rule 14).
 -- Owner module per table in brackets (ADR-0022 rule 2). Referenced tables defined elsewhere: user_account and department (DS-15-access.sql, which adds employee_profile's department key),
 -- account and payment_term (DS-06, ledger), tax groups' matrix (ADR-0041, tax).
 -- IDs are UUIDv7 from context.new_id or the client (ADR-0006 rule 3); no ID defaults, except barcode.id, whose rows a trigger writes (ADR-0006 rule 2).
@@ -498,7 +499,7 @@ CREATE TABLE product_category (
     parent_id                  uuid,
     default_item_group_id      uuid,
     default_valuation_class_id uuid,
-    default_item_tax_group_id  uuid,
+    default_item_tax_group_id  uuid,                           -- empty: inherited from the parent category, then the company default (ADR-0018 rule 3 note, 2026-11-21)
     default_inventory_uom_id   uuid REFERENCES uom (id),
     basis                      jsonb NOT NULL,
     is_active                  boolean NOT NULL DEFAULT true,
@@ -552,7 +553,7 @@ CREATE TABLE product (
     sales_uom_id                   uuid NOT NULL REFERENCES uom (id),
     -- catch_weight_uom_id is reserved by ADR-0018 rule 3 and not created in Phase 1.
     tracking                       text NOT NULL DEFAULT 'none' CONSTRAINT ck_product_tracking CHECK (tracking IN ('none', 'lot', 'serial')),
-    item_tax_group_id              uuid NOT NULL,
+    item_tax_group_id              uuid,                            -- empty: inherited from the category chain, then the company default (ADR-0018 rule 3 note, 2026-11-21; tax_effective_item_tax_group in DS-05)
     is_item_created_on_order       boolean NOT NULL DEFAULT false,  -- a document line may name a new combination of variant values (ADR-0045 rule 16)
     is_configurable                boolean NOT NULL DEFAULT false,  -- sold through a configuration model; its items are configured items (ADR-0046 rule 2)
     last_item_number               integer NOT NULL DEFAULT 0,      -- counter for codes of items created on order, under the product row lock
@@ -1264,11 +1265,14 @@ END $$;
 -- (company_id compared as text with nativeflows.company_id, failing closed) and the read-only company_ids_policy for
 -- registered cross-company queries (ADR-0017 rule 19). Tables whose company_id is nullable (v_nullable) show their null
 -- rows only under the setting value installation. Default partitions are listed with their parent. Exceptions are in
--- lab gen_overview.RLS_ALLOWLIST with their reasons (here: uom).
+-- lab gen_overview.RLS_ALLOWLIST with their reasons; this file has none.
+-- Shared reference catalogs (v_shared, gen_overview.RLS_SHARED_READ) also get shared_read_policy: every company reads
+-- their null rows, which only the installation scope writes (S2 closure, 2026-11-21).
+-- A table whose row is a company (v_self, gen_overview.RLS_SELF) compares its own id with the settings instead.
 -- Lab gen_overview.py --check compares this section with what schema_phase_b.py writes.
 DO $$
 DECLARE
-    v_tables    text[] := ARRAY['company_currency_activation', 'uom_alias', 'branch', 'print_profile', 'business_unit', 'cost_center',
+    v_tables    text[] := ARRAY['company_currency_activation', 'uom', 'uom_alias', 'branch', 'print_profile', 'business_unit', 'cost_center',
         'working_calendar', 'working_calendar_holiday', 'site', 'data_translation', 'partner_group', 'partner_tax_group',
         'item_group', 'valuation_class', 'item_tax_group', 'partner', 'project', 'partner_role', 'payment_method',
         'delivery_method', 'price_list', 'customer_profile', 'supplier_profile', 'employee_profile', 'partner_address',
@@ -1279,7 +1283,9 @@ DECLARE
         'product_classification', 'warehouse', 'zone', 'bin', 'lot', 'serial_number', 'price_list_entry',
         'price_list_option_extra', 'barcode', 'gs1_company_prefix', 'partner_relationship', 'external_id_map',
         'custom_field_definition', 'reason'];
-    v_nullable  text[] := ARRAY[]::text[];
+    v_nullable  text[] := ARRAY['uom']::text[];
+    v_shared    text[] := ARRAY['uom']::text[];
+    v_self      text[] := ARRAY['company']::text[];
     v_table     text;
 BEGIN
     FOREACH v_table IN ARRAY v_tables LOOP
@@ -1292,6 +1298,15 @@ BEGIN
             EXECUTE format('CREATE POLICY company_policy ON %I USING (company_id::text = current_setting(''nativeflows.company_id'', true))', v_table);
         END IF;
         EXECUTE format('CREATE POLICY company_ids_policy ON %I FOR SELECT USING (company_id::text = ANY (string_to_array(current_setting(''nativeflows.company_ids'', true), '','')))', v_table);
+        IF v_table = ANY (v_shared) THEN
+            EXECUTE format('CREATE POLICY shared_read_policy ON %I FOR SELECT USING (company_id IS NULL)', v_table);
+        END IF;
+    END LOOP;
+    FOREACH v_table IN ARRAY v_self LOOP
+        EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', v_table);
+        EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', v_table);
+        EXECUTE format('CREATE POLICY company_policy ON %I USING (id::text = current_setting(''nativeflows.company_id'', true))', v_table);
+        EXECUTE format('CREATE POLICY company_ids_policy ON %I FOR SELECT USING (id::text = ANY (string_to_array(current_setting(''nativeflows.company_ids'', true), '','')))', v_table);
     END LOOP;
 END $$;
 -- ===== end of row-level security =====

@@ -149,7 +149,10 @@ CREATE TRIGGER trg_company_setup_acknowledgement_guard BEFORE UPDATE OR DELETE O
 
 -- ===== Setting values [registry] (ADR-0063 rules 2-4) =====
 -- Append-only: a change is a new row, effective from its date; the value in force for a key, scope, scope reference and
--- placeholder values is the row with the latest effective_from on or before the date, the latest recorded among equals.
+-- placeholder values is the row with the latest effective_from on or before the date, the latest written among equals: the
+-- greatest id, a UUIDv7 from context.new_id, which increases within a writer and across the changes of one key, because the
+-- trigger below serializes them per company and key. recorded_at is never the tie-breaker: rows of one transaction share it
+-- (ADR-0007 rule 10; chief architect, 2026-11-21, S2 closure).
 -- The row copies the definition's type, bounds, allowed values and direction; the trigger setting_value_check_insert below
 -- ties every copy to setting_definition, checks the scope and the placeholder keys, refuses a value looser than the
 -- installation value in force, derives the replaced value itself (filling it when absent, refusing a different one) and
@@ -190,6 +193,9 @@ CREATE TABLE setting_value (                               -- company data (inst
     FOREIGN KEY (preset_code, preset_version) REFERENCES setting_preset (preset_code, preset_version),
     CONSTRAINT ck_setting_value_preset CHECK ((preset_code IS NULL) = (preset_version IS NULL)),
     CONSTRAINT ck_setting_value_installation CHECK ((scope_kind = 'installation') = (company_id IS NULL)),
+    -- the proposal and acknowledgement keys are composite and unchecked while company_id is null; an installation value is
+    -- approved by the operators' deployment change, never by a company's proposal or acknowledgement (S2 closure)
+    CONSTRAINT ck_setting_value_company_keys CHECK (company_id IS NOT NULL OR (change_proposal_id IS NULL AND setup_acknowledgement_id IS NULL)),
     CONSTRAINT ck_setting_value_scope_ref CHECK ((scope_kind IN ('installation', 'company')) = (scope_ref = '')),
     -- a loosening is executed from an approved proposal (an installation value: from the operators' approved change), approved
     -- by someone other than its submitter (rule 3), or, before go-live, set under the owner's setup acknowledgement with no
@@ -212,7 +218,7 @@ CREATE TABLE setting_value (                               -- company data (inst
         WHEN value_type IN ('code_list', 'field_list') THEN jsonb_typeof(value) = 'array'
         ELSE jsonb_typeof(value) = 'object' END)
 );
-CREATE INDEX ix_setting_value_lookup ON setting_value (company_id, setting_key, scope_kind, scope_ref, placeholder_values, effective_from DESC, recorded_at DESC);
+CREATE INDEX ix_setting_value_lookup ON setting_value (company_id, setting_key, scope_kind, scope_ref, placeholder_values, effective_from DESC, id DESC);
 
 -- ===== Extension points [registry] (ADR-0063 rule 19) =====
 CREATE TABLE extension_point (                             -- installation data; declared by a module, written at startup; no runtime in Phase 1
@@ -278,7 +284,7 @@ CREATE FUNCTION setting_installation_value(p_key text, p_placeholder_values json
     LANGUAGE sql STABLE SECURITY DEFINER SET search_path = nativeflows, pg_temp AS $$
     SELECT v.setting_key, v.value, v.effective_from FROM nativeflows.setting_value v
      WHERE v.company_id IS NULL AND v.setting_key = p_key AND v.placeholder_values = p_placeholder_values AND v.effective_from <= p_date
-     ORDER BY v.effective_from DESC, v.recorded_at DESC LIMIT 1
+     ORDER BY v.effective_from DESC, v.id DESC LIMIT 1
 $$;
 -- Ties a value to its definition and derives its change kind (rules 2-4): type, bounds, allowed values and direction equal
 -- the definition's (copied when left null); the scope is one the definition declares; a value looser than the installation
@@ -328,15 +334,23 @@ BEGIN
             RAISE EXCEPTION 'setting_out_of_bounds: % is looser than the installation value % of %', NEW.value, v_max, NEW.setting_key USING ERRCODE = 'check_violation';
         END IF;
     END IF;
+    -- the tie-breaker among rows of one effective date is the id (rule 2's order; ADR-0007 rule 10): a new row's id must exceed
+    -- every id already written for the same key, scope and date, so "the latest written" is the greatest id by construction
+    IF EXISTS (SELECT 1 FROM nativeflows.setting_value v
+                WHERE v.company_id IS NOT DISTINCT FROM NEW.company_id AND v.setting_key = NEW.setting_key AND v.scope_kind = NEW.scope_kind
+                  AND v.scope_ref = NEW.scope_ref AND v.placeholder_values = NEW.placeholder_values
+                  AND v.effective_from = NEW.effective_from AND v.id >= NEW.id) THEN
+        RAISE EXCEPTION 'setting_value id % does not follow the ids already written for % on %', NEW.id, NEW.setting_key, NEW.effective_from USING ERRCODE = 'check_violation';
+    END IF;
     SELECT v.value, true INTO v_in, v_found FROM nativeflows.setting_value v
      WHERE v.company_id IS NOT DISTINCT FROM NEW.company_id AND v.setting_key = NEW.setting_key AND v.scope_kind = NEW.scope_kind
        AND v.scope_ref = NEW.scope_ref AND v.placeholder_values = NEW.placeholder_values AND v.effective_from <= NEW.effective_from
-     ORDER BY v.effective_from DESC, v.recorded_at DESC LIMIT 1;
+     ORDER BY v.effective_from DESC, v.id DESC LIMIT 1;
     IF NOT coalesce(v_found, false) AND NEW.scope_kind NOT IN ('company', 'installation') THEN
         SELECT v.value, true INTO v_in, v_found FROM nativeflows.setting_value v
          WHERE v.company_id = NEW.company_id AND v.setting_key = NEW.setting_key AND v.scope_kind = 'company'
            AND v.placeholder_values = NEW.placeholder_values AND v.effective_from <= NEW.effective_from
-         ORDER BY v.effective_from DESC, v.recorded_at DESC LIMIT 1;
+         ORDER BY v.effective_from DESC, v.id DESC LIMIT 1;
     END IF;
     IF NOT coalesce(v_found, false) THEN
         v_in := d.core_default;

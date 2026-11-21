@@ -28,7 +28,7 @@ CREATE TABLE close_task (id uuid PRIMARY KEY, company_id uuid NOT NULL, posting_
   is_required boolean NOT NULL, is_sequential boolean NOT NULL, depends_on text[] NOT NULL DEFAULT '{}', parameters jsonb NOT NULL DEFAULT '{}',
   state text NOT NULL DEFAULT 'pending', entry_count_at_done bigint, actor_kind text, actor_id uuid, on_behalf_of_id uuid, completed_at timestamptz,
   evidence jsonb, recorded_at timestamptz NOT NULL DEFAULT now(), UNIQUE (company_id, id), UNIQUE (posting_period_id, code));
-CREATE TABLE tax_code (id uuid PRIMARY KEY, localization_package text NOT NULL, code text NOT NULL, name text NOT NULL, tax_kind text NOT NULL, package_kind text,
+CREATE TABLE tax_code (id uuid PRIMARY KEY, company_id uuid, source text NOT NULL DEFAULT 'package', localization_package text, code text NOT NULL, name text NOT NULL, tax_kind text NOT NULL, package_kind text,
   direction text NOT NULL, calculation text NOT NULL, sequence integer NOT NULL, base_includes text[] NOT NULL DEFAULT '{}', transaction_key_id uuid NOT NULL,
-  deductibility text, fixed_asset_code text, import_treatment text, basis jsonb NOT NULL, recorded_at timestamptz NOT NULL DEFAULT now(),
+  deductibility text, fixed_asset_code text, import_treatment text, basis jsonb NOT NULL, change_proposal_id uuid, recorded_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (localization_package, code));

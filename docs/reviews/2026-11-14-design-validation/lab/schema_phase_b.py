@@ -33,7 +33,8 @@ What it does to every CREATE TABLE of docs/design/*.sql (partitions inherit from
    to every table of the file (BEFORE INSERT OR UPDATE; BEFORE INSERT only on its append-only tables) and
    `trg_<table>_refuse_truncate` (BEFORE TRUNCATE) to its append-only and delete-guarded tables without a TRUNCATE trigger of
    their own; and a row-level security section with the company policies of every table with company_id (default
-   partitions included; gen_overview.RLS_ALLOWLIST aside). The phase A CREATE TRIGGER ... set_recorded_at statements and the
+   partitions included; gen_overview.RLS_ALLOWLIST aside), with shared_read_policy on the shared reference catalogs of
+   gen_overview.RLS_SHARED_READ and the policies on id for gen_overview.RLS_SELF (S2 closure, 2026-11-21). The phase A CREATE TRIGGER ... set_recorded_at statements and the
    function definitions at the top of the files are removed. Append-only: tables whose guard trigger refuses every update
    outside an erasure (ALWAYS_REFUSE, or platform_check_append_only / crm_check_append_only with no mutable column but
    recorded_at and no set-once column), and the pure logs in gen_overview.PURE_LOGS.
@@ -278,10 +279,10 @@ def main():
     files = sorted(glob.glob(os.path.join(os.path.abspath(a.docs), "design", "*.sql")))
     ctx = design_context(design_texts(os.path.join(os.path.abspath(a.docs), "design")))
     company, need_uq = company_plan(files)
-    n = dict(tables=0, ao=0, trunc=0, rls=0, nullable=0)
+    n = dict(tables=0, ao=0, trunc=0, rls=0, nullable=0, shared=0, selfs=0)
     for p in files:
-        new, report, tables, (_, ao, trunc, rls, nullable) = convert_file(p, ctx, company, need_uq)
-        for k, v in (("tables", tables), ("ao", ao), ("trunc", trunc), ("rls", rls), ("nullable", nullable)):
+        new, report, tables, (_, ao, trunc, rls, nullable, shared, selfs) = convert_file(p, ctx, company, need_uq)
+        for k, v in (("tables", tables), ("ao", ao), ("trunc", trunc), ("rls", rls), ("nullable", nullable), ("shared", shared), ("selfs", selfs)):
             n[k] += len(v)
         for r in report:
             print(f"{os.path.basename(p)}: {r}")
@@ -289,7 +290,7 @@ def main():
             open(p, "w", encoding="utf-8").write(new)
     print(f"{n['tables']} tables: {n['tables'] - n['ao']} with set_recorded_at on insert and update, {n['ao']} append-only on insert "
           f"only; {n['trunc']} generated TRUNCATE guards; row-level security on {n['rls']} tables and partitions "
-          f"({n['nullable']} with a nullable company_id)")
+          f"({n['nullable']} with a nullable company_id, {n['shared']} of them shared reference catalogs; {n['selfs']} company table keyed on id)")
 
 if __name__ == "__main__":
     main()

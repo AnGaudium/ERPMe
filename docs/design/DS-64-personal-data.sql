@@ -41,6 +41,8 @@ CREATE TABLE data_subject_state (                          -- [audit] ADR-0079 r
     UNIQUE (subject_table, subject_id),
     FOREIGN KEY (company_id, data_subject_request_id) REFERENCES document (company_id, id),
     CONSTRAINT ck_data_subject_state_company CHECK (company_id IS NOT NULL OR subject_table = 'user_account'),
+    -- a state that names its request carries the request's company, a user account's too, so the composite key holds (S2 closure)
+    CONSTRAINT ck_data_subject_state_request_company CHECK (data_subject_request_id IS NULL OR company_id IS NOT NULL),
     CONSTRAINT ck_data_subject_state_destroyed CHECK ((state = 'destroyed') = (destroyed_at IS NOT NULL)),
     CONSTRAINT ck_data_subject_state_released CHECK ((state = 'released') = (released_at IS NOT NULL)),
     CONSTRAINT ck_data_subject_state_dates CHECK ((destroyed_at IS NULL OR destroyed_at >= blocked_at) AND (released_at IS NULL OR released_at >= blocked_at))
@@ -88,6 +90,9 @@ CREATE TABLE data_erasure_entry (                          -- [audit] ADR-0079 r
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, data_subject_request_id) REFERENCES document (company_id, id),
     CONSTRAINT ck_data_erasure_entry_company CHECK (company_id IS NOT NULL OR subject_table = 'user_account'),
+    -- the request key is composite, so it is enforced only with company_id set: an installation row of a user account's
+    -- erasure names no request; the request is reached through command_id and the company rows of the same command (S2 closure)
+    CONSTRAINT ck_data_erasure_entry_request_company CHECK (data_subject_request_id IS NULL OR company_id IS NOT NULL),
     CONSTRAINT ck_data_erasure_entry_row_key CHECK (target_row_key IS NULL OR cardinality(target_row_key) > 1)
 );
 CREATE INDEX ix_data_erasure_entry_subject_id ON data_erasure_entry (subject_table, subject_id);

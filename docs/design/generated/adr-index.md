@@ -64,7 +64,7 @@ Title, status and design item come from each ADR's first lines. **Declared** ADR
 | [ADR-0054](../../adr/0054-users-roles-and-authorizations.md) | Users, roles and authorizations | accepted 2026-11-15 | DS-15 (full part; the envelope part is ADR-0017) | `master_data`, `audit`, `documents`, `permissions`, `work` | 3, 2 | `master_data`, `permissions`, `documents`, `purchasing` |
 | [ADR-0055](../../adr/0055-approval-pools-and-stages.md) | Approval pools and stages | accepted 2026-11-15 | DS-28 (extends ADR-0043) | `production`, `documents`, `periods`, `policy`, `work` | 3, 2 | `policy`, `sales`, `documents`, `permissions` |
 | [ADR-0056](../../adr/0056-multiple-units-of-measure.md) | Multiple units of measure | accepted 2026-11-15 | DS-20 (units on the item master), DS-22 (document lines), DS-43 and DS-51 (planning and production lines), DS-42 (counts and packaging) | `inventory`, `master_data` | 3 | `master_data`, `purchasing`, `inventory`, `planning` |
-| [ADR-0057](../../adr/0057-document-intake-and-extraction.md) | Document intake and extraction | accepted 2026-11-15 | DS-36 (the `attachments` module: extraction records), DS-34 (workflow inputs), with the DS-24 seam named | `master_data`, `agent_runs`, `attachments` | 3, 2 | `attachments`, `master_data`, `agent_runs`, `crm` |
+| [ADR-0057](../../adr/0057-document-intake-and-extraction.md) | Document intake and extraction | accepted 2026-11-15 | DS-36 (the `attachments` module: extraction records), DS-34 (workflow inputs), with the DS-24 seam named | `master_data`, `agent_runs`, `attachments` | 3, 2 | `attachments`, `master_data`, `agent_runs`, `tax` |
 | [ADR-0058](../../adr/0058-configurable-workflows.md) | Configurable workflows | accepted 2026-11-15 | DS-28 (configuration part), DS-13 and DS-04 (the causation chain) | `automation`, `configuration` | 5, 2 | `configuration`, `automation`, `master_data`, `audit` |
 | [ADR-0059](../../adr/0059-ai-tuning-and-development-of-deterministic-functions.md) | AI tuning and development of deterministic functions | accepted 2026-11-15 | DS-34 (artifact evidence and promotion), DS-32 (the evaluation harness), DS-25 (the bank cascade's parameters) | `configuration` | 2 | `configuration`, `automation`, `cash`, `policy` |
 | [ADR-0060](../../adr/0060-agent-assisted-reporting-and-analysis.md) | Agent-assisted reporting and analysis | accepted 2026-11-15 | DS-33 (the analysis layer of the read-only query layer), DS-34 (the analysis agent), DS-30 (the analysis screens) | `query` | 5 | `master_data`, `query`, `ledger`, `periods` |
@@ -100,7 +100,7 @@ Title, status and design item come from each ADR's first lines. **Declared** ADR
 | 5 | `query` | ADR-0060 | ADR-0022, ADR-0050, ADR-0060 |
 | 5 | `sdk` | — | — |
 | 4 | `cash` | ADR-0029, ADR-0030, ADR-0038, ADR-0048, ADR-0050, ADR-0068 | ADR-0026, ADR-0048, ADR-0052, ADR-0059, ADR-0068 |
-| 4 | `crm` | ADR-0009, ADR-0019, ADR-0052 | ADR-0009, ADR-0019, ADR-0045, ADR-0048, ADR-0051, ADR-0052, ADR-0057, ADR-0066, ADR-0079 |
+| 4 | `crm` | ADR-0009, ADR-0019, ADR-0052 | ADR-0009, ADR-0019, ADR-0045, ADR-0048, ADR-0051, ADR-0052, ADR-0066, ADR-0079 |
 | 4 | `planning` | ADR-0024, ADR-0031, ADR-0036, ADR-0037 | ADR-0024, ADR-0036, ADR-0037, ADR-0050, ADR-0051, ADR-0056, ADR-0064, ADR-0078 |
 | 4 | `purchasing` | ADR-0028, ADR-0037, ADR-0047 | ADR-0020, ADR-0037, ADR-0047, ADR-0051, ADR-0054, ADR-0056, ADR-0065, ADR-0074, ADR-0078 |
 | 4 | `quality` | ADR-0009, ADR-0022, ADR-0052, ADR-0070 | ADR-0066, ADR-0070 |
@@ -111,7 +111,7 @@ Title, status and design item come from each ADR's first lines. **Declared** ADR
 | 3 | `ledger` | ADR-0006, ADR-0010, ADR-0011, ADR-0014, ADR-0015, ADR-0025, ADR-0026, ADR-0027, ADR-0035, ADR-0044, ADR-0048, ADR-0049 | ADR-0004, ADR-0010, ADR-0014, ADR-0015, ADR-0025, ADR-0026, ADR-0041, ADR-0044, ADR-0048, ADR-0049, ADR-0060, ADR-0069 |
 | 3 | `master_data` | ADR-0006, ADR-0011, ADR-0018, ADR-0019, ADR-0020, ADR-0023, ADR-0024, ADR-0027, ADR-0029, ADR-0031, ADR-0033, ADR-0037, ADR-0041, ADR-0044, ADR-0045, ADR-0046, ADR-0049, ADR-0054, ADR-0056, ADR-0057, ADR-0061, ADR-0062, ADR-0068, ADR-0069, ADR-0074 | ADR-0004, ADR-0006, ADR-0010, ADR-0015, ADR-0017, ADR-0018, ADR-0019, ADR-0020, ADR-0023, ADR-0024, ADR-0027, ADR-0033, ADR-0038, ADR-0041, ADR-0045, ADR-0046, ADR-0049, ADR-0051, ADR-0053, ADR-0054, ADR-0056, ADR-0057, ADR-0058, ADR-0060, ADR-0061, ADR-0062, ADR-0063, ADR-0064, ADR-0067, ADR-0068, ADR-0069, ADR-0070, ADR-0072, ADR-0074, ADR-0076, ADR-0079 |
 | 3 | `production` | ADR-0014, ADR-0025, ADR-0026, ADR-0027, ADR-0032, ADR-0033, ADR-0034, ADR-0035, ADR-0037, ADR-0046, ADR-0055, ADR-0062, ADR-0068, ADR-0071, ADR-0072 | ADR-0024, ADR-0025, ADR-0032, ADR-0033, ADR-0034, ADR-0035, ADR-0036, ADR-0037, ADR-0043, ADR-0046, ADR-0049, ADR-0062, ADR-0064, ADR-0068, ADR-0070, ADR-0071, ADR-0072 |
-| 3 | `tax` | ADR-0004, ADR-0016, ADR-0028, ADR-0041, ADR-0053 | ADR-0041 |
+| 3 | `tax` | ADR-0004, ADR-0016, ADR-0028, ADR-0041, ADR-0053 | ADR-0041, ADR-0057 |
 | 2 | `agent_runs` | ADR-0027, ADR-0050, ADR-0057 | ADR-0027, ADR-0042, ADR-0050, ADR-0057, ADR-0063, ADR-0065, ADR-0078 |
 | 2 | `attachments` | ADR-0027, ADR-0038, ADR-0049, ADR-0057 | ADR-0057, ADR-0078 |
 | 2 | `audit` | ADR-0019, ADR-0038, ADR-0052, ADR-0054, ADR-0079 | ADR-0006, ADR-0019, ADR-0038, ADR-0052, ADR-0058, ADR-0079 |

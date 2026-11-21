@@ -167,8 +167,11 @@ check(f"A02b the {len(DS05_STUBS)} lab stubs of DS-05 tables have the design col
       sorted(DS05_STUBS) if drift == [] else drift)
 
 tables = re.findall(r"^CREATE TABLE (\w+) \(", platform, flags=re.M)   # default partitions (PARTITION OF) follow their parent; A09 checks them
-INSTALLATION = {"event_subject", "event_consumer", "agent_type", "agent_type_version", "regime_setting", "tax_code"}
-NULLABLE = {"outbox_event", "event_delivery", "audit_record", "audit_change", "audit_denial", "agent_budget_usage", "idempotency_record"}
+# tax_code moved from the installation tables to the shared reference catalogs with tax_rate, and tax_matrix joined the
+# installation tables (ADR-0041 rules 2-4 notes, S2 closure 2026-11-21): a design change, so A04 and A05 follow it.
+INSTALLATION = {"event_subject", "event_consumer", "agent_type", "agent_type_version", "regime_setting", "tax_matrix"}
+NULLABLE = {"outbox_event", "event_delivery", "audit_record", "audit_change", "audit_denial", "agent_budget_usage", "idempotency_record",
+            "tax_code", "tax_rate"}
 
 
 def cols(t):
@@ -179,7 +182,7 @@ missing = [t for t in tables if t not in INSTALLATION and "company_id" not in co
 check(f"A03 all {len(tables) - len(INSTALLATION)} company tables of the platform file carry company_id", missing == [], missing)
 check("A04 the six installation tables carry no company_id", [t for t in INSTALLATION if "company_id" in cols(t)] == [])
 bad_null = [t for t in tables if t not in INSTALLATION and (cols(t)["company_id"] == "YES") != (t in NULLABLE)]
-check("A05 company_id is nullable exactly on the seven tables with installation-scoped rows", bad_null == [], bad_null)
+check(f"A05 company_id is nullable exactly on the {len(NULLABLE)} tables with installation-scoped or package rows", bad_null == [], bad_null)
 check("A06 every platform table has recorded_at", [t for t in tables if "recorded_at" not in cols(t)] == [])
 not_forced = [t for t in tables if t not in INSTALLATION and not X(
     "select relrowsecurity and relforcerowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace where nspname='nativeflows' and relname=%s", (t,)).fetchone()[0]]

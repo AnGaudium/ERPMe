@@ -85,9 +85,20 @@ GENERATED_HEADS = (RECORDED_AT_SECTION, RLS_SECTION, "-- ===== recorded_at on up
 RECORDED_AT_COLUMN = "recorded_at timestamptz NOT NULL DEFAULT now()"
 # Row-level security (ADR-0017 rule 19): every table with company_id gets the generated section's policies, unless it is
 # listed here with its reason; an entry that no longer has company_id fails. Partitions follow their parent.
-RLS_ALLOWLIST = {
-    "uom": "core units (company_id null, ADR-0018 rule 8) are read by every company; the nullable policy would show them only "
-           "under installation, so the read rule for installation rows is a design decision (S2 adversarial review N1; open question)",
+# Empty since the S2 closure of 2026-11-21: uom takes the shared-reference variant below.
+RLS_ALLOWLIST = {}
+# Shared reference catalogs with company rows (chief architect, 2026-11-21, S2 closure; ADR-0017 rule 19 note): rows with a
+# null company_id are core or package rows that every company reads; company rows are the company's own. Such a table takes
+# the installation variant of company_policy (writes only to the session's company, null rows only under installation) and,
+# in addition, shared_read_policy FOR SELECT USING (company_id IS NULL). An entry must have a nullable company_id.
+RLS_SHARED_READ = {
+    "uom": "core units (company_id null, ADR-0018 rule 8) and a company's own units",
+    "tax_code": "package tax codes (company_id null) and a company's own codes (ADR-0041 rule 4 note, 2026-11-21)",
+    "tax_rate": "package rates (company_id null) and the rates of a company's own codes (ADR-0041 rule 4 note, 2026-11-21)",
+}
+# Tables whose row is a company itself (no company_id): the policies compare id with the settings (S2 closure, 2026-11-21).
+RLS_SELF = {
+    "company": "the company row; a session sees its own company, a registered cross-company query the companies it lists",
 }
 # A top-level trigger statement: name, timing, events, table (schema prefix allowed; finding S5 of the S2 schema review).
 TRIGGER_RE = re.compile(r"^CREATE (?:OR REPLACE )?(?:CONSTRAINT )?TRIGGER (\w+)\s+(BEFORE|AFTER|INSTEAD OF)\s+([A-Za-z_, \n]+?)\s+ON\s+(?:\w+\.)?(\w+)\b",
@@ -197,6 +208,8 @@ COMPANY_KEY_ALLOWLIST = {
     "audit_record": "target: installation-scoped audit rows have company_id null (ADR-0017 rule 19)",
     "audit_change": "referencing table: installation-scoped audit rows have company_id null (ADR-0017 rule 19)",
     "outbox_event": "target: installation-scoped events have company_id null (ADR-0013 rule 14)",
+    "tax_code": "target: package codes have company_id null (ADR-0041 rule 4 note, 2026-11-21); a composite key would refuse them",
+    "tax_rate": "both sides: package rates and codes have company_id null (ADR-0041 rule 4 note, 2026-11-21)",
     "event_delivery": "referencing table: installation-scoped deliveries have company_id null (ADR-0013 rule 14)",
 }
 FK_ELEMENT_RE = re.compile(r"(?:CONSTRAINT \w+ )?FOREIGN KEY \(([^)]*)\) REFERENCES (\w+) \(([^)]*)\)")
@@ -356,7 +369,8 @@ def wrap_array(names, indent):
 
 
 def file_plan(fname, text, ctx):
-    """The lists of a design file's generated sections: (tables, append-only, refuse-truncate, RLS tables, RLS nullable)."""
+    """The lists of a design file's generated sections: (tables, append-only, refuse-truncate, RLS tables, RLS nullable,
+    RLS shared reference, RLS self)."""
     pre = text[:generated_start(text)]
     tables = [name for name, _, _, _ in table_spans(pre, mask_sql(pre))]
     parts = [p for p, (_, f) in ctx["partitions"].items() if f == fname]
@@ -366,13 +380,15 @@ def file_plan(fname, text, ctx):
     trunc = [t for t in tables + parts if parent(t) in ctx["truncate_need"] and t not in ctx["hand_truncate"]]
     rls = [t for t in tables + parts if company(t) and parent(t) not in RLS_ALLOWLIST]
     nullable = [t for t in rls if company(t) == "null"]
-    return tables, ao, trunc, rls, nullable
+    shared = [t for t in nullable if parent(t) in RLS_SHARED_READ]
+    selfs = [t for t in tables if t in RLS_SELF and not company(t)]
+    return tables, ao, trunc, rls, nullable, shared, selfs
 
 
 def render_sections(fname, text, ctx):
     """The generated end sections of a design file (empty for a file without tables). schema_phase_b.py writes them and
     check_keys_and_recorded_at compares them with the file, character for character."""
-    tables, ao, trunc, rls, nullable = file_plan(fname, text, ctx)
+    tables, ao, trunc, rls, nullable, shared, selfs = file_plan(fname, text, ctx)
     if not tables:
         return ""
     pad = " " * 8
@@ -421,7 +437,7 @@ def render_sections(fname, text, ctx):
         "END $$;",
         RECORDED_AT_END,
     ]
-    if rls:
+    if rls or selfs:
         exceptions = sorted(t for t in tables if ctx["company"].get(t) and t in RLS_ALLOWLIST)
         out += [
             "",
@@ -432,11 +448,19 @@ def render_sections(fname, text, ctx):
             "-- rows only under the setting value installation. Default partitions are listed with their parent. Exceptions are in",
             "-- lab gen_overview.RLS_ALLOWLIST with their reasons" + (f" (here: {', '.join(exceptions)})." if exceptions else "; this file has none.")
             ,
+        ] + ([
+            "-- Shared reference catalogs (v_shared, gen_overview.RLS_SHARED_READ) also get shared_read_policy: every company reads",
+            "-- their null rows, which only the installation scope writes (S2 closure, 2026-11-21).",
+        ] if shared else []) + ([
+            "-- A table whose row is a company (v_self, gen_overview.RLS_SELF) compares its own id with the settings instead.",
+        ] if selfs else []) + [
             "-- Lab gen_overview.py --check compares this section with what schema_phase_b.py writes.",
             "DO $$",
             "DECLARE",
-            f"    v_tables    text[] := ARRAY[{wrap_array(rls, pad)}];",
+            f"    v_tables    text[] := ARRAY[{wrap_array(rls, pad)}]::text[];" if not rls else f"    v_tables    text[] := ARRAY[{wrap_array(rls, pad)}];",
             f"    v_nullable  text[] := ARRAY[{wrap_array(nullable, pad)}]::text[];",
+        ] + ([f"    v_shared    text[] := ARRAY[{wrap_array(shared, pad)}]::text[];"] if shared else []) + (
+            [f"    v_self      text[] := ARRAY[{wrap_array(selfs, pad)}]::text[];"] if selfs else []) + [
             "    v_table     text;",
             "BEGIN",
             "    FOREACH v_table IN ARRAY v_tables LOOP",
@@ -449,7 +473,20 @@ def render_sections(fname, text, ctx):
             "            EXECUTE format('CREATE POLICY company_policy ON %I USING (company_id::text = current_setting(''nativeflows.company_id'', true))', v_table);",
             "        END IF;",
             "        EXECUTE format('CREATE POLICY company_ids_policy ON %I FOR SELECT USING (company_id::text = ANY (string_to_array(current_setting(''nativeflows.company_ids'', true), '','')))', v_table);",
+        ] + ([
+            "        IF v_table = ANY (v_shared) THEN",
+            "            EXECUTE format('CREATE POLICY shared_read_policy ON %I FOR SELECT USING (company_id IS NULL)', v_table);",
+            "        END IF;",
+        ] if shared else []) + [
             "    END LOOP;",
+        ] + ([
+            "    FOREACH v_table IN ARRAY v_self LOOP",
+            "        EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', v_table);",
+            "        EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', v_table);",
+            "        EXECUTE format('CREATE POLICY company_policy ON %I USING (id::text = current_setting(''nativeflows.company_id'', true))', v_table);",
+            "        EXECUTE format('CREATE POLICY company_ids_policy ON %I FOR SELECT USING (id::text = ANY (string_to_array(current_setting(''nativeflows.company_ids'', true), '','')))', v_table);",
+            "    END LOOP;",
+        ] if selfs else []) + [
             "END $$;",
             RLS_END,
         ]
@@ -514,7 +551,7 @@ def check_keys_and_recorded_at(docs):
     design = os.path.join(docs, "design")
     named = design_texts(design)
     ctx = design_context(named)
-    seen_rls = set()
+    seen_rls, seen_shared, seen_self = set(), set(), set()
     for fname, text in named:
         start = generated_start(text)
         pre = text[:start]
@@ -540,6 +577,14 @@ def check_keys_and_recorded_at(docs):
             elif not pk_ok:
                 errors.append(f"{where}: table {name} has the primary key ({', '.join(pk) or 'none'}), not id uuid "
                               "(ADR-0006 rule 1; exceptions only in KEY_ALLOWLIST)")
+            if name in RLS_SHARED_READ:
+                seen_shared.add(name)
+                if ctx["company"].get(name) != "null":
+                    errors.append(f"RLS_SHARED_READ names {name}, whose company_id is not nullable; remove it")
+            if name in RLS_SELF:
+                seen_self.add(name)
+                if ctx["company"].get(name):
+                    errors.append(f"RLS_SELF names {name}, which has company_id; remove it")
             if name in RLS_ALLOWLIST:
                 seen_rls.add(name)
                 if not ctx["company"].get(name):
@@ -553,7 +598,7 @@ def check_keys_and_recorded_at(docs):
             errors.append(f"design/{fname}: generated triggers written by hand: {', '.join(explicit)}")
         if not tables:
             continue
-        _, ao, trunc, rls, nullable = file_plan(fname, text, ctx)
+        _, ao, trunc, rls, nullable, shared, selfs = file_plan(fname, text, ctx)
         befores, inserts = defaultdict(list), defaultdict(list)
         parsed = set()
         for g in ctx["triggers"]:
@@ -587,11 +632,17 @@ def check_keys_and_recorded_at(docs):
         counts["truncate"] += len(trunc)
         counts["rls"] += len(rls)
         counts["rls_nullable"] += len(nullable)
+        counts["rls_shared"] += len(shared)
+        counts["rls_self"] += len(selfs)
     counts["hand_truncate"] = len(ctx["hand_truncate"])
     for name in sorted(set(KEY_ALLOWLIST) - seen_allow):
         errors.append(f"KEY_ALLOWLIST names {name}, which no design file defines")
     for name in sorted(set(RLS_ALLOWLIST) - seen_rls):
         errors.append(f"RLS_ALLOWLIST names {name}, which no design file defines")
+    for name in sorted(set(RLS_SHARED_READ) - seen_shared):
+        errors.append(f"RLS_SHARED_READ names {name}, which no design file defines")
+    for name in sorted(set(RLS_SELF) - seen_self):
+        errors.append(f"RLS_SELF names {name}, which no design file defines")
     company_errors, company_counts = check_company_keys(docs)
     errors += company_errors
     return errors, {**counts, "allowlist": len(KEY_ALLOWLIST), "triggers": counts["tables"], "rls_exceptions": len(RLS_ALLOWLIST),
@@ -1340,6 +1391,16 @@ SELFTESTS = (
     ("a company table left out of the row-level security section", "DS-30-ui.sql",
      "    v_tables    text[] := ARRAY['assist_request', 'list_variant'];", "    v_tables    text[] := ARRAY['assist_request'];",
      "DS-30-ui.sql: the generated sections differ"),
+    ("a shared reference catalog left out of the shared read policy", "DS-20-master-data.sql",
+     "    v_shared    text[] := ARRAY['uom']::text[];", "    v_shared    text[] := ARRAY[]::text[];",
+     "DS-20-master-data.sql: the generated sections differ"),
+    ("the company table left without its policies on id", "DS-20-master-data.sql",
+     "    v_self      text[] := ARRAY['company']::text[];", "    v_self      text[] := ARRAY[]::text[];",
+     "DS-20-master-data.sql: the generated sections differ"),
+    ("a table in RLS_SHARED_READ whose company_id is not nullable", "DS-20-master-data.sql",
+     "    company_id      uuid REFERENCES company (id),\n    code            text NOT NULL,\n    name            text NOT NULL,                          -- core:",
+     "    company_id      uuid NOT NULL REFERENCES company (id),\n    code            text NOT NULL,\n    name            text NOT NULL,                          -- core:",
+     "RLS_SHARED_READ names uom, whose company_id is not nullable"),
     ("an append-only table left out of the TRUNCATE guards", "DS-05-platform.sql",
      "v_refuse_truncate   text[] := ARRAY['agent_type_version', ", "v_refuse_truncate   text[] := ARRAY[",
      "DS-05-platform.sql: the generated sections differ"),
@@ -1405,7 +1466,7 @@ def main():
               f"{k['tables']} tables, {k['allowlist']} key exceptions, {k['triggers']} set_recorded_at triggers ({k['insert_update']} on "
               f"insert and update, {k['append_only']} append-only on insert); {k['truncate']} generated and {k['hand_truncate']} "
               f"hand-written TRUNCATE guards; row-level security on {k['rls']} tables and partitions ({k['rls_nullable']} nullable, "
-              f"{k['rls_exceptions']} exception); {k['company_keys']} composite company keys, {k['company_key_exceptions']} single-column keys to or from "
+              f"{k['rls_shared']} shared reference, {k['rls_self']} self, {k['rls_exceptions']} exceptions); {k['company_keys']} composite company keys, {k['company_key_exceptions']} single-column keys to or from "
               f"installation-or-company tables ({len(COMPANY_KEY_ALLOWLIST)} allowlisted tables); {len(SELFTESTS)} guard self-tests pass")
     else:
         os.makedirs(out_dir, exist_ok=True)

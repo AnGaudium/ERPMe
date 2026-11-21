@@ -110,7 +110,7 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Work item kinds (9):** `complaint_open`, `data_subject_request_due`, `data_subject_request_received`, `follow_up_due`, `inbound_message_matched`, `interaction_unmatched`, `mailbox_unreachable`, `outbound_message_failed`, `partner_duplicate_suspected`
 - **Authorization areas (7):** `complaint`, `data_protection`, `data_subject_request`, `interaction`, `mailbox`, `outbound_message`, `partner_insight`
 - **ADRs (declared):** [ADR-0009](../../adr/0009-document-lifecycle.md), [ADR-0019](../../adr/0019-partners-and-crm-foundation.md), [ADR-0052](../../adr/0052-minimal-crm.md)
-- **ADRs that name this module most (mentions; not complete):** [ADR-0009](../../adr/0009-document-lifecycle.md), [ADR-0019](../../adr/0019-partners-and-crm-foundation.md), [ADR-0045](../../adr/0045-master-data-and-price-lists.md), [ADR-0048](../../adr/0048-cash-bank-receivables-payables.md), [ADR-0051](../../adr/0051-agent-workflows.md), [ADR-0052](../../adr/0052-minimal-crm.md), [ADR-0057](../../adr/0057-document-intake-and-extraction.md), [ADR-0066](../../adr/0066-work-cases.md), [ADR-0079](../../adr/0079-personal-data-protection.md)
+- **ADRs that name this module most (mentions; not complete):** [ADR-0009](../../adr/0009-document-lifecycle.md), [ADR-0019](../../adr/0019-partners-and-crm-foundation.md), [ADR-0045](../../adr/0045-master-data-and-price-lists.md), [ADR-0048](../../adr/0048-cash-bank-receivables-payables.md), [ADR-0051](../../adr/0051-agent-workflows.md), [ADR-0052](../../adr/0052-minimal-crm.md), [ADR-0066](../../adr/0066-work-cases.md), [ADR-0079](../../adr/0079-personal-data-protection.md)
 
 ## `planning` (layer 4)
 
@@ -235,14 +235,14 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 ## `tax` (layer 3)
 
 - **Note in ADR-0022 rule 2:** —
-- **Owned tables (4):** `document_line_tax`, `tax_code`, `tax_line`, `tax_line_adjustment`
+- **Owned tables (7):** `company_tax_matrix`, `document_line_tax`, `tax_code`, `tax_line`, `tax_line_adjustment`, `tax_matrix`, `tax_rate`
 - **Events produced (0):** none found
 - **Commands and queries named in ADRs (0):** none found
 - **Settings (0):** none in settings.csv
 - **Work item kinds (12):** `e_invoice_date_outside_window`, `e_invoice_key_conflict`, `e_invoice_outage`, `e_invoice_posting_held`, `e_invoice_quarantine_overflow`, `e_invoice_quarantine_review`, `e_invoice_record_superseded`, `e_invoice_rejected`, `supplier_invoice_received`, `tax_adjustment_redated`, `tax_condition_pending`, `tax_deductibility_changed`
 - **Authorization areas (2):** `tax_adjustment`, `tax_setup`
 - **ADRs (declared):** [ADR-0004](../../adr/0004-naming-conventions.md), [ADR-0016](../../adr/0016-localization-package-structure.md), [ADR-0028](../../adr/0028-document-lifecycle-hardening.md), [ADR-0041](../../adr/0041-tax-engine.md), [ADR-0053](../../adr/0053-core-neutrality.md)
-- **ADRs that name this module most (mentions; not complete):** [ADR-0041](../../adr/0041-tax-engine.md)
+- **ADRs that name this module most (mentions; not complete):** [ADR-0041](../../adr/0041-tax-engine.md), [ADR-0057](../../adr/0057-document-intake-and-extraction.md)
 
 ## `agent_runs` (layer 2)
 

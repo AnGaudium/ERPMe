@@ -147,9 +147,9 @@ if "--load" in sys.argv:
     def warehouse(cx, kind="physical", site=None, valuation=None, co="co", branch=None):
         w, z, b = new(), new(), new()
         cx.execute("insert into warehouse (id, company_id, site_id, valuation_warehouse_id, code, name, kind, default_bin_id, branch_id) values (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
-                   (w, I[co], site, valuation, "WX" + w.hex[:6], "WX", kind, b, branch))
+                   (w, I[co], site, valuation, "WX" + w.hex[-6:], "WX", kind, b, branch))
         cx.execute("insert into zone (id, company_id, warehouse_id, code, name) values (%s,%s,%s,'DEFAULT','Default')", (z, I[co], w))
-        cx.execute("insert into bin (id, company_id, warehouse_id, zone_id, code, barcode, bin_type) values (%s,%s,%s,%s,'DEFAULT',%s,'storage')", (b, I[co], w, z, "BX" + b.hex[:10].upper()))
+        cx.execute("insert into bin (id, company_id, warehouse_id, zone_id, code, barcode, bin_type) values (%s,%s,%s,%s,'DEFAULT',%s,'storage')", (b, I[co], w, z, "BX" + b.hex[-10:].upper()))
         return w
     trial("X02 a physical warehouse carries a site (ck_warehouse_site)", lambda cx: warehouse(cx), "ck_warehouse_site")
     trial("X03 a transit warehouse carries none: its site is its valuation warehouse's", lambda cx: warehouse(cx, kind="transit", site=I["site"], valuation=I["w1"]), "ck_warehouse_site")
