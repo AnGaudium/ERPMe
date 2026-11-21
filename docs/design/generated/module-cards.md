@@ -110,7 +110,7 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Work item kinds (9):** `complaint_open`, `data_subject_request_due`, `data_subject_request_received`, `follow_up_due`, `inbound_message_matched`, `interaction_unmatched`, `mailbox_unreachable`, `outbound_message_failed`, `partner_duplicate_suspected`
 - **Authorization areas (7):** `complaint`, `data_protection`, `data_subject_request`, `interaction`, `mailbox`, `outbound_message`, `partner_insight`
 - **ADRs (declared):** [ADR-0009](../../adr/0009-document-lifecycle.md), [ADR-0019](../../adr/0019-partners-and-crm-foundation.md), [ADR-0052](../../adr/0052-minimal-crm.md)
-- **ADRs that name this module most (mentions; not complete):** [ADR-0009](../../adr/0009-document-lifecycle.md), [ADR-0019](../../adr/0019-partners-and-crm-foundation.md), [ADR-0045](../../adr/0045-master-data-and-price-lists.md), [ADR-0048](../../adr/0048-cash-bank-receivables-payables.md), [ADR-0051](../../adr/0051-agent-workflows.md), [ADR-0052](../../adr/0052-minimal-crm.md), [ADR-0066](../../adr/0066-work-cases.md), [ADR-0079](../../adr/0079-personal-data-protection.md)
+- **ADRs that name this module most (mentions; not complete):** [ADR-0009](../../adr/0009-document-lifecycle.md), [ADR-0019](../../adr/0019-partners-and-crm-foundation.md), [ADR-0045](../../adr/0045-master-data-and-price-lists.md), [ADR-0048](../../adr/0048-cash-bank-receivables-payables.md), [ADR-0051](../../adr/0051-agent-workflows.md), [ADR-0052](../../adr/0052-minimal-crm.md), [ADR-0066](../../adr/0066-work-cases.md)
 
 ## `planning` (layer 4)
 
@@ -238,7 +238,7 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Owned tables (7):** `company_tax_matrix`, `document_line_tax`, `tax_code`, `tax_line`, `tax_line_adjustment`, `tax_matrix`, `tax_rate`
 - **Events produced (0):** none found
 - **Commands and queries named in ADRs (0):** none found
-- **Settings (0):** none in settings.csv
+- **Settings (1):** `tax.default_item_tax_group`
 - **Work item kinds (12):** `e_invoice_date_outside_window`, `e_invoice_key_conflict`, `e_invoice_outage`, `e_invoice_posting_held`, `e_invoice_quarantine_overflow`, `e_invoice_quarantine_review`, `e_invoice_record_superseded`, `e_invoice_rejected`, `supplier_invoice_received`, `tax_adjustment_redated`, `tax_condition_pending`, `tax_deductibility_changed`
 - **Authorization areas (2):** `tax_adjustment`, `tax_setup`
 - **ADRs (declared):** [ADR-0004](../../adr/0004-naming-conventions.md), [ADR-0016](../../adr/0016-localization-package-structure.md), [ADR-0028](../../adr/0028-document-lifecycle-hardening.md), [ADR-0041](../../adr/0041-tax-engine.md), [ADR-0053](../../adr/0053-core-neutrality.md)
@@ -278,7 +278,7 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Work item kinds (1):** `personal_data_incident_suspected`
 - **Authorization areas (2):** `audit`, `blocked_personal_data`
 - **ADRs (declared):** [ADR-0019](../../adr/0019-partners-and-crm-foundation.md), [ADR-0038](../../adr/0038-audit-and-observability.md), [ADR-0052](../../adr/0052-minimal-crm.md), [ADR-0054](../../adr/0054-users-roles-and-authorizations.md), [ADR-0079](../../adr/0079-personal-data-protection.md)
-- **ADRs that name this module most (mentions; not complete):** [ADR-0006](../../adr/0006-id-and-numeric-model.md), [ADR-0019](../../adr/0019-partners-and-crm-foundation.md), [ADR-0038](../../adr/0038-audit-and-observability.md), [ADR-0052](../../adr/0052-minimal-crm.md), [ADR-0058](../../adr/0058-configurable-workflows.md), [ADR-0079](../../adr/0079-personal-data-protection.md)
+- **ADRs that name this module most (mentions; not complete):** [ADR-0006](../../adr/0006-id-and-numeric-model.md), [ADR-0017](../../adr/0017-permission-envelope.md), [ADR-0019](../../adr/0019-partners-and-crm-foundation.md), [ADR-0038](../../adr/0038-audit-and-observability.md), [ADR-0052](../../adr/0052-minimal-crm.md), [ADR-0058](../../adr/0058-configurable-workflows.md), [ADR-0079](../../adr/0079-personal-data-protection.md)
 
 ## `configuration` (layer 2)
 
@@ -338,7 +338,7 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Work item kinds (2):** `event_delivery_held`, `external_call_outcome_unknown`
 - **Authorization areas (1):** `event_delivery`
 - **ADRs (declared):** [ADR-0013](../../adr/0013-outbox-and-events.md)
-- **ADRs that name this module most (mentions; not complete):** [ADR-0013](../../adr/0013-outbox-and-events.md), [ADR-0017](../../adr/0017-permission-envelope.md), [ADR-0073](../../adr/0073-coding-pipeline-and-mechanical-assurance.md)
+- **ADRs that name this module most (mentions; not complete):** [ADR-0013](../../adr/0013-outbox-and-events.md), [ADR-0073](../../adr/0073-coding-pipeline-and-mechanical-assurance.md)
 
 ## `periods` (layer 2)
 
@@ -386,7 +386,7 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Work item kinds (2):** `setting_review_required`, `setup_loosening_review`
 - **Authorization areas (3):** `company_setting`, `general_access`, `list_variant`
 - **ADRs (declared):** [ADR-0008](../../adr/0008-command-envelope-and-registry.md), [ADR-0015](../../adr/0015-account-determination.md), [ADR-0017](../../adr/0017-permission-envelope.md), [ADR-0022](../../adr/0022-repository-and-engineering-conventions.md), [ADR-0038](../../adr/0038-audit-and-observability.md), [ADR-0052](../../adr/0052-minimal-crm.md), [ADR-0063](../../adr/0063-configurable-policy-settings.md), [ADR-0067](../../adr/0067-quickflows-operating-presets.md), [ADR-0077](../../adr/0077-ui-floorplans-annotations-and-embedded-agent.md)
-- **ADRs that name this module most (mentions; not complete):** [ADR-0006](../../adr/0006-id-and-numeric-model.md), [ADR-0008](../../adr/0008-command-envelope-and-registry.md), [ADR-0017](../../adr/0017-permission-envelope.md), [ADR-0063](../../adr/0063-configurable-policy-settings.md), [ADR-0067](../../adr/0067-quickflows-operating-presets.md), [ADR-0073](../../adr/0073-coding-pipeline-and-mechanical-assurance.md), [ADR-0076](../../adr/0076-internal-messaging-and-notifications.md), [ADR-0077](../../adr/0077-ui-floorplans-annotations-and-embedded-agent.md)
+- **ADRs that name this module most (mentions; not complete):** [ADR-0006](../../adr/0006-id-and-numeric-model.md), [ADR-0008](../../adr/0008-command-envelope-and-registry.md), [ADR-0017](../../adr/0017-permission-envelope.md), [ADR-0063](../../adr/0063-configurable-policy-settings.md), [ADR-0067](../../adr/0067-quickflows-operating-presets.md), [ADR-0073](../../adr/0073-coding-pipeline-and-mechanical-assurance.md), [ADR-0076](../../adr/0076-internal-messaging-and-notifications.md), [ADR-0077](../../adr/0077-ui-floorplans-annotations-and-embedded-agent.md), [ADR-0079](../../adr/0079-personal-data-protection.md)
 
 ## `work` (layer 2)
 

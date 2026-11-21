@@ -351,7 +351,9 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Product category | product\_category | Built-in hierarchy of products that proposes defaults when a product is created |
 | Item tax group, partner tax group | item\_tax\_group, partner\_tax\_group | The two axes of the dated tax matrix (with direction) that proposes and checks a line's tax codes (DS-23) |
 | Tax code | tax\_code | Package rule naming one tax treatment: core kind (vat, sales\_tax, excise, customs\_duty, other) with an optional package kind, direction, calculation, transaction key, deductibility, import treatment; rates dated per code ([ADR-0041](../adr/0041-tax-engine.md)) |
-| Tax matrix | tax\_matrix | Dated map from direction, partner tax group and item tax group to tax codes, as a fiscal position does |
+| Tax rate | tax\_rate | A tax code's rate from an effective date, one row per code and date; a change is a new dated row; package rows, or a company's rates of its own `x-` codes ([ADR-0041](../adr/0041-tax-engine.md) rules 2, 4 notes) |
+| Tax matrix | tax\_matrix | Dated map from direction, partner tax group and item tax group to tax codes, as a fiscal position does; a company's own rows for keys with its own groups or keys the package marks adjustable are `company_tax_matrix` ([ADR-0041](../adr/0041-tax-engine.md) rules 3, 4 notes) |
+| Effective item tax group | tax\_effective\_item\_tax\_group | The item tax group a product's lines use: the product's own, else the nearest product category's up the parent chain, else the company setting `tax.default_item_tax_group`; recorded on each tax row with its level ([ADR-0041](../adr/0041-tax-engine.md) rule 7 note) |
 | Document line tax | document\_line\_tax | Base, rate and tax per document line and code, part of the document's content and frozen with it |
 | Tax line | tax\_line | Immutable tax subledger row written at posting, tied to the journal tax line |
 | Tax line adjustment | tax\_line\_adjustment | Append-only later change of a tax line: condition met, condition failed, apportionment, period move, reversal of an adjustment ([ADR-0053](../adr/0053-core-neutrality.md) rule 3) |

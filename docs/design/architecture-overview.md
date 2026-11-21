@@ -165,7 +165,7 @@ The [module cards](generated/module-cards.md) are generated. Layers and modules:
 - **Layer 5, Interfaces**: `api` (REST and MCP from the registry), `query` (read-only views and the analysis layer), `agents` (gateway, runtime, workflows), `sdk`, `imports`, `automation`.
 - **Layer 6**: `app`, the composition root.
 
-Generated counts from the DDL drafts (2026-11-21): 399 tables, each with a stated owner, in 25 modules; the largest are `master_data` (74), `production` (53), `inventory` (44) and `crm` (24) ([data map](generated/data-map.md)).
+Generated counts from the DDL drafts (2026-11-21): 402 tables, each with a stated owner, in 25 modules; the largest are `master_data` (74), `production` (53), `inventory` (44) and `crm` (24) ([data map](generated/data-map.md)).
 
 ## B6. Data architecture
 
@@ -669,7 +669,7 @@ The production core step proposed by ADR-0032 rule 7 has no number yet ([open-qu
 
 ## B18. Open decisions and known limits
 
-[open-questions.md](../open-questions.md) holds 118 open and 221 closed items; 40 open items carry an interim (an entry counts when it says "interim").
+[open-questions.md](../open-questions.md) holds 119 open and 223 closed items; 40 open items carry an interim (an entry counts when it says "interim").
 
 **Author decisions that block coding** (examples)
 - Test server host (open-questions:8).
