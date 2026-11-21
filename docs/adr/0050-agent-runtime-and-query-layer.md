@@ -227,6 +227,9 @@ Status: accepted (2026-11-15) under ADR-0005, reviewed by Claude Fable 5.2 (buil
     - **Retention.** Partitions older than `agent_run_step_retention_days` (installation setting, default 400, flagged for the author) are dropped. The `agent_run` row stays.
 
     Note ([ADR-0057](0057-document-intake-and-extraction.md), 2026-11-15): for every extraction field a step receives, `context_refs` also records the trust the dispatcher served and the rule run number it used, and whether the raw text or evidence was served; INV-642 checks those values ([ADR-0057](0057-document-intake-and-extraction.md) rule 17).
+
+    Note (S2 findings closure, 2026-11-21): the registry key of `agent_run_step_retention_days` is `agents.run_step_retention_days` (ADR-0063 rule 2 asks for dotted keys; installation, a deployment value, default 400; ADR-0063 rule 29 note of this date).
+
 20. Queries, export and erasure:
     - **Queries.** `ListAgentRun` and `GetAgentRun` (with its steps, paged), each with its generated permission. Request and response bodies are returned only to holders of the capability `read_agent_run_bodies` (ADR-0017 rule 4; in the `owner` template only); access to bodies is by that capability alone. They are on no agent tool list (rule 30).
     - **Export.** `ExportCompanyData` includes both tables (ADR-0044 rule 17).

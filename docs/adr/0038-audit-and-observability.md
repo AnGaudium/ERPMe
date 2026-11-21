@@ -181,6 +181,8 @@ The retention periods and the strictness of scanning are flagged for the author.
 
     [DS-05-platform.sql](../design/DS-05-platform.sql) adds `attachment.bytes_released_at`; DS-37 ([backlog](../design/backlog.md)) chooses the store, its versioning or object lock, and the recovery window.
 
+    Note (S2 findings closure, 2026-11-21): the registry key of `attachment_retention_years` is `attachments.evidence_retention_years` (ADR-0063 rule 2 asks for dotted keys): a regime setting with no core default (unset), because the period is a legal rule the package supplies, flagged verified or unverified (ADR-0016 rule 12); unset or unverified, the bytes are never purged (ADR-0063 rule 29 note of this date).
+
 ## Context
 
 INV-81 and INV-85 to INV-87 query audit rows, change proposals link to them, and spec 03 links agent runs to audit. ADR-0002 already says audit data is never deleted. The first review of this ADR found that it had contradicted that rule, left the change capture unowned, and lacked a workable model for denials and attachment scanning. This version closes those gaps.

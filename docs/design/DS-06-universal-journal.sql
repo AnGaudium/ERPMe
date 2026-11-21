@@ -33,7 +33,8 @@ CREATE TABLE derivation_trace (                            -- [ledger] ADR-0027 
     steps         jsonb NOT NULL,   -- ordered intermediate values as exact decimal or rational strings
     result        jsonb NOT NULL,
     recorded_at   timestamptz NOT NULL,
-    command_id    uuid NOT NULL     -- the command request id (ADR-0008)
+    command_id    uuid NOT NULL,    -- the command request id (ADR-0008)
+    UNIQUE (company_id, id)         -- target of company-composite references (journal_entry.business_unit_trace_id)
 );
 CREATE INDEX ix_derivation_trace_company_id_rule_code ON derivation_trace (company_id, rule_code);
 
@@ -209,10 +210,11 @@ CREATE TABLE journal_entry (                               -- [ledger] ADR-0014 
     close_task_id                uuid        REFERENCES close_task (id),
     database_transaction_number  xid8        NOT NULL,
     line_count                   integer     NOT NULL CHECK (line_count >= 2),
-    business_unit_trace_id       uuid        REFERENCES derivation_trace (id),   -- ADR-0069 rule 12: the entry's business unit derivation (rule_code business_unit_derivation); journal_line.derivation_trace_id stays costing's
+    business_unit_trace_id       uuid,       -- ADR-0069 rule 12, composite key below: the entry's business unit derivation (rule_code business_unit_derivation); journal_line.derivation_trace_id stays costing's
     note                         text CONSTRAINT ck_journal_entry_note CHECK (note IS NULL OR char_length(note) <= 4000),   -- copied from the document's header note at posting (ADR-0074 rule 17)
     recorded_at                  timestamptz NOT NULL DEFAULT now(),
-    CONSTRAINT uq_journal_entry_document_id UNIQUE (document_id)
+    CONSTRAINT uq_journal_entry_document_id UNIQUE (document_id),
+    FOREIGN KEY (company_id, business_unit_trace_id) REFERENCES derivation_trace (company_id, id)   -- the trace is of the entry's company (ADR-0069 rule 12)
 );
 
 CREATE INDEX ix_journal_entry_company_id_posting_date
@@ -357,21 +359,27 @@ CREATE INDEX ix_journal_line_company_id_business_unit_id_posting_period_id
     ON journal_line (company_id, business_unit_id, posting_period_id) WHERE business_unit_id IS NOT NULL;
 
 -- Rule 13: append-only.
+-- ADR-0079 rule 7: under the erasure marker an update may blank the argument's catalog columns (erasure_update_allowed, DS-05).
 CREATE FUNCTION journal_reject_change() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
+    IF TG_OP = 'UPDATE' AND TG_NARGS > 0 AND coalesce(current_setting('nativeflows.erasure_command_id', true), '') <> '' THEN
+        IF erasure_update_allowed(to_jsonb(OLD), to_jsonb(NEW), TG_ARGV[0]::text[]) THEN
+            RETURN NEW;
+        END IF;
+    END IF;
     RAISE EXCEPTION 'journal rows are append-only (ADR-0014 rule 13)'
         USING ERRCODE = 'restrict_violation';
 END $$;
 
 CREATE TRIGGER trg_journal_entry_append_only
     BEFORE UPDATE OR DELETE ON journal_entry
-    FOR EACH ROW EXECUTE FUNCTION journal_reject_change();
+    FOR EACH ROW EXECUTE FUNCTION journal_reject_change('{note}');
 CREATE TRIGGER trg_journal_entry_no_truncate
     BEFORE TRUNCATE ON journal_entry
     FOR EACH STATEMENT EXECUTE FUNCTION journal_reject_change();
 CREATE TRIGGER trg_journal_line_append_only
     BEFORE UPDATE OR DELETE ON journal_line
-    FOR EACH ROW EXECUTE FUNCTION journal_reject_change();
+    FOR EACH ROW EXECUTE FUNCTION journal_reject_change('{description}');
 CREATE TRIGGER trg_subledger_activation_append_only
     BEFORE UPDATE OR DELETE ON subledger_activation
     FOR EACH ROW EXECUTE FUNCTION journal_reject_change();

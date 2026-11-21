@@ -641,9 +641,9 @@ CREATE TRIGGER trg_parameter_set_pointer BEFORE INSERT OR UPDATE ON parameter_se
 CREATE TRIGGER trg_automation_rule_version_pins BEFORE UPDATE ON automation_rule_version FOR EACH ROW EXECUTE FUNCTION automation_rule_version_check_pins();
 CREATE TRIGGER trg_decision_table_version_in_use BEFORE UPDATE ON decision_table_version FOR EACH ROW EXECUTE FUNCTION decision_table_version_check_in_use();
 CREATE TRIGGER trg_automation_scope_skip_check_change BEFORE UPDATE OR DELETE ON automation_scope_skip FOR EACH ROW EXECUTE FUNCTION automation_scope_skip_check_change();
-CREATE TRIGGER trg_automation_execution_immutable BEFORE UPDATE OR DELETE ON automation_execution FOR EACH ROW EXECUTE FUNCTION platform_reject_change();
+CREATE TRIGGER trg_automation_execution_immutable BEFORE UPDATE OR DELETE ON automation_execution FOR EACH ROW EXECUTE FUNCTION platform_reject_change('{condition_results}');
 CREATE TRIGGER trg_artifact_promotion_evidence_immutable BEFORE UPDATE OR DELETE ON artifact_promotion_evidence FOR EACH ROW EXECUTE FUNCTION platform_reject_change();
-CREATE TRIGGER trg_artifact_transition_immutable BEFORE UPDATE OR DELETE ON artifact_transition FOR EACH ROW EXECUTE FUNCTION platform_reject_change();
+CREATE TRIGGER trg_artifact_transition_immutable BEFORE UPDATE OR DELETE ON artifact_transition FOR EACH ROW EXECUTE FUNCTION platform_reject_change('{reason}');
 CREATE TRIGGER trg_artifact_shadow_outcome_immutable BEFORE UPDATE OR DELETE ON artifact_shadow_outcome FOR EACH ROW EXECUTE FUNCTION platform_reject_change();
 CREATE TRIGGER trg_artifact_monitor_snapshot_immutable BEFORE UPDATE OR DELETE ON artifact_monitor_snapshot FOR EACH ROW EXECUTE FUNCTION platform_reject_change();
 CREATE TRIGGER trg_golden_case_label_append_only BEFORE UPDATE OR DELETE ON golden_case_label FOR EACH ROW

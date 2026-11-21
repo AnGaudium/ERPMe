@@ -75,6 +75,8 @@ Every write goes through one command registry. A command is a pydantic payload w
 18. A replayed response is the stored response with `replayed: true`; everything else, including `mode: execute`, is as stored. The DS-16 invariant compares responses ignoring `replayed`.
 19. `idempotency_record` is not partitioned. A daily job deletes rows older than the retention (`retention_days` in installation settings, default 90); rows are kept at least that long. These rows are not the audit log, which is never deleted (DS-36). Every executed command's record has an audit record (INV-89, [ADR-0038](0038-audit-and-observability.md) rule 8).
 
+    Note (S2 findings closure, 2026-11-21): the registry key of the idempotency retention (`retention_days` above) is `commands.idempotency_retention_days` (ADR-0063 rule 2 asks for dotted keys; installation, a deployment value, default 90; ADR-0063 rule 29 note of this date).
+
 **Command batches**
 
 20. A command batch has the envelope with `command_type` and `schema_version` replaced by `items`, an ordered list of `{command_type, schema_version, payload}`, all for the same company and actor. Its REST endpoint is `POST /api/command-batches` and its MCP tool is `command_batch`. All items are validated first and every validation error is reported (field paths `items[<n>].payload.<field>`); then the items run in order in one transaction, all or nothing, stopping at the first handler error, which names its item. Its plan is the list of item plans, hashed as one; one `expected_plan_hash` and one idempotency key cover the batch. An item refers to a record created by an earlier item through the client-supplied `id` (ADR-0006 rule 3). A batch is not a command type, so no verb is needed.

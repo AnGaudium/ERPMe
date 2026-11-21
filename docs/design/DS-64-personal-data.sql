@@ -11,7 +11,12 @@
 -- A data subject request (DS-35, module crm) is named through document (company_id, id) only: audit is layer 2 and refers to
 -- no crm table (ADR-0022 rule 2); the command checks that the document is a data subject request.
 -- Append-only tables use audit_refuse_change() of DS-35-crm.sql (owner audit). The erasure exception on posted documents,
--- versions, the journal and append-only rows (ADR-0079 rule 7) is written with the ledger and document DDL in session S2.
+-- versions and the journal (ADR-0079 rule 7) is erasure_update_allowed() of DS-05-platform.sql: the refusing triggers of
+-- document, document_version, payment, payment_line, tax_line, change proposals, period unlock requests, journal_entry,
+-- journal_line, approval, artifact_transition, automation_execution, setting_value, taint_clearance and work_item_note pass
+-- their catalog columns to it (lab t31 checks the lists against the catalog). The append-only guards of their own
+-- (analysis_example, company_setup_acknowledgement, document_extraction, posting_intent, saved_analysis_version) and the
+-- generated header and line triggers of DS-22 follow when those functions are next written (lab t31 lists them).
 -- The erasure journal outside the database holds one line per data_erasure_entry with every column of the entry (id, subject,
 -- target table, row key, column names, action, cause, request, command, time; no values), appended by the journal consumer of
 -- the IDs-only event DataErasureRecorded that audit.contract emits with each insert (ADR-0079 rule 7); ReapplyErasures, a step
@@ -44,7 +49,7 @@ CREATE INDEX ix_data_subject_state_company_id_state ON data_subject_state (compa
 CREATE INDEX ix_data_subject_state_destroy_due_date ON data_subject_state (destroy_due_date) WHERE state = 'blocked' AND destroy_due_date IS NOT NULL;
 
 -- ===== Retention rules [audit] (ADR-0079 rule 9) =====
-CREATE TABLE retention_rule (                              -- [audit] ADR-0079 rule 9; seeded per company from the package's rules; the core seeds none
+CREATE TABLE retention_rule (                              -- [audit] ADR-0079 rule 9 and its note of 2026-11-21; set per company, defaults from the package; the core seeds none
     id                       uuid PRIMARY KEY,
     company_id               uuid NOT NULL REFERENCES company (id),
     retention_class          text NOT NULL CONSTRAINT ck_retention_rule_retention_class CHECK (retention_class IN ('master_data', 'accounting_document', 'crm_interaction',
@@ -52,15 +57,16 @@ CREATE TABLE retention_rule (                              -- [audit] ADR-0079 r
     start_event              text NOT NULL CONSTRAINT ck_retention_rule_start_event CHECK (start_event IN ('record_created', 'relationship_ended', 'last_document_posted', 'fiscal_year_closed')),
     block_after_months       integer CONSTRAINT ck_retention_rule_block_after_months CHECK (block_after_months >= 0),   -- null: the class is never blocked by the job
     destroy_after_months     integer CONSTRAINT ck_retention_rule_destroy_after_months CHECK (destroy_after_months >= 0),   -- null: nothing of the class is destroyed by the job
-    source                   text NOT NULL CONSTRAINT ck_retention_rule_source CHECK (source IN ('package', 'company')),   -- company: the company adjusted the package's periods
-    package_rule_ref         text NOT NULL,                       -- the package rule's key, flagged as ADR-0016 rule 12 says; kept when the company adjusts
-    is_verified              boolean NOT NULL DEFAULT false,      -- no destruction without a verified rule (rule 9; INV-894)
-    is_adjustable            boolean NOT NULL DEFAULT false,      -- the package allows the company to change the periods
+    source                   text NOT NULL CONSTRAINT ck_retention_rule_source CHECK (source IN ('package', 'company')),   -- company: the company's own rule, written or adjusted by it (rule 9 note)
+    package_rule_ref         text,                                -- the package rule's key, flagged as ADR-0016 rule 12 says; null only for a company rule with no package default
+    is_verified              boolean NOT NULL DEFAULT false,      -- no destruction without a verified rule (rule 9; INV-894); a package rule: the package's flag; a company rule: always true
+    is_adjustable            boolean NOT NULL DEFAULT false,      -- the package's mark; informative only since the rule 9 note of 2026-11-21 (no gate)
     recorded_at              timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     UNIQUE (company_id, retention_class),
     CONSTRAINT ck_retention_rule_order CHECK (block_after_months IS NULL OR destroy_after_months IS NULL OR destroy_after_months >= block_after_months),
-    CONSTRAINT ck_retention_rule_adjusted CHECK (source = 'package' OR is_adjustable)
+    CONSTRAINT ck_retention_rule_package_rule_ref CHECK (source = 'company' OR package_rule_ref IS NOT NULL),   -- a package rule names its package rule
+    CONSTRAINT ck_retention_rule_company_verified CHECK (source = 'package' OR is_verified)   -- the person who records a company rule confirms it (rule 9 note)
 );
 
 -- ===== Erasure entries [audit] (ADR-0079 rule 7) =====
