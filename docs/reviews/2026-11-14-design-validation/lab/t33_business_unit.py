@@ -29,6 +29,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 LAB = os.environ.get("NATIVEFLOWS_LAB_DIR", HERE)
 sys.path.insert(0, LAB)
 from fx_adr74 import DOCS, RESULTS, build, check, conn, doc, ins, new, reset_and_load, trial  # noqa: E402
+from lab import ins_account, ins_area_state, ins_fiscal_year, ins_posting_period, ins_system_account  # noqa: E402
 
 ORDER = ("line", "item", "cost_center", "project", "document", "site", "company_default")
 SOURCES = ORDER + ("reversal", "closing")
@@ -188,15 +189,15 @@ if "--load" in sys.argv:
 
     # post the entry: fiscal year, period, accounts (the lab writes what posting would)
     fy, pp = new(), new()
-    X("insert into fiscal_year (id, company_id) values (%s,%s)", (fy, I["co"]))
-    X("insert into posting_period (id, company_id, fiscal_year_id, start_date, end_date) values (%s,%s,%s,'2026-11-01','2026-11-30')", (pp, I["co"], fy))
+    ins_fiscal_year(X, fy, I["co"], "2026", "2026-01-01", "2026-12-31")
+    ins_posting_period(X, pp, I["co"], fy, 11, "2026-11-01", "2026-11-30")
     for area in ("general", "inventory", "receivable", "payable"):
-        X("insert into posting_period_area_state values (%s,%s,'open')", (pp, area))
+        ins_area_state(X, I["co"], pp, area, "open")
     ACC = {}
-    for code in ("rev", "exp", "bs"):
+    for code, account_type in (("rev", "income"), ("exp", "expense"), ("bs", "asset")):
         sa, a = new(), new()
-        X("insert into system_account (id, code, control_kind) values (%s,%s,'none')", (sa, code + I["t"]))
-        X("insert into account (id, company_id, code, system_account_id) values (%s,%s,%s,%s)", (a, I["co"], code, sa))
+        ins_system_account(X, sa, code + I["t"], account_type=account_type)
+        ins_account(X, a, I["co"], code, sa)
         ACC[code] = (a, sa)
     JL_COLS = {r_[0] for r_ in X("select column_name from information_schema.columns where table_schema='nativeflows' and table_name='journal_line'").fetchall()}
     POST_DATE = "2026-11-10"

@@ -29,6 +29,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 LAB = os.environ.get("NATIVEFLOWS_LAB_DIR", HERE)
 sys.path.insert(0, LAB)
 from fx_adr74 import DOCS, RESULTS, build, check, conn, doc, ins, new, reset_and_load, trial  # noqa: E402
+from lab import ins_account, ins_area_state, ins_fiscal_year, ins_posting_period, ins_system_account  # noqa: E402
 
 
 # ======================================================================= reference functions
@@ -188,8 +189,8 @@ if "--load" in sys.argv:
           lambda cx: mline(cx, I["w1"], I["b1"], valuation_type="new"), "ck_material_document_line_valuation_type")
 
     fy, pp = new(), new()
-    X("insert into fiscal_year (id, company_id) values (%s,%s)", (fy, I["co"]))
-    X("insert into posting_period (id, company_id, fiscal_year_id, start_date, end_date) values (%s,%s,%s,'2026-11-01','2026-11-30')", (pp, I["co"], fy))
+    ins_fiscal_year(X, fy, I["co"], "2026", "2026-01-01", "2026-12-31")
+    ins_posting_period(X, pp, I["co"], fy, 11, "2026-11-01", "2026-11-30")
 
     def price(cx, site=None, wh=None):
         ins(cx, "preliminary_price", id=new(), company_id=I["co"], item_id=I["item"], valuation_site_id=site, valuation_warehouse_id=wh, posting_period_id=pp,
