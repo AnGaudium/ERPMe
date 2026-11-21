@@ -1545,8 +1545,10 @@ ALTER TABLE interaction_summary ADD CONSTRAINT fk_interaction_summary_agent_run_
 -- nativeflows.erasure_command_id is the id of an idempotency_record of an erasure command (EraseDataSubject or
 -- DestroyRetainedPersonalData) written in the same transaction (transaction_id = pg_current_xact_id(); ADR-0008 rule 16 note). A marker that
 -- is not a uuid, names no such row, or names a row of another transaction is refused. The table is schema-qualified, so a
--- temporary table of the same name cannot stand in for it. A load without idempotency_record refuses every marker.
-CREATE FUNCTION erasure_marker_valid() RETURNS boolean LANGUAGE plpgsql STABLE AS $$
+-- temporary table of the same name cannot stand in for it. A load without idempotency_record refuses every marker. The
+-- record must belong to the current company (nativeflows.company_id; null company only under 'installation'), so a marker
+-- of company A never validates under company B, even when nativeflows.company_ids lists A (S2 schema review round 2, R2-N1).
+CREATE FUNCTION erasure_marker_valid() RETURNS boolean LANGUAGE plpgsql STABLE SET search_path = nativeflows, pg_temp AS $$
 DECLARE
     v_marker  text := coalesce(current_setting('nativeflows.erasure_command_id', true), '');
     v_found   boolean;
@@ -1558,14 +1560,17 @@ BEGIN
         RETURN false;
     END IF;
     EXECUTE 'SELECT EXISTS (SELECT 1 FROM nativeflows.idempotency_record WHERE id = $1::uuid'
-            ' AND scope IN (''EraseDataSubject'', ''DestroyRetainedPersonalData'') AND transaction_id = pg_current_xact_id())'
+            ' AND scope IN (''EraseDataSubject'', ''DestroyRetainedPersonalData'') AND transaction_id = pg_current_xact_id()'
+            ' AND (company_id::text = current_setting(''nativeflows.company_id'', true)'
+            '      OR (company_id IS NULL AND current_setting(''nativeflows.company_id'', true) = ''installation'')))'
         INTO v_found USING v_marker;
     RETURN v_found;
 END
 $$;
 -- Arguments: columns that may change; columns that may be set once from null; columns only the erasure command may
--- change (under a valid erasure marker, erasure_marker_valid above). Deletes are refused.
-CREATE FUNCTION platform_check_append_only() RETURNS trigger LANGUAGE plpgsql AS $$
+-- change (under a valid erasure marker, erasure_marker_valid above, and only to an erasure result of ADR-0079 rule 6,
+-- erasure_column_change_allowed below; R2-N3). Deletes are refused.
+CREATE FUNCTION platform_check_append_only() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 DECLARE
     v_mutable       text[] := TG_ARGV[0]::text[];
     v_set_once      text[] := TG_ARGV[1]::text[];
@@ -1586,7 +1591,7 @@ BEGIN
         CONTINUE WHEN v_key = ANY (v_set_once) AND jsonb_typeof(v_old -> v_key) = 'null';
         IF v_key = ANY (v_erasure_only) THEN
             v_is_erasing := v_is_erasing OR erasure_marker_valid();
-            CONTINUE WHEN v_is_erasing;
+            CONTINUE WHEN v_is_erasing AND erasure_column_change_allowed(v_key, v_old -> v_key, v_new -> v_key);
         END IF;
         RAISE EXCEPTION '%.% is append-only', TG_TABLE_NAME, v_key USING ERRCODE = 'restrict_violation';
     END LOOP;
@@ -1601,11 +1606,63 @@ $$;
 -- 12 to 64 lowercase hex digits (tokenize), or, for a JSON object, a part of the old object (clear_keys). A column whose
 -- value is already such a result is never rewritten. erased_at does not freeze the row, because one row can name several
 -- subjects (a version names a partner and a contact). No catalog columns: false. p_relid is the trigger's TG_RELID.
-CREATE FUNCTION erasure_value_is_erased(p_value jsonb) RETURNS boolean LANGUAGE sql IMMUTABLE AS $$
+-- clear_keys (R2-N4): p_keys, passed by the trigger like the column list, names the keys an erasure may remove from a JSON
+-- object column, or blank to an erasure result, at any depth (erasure_json_reduced); nothing else of the object may change,
+-- and no key is added. Without p_keys a JSON object is only blanked whole.
+CREATE FUNCTION erasure_value_is_erased(p_value jsonb) RETURNS boolean LANGUAGE sql IMMUTABLE SET search_path = nativeflows, pg_temp AS $$
     SELECT p_value IS NULL OR jsonb_typeof(p_value) = 'null' OR p_value IN ('""', '[]', '{}')
         OR (jsonb_typeof(p_value) = 'string' AND (p_value #>> '{}') ~ '^erased-[0-9a-f]{12,64}$')
 $$;
-CREATE FUNCTION erasure_update_allowed(p_relid oid, p_old jsonb, p_new jsonb, p_columns text[]) RETURNS boolean LANGUAGE plpgsql STABLE AS $$
+CREATE FUNCTION erasure_json_reduced(p_old jsonb, p_new jsonb, p_keys text[]) RETURNS boolean LANGUAGE plpgsql IMMUTABLE SET search_path = nativeflows, pg_temp AS $$
+DECLARE
+    v_key  text;
+    v_i    integer;
+BEGIN
+    IF p_old IS NOT DISTINCT FROM p_new THEN
+        RETURN true;
+    END IF;
+    IF jsonb_typeof(p_old) = 'object' AND jsonb_typeof(p_new) = 'object' THEN
+        FOR v_key IN SELECT jsonb_object_keys(p_new) LOOP
+            IF NOT p_old ? v_key THEN
+                RETURN false;                                   -- no key is added
+            END IF;
+        END LOOP;
+        FOR v_key IN SELECT jsonb_object_keys(p_old) LOOP
+            CONTINUE WHEN p_new ? v_key AND (p_old -> v_key) = (p_new -> v_key);
+            CONTINUE WHEN v_key = ANY (p_keys) AND (NOT p_new ? v_key OR erasure_value_is_erased(p_new -> v_key));
+            CONTINUE WHEN p_new ? v_key AND erasure_json_reduced(p_old -> v_key, p_new -> v_key, p_keys);
+            RETURN false;
+        END LOOP;
+        RETURN true;
+    END IF;
+    IF jsonb_typeof(p_old) = 'array' AND jsonb_typeof(p_new) = 'array' AND jsonb_array_length(p_old) = jsonb_array_length(p_new) THEN
+        FOR v_i IN 0 .. jsonb_array_length(p_old) - 1 LOOP
+            IF NOT erasure_json_reduced(p_old -> v_i, p_new -> v_i, p_keys) THEN
+                RETURN false;
+            END IF;
+        END LOOP;
+        RETURN true;
+    END IF;
+    RETURN false;
+END
+$$;
+-- One changed column under a valid marker: an erasure flag only from null; a column already erased is never rewritten; the
+-- new value is an erasure result, or a JSON object reduced by clear_keys.
+CREATE FUNCTION erasure_column_change_allowed(p_key text, p_old jsonb, p_new jsonb, p_keys text[] DEFAULT NULL) RETURNS boolean
+    LANGUAGE plpgsql IMMUTABLE SET search_path = nativeflows, pg_temp AS $$
+BEGIN
+    IF p_key IN ('erased_at', 'body_removed_at') THEN
+        RETURN jsonb_typeof(p_old) = 'null';
+    END IF;
+    IF erasure_value_is_erased(p_old) THEN
+        RETURN false;
+    END IF;
+    RETURN erasure_value_is_erased(p_new)
+        OR (jsonb_typeof(p_old) = 'object' AND jsonb_typeof(p_new) = 'object' AND erasure_json_reduced(p_old, p_new, coalesce(p_keys, '{}')));
+END
+$$;
+CREATE FUNCTION erasure_update_allowed(p_relid oid, p_old jsonb, p_new jsonb, p_columns text[], p_keys text[] DEFAULT NULL) RETURNS boolean
+    LANGUAGE plpgsql STABLE SET search_path = nativeflows, pg_temp AS $$
 DECLARE
     v_key        text;
     v_generated  text[];
@@ -1621,15 +1678,10 @@ BEGIN
     FOR v_key IN SELECT jsonb_object_keys(p_new) LOOP
         CONTINUE WHEN (p_old -> v_key) IS NOT DISTINCT FROM (p_new -> v_key);
         CONTINUE WHEN v_key = ANY (v_generated);
-        IF v_key IN ('erased_at', 'body_removed_at') THEN
-            CONTINUE WHEN jsonb_typeof(p_old -> v_key) = 'null';
+        IF NOT (v_key = ANY (p_columns) OR v_key IN ('erased_at', 'body_removed_at')) THEN
             RETURN false;
         END IF;
-        IF NOT v_key = ANY (p_columns) OR erasure_value_is_erased(p_old -> v_key) THEN
-            RETURN false;
-        END IF;
-        CONTINUE WHEN erasure_value_is_erased(p_new -> v_key);
-        CONTINUE WHEN jsonb_typeof(p_old -> v_key) = 'object' AND jsonb_typeof(p_new -> v_key) = 'object' AND (p_old -> v_key) @> (p_new -> v_key);
+        CONTINUE WHEN erasure_column_change_allowed(v_key, p_old -> v_key, p_new -> v_key, p_keys);
         RETURN false;
     END LOOP;
     RETURN true;
@@ -1696,9 +1748,11 @@ $$;
 -- ADR-0009 rule 14: versions are never updated. The generated Delete of a draft removes them with the draft: the
 -- dispatcher sets nativeflows.document_delete_id to that document's ID for Delete alone (the pattern of DS-35). An erasure
 -- may clear catalog keys of content and set erased_at (ADR-0079 rules 6-7; the argument is the catalog columns).
+-- The optional second argument is the keys clear_keys may remove from content (R2-N4).
 CREATE FUNCTION document_version_check_change() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
-    IF TG_OP = 'UPDATE' AND TG_NARGS > 0 AND erasure_update_allowed(TG_RELID, to_jsonb(OLD), to_jsonb(NEW), TG_ARGV[0]::text[]) THEN
+    IF TG_OP = 'UPDATE' AND TG_NARGS > 0 AND erasure_update_allowed(TG_RELID, to_jsonb(OLD), to_jsonb(NEW), TG_ARGV[0]::text[],
+                                                                    CASE WHEN TG_NARGS > 1 THEN TG_ARGV[1]::text[] END) THEN
         RETURN NEW;
     END IF;
     IF TG_OP = 'DELETE'
@@ -1868,7 +1922,10 @@ CREATE TRIGGER trg_work_case_check_change BEFORE UPDATE OR DELETE ON work_case F
 CREATE TRIGGER trg_work_case_link_append_only BEFORE UPDATE OR DELETE ON work_case_link FOR EACH ROW
     EXECUTE FUNCTION platform_check_append_only('{}', '{unlinked_at}', '{}');
 CREATE TRIGGER trg_document_check_row_change BEFORE UPDATE OR DELETE ON document FOR EACH ROW EXECUTE FUNCTION document_check_row_change('{canceled_note}');
-CREATE TRIGGER trg_document_version_check_change BEFORE UPDATE OR DELETE ON document_version FOR EACH ROW EXECUTE FUNCTION document_version_check_change('{content}');
+-- The keys of content an erasure may clear (R2-N4): the catalog columns of store class frozen_document of the headers and
+-- lines content mirrors (catalogs/personal-data-fields.csv; ADR-0079 rule 6), custom_values excluded (S2 closure entry).
+CREATE TRIGGER trg_document_version_check_change BEFORE UPDATE OR DELETE ON document_version FOR EACH ROW EXECUTE FUNCTION document_version_check_change('{content}',
+    '{bill_to_address,bill_to_name,bill_to_tax_id,canceled_note,counterparty_name,description,difference_note,invoicing_party_address,invoicing_party_name,invoicing_party_tax_id,note,partner_address,partner_name,partner_tax_id,payee_name,payer_name,reason,reason_note,ship_to_address,ship_to_name,supplier_name,supplier_tax_id,text}');
 CREATE TRIGGER trg_document_version_check_taint BEFORE INSERT ON document_version FOR EACH ROW EXECUTE FUNCTION document_version_check_taint();
 CREATE TRIGGER trg_taint_clearance_immutable BEFORE UPDATE OR DELETE ON taint_clearance FOR EACH ROW EXECUTE FUNCTION platform_reject_change('{reason}');
 CREATE TRIGGER trg_policy_decision_immutable BEFORE UPDATE OR DELETE ON policy_decision FOR EACH ROW EXECUTE FUNCTION platform_reject_change();

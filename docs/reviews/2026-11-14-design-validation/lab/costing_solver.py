@@ -203,8 +203,10 @@ def cost_period(k, op, Q, final, prelim, offs):
     final value (case b, or another area). Pass 3: closing values. A return kept outside the average leaves its difference in
     the closing value: target = round(A x (closing q - kept q)) + kept values. When the closing quantity is zero, the target
     is 0 and whatever value remains (rounding and the set-aside difference) is the posted rule 13 residual, with the issues
-    still at A. When the target would be negative (rule 13), the issues take the preliminary price and the area closes at
-    round(preliminary x closing q). The posted residual is the book value minus the target.
+    still at A. When the target would be negative, which only kept returns can cause (A is never negative here), it is
+    treated like a closing quantity of zero (S2 schema review round 2, R2-S1): the issues stay at A, the kept differences are
+    posted as the rule 13 residual and the area closes at round(A x closing q). The posted residual is the book value minus
+    the target.
     Returns ({area: (A, (closing q, target), posted residual)}, line targets)."""
     base = {}
     for ar in sorted(Q):
@@ -216,36 +218,28 @@ def cost_period(k, op, Q, final, prelim, offs):
         if cq < 0:
             raise ValueError(f"negative closing quantity in area {ar}")
         base[ar] = (p, cq, bv)
-    negative = set()                     # areas whose target would be negative: rule 13, issues at the preliminary price
-    while True:
-        tg = {}
-        for ar in sorted(Q):
-            p = prelim[ar] if ar in negative else base[ar][0]
-            for ln in Q[ar]["issues"]:
-                tg[ln["id"]] = round_amount(ln["q"] * p)
-        fin = dict(final); fin.update(tg)
-        for ar in sorted(Q):
-            for ln in Q[ar]["returns"]:
-                o = ln["orig"]
-                tg[ln["id"]] = share(fin[o["id"]], o["q"], offs[ln["id"]], ln["q"])
-        res, flipped = {}, set()
-        for ar in sorted(Q):
-            X = Q[ar]; _, cq, vin = base[ar]
-            p = prelim[ar] if ar in negative else base[ar][0]
-            kept = [l for l in X["returns"] if l["orig"]["period"] != k or l["orig"]["area"] != ar]
-            if cq == 0:
-                target = 0
-            elif ar in negative:
+    tg = {}
+    for ar in sorted(Q):
+        for ln in Q[ar]["issues"]:
+            tg[ln["id"]] = round_amount(ln["q"] * base[ar][0])
+    fin = dict(final); fin.update(tg)
+    for ar in sorted(Q):
+        for ln in Q[ar]["returns"]:
+            o = ln["orig"]
+            tg[ln["id"]] = share(fin[o["id"]], o["q"], offs[ln["id"]], ln["q"])
+    res = {}
+    for ar in sorted(Q):
+        X = Q[ar]; p, cq, vin = base[ar]
+        kept = [l for l in X["returns"] if l["orig"]["period"] != k or l["orig"]["area"] != ar]
+        if cq == 0:
+            target = 0
+        else:
+            target = round_amount(p * (cq - sum(l["q"] for l in kept))) + sum(tg[l["id"]] for l in kept)
+            if target < 0:               # only kept returns make it negative: like a zero closing quantity (R2-S1)
                 target = round_amount(p * cq)
-            else:
-                target = round_amount(p * (cq - sum(l["q"] for l in kept))) + sum(tg[l["id"]] for l in kept)
-                if target < 0:
-                    flipped.add(ar)
-            value = vin - sum(tg[l["id"]] for l in X["issues"]) + sum(tg[l["id"]] for l in X["returns"])
-            res[ar] = (p, (cq, target), value - target)
-        if not flipped:
-            return res, tg
-        negative |= flipped
+        value = vin - sum(tg[l["id"]] for l in X["issues"]) + sum(tg[l["id"]] for l in X["returns"])
+        res[ar] = (p, (cq, target), value - target)
+    return res, tg
 
 
 def _prelim(k, out, op0, Q):
@@ -331,40 +325,31 @@ def independent_values(periods, opening):
             qty_base[area], val_base[area] = q_in, v_in
             avg[area] = v_in / q_in if q_in > 0 and v_in >= 0 else prelim[area]
             closing_q[area] = q_in - sum(F(l["q"]) for l in rows["issues"]) + sum(F(l["q"]) for l in rows["returns"])
-        at_prelim = set()
-        while True:
-            values = {}
-            for area, rows in areas.items():
-                unit = prelim[area] if area in at_prelim else avg[area]
-                for line in rows["issues"]:
-                    values[line["id"]] = round_amount(F(line["q"]) * unit)
-            done = dict(returned)
-            for area in sorted(areas):
-                for line in areas[area]["returns"]:
-                    orig = line["orig"]
-                    worth = values[orig["id"]] if orig["id"] in values else ledger[orig["id"]]
-                    before = done.get(orig["id"], F(0))
-                    after = before + F(line["q"])
-                    values[line["id"]] = round_amount(worth * after / F(orig["q"])) - round_amount(worth * before / F(orig["q"]))
-                    done[orig["id"]] = after
-            result, again = {}, set()
-            for area, rows in areas.items():
-                unit = prelim[area] if area in at_prelim else avg[area]
-                book = val_base[area] - sum(values[l["id"]] for l in rows["issues"]) + sum(values[l["id"]] for l in rows["returns"])
-                outside = [l for l in rows["returns"] if where.get(l["orig"]["id"]) != area]
-                if closing_q[area] == 0:
-                    target = 0
-                elif area in at_prelim:
-                    target = round_amount(unit * closing_q[area])
-                else:
-                    rest_q = closing_q[area] - sum(F(l["q"]) for l in outside)
-                    target = round_amount(unit * rest_q) + sum(values[l["id"]] for l in outside)
-                    if target < 0:
-                        again.add(area)
-                result[area] = (unit, (closing_q[area], target), book - target)
-            if not again:
-                break
-            at_prelim |= again
+        values = {}
+        for area, rows in areas.items():
+            for line in rows["issues"]:
+                values[line["id"]] = round_amount(F(line["q"]) * avg[area])
+        done = dict(returned)
+        for area in sorted(areas):
+            for line in areas[area]["returns"]:
+                orig = line["orig"]
+                worth = values[orig["id"]] if orig["id"] in values else ledger[orig["id"]]
+                before = done.get(orig["id"], F(0))
+                after = before + F(line["q"])
+                values[line["id"]] = round_amount(worth * after / F(orig["q"])) - round_amount(worth * before / F(orig["q"]))
+                done[orig["id"]] = after
+        result = {}
+        for area, rows in areas.items():
+            unit = avg[area]
+            book = val_base[area] - sum(values[l["id"]] for l in rows["issues"]) + sum(values[l["id"]] for l in rows["returns"])
+            outside = [l for l in rows["returns"] if where.get(l["orig"]["id"]) != area]
+            rest_q = closing_q[area] - sum(F(l["q"]) for l in outside)
+            target = round_amount(unit * rest_q) + sum(values[l["id"]] for l in outside)
+            if closing_q[area] == 0:
+                target = 0                                # nothing left: everything remaining is the posted residual
+            elif target < 0:
+                target = round_amount(unit * closing_q[area])   # a negative target from kept returns closes at the average
+            result[area] = (unit, (closing_q[area], target), book - target)
         ledger.update(values)
         returned = done
         last_avg = {}                                     # the preliminary price is the previous period's price
@@ -518,10 +503,12 @@ def check_issue_returns():
            dict(receipts=[(10, 500)], issues=[dict(id="N2", period=1, q=F(12), kind="issue")], returns=[dict(id="RN", q=F(5), kind="return", orig=dN)])]
     fn_, nn = naive_periods(neg, (F(10), F(100)))
     examples.append(("negative closing value", neg, (F(10), F(100))))
-    R.append((fn_["RN"] == 50 and nn[1][0] == 10 and fn_["N2"] == 120 and nn[1][1] == (3, 30) and nn[1][2] == 500 - 120 + 50 - 30,
-              "S7 (iii): a return of 5 at 10 (50) into an area averaging 50, then an issue of 12 that takes 2 returned units, would "
-              "close 3 units at 50 x (3 - 5) + 50 = -50; rule 13: the issue takes the preliminary price 10 (120), the area closes "
-              "3 x 10 = 30 and 400 is posted (before the fix: -50 stayed as the closing value)", nn[1]))
+    R.append((fn_["RN"] == 50 and nn[1][0] == 50 and fn_["N2"] == 600 and nn[1][1] == (3, 150) and nn[1][2] == 500 - 600 + 50 - 150 == -200,
+              "S7 (iii) as decided in round 2 (R2-S1): a return of 5 at 10 (50) into an area averaging 50, then an issue of 12 that "
+              "takes 2 returned units, would close 3 units at 50 x (3 - 5) + 50 = -50; only the kept return makes it negative, so it "
+              "is treated like a zero closing quantity: the issue stays at the actual average 50 (600), the area closes 3 x 50 = 150 "
+              "and the kept difference 5 x (10 - 50) = -200 is the posted rule 13 residual (before: the issue at the preliminary "
+              "10 and 400 posted)", nn[1]))
     # ---- S8: returned units issued again are issues at A; the return's difference stays in the closing value
     dR = dict(id="DR", period=0, q=F(10), kind="issue")
     reiss = [dict(receipts=[], issues=[dR], returns=[]),

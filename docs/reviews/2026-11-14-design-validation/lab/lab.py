@@ -98,10 +98,13 @@ def id_default_shim_sql():
 
 def erasure_marker(X, scope="EraseDataSubject", company_id=None):
     """Writes the idempotency record of an erasure command in the current transaction and sets nativeflows.erasure_command_id
-    to its id, as the dispatcher does (ADR-0038 rule 4; ADR-0079 rule 7; erasure_marker_valid in DS-05). Returns the id.
+    to its id, as the dispatcher does (ADR-0038 rule 4; ADR-0079 rule 7; erasure_marker_valid in DS-05), with
+    nativeflows.company_id set to the record's company ('installation' for none). Returns the id.
     X is a connection's or cursor's execute; call it inside the transaction that erases."""
     rid = new()
     X("insert into idempotency_record (id, company_id, actor_kind, actor_id, scope, idempotency_key, request_hash)"
       " values (%s, %s, 'human', %s, %s, %s, %s)", (rid, company_id, new(), scope, "lab-" + str(rid), "0" * 64))
     X("select set_config('nativeflows.erasure_command_id', %s, true)", (str(rid),))
+    # the record must belong to the current company (S2 schema review round 2, R2-N1), as the dispatcher sets it
+    X("select set_config('nativeflows.company_id', %s, true)", (str(company_id) if company_id else "installation",))
     return rid

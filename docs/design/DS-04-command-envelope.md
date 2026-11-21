@@ -207,7 +207,7 @@ Outcome and violation enumerations are not error codes and are not catalogued he
 | `landed_cost_source_invalid` | validation | 422 | no | The source is not a posted, unreversed line of the company on a `purchase_cost_clearing` account ([ADR-0021](../adr/0021-landed-cost.md) rule 2) |
 | `landed_cost_source_exceeded` | precondition | 422 | no | A cost line would allocate more than its source journal line's unallocated rest; `details` gives the rest ([ADR-0021](../adr/0021-landed-cost.md) rule 2) |
 | `landed_cost_target_invalid` | validation | 422 | no | A target is not an unreversed purchase or other receipt line, or not of the cost line's item ([ADR-0021](../adr/0021-landed-cost.md) rules 1, 3) |
-| `landed_cost_period_mismatch` | precondition | 422 | no | The posting date does not fit the targets' receipt periods; `details` names the required period, its valid posting date range, or the groups to split ([ADR-0021](../adr/0021-landed-cost.md) rule 6) |
+| `landed_cost_period_mismatch` | precondition | 422 | no | The posting date is earlier than a target's receipt posting date; `details` names the targets and the earliest valid posting date ([ADR-0021](../adr/0021-landed-cost.md) rule 6 and its note of 2026-11-21) |
 | `negative_stock_value` | precondition | 422 | no | A value-only inventory line would make a warehouse's stock value negative ([ADR-0021](../adr/0021-landed-cost.md) rule 9) |
 | `bin_required` | validation | 422 | no | A line in a bin-managed warehouse has no bin ([ADR-0023](../adr/0023-warehouse-management.md) rule 4) |
 | `bin_not_in_warehouse` | validation | 422 | no | The bin belongs to another warehouse ([ADR-0023](../adr/0023-warehouse-management.md) rule 2) |

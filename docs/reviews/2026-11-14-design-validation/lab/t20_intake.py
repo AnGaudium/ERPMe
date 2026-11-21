@@ -1044,7 +1044,9 @@ if "--load" in sys.argv:
     trial("X52 an assessment attachment needs its date", lambda cx: cx.execute(perm_sql, (new(), I["co"], "eu-west", "IE", I["att"], None, I["u2"], "2026-11-01", None)), True, "ck_data_processing_permission_assessment")
     trial("X53 the processing country is an ISO code from the registry", lambda cx: cx.execute(perm_sql, (new(), I["co"], "eu-west", "Ireland", None, None, I["u2"], "2026-11-01", None)), True, "ck_data_processing_permission_country")
     trial("X54 sensitive personal data is never permitted in Phase 1", lambda cx: cx.execute(perm_sql.replace("'personal','extraction", "'sensitive_personal','extraction"), (new(), I["co"], "sg", "SG", None, None, I["u2"], "2026-11-01", None)), True, "ck_data_processing_permission_data_class")
-    blank = """update extraction_field set value_raw='', value_normalized='', evidence='{"erased": true}' where id=%s"""
+    # evidence takes the blank marker {} of ADR-0079 rule 1 (catalog row extraction_field.evidence), the only JSON erasure
+    # result the guards accept since S2 schema review round 2 (R2-N3); ADR-0057's older {"erased": true} is not one
+    blank = """update extraction_field set value_raw='', value_normalized='', evidence='{}' where id=%s"""
     trial("X55 without the erasure setting a field's value and evidence cannot be blanked", lambda cx: cx.execute(blank, (FX,)), True, "append-only")
 
     def erase(cx):

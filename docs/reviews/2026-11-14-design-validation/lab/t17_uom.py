@@ -774,14 +774,16 @@ for i, (ok_, name_, detail_) in enumerate(check_issue_returns()):   # U73-U80, t
 ck_role = ds22.split("CONSTRAINT ck_movement_type_costing_role CHECK", 1)[1].split("\n", 1)[0]
 st = {r["key"]: r for r in read_csv(os.path.join(CAT, "settings.csv"))}
 srr = st["movement_type.sales_return_receipt.costing_role"]
-# The interim seed's wording is the catalog's (it follows SAP since the author's decision of 2026-11-21); the check holds the
-# structure only: value source and costing role set by regime, the three pairs with (document, issue_return) optional.
+# The interim seed is document value (the original issue cost), issue return, confirmed by the author on 2026-11-21
+# (ADR-0020 rule 5 note); value source and costing role stay set by regime, with three allowed pairs.
 check("U81 the role is in the catalog and the DDL: the CHECK on movement_type.costing_role admits issue_return; the sales return "
       "receipt's costing role setting allows receipt, revalued_issue and issue_return with the pair (document, issue_return), "
-      "stays fail_closed with no core default; the catalog row sets value source and costing role by regime",
+      "stays fail_closed with no core default; the catalog row sets value source and costing role by regime and its meaning "
+      "names the interim seed: document value (the original issue cost), issue return",
       "'issue_return'" in ck_role and srr["bounds"].split("|") == ["receipt", "revalued_issue", "issue_return"]
       and srr["core_default"] == "fail_closed" and "(document, issue_return)" in srr["meaning"]
-      and mt["sales_return_receipt"]["value_source"] == "regime" and mt["sales_return_receipt"]["costing_role"] == "regime",
+      and mt["sales_return_receipt"]["value_source"] == "regime" and mt["sales_return_receipt"]["costing_role"] == "regime"
+      and "interim seed (unverified): document value (the original issue cost), issue return" in mt["sales_return_receipt"]["meaning"],
       (srr["bounds"], ck_role.strip()[:120]))
 
 # ======================================================================= D: database checks (--load)

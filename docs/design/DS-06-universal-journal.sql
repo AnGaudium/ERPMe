@@ -424,7 +424,7 @@ CREATE TRIGGER trg_derivation_trace_append_only
     FOR EACH ROW EXECUTE FUNCTION journal_reject_change();
 
 -- ADR-0012 rule 1; ADR-0014 rule 1: the posting date lies in the entry's posting period (S2 schema review note N1).
-CREATE FUNCTION journal_entry_check_period() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION journal_entry_check_period() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM posting_period p WHERE p.id = NEW.posting_period_id
                    AND NEW.posting_date BETWEEN p.start_date AND p.end_date) THEN

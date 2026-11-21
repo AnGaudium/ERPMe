@@ -536,7 +536,7 @@ trial("E12 executions are immutable", lambda cx: cx.execute("update change_propo
 R2 = run(X0, I["runR2"], wi=WIR, tainted_at=NOW)
 REQ = new()
 X("""insert into agent_run_step (id, company_id, agent_run_id, ordinal, step_code, kind, seat, provider, model, template_code, template_version, request_hash,
-     reserved_amount, request_body, recorded_at) values (%s,%s,%s,1,'bank_matching.read_description','llm_request','classification','anthropic','m','read_description','1.0.0',%s,0.02,'{}',now())""",
+     reserved_amount, request_body, recorded_at) values (%s,%s,%s,1,'bank_matching.read_description','llm_request','classification','anthropic','m','read_description','1.0.0',%s,0.02,'{"messages": [{"role": "user", "content": "Sample text"}]}',now())""",
   (REQ, I["co"], R2, "f" * 64))
 X("""insert into agent_run_step (id, company_id, agent_run_id, ordinal, step_code, kind, request_step_id, seat, provider, model, response_body, cost_amount, recorded_at)
      values (%s,%s,%s,2,'bank_matching.read_description','llm_response',%s,'classification','anthropic','m','{}',0.01,now())""", (new(), I["co"], R2, REQ))
@@ -708,7 +708,7 @@ AUD = audit(X0, command="ApproveChangeProposal", effect="other", reason="looks r
 trial("H05 audit records are append-only (ADR-0038 rule 4)", lambda cx: cx.execute("update audit_record set reason='x' where id=%s", (AUD,)), True, "append-only")
 trial("H06 ... except that erasure masks reason under a valid erasure marker", lambda cx: (
     erasure_marker(cx.execute, company_id=I["co"]),
-    cx.execute("update audit_record set reason='[erased]', erased_at=now() where id=%s", (AUD,))), False)
+    cx.execute("update audit_record set reason='', erased_at=now() where id=%s", (AUD,))), False)   # an erasure result of ADR-0079 rule 6 (R2-N3)
 trial("H07 ... and erasure changes nothing else", lambda cx: (
     erasure_marker(cx.execute, company_id=I["co"]),
     cx.execute("update audit_record set command_type='X' where id=%s", (AUD,))), True, "append-only")

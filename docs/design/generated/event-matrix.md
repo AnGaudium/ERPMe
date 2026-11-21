@@ -22,14 +22,14 @@ Event types named in backticks in the ADRs, recognised by the event forms of the
 | `ContactUpdated` | `contact` | master_data | a consumer in `crm` | ADR-0052:186 |
 | `DataErasureRecorded` | — | — | — | ADR-0079:60, ADR-0079:62 |
 | `DataSubjectErased` | — | — | a consumer in `cash`, `imports_data_subject_erasure` | ADR-0052:263, ADR-0052:270, ADR-0052:371 (+1) |
-| `DocumentExtractionCanceled` | `document_extraction` | attachments | — | ADR-0057:243, ADR-0057:311 |
-| `DocumentExtractionRecorded` | `document_extraction` | attachments | `certificate_result_drafter`, a consumer in `crm`, a consumer in `tax` | ADR-0057:77, ADR-0057:255, ADR-0057:259 (+2) |
-| `DocumentExtractionRequested` | `document_extraction` | attachments | `document_extraction_runner` | ADR-0057:56, ADR-0057:61, ADR-0057:311 |
-| `DocumentExtractionVerified` | `document_extraction` | attachments | `certificate_result_drafter`, a consumer in `purchasing` | ADR-0057:242, ADR-0057:270, ADR-0057:311 (+1) |
-| `ExtractionFieldCorrected` | `extraction_field` | attachments | — | ADR-0057:241, ADR-0057:248, ADR-0057:311 |
+| `DocumentExtractionCanceled` | `document_extraction` | attachments | — | ADR-0057:245, ADR-0057:313 |
+| `DocumentExtractionRecorded` | `document_extraction` | attachments | `certificate_result_drafter`, a consumer in `crm`, a consumer in `tax` | ADR-0057:77, ADR-0057:257, ADR-0057:261 (+2) |
+| `DocumentExtractionRequested` | `document_extraction` | attachments | `document_extraction_runner` | ADR-0057:56, ADR-0057:61, ADR-0057:313 |
+| `DocumentExtractionVerified` | `document_extraction` | attachments | `certificate_result_drafter`, a consumer in `purchasing` | ADR-0057:244, ADR-0057:272, ADR-0057:313 (+1) |
+| `ExtractionFieldCorrected` | `extraction_field` | attachments | — | ADR-0057:243, ADR-0057:250, ADR-0057:313 |
 | `ForecastCompleted` | — | — | — | ADR-0024:286 |
-| `GoodsReceiptPosted` | `goods_receipt` | inventory | `inspection_lot_creator` | ADR-0004:7, ADR-0004:63, ADR-0009:106 (+4) |
-| `InboundMessageRecorded` | `inbound_message` | crm | a consumer in `crm` | ADR-0052:371, ADR-0057:255 |
+| `GoodsReceiptPosted` | `goods_receipt` | inventory | `inspection_lot_creator` | ADR-0004:7, ADR-0004:63, ADR-0009:108 (+4) |
+| `InboundMessageRecorded` | `inbound_message` | crm | a consumer in `crm` | ADR-0052:371, ADR-0057:257 |
 | `InspectionLotApproved` | `inspection_lot` | quality | `usage_decision_executor` | ADR-0070:140 |
 | `InspectionLotExecutionRecorded` | `inspection_lot_execution` | quality | — | ADR-0070:178 |
 | `InspectionPlanRevisionReleased` | `inspection_plan_revision` | quality | — | ADR-0070:178 |
@@ -93,7 +93,7 @@ Event types named in backticks in the ADRs, recognised by the event forms of the
 | `ReturnFromCustomerPosted` | `return_from_customer` | inventory | `inspection_lot_creator` | ADR-0070:77 |
 | `SalesOrderApproved` | `sales_order` | sales | — | ADR-0058:122, ADR-0058:249, ADR-0058:257 (+1) |
 | `SalesOrderChanged` | `sales_order` | sales | — | ADR-0058:123 |
-| `SalesOrderClosed` | `sales_order` | sales | — | ADR-0009:106 |
+| `SalesOrderClosed` | `sales_order` | sales | — | ADR-0009:108 |
 | `StockReservationCanceled` | `stock_reservation` | inventory | — | ADR-0023:286, ADR-0064:130 |
 | `StockReservationCreated` | `stock_reservation` | inventory | — | ADR-0023:286 |
 | `StockReservationTransferred` | `stock_reservation` | inventory | — | ADR-0064:258 |
@@ -139,8 +139,8 @@ A module name here means the ADR speaks of a consumer of that module without nam
 | a consumer in `purchasing` | 6 | ADR-0024:265, ADR-0024:353, ADR-0037:45 |
 | a consumer in `quality` | 4 | ADR-0057:51, ADR-0070:14, ADR-0070:102 |
 | `render_worker` | 2 | ADR-0013:25, ADR-0049:199 |
-| a consumer in `sales` | 3 | ADR-0047:114, ADR-0047:246, ADR-0048:262 |
-| a consumer in `tax` | 2 | ADR-0041:154, ADR-0057:259 |
+| a consumer in `sales` | 3 | ADR-0047:114, ADR-0047:248, ADR-0048:262 |
+| a consumer in `tax` | 2 | ADR-0041:154, ADR-0057:261 |
 | `tax_payment_evidence` | 2 | ADR-0044:150, ADR-0053:182 |
 | `usage_decision_auto_drafter` | 1 | ADR-0070:138 |
 | `usage_decision_executor` | 1 | ADR-0070:140 |

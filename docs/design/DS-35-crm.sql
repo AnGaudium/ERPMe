@@ -499,9 +499,9 @@ CREATE INDEX ix_personal_data_processing_log_subject_id ON personal_data_process
 -- draft removes (rule 7): the dispatcher sets nativeflows.document_delete_id to that document's ID for Delete alone, and the
 -- delete is allowed only while the document is a draft. Generated columns follow their sources and are skipped. Columns
 -- only the erasure command may change need a valid erasure marker: erasure_marker_valid() of DS-05-platform.sql (ADR-0038
--- rule 4; ADR-0079 rule 7). It is called only when the marker is set, so a load without DS-05 keeps working and refuses
--- every erasure.
-CREATE FUNCTION crm_check_append_only() RETURNS trigger LANGUAGE plpgsql AS $$
+-- rule 4; ADR-0079 rule 7), and the new value must be an erasure result (erasure_column_change_allowed of DS-05; R2-N3).
+-- Both are called only when the marker is set, so a load without DS-05 keeps working and refuses every erasure.
+CREATE FUNCTION crm_check_append_only() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 DECLARE
     v_mutable       text[];
     v_set_once      text[];
@@ -536,7 +536,9 @@ BEGIN
         CONTINUE WHEN v_key = ANY (v_generated);
         CONTINUE WHEN v_key = ANY (v_mutable);
         CONTINUE WHEN v_key = ANY (v_set_once) AND jsonb_typeof(v_old -> v_key) = 'null';
-        CONTINUE WHEN v_key = ANY (v_erasure_only) AND v_is_erasing;
+        IF v_is_erasing AND v_key = ANY (v_erasure_only) THEN       -- only an erasure result of ADR-0079 rule 6 (R2-N3)
+            CONTINUE WHEN erasure_column_change_allowed(v_key, v_old -> v_key, v_new -> v_key);
+        END IF;
         RAISE EXCEPTION '%.% is append-only (ADR-0052 rule 7)', TG_TABLE_NAME, v_key USING ERRCODE = 'check_violation';
     END LOOP;
     RETURN NEW;

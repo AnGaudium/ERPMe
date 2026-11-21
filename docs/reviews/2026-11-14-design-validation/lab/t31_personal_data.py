@@ -799,6 +799,44 @@ if "--load" in sys.argv:
     trial("X71 B1: a load without idempotency_record refuses every marker (the table renamed away inside the transaction)",
           lambda cx: (scratch(cx, jr), erasing(cx), cx.execute("alter table idempotency_record rename to lab_idempotency_record_away"),
                       cx.execute("update lab_frozen set note = null")), "append-only")
+
+    # ---- S2 schema review round 2
+    def other_company(cx):
+        cx.execute("select set_config('nativeflows.company_id', %s, true)", (str(new()),))
+        cx.execute("select set_config('nativeflows.company_ids', %s, true)", (str(I["co"]) + "," + str(new()),))
+    trial("X72 R2-N1: an erasure record of this company does not validate under another company, even when company_ids lists it",
+          lambda cx: (scratch(cx, jr), erasing(cx), other_company(cx), cx.execute("update lab_frozen set note = null")), "append-only")
+    trial("X73 R2-N2: an installation-scoped erasure record (no company) is not visible under a company setting",
+          lambda cx: (scratch(cx, jr), erasure_marker(cx.execute, company_id=None),
+                      cx.execute("select set_config('nativeflows.company_id', %s, true)", (str(I["co"]),)), cx.execute("update lab_frozen set note = null")), "append-only")
+
+    def ao(cx, fn):
+        cx.execute("create temp table lab_ao (id uuid primary key, reason text) on commit drop")
+        cx.execute(f"create trigger lab_ao_guard before update or delete on lab_ao for each row execute function {fn}('{{}}', '{{}}', '{{reason}}')")
+        cx.execute("insert into lab_ao values (%s, 'Sample Person')", (new(),))
+    trial("X74 R2-N3: under a valid marker platform_check_append_only refuses another person's name in an erasure-only column",
+          lambda cx: (ao(cx, "platform_check_append_only"), erasing(cx), cx.execute("update lab_ao set reason = 'Mrs Y'")), "append-only")
+    trial("X75 R2-N3: under a valid marker crm_check_append_only refuses another person's name in an erasure-only column",
+          lambda cx: (ao(cx, "crm_check_append_only"), erasing(cx), cx.execute("update lab_ao set reason = 'Mrs Y'")), "append-only")
+    trial("X76 R2-N3: crm_check_append_only still takes the blank (rolled back afterwards)",
+          lambda cx: (ao(cx, "crm_check_append_only"), erasing(cx), cx.execute("update lab_ao set reason = ''"), cx.execute("select 1/0")), "division by zero")
+    trial("X77 R2-N4: clear_keys may not remove a key of content the trigger does not list (lines)",
+          lambda cx: (erasing(cx), cx.execute("update document_version set content = content - 'lines' where id=%s", (ver,))), "never updated")
+    trial("X78 R2-N4: a listed key may be blanked in place instead of removed (rolled back afterwards)",
+          lambda cx: (erasing(cx), cx.execute("""update document_version set content = jsonb_set(content, '{partner_name}', '""') where id=%s""", (ver,)),
+                      cx.execute("select 1/0")), "division by zero")
+    want = sorted({r["column_name"] for r in read_dicts("personal-data-fields.csv")
+                   if r["store_class"] == "frozen_document" and r["table_name"] not in ("document_version", "posting_intent") and r["column_name"] != "custom_values"})
+    targs = bytes(X("select t.tgargs from pg_trigger t where t.tgname = 'trg_document_version_check_change'").fetchone()[0]).split(b"\x00")
+    got = sorted(targs[1].decode().strip("{}").split(",")) if len(targs) > 1 and targs[1] else []
+    check("X79 R2-N4: the version trigger lists as clearable keys exactly the catalog columns of store class frozen_document (custom_values aside)",
+          got == want, (len(got), len(want), sorted(set(want) ^ set(got))[:5]))
+    fns = ("erasure_marker_valid", "erasure_value_is_erased", "erasure_json_reduced", "erasure_column_change_allowed", "erasure_update_allowed",
+           "platform_check_append_only", "crm_check_append_only", "journal_entry_check_period")
+    unpinned = [r[0] for r in X("select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'nativeflows' "
+                               "and p.proname = any(%s) and not coalesce(p.proconfig, '{}') @> array['search_path=nativeflows, pg_temp']", (list(fns),)).fetchall()]
+    nfound = X("select count(distinct p.proname) from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'nativeflows' and p.proname = any(%s)", (list(fns),)).fetchone()[0]
+    check("X80 R2-N5: the erasure guard functions and journal_entry_check_period pin search_path to nativeflows, pg_temp", not unpinned and nfound == len(fns), (unpinned, nfound))
     c.close()
 
 passed = sum(1 for ok_, *_ in RESULTS if ok_)

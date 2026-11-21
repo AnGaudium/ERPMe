@@ -184,7 +184,7 @@ The author's decision of 2026-11-18: ADR-0035 keeps actual costing as it is (the
     - every surcharge row names its credited cost center and detail, the two keys an absorption posting needs;
     - such a posting would debit the order and credit the pool with the planned absorption, leaving the pool's rest as the variance; that needs a new settlement step, a transaction key, a method value and the author's choice. Nothing in this ADR posts.
 
-    Note (the author, 2026-11-21: costing follows SAP): the author's choice is made. As in SAP, standard price with variance postings is a price-control option beside periodic actual costing (the default, D6), and actual overhead is applied by costing sheet with the over- or under-absorption left as a variance on the pool. This seam is where an ADR after step 5 designs both ([ADR-0035](0035-production-costing.md) rule 16 note; [open-questions.md](../open-questions.md), DS-53 entries).
+    Note (the author, 2026-11-21: costing follows SAP): the author's choice is made. As in SAP, standard price with variance postings is a price-control option beside periodic actual costing (the default, D6), and actual overhead is applied by costing sheet with the over- or under-absorption left as a variance on the pool. This seam is where an ADR after step 5 designs both ([ADR-0035](0035-production-costing.md) rule 16 note; [open-questions.md](../open-questions.md), DS-53 entries). The phase is stated by that ADR: after step 5 and after Phase 1 unless the author moves it, since ADR-0018 rule 3 and spec 09 keep standard price out of Phase 1; until then those hold.
 
 ## Context
 

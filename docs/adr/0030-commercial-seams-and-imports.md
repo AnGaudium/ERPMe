@@ -32,6 +32,8 @@ Accounting and business choices stay with the author, as flagged interims: close
    - **The receipt's period is `soft_locked` or `locked`:** closed mode. The document is dated on the invoice's posting date when that lies in the postable period, on the postable period's first day when the invoice is earlier, and on its last day when the invoice is later. For this interface, `consumer_split` (ADR-0021 rule 7) runs over every period from the receipt's period to the one before the postable period, treating soft-locked periods as locked. It reads their movements as posted at that time. A later costing rerun of a soft-locked period does not change a split already posted. These dates and this range replace, for interface-written documents, ADR-0021 rule 6's "first unlocked inventory period" and rule 7's "every locked period".
    - **Status.** Interim, flagged: the existing open question on earlier unlocked periods is extended to soft-locked periods.
 
+   Note (the author, 2026-11-21): superseded in part by the [ADR-0021](0021-landed-cost.md) rule 6 note of this date. A document written by `inventory.contract.adjust_receipt_value` is a `receipt_addition` in its own posting period, whatever the state of the receipt's period; `consumer_split` no longer runs, and no document is dated back into the receipt's period. Its date (chief architect, replacing the dates above): the invoice's posting date when that date's inventory period is open and is not earlier than the latest receipt the document targets; that receipt's posting date when the invoice is earlier; the first day of the first open inventory period after the invoice's date when the invoice's period is not open. Rule 1's split into one document per receipt period is no longer needed; it stays until DS-22 designs the invoice (interim). The flagged status above is answered.
+
 **GR/IR** (F12)
 
 3. `journal_line` gets a nullable `purchase_order_line_id` (ADR-0014 rule 9: a new nullable column by ADR).
@@ -52,6 +54,8 @@ Accounting and business choices stay with the author, as flagged interims: close
    - **Status.** Interim, flagged: the regime might instead value an invoice-first receipt at the invoice price (open question). The company-currency difference between receipt and invoice rates stays with the existing FX open question.
 
    Matching is by unit positions per order line, each priced once at first posting; postings are differences of rounded cumulative values, so the balance is zero whenever received equals invoiced; returns and quantity credits take the latest positions, which equals the receipt's or invoice's price when the order price never changed; reversals are allowed only for the latest postings of a side ([ADR-0047](0047-commercial-documents-and-pricing.md) rule 13).
+
+   Note (the author, 2026-11-21): the company-currency difference between receipt and invoice rates is answered: on a line for an item kept in stock it enters the item's actual cost; on other lines it stays a realized exchange difference ([ADR-0047](0047-commercial-documents-and-pricing.md) rule 13 note of this date).
 5. INV-37 has two parts:
    - every journal line on a `gr_ir` account whose document line refers to a purchase order line has `purchase_order_line_id`;
    - per purchase order line whose received quantity equals its invoiced quantity, net of returns and credit notes, the GR/IR balance in transaction currency is zero.
