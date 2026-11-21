@@ -82,6 +82,9 @@ On 2026-11-14 the author decided that every capability a customer cannot operate
    Note (author's delegation, 2026-11-19): the author's answer: there is no deadline and no customer commitment. The build carries no calendar dates; the build order and the gates are the only schedule, and no dated plan is set. The production core is a Phase 1 step numbered 4b: it starts after step 4's gate and may run beside step 5, and its gate check is the independent naive recomputation, not a manual spreadsheet. Spec 10 and spec 11 record step 4b without dates. Where subcontracting is built and the rest of the wording above stay open.
 
    Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-21): the list of agents done before platform completion keeps the planning agent, which ADR-0078 puts in Phase 1 after the manual path of planning with multi-level MRP is built and has passed its gate (after step 5; ADR-0024 rule 26, this rule). The runbook does not place that work yet (open question) (ADR-0078 rule 1). The three production agent types move to Phase 2 (ADR-0078 rule 2).
+
+   Note (author's delegation, 2026-11-21; decided by the chief architect): the planning slice with multi-level MRP is the build step 5b ([runbook](../runbook/steps-5-9.md), [spec 11](../spec/11-build-order.md)), after the gates of steps 5 and 4b. The planning agent starts after the step 5b gate ([ADR-0078](0078-agent-simplification-for-phase-1.md) rule 1); this replaces "the runbook does not place that work yet" in the note above.
+
 8. **Questions this decision answers:**
    - planning's phase (DS-43): Phase 1;
    - the proposed cuts of warehouse and first-slice planning features (OPT-12): no cut. Confirming the items left for later stays open;

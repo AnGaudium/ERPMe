@@ -142,6 +142,8 @@ The author's direction of 2026-11-15: survey best practice and follow it, keep h
     - **Setting** `agents.tainted_reference_reads`, company with an optional per-agent-type value, `literal` or `declared_projections`, default `declared_projections`. An agent type version uses a projection only when it names the query on its tool list.
     - **The reading.** Under the author's direction, declared projections join the reference data of the literal scope (ADR-0050 rule 27, item 4) as this ADR's reading of spec 03 rule 1; the setting only narrows that reading back to the literal scope, so no setting widens the floor (ADR-0029 rule 14). The run stays tainted; projected calls are recorded in the step's `context_refs` with the projection version and the row count.
     - **Partly answered:** the tainted catalog read for matching, open for the author's confirmation of the reading (ADR-0005 item 7).
+
+    Note (author's delegation, 2026-11-21; decided by the chief architect): the reading is confirmed (rule 27 of ADR-0050 stays; declared projections are the only read beyond items 1 to 3 of rule 27, and the readings (a) to (r) of the cited ADRs stand as readings of that rule).
 17. Analysis questions (ADR-0060 rule 21):
     - **The label stays `personal`.** A question may name a person; a pseudonymized question is still personal.
     - **Setting** `analysis.pseudonymize_known_subjects`, company, default true: before the gateway call, code replaces each match of the company's own personal records that the asker may read (individual and sole-proprietor partners, contacts, employees) with a handle such as `[partner:<id>]`, which the planner may use as a filter value and code dereferences. The processing log records the handles substituted, never the values.

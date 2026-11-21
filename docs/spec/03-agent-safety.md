@@ -11,5 +11,5 @@ Rule 1 (untrusted content), rule 5 (segregation of duties) and the "Human only" 
 5. **Segregation of duties:** the person who triggers an agent must not approve that agent's drafts.
 6. **Legal accountability:** accounting law requires a preparer and an approver for each document. Every document an agent auto-posts must have one accountable human (the owner of the policy that allows auto-posting), who confirms in batches within the period. Unconfirmed agent auto-posts block the period close; this is an item in the close checklist.
 7. **Run record:** trigger, model, prompt version, tool calls, tokens, cost, commands produced, link to audit.
-8. **Budgets:** per agent, per company, per day, with a circuit breaker.
+8. **Budgets:** per run for each agent type, and per company per day, with a circuit breaker.
 9. **No hidden memory:** anything an agent "learns" (e.g. a customer's purchase cycle) must be deterministically computed data stored in the system, viewable and editable.

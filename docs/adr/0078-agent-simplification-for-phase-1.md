@@ -39,6 +39,8 @@ The safety model is unchanged: the hard floors, the permission intersection, tai
    - `planning` is the safest kind of agent the design has: it declares `may_read_untrusted: false`, reads internal data only and is never tainted (ADR-0050 rule 28); it writes nothing but a draft change proposal, and floor 7 requires approval of every proposal (ADR-0043 rule 9). Its ceilings are those of ADR-0051 rule 9, and its evaluation set passes its golden set at 90% (ADR-0051 rule 7); the size of the set is fixed with the declaration. This restores, for planning, what ADR-0032 rule 7 decided: the planning agent is done before the platform counts as complete.
    - **One at a time.** Each agent type is built behind its manual path (spec 11, B6) and counts as done only when its evaluation set passes. Agent types that start after the same gate are built in the order of this table. No gate depends on an agent's accuracy in use: the gate items that name an agent are evaluation sets on recorded and synthetic cases (the assistant's at step 5, ADR-0077 rule 23). No agent in mode `active` is a go-live condition.
 
+    Note (author's delegation, 2026-11-21; decided by the chief architect): the build order now places the manual path of planning with multi-level MRP as step 5b ([runbook](../runbook/steps-5-9.md), [spec 11](../spec/11-build-order.md)). The `planning` agent starts after the step 5b gate; this replaces "the runbook does not place that work yet" in the table above. Its golden pair of rule 13 is an item of the agent's own completion, not of the step 5b gate.
+
 2. Agent types moved to Phase 2, each keeping its design, DDL draft and catalog rows as seams:
    - `auto_post_advisor` (ADR-0065 rule 18). It reads months of gateway outcomes that do not exist before go-live. Until then a person proposes gateway settings and decision tables, and the assistant in `act` mode may draft them on request (rule 8);
    - `customer_onboarding` and `quotation` (ADR-0051);
@@ -103,6 +105,8 @@ The safety model is unchanged: the hard floors, the permission intersection, tai
 
    The nine settings `agents.<agent_type>.daily_max_cost`, `.daily_max_runs` and the seven `.run_max_*` keys are removed from `settings.csv`. The reservation before every LLM call, the stop on `budget_exceeded` and the `agent_budget_exhausted` work item stay (ADR-0050 rule 22).
 
+   Note (author's delegation, 2026-11-21; decided by the chief architect): spec 03 rule 8 and the per-run seat budget of spec 17 were aligned on 2026-11-21, so the bullet above is no longer open. Spec 03 rule 8 now reads "Budgets: per run for each agent type, and per company per day, with a circuit breaker." Spec 17 says the seat's budget is per run and the daily budget is the company's.
+
 **Gateway, AI drafting, analysis and vision, the light way**
 
 8. Kept in Phase 1, each without new machinery:
@@ -150,6 +154,8 @@ These rules state in one place what ADR-0042, ADR-0050, ADR-0058 and ADR-0066 al
 13. Every workflow has its manual path, and it is tested.
     - With `llm_provider` unset, every agent mode is `off`, every work item stays with people, and every operation works (Principle 12; ADR-0050 rule 5).
     - **Proposed gate item, for the author (gates are reserved, ADR-0005):** the purchase invoice flow is a golden scenario at step 7 in two variants over the same input files: with agents, using recorded responses, and with the LLM off. Both must end in the same posted invoice. The flow has every kind of step: deterministic intake and extraction, the vision reader, a person's verification, the agent's draft, the three-way match, approval where the match is exceeded, the gateway in `shadow`, and a person's posting. The planning agent gains the same pair for one planning exception at its gate, once the manual path of planning with multi-level MRP has passed its gate (rule 1). This turns "works with LLMs off" from a walk-through into a check.
+
+    Note (author's delegation, 2026-11-21; decided by the chief architect): the purchase invoice golden scenario is split from 2026-11-21 and is no longer proposed. The variant with the LLM off, from the input files to a posted invoice, is a gate item of step 7 ([runbook](../runbook/steps-5-9.md), step 7). The variant with agents on recorded responses, over the same input files and ending in the same posted invoice, is an item of the completion of `purchase_invoice` and `document_reader`, which start only after that gate. The planning pair (one planning exception with the agent on recorded responses and with the LLM off) is an item of the planning agent's own completion after the step 5b gate, not of that gate.
 
 14. Tracing. An operator follows one piece of work from the work item: `ListAgentRun` filters by `work_item_id`; `GetAgentRun` returns the steps with tool name, plan hash and audit record; the case timeline of ADR-0066 rule 17 shows items, runs, versions, approvals and policy decisions in order. Cost and runs per company, agent type and business date are the `company_agent_type` rows of `agent_budget_usage`, shown on the operations dashboard (ADR-0038).
 

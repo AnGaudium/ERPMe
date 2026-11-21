@@ -60,6 +60,8 @@ Every table has a single-column primary key `id` of type `uuid`, version 7; rows
 
     Note (author, 2026-11-19): NativeFlows has no company-size limit. The "SME" reasoning in the options table explains the Phase 1 choice; it is not a ceiling. The scale path is in [go-live.md](../runbook/go-live.md), step 10: ten times the Phase 1 targets must stay possible without restructuring. Ledger partitioning is decided here by ADR when a company's journal approaches 100,000,000 lines.
 
+    Note (author's delegation, 2026-11-21; decided by the chief architect): `journal_line` carries `posting_date` and `fiscal_year_id` ([ADR-0014](0014-universal-journal.md) rule 5 note), copied from its entry at insert and never changed; the primary key stays `id`. This rule is unchanged: no partitioning in Phase 1, the scheme decided by an ADR when a journal nears 100,000,000 lines; the two columns keep a scheme by date or fiscal year available to that ADR.
+
 ## Context
 
 DS-02 is needed by DS-04 (command envelope), DS-06 (journal), DS-10 (multi-currency) and every table. Constraints:
