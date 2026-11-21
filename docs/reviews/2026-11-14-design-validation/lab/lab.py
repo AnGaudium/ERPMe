@@ -59,6 +59,9 @@ def entry_dates(cx, journal_entry_id):
 # with no default, because the command layer supplies UUIDv7 IDs (ADR-0006 rule 2). Their lab fixtures predate the key and
 # insert without an id, so after loading, load_all.py and load_ds06.py give id the default uuidv7() on these tables (the
 # ones the load defines). The design DDL never has this default (barcode's, for rows database code writes, is in the DDL).
+# Lab only, also for the E2 registries among them (setting_definition, setting_preset, setting_preset_item, extension_point,
+# event_consumer, public_mail_domain): the design gives those a uuid5 id computed by the loader (ADR-0006 rule 1 note), and
+# the lab's uuidv7() default stands in for it (S2 schema review note N5).
 PHASE_B_ID_TABLES = (
     "change_proposal_execution_item", "event_subject", "event_consumer", "open_item_collection",
     "installation_role_assignment", "team_member", "role_level", "role_permission", "role_assignment_scope",
@@ -91,3 +94,14 @@ def id_default_shim_sql():
             "        CONTINUE WHEN to_regclass('nativeflows.' || v_table) IS NULL;\n"
             "        EXECUTE format('ALTER TABLE nativeflows.%I ALTER COLUMN id SET DEFAULT uuidv7()', v_table);\n"
             "    END LOOP;\nEND $$;\n")
+
+
+def erasure_marker(X, scope="EraseDataSubject", company_id=None):
+    """Writes the idempotency record of an erasure command in the current transaction and sets nativeflows.erasure_command_id
+    to its id, as the dispatcher does (ADR-0038 rule 4; ADR-0079 rule 7; erasure_marker_valid in DS-05). Returns the id.
+    X is a connection's or cursor's execute; call it inside the transaction that erases."""
+    rid = new()
+    X("insert into idempotency_record (id, company_id, actor_kind, actor_id, scope, idempotency_key, request_hash)"
+      " values (%s, %s, 'human', %s, %s, %s, %s)", (rid, company_id, new(), scope, "lab-" + str(rid), "0" * 64))
+    X("select set_config('nativeflows.erasure_command_id', %s, true)", (str(rid),))
+    return rid

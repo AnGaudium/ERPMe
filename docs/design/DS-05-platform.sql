@@ -14,7 +14,7 @@
 -- Conventions of DS-20 and DS-15: tables in schema `nativeflows`, domains in `types`; keys inline, named by the MetaData naming
 -- convention in migrations (ADR-0004 rule 15); IDs are UUIDv7 from context.new_id (ADR-0006 rule 3), no ID defaults;
 -- references between company tables are composite on (company_id, id); recorded_at on every row (ADR-0007 rule 9).
--- Every table follows the one convention of D13 (ADR-0007 rule 16 note; DS-06-universal-journal.sql header): recorded_at
+-- Every table follows the one convention of the ADR-0007 rule 16 note (DS-06-universal-journal.sql header): recorded_at
 -- timestamptz NOT NULL DEFAULT now(), and the trigger trg_<table>_set_recorded_at on tables updated in place, attached in the
 -- last section of this file.
 -- Every table with company_id gets FORCE ROW LEVEL SECURITY and the company policy of ADR-0017 rule 19; the last
@@ -32,7 +32,7 @@
 -- interaction_summary (DS-35); journal_entry, open_item, derivation_trace, account, transaction_key (DS-06). The tables of
 -- other files that this file changes are in "Keys closed after their tables". The labs that load DS-06 without this file
 -- use lab stubs of fiscal_year, posting_period, posting_period_area_state, close_task and tax_code with the columns of this
--- file (lab 00_stubs.sql; D6).
+-- file (lab 00_stubs.sql).
 -- Columns that no ADR states are marked "interim: not stated in ADR-xxxx"; a later ADR note or design item decides them.
 -- Owner module per section in brackets (ADR-0022 rule 2; ADR-0027 rule 1).
 -- Rules that need other rows or the registry (allowed targets of a proposal, stage eligibility, the matching cascade,
@@ -993,17 +993,17 @@ CREATE INDEX ix_attachment_link_target ON attachment_link (company_id, target_ta
 -- Package rule read live: one row per package and code (ADR-0041 rule 1), loaded with the package version at deployment and
 -- compared by identity (ADR-0016 rules 3, 13). Installation data: no company_id and no row-level security; application roles
 -- get SELECT only, as on regime_setting. id = uuid5(f244ce09-3c6c-4c82-af14-918bdeca6be3, '<package>:tax_code:<code>'),
--- computed by the loader, so the ID is the same in every installation (D2; ADR-0016 rule 13 note). Reading a code whose
+-- computed by the loader, so the ID is the same in every installation (ADR-0016 rule 13 note). Reading a code whose
 -- basis is unverified fails with regime_setting_unverified in a production installation (ADR-0041 rule 4).
 -- Cross-row rules are the loader's and check_package.py's (ADR-0041 rule 20; ADR-0053 rule 2):
 --   - package_kind is declared in tax/package_kinds.csv and belongs to tax_kind;
 --   - base_includes names core kinds or package kinds;
 --   - fixed_asset_code names a code of the same package and direction.
--- The package CSV names the transaction key by its code; the loader resolves it to transaction_key_id (D5; ADR-0041 rule 1
+-- The package CSV names the transaction key by its code; the loader resolves it to transaction_key_id (ADR-0041 rule 1
 -- note). e_invoice_label is not a core column; it moves to the e-invoice add-on's data (ADR-0053 rule 12). tax_rate and
 -- tax_matrix (ADR-0041 rules 2-3) have no DDL yet.
 CREATE TABLE tax_code (                                    -- installation data (package rule)
-    id                    uuid PRIMARY KEY,                -- uuid5 of the package, table and code (D2)
+    id                    uuid PRIMARY KEY,                -- uuid5 of the package, table and code (ADR-0016 rule 13 note)
     localization_package  text NOT NULL,                   -- one row per package (ADR-0041 rule 1)
     code                  text NOT NULL,
     name                  text NOT NULL,                   -- English source, translated by the package (ADR-0041 rule 1; ADR-0016 rule 18)
@@ -1013,7 +1013,7 @@ CREATE TABLE tax_code (                                    -- installation data 
     calculation           text NOT NULL CONSTRAINT ck_tax_code_calculation CHECK (calculation IN ('percent', 'none', 'assessed')),
     sequence              integer NOT NULL CONSTRAINT ck_tax_code_sequence CHECK (sequence >= 1),   -- order of codes on one line
     base_includes         text[] NOT NULL DEFAULT '{}',    -- tax kinds of the same line added to this code's base
-    transaction_key_id    uuid NOT NULL REFERENCES transaction_key (id),   -- ADR-0041 rule 1; ADR-0004 rule 12 (D5)
+    transaction_key_id    uuid NOT NULL REFERENCES transaction_key (id),   -- ADR-0041 rule 1 and its note; ADR-0004 rule 12
     deductibility         text CONSTRAINT ck_tax_code_deductibility CHECK (deductibility IN ('deductible', 'not_deductible')),
     fixed_asset_code      text,                            -- capital-goods mapping usable by any regime (ADR-0053 rule 12)
     import_treatment      text CONSTRAINT ck_tax_code_import_treatment CHECK (import_treatment IN ('capitalize', 'recoverable')),   -- ADR-0021 rule 11
@@ -1038,14 +1038,15 @@ CREATE TABLE document_line_tax (
     tax_code_id                      uuid NOT NULL REFERENCES tax_code (id),
     tax_rate_id                      uuid,                 -- tax_rate is package data without DDL yet
     rate_percent                     types.percent,        -- null for none and assessed codes
-    derivation_trace_id              uuid REFERENCES derivation_trace (id),   -- the matrix row used (ADR-0027 rule 3)
+    derivation_trace_id              uuid,   -- the matrix row used (ADR-0027 rule 3)
     base_transaction_amount          types.amount NOT NULL,
     tax_transaction_amount           types.amount NOT NULL,   -- the amount used: the stated tax when there is one
     computed_tax_transaction_amount  types.amount NOT NULL,
     input_use                        text CONSTRAINT ck_document_line_tax_input_use CHECK (input_use IN ('taxable', 'non_taxable', 'shared')),   -- purchase lines (rule 6)
     recorded_at                      timestamptz NOT NULL DEFAULT now(),
     UNIQUE (document_id, line_number, tax_code_id),
-    FOREIGN KEY (company_id, document_id) REFERENCES document (company_id, id)
+    FOREIGN KEY (company_id, document_id) REFERENCES document (company_id, id),
+    FOREIGN KEY (company_id, derivation_trace_id) REFERENCES derivation_trace (company_id, id)   -- company key (S2 schema review S4)
 );
 CREATE TABLE tax_line (                                    -- the immutable tax subledger, written at posting (rule 11)
     id                       uuid PRIMARY KEY,
@@ -1294,7 +1295,7 @@ CREATE TABLE payment_line (
     line_number                  integer NOT NULL CONSTRAINT ck_payment_line_line_number CHECK (line_number > 0),
     line_kind                    text NOT NULL CONSTRAINT ck_payment_line_line_kind CHECK (line_kind IN ('settle', 'advance', 'on_account', 'account', 'bank_charge')),
     transaction_amount           types.amount NOT NULL CONSTRAINT ck_payment_line_amount CHECK (transaction_amount > 0),   -- in the document's currency
-    open_item_id                 uuid REFERENCES open_item (id),   -- settle lines
+    open_item_id                 uuid,   -- settle lines
     open_item_transaction_amount types.amount,             -- settle lines: the amount in the item's currency
     exchange_rate                types.exchange_rate,      -- settle lines in another currency: the bank's rate
     discount_transaction_amount  types.amount CONSTRAINT ck_payment_line_discount CHECK (discount_transaction_amount >= 0),   -- rule 7, in the item's currency
@@ -1302,7 +1303,7 @@ CREATE TABLE payment_line (
     evidence_method              text CONSTRAINT ck_payment_line_evidence_method CHECK (evidence_method IN ('cash', 'bank_transfer', 'card', 'third_party')),   -- rule 18
     account_id                   uuid,   -- account lines
     cost_center_id               uuid,
-    project_id                   uuid REFERENCES project (id),
+    project_id                   uuid,
     supplier_partner_id          uuid,                     -- taxed account lines: a partner, or a tax ID and name snapshot
     supplier_tax_id              text,
     supplier_name                text,
@@ -1328,7 +1329,9 @@ CREATE TABLE payment_line (
     CONSTRAINT ck_payment_line_supplier CHECK ((supplier_partner_id IS NULL AND supplier_tax_id IS NULL AND supplier_invoice_key IS NULL)
         OR line_kind = 'account'),
     FOREIGN KEY (company_id, business_unit_id) REFERENCES business_unit (company_id, id),
-    FOREIGN KEY (company_id, account_id) REFERENCES account (company_id, id)   -- company key (S2 schema phase B)
+    FOREIGN KEY (company_id, account_id) REFERENCES account (company_id, id),   -- company key (S2 schema phase B)
+    FOREIGN KEY (company_id, open_item_id) REFERENCES open_item (company_id, id),   -- company key (S2 schema review S4)
+    FOREIGN KEY (company_id, project_id) REFERENCES project (company_id, id)   -- company key (S2 schema review S4)
 );
 CREATE INDEX ix_payment_line_open_item_id ON payment_line (open_item_id) WHERE open_item_id IS NOT NULL;
 -- ADR-0048 rule 17 (and its note of the final simulation review): the collection side table of an open item (ADR-0026
@@ -1365,8 +1368,8 @@ BEGIN
 END
 $$;
 
--- ===== Clock override [periods] (ADR-0007 rule 15; DS-16 rule 19; DS-17 rule 1; D1) =====
--- Owned by periods with the fiscal calendar (D1); layer 1 modules own no tables (ADR-0022 rule 3), so clock reads the row
+-- ===== Clock override [periods] (ADR-0007 rule 15; DS-16 rule 19; DS-17 rule 1; ADR-0007 rule 15 note) =====
+-- Owned by periods with the fiscal calendar (ADR-0007 rule 15 note); layer 1 modules own no tables (ADR-0022 rule 3), so clock reads the row
 -- through a hook that periods registers and app wires (ADR-0022 rule 2, hooks; ADR-0007 rule 15 note). Written only by the replay runner's command, which the dispatcher refuses unless the
 -- installation setting environment is test or simulation; in production clock.today ignores the table (ADR-0007 rule 15).
 -- The database cannot read that setting (stored at first start, ADR-0022 rule 9; storage is DS-37), so no trigger can
@@ -1386,9 +1389,9 @@ CREATE TABLE business_date_override (                      -- one row per compan
 -- nothing refers to it by a key: audit_record.batch_id holds a batch's id without one (rule 19; ADR-0038 rule 1).
 -- company_id is null for installation-scoped commands and follows the company policy with the installation exception
 -- (ADR-0017 rule 19); INV-89 compares it null-safely with the audit record (ADR-0038 rule 8).
--- transaction_id is the writing transaction (D16; ADR-0008 rule 16 note): the erasure guard checks that
--- nativeflows.erasure_command_id names a row of command type EraseDataSubject whose transaction_id is pg_current_xact_id()
--- (ADR-0038 rule 4). xmin is not used, because freezing rewrites it.
+-- transaction_id is the writing transaction (ADR-0008 rule 16 note): erasure_marker_valid() (Guards below) checks that
+-- nativeflows.erasure_command_id names a row of scope EraseDataSubject or DestroyRetainedPersonalData whose transaction_id
+-- is pg_current_xact_id() (ADR-0038 rule 4; ADR-0079 rule 7). xmin is not used, because freezing rewrites it.
 CREATE TABLE idempotency_record (
     id               uuid PRIMARY KEY,                     -- for a batch, audit_record.batch_id (ADR-0038 rule 1)
     company_id       uuid REFERENCES company (id),         -- null for installation scope (rule 16)
@@ -1398,7 +1401,7 @@ CREATE TABLE idempotency_record (
     idempotency_key  text NOT NULL CONSTRAINT ck_idempotency_record_idempotency_key CHECK (idempotency_key ~ '^[A-Za-z0-9_.:-]{1,128}$'),   -- rule 14
     request_hash     text NOT NULL CONSTRAINT ck_idempotency_record_request_hash CHECK (request_hash ~ '^[0-9a-f]{64}$'),   -- SHA-256 of the canonical request (rule 15)
     response         jsonb,                                -- written before commit (rule 16); a batch stores its per-item summary (rule 21)
-    transaction_id   xid8 NOT NULL DEFAULT pg_current_xact_id(),   -- the writing transaction (D16)
+    transaction_id   xid8 NOT NULL DEFAULT pg_current_xact_id(),   -- the writing transaction (ADR-0008 rule 16 note)
     recorded_at      timestamptz NOT NULL DEFAULT now(),
     UNIQUE (actor_kind, actor_id, scope, idempotency_key)  -- the unique constraint of rule 16
 );
@@ -1413,9 +1416,9 @@ CREATE INDEX ix_idempotency_record_recorded_at ON idempotency_record (recorded_a
 -- through registry.contract.get_setting (rule 10 note). A value a posting has used never changes (rule 13, loader error
 -- regime_setting_in_use). An unverified basis fails with regime_setting_unverified in production (rule 12).
 -- id = uuid5(f244ce09-3c6c-4c82-af14-918bdeca6be3, '<package>:regime_setting:<regime>:<key>:<effective_from>'), computed by
--- the loader (D2; rule 13 note); an empty regime is written as an empty string in the name.
+-- the loader (ADR-0016 rule 13 note); an empty regime is written as an empty string in the name.
 CREATE TABLE regime_setting (                              -- installation data
-    id                    uuid PRIMARY KEY,                -- uuid5 of the package, table and identity (D2)
+    id                    uuid PRIMARY KEY,                -- uuid5 of the package, table and identity (ADR-0016 rule 13 note)
     localization_package  text NOT NULL,                   -- l10n_<country> (rule 1), as company.localization_package
     accounting_regime     text,                            -- null: every regime of the package; a row for the company's regime wins (rule 9)
     key                   text NOT NULL,                   -- a key the core registers (rule 10; setting_definition), checked by the loader and CI (rule 15)
@@ -1442,7 +1445,7 @@ CREATE TABLE fiscal_year (
     code          text NOT NULL,                           -- e.g. 2026 (ADR-0007 rule 18); M2026 for a migration year by convention (ADR-0044 rule 2)
     start_date    date NOT NULL,
     end_date      date NOT NULL,                           -- never null (ADR-0007 rule 18)
-    is_migration  boolean NOT NULL DEFAULT false,          -- the one-day migration year (D3; ADR-0012 rule 1 note)
+    is_migration  boolean NOT NULL DEFAULT false,          -- the one-day migration year (ADR-0012 rule 1 note)
     recorded_at   timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, code),
     UNIQUE (company_id, id),
@@ -1461,6 +1464,7 @@ CREATE TABLE posting_period (                              -- found by range loo
     recorded_at     timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     UNIQUE (fiscal_year_id, number),
+    CONSTRAINT uq_posting_period_company_id_fiscal_year_id_id UNIQUE (company_id, fiscal_year_id, id),   -- target of journal_entry's period key (S2 schema review N1)
     FOREIGN KEY (company_id, fiscal_year_id) REFERENCES fiscal_year (company_id, id),
     CONSTRAINT ck_posting_period_dates CHECK (start_date <= end_date),
     CONSTRAINT ck_posting_period_special CHECK (kind = 'regular' OR start_date = end_date),   -- the fiscal year's last day as both dates (ADR-0012 rule 1)
@@ -1485,7 +1489,7 @@ CREATE TABLE posting_period_area_state (
 -- A task goes back to pending when it is no longer current or after UnlockPostingPeriod (rule 12), and a sequential task's
 -- later periods go back with it (rule 16). Both are command rules, and they clear the actor columns.
 -- The actor who completed a task is stored as the command envelope gives it: actor_kind, actor_id and on_behalf_of_id, the
--- columns of document_version and audit_record (D4; ADR-0012 rule 11 note), because jobs and the system complete tasks too.
+-- columns of document_version and audit_record (ADR-0012 rule 11 note), because jobs and the system complete tasks too.
 CREATE TABLE close_task (
     id                   uuid PRIMARY KEY,
     company_id           uuid NOT NULL REFERENCES company (id),
@@ -1499,7 +1503,7 @@ CREATE TABLE close_task (
     parameters           jsonb NOT NULL DEFAULT '{}',      -- copied from the template, read by the task's job (rule 11 note; ADR-0049 rule 23)
     state                text NOT NULL DEFAULT 'pending' CONSTRAINT ck_close_task_state CHECK (state IN ('pending', 'running', 'done', 'failed', 'skipped')),   -- rule 11
     entry_count_at_done  bigint CONSTRAINT ck_close_task_entry_count_at_done CHECK (entry_count_at_done >= 0),   -- journal entries and material documents of the period and area at done (rule 12)
-    actor_kind           text CONSTRAINT ck_close_task_actor_kind CHECK (actor_kind IN ('human', 'agent', 'integration', 'system')),   -- who completed it (rule 11; D4)
+    actor_kind           text CONSTRAINT ck_close_task_actor_kind CHECK (actor_kind IN ('human', 'agent', 'integration', 'system')),   -- who completed it (rule 11 and its note)
     actor_id             uuid,
     on_behalf_of_id      uuid REFERENCES user_account (id),   -- the human an agent or integration acted for (ADR-0008)
     completed_at         timestamptz,                      -- rule 11 "when"
@@ -1530,23 +1534,43 @@ ALTER TABLE segregation_exception ADD CONSTRAINT fk_segregation_exception_audit_
 -- DS-20: a payment's beneficiary account belongs to its partner (ADR-0028 rule 15; ADR-0048 rule 3).
 ALTER TABLE partner_bank_account ADD CONSTRAINT uq_partner_bank_account_company_id_partner_id_id UNIQUE (company_id, partner_id, id);
 ALTER TABLE payment ADD CONSTRAINT fk_payment_partner_bank_account_id FOREIGN KEY (company_id, partner_id, partner_bank_account_id) REFERENCES partner_bank_account (company_id, partner_id, id);
--- DS-06: an open item's collection row belongs to the item's company (ADR-0048 rule 17 note). open_item gains a key with its company.
-ALTER TABLE open_item ADD CONSTRAINT uq_open_item_company_id_id UNIQUE (company_id, id);
+-- DS-06: an open item's collection row belongs to the item's company (ADR-0048 rule 17 note); the key is open_item's UNIQUE (company_id, id).
 ALTER TABLE open_item_collection ADD CONSTRAINT fk_open_item_collection_open_item_id FOREIGN KEY (company_id, open_item_id) REFERENCES open_item (company_id, id);
 -- DS-35 refers to attachment and agent_run by ID until their DDL exists; this file is that DDL.
 ALTER TABLE inbound_message ADD CONSTRAINT fk_inbound_message_raw_attachment_id FOREIGN KEY (company_id, raw_attachment_id) REFERENCES attachment (company_id, id);
 ALTER TABLE interaction_summary ADD CONSTRAINT fk_interaction_summary_agent_run_id FOREIGN KEY (company_id, agent_run_id) REFERENCES agent_run (company_id, id);
 
 -- ===== Guards =====
+-- ADR-0038 rule 4; ADR-0079 rule 7 (S2 findings closure, finding B1): the erasure marker is valid only when
+-- nativeflows.erasure_command_id is the id of an idempotency_record of an erasure command (EraseDataSubject or
+-- DestroyRetainedPersonalData) written in the same transaction (transaction_id = pg_current_xact_id(); ADR-0008 rule 16 note). A marker that
+-- is not a uuid, names no such row, or names a row of another transaction is refused. The table is schema-qualified, so a
+-- temporary table of the same name cannot stand in for it. A load without idempotency_record refuses every marker.
+CREATE FUNCTION erasure_marker_valid() RETURNS boolean LANGUAGE plpgsql STABLE AS $$
+DECLARE
+    v_marker  text := coalesce(current_setting('nativeflows.erasure_command_id', true), '');
+    v_found   boolean;
+BEGIN
+    IF v_marker !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN
+        RETURN false;
+    END IF;
+    IF to_regclass('nativeflows.idempotency_record') IS NULL THEN
+        RETURN false;
+    END IF;
+    EXECUTE 'SELECT EXISTS (SELECT 1 FROM nativeflows.idempotency_record WHERE id = $1::uuid'
+            ' AND scope IN (''EraseDataSubject'', ''DestroyRetainedPersonalData'') AND transaction_id = pg_current_xact_id())'
+        INTO v_found USING v_marker;
+    RETURN v_found;
+END
+$$;
 -- Arguments: columns that may change; columns that may be set once from null; columns only the erasure command may
--- change (nativeflows.erasure_command_id, set by the dispatcher for EraseDataSubject alone, ADR-0038 rule 4; DS-36 adds the
--- check that it names an idempotency record of that command in this transaction). Deletes are refused.
+-- change (under a valid erasure marker, erasure_marker_valid above). Deletes are refused.
 CREATE FUNCTION platform_check_append_only() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE
     v_mutable       text[] := TG_ARGV[0]::text[];
     v_set_once      text[] := TG_ARGV[1]::text[];
     v_erasure_only  text[] := TG_ARGV[2]::text[];
-    v_is_erasing    boolean := coalesce(current_setting('nativeflows.erasure_command_id', true), '') <> '';
+    v_is_erasing    boolean := false;
     v_old           jsonb;
     v_new           jsonb;
     v_key           text;
@@ -1560,27 +1584,52 @@ BEGIN
         CONTINUE WHEN (v_old -> v_key) IS NOT DISTINCT FROM (v_new -> v_key);
         CONTINUE WHEN v_key = ANY (v_mutable);
         CONTINUE WHEN v_key = ANY (v_set_once) AND jsonb_typeof(v_old -> v_key) = 'null';
-        CONTINUE WHEN v_key = ANY (v_erasure_only) AND v_is_erasing;
+        IF v_key = ANY (v_erasure_only) THEN
+            v_is_erasing := v_is_erasing OR erasure_marker_valid();
+            CONTINUE WHEN v_is_erasing;
+        END IF;
         RAISE EXCEPTION '%.% is append-only', TG_TABLE_NAME, v_key USING ERRCODE = 'restrict_violation';
     END LOOP;
     RETURN NEW;
 END
 $$;
--- ADR-0079 rule 7, the exception: under the erasure marker an update of a frozen or append-only row may change only the
--- table's catalog columns (catalogs/personal-data-fields.csv), which its trigger passes as an argument, and set the erasure
--- flag erased_at or body_removed_at from null. The marker test is platform_check_append_only's; DS-36 adds the check that it
--- names a committed EraseDataSubject or DestroyRetainedPersonalData (ADR-0038 rule 4 note). No catalog columns: false.
-CREATE FUNCTION erasure_update_allowed(p_old jsonb, p_new jsonb, p_columns text[]) RETURNS boolean LANGUAGE plpgsql STABLE AS $$
+-- ADR-0079 rules 6-7, the exception: under a valid erasure marker (erasure_marker_valid) an update of a frozen or
+-- append-only row may change only the table's catalog columns (catalogs/personal-data-fields.csv), which its trigger passes
+-- as an argument, and set the erasure flag erased_at or body_removed_at from null. Generated columns follow their sources
+-- and are skipped (in a BEFORE trigger NEW holds null for them; finding S1). A catalog column may only take an erasure
+-- result of rule 6 (finding S2): null, the blank marker ('' text, '{}' array, '{}' or '[]' JSON), the token 'erased-' and
+-- 12 to 64 lowercase hex digits (tokenize), or, for a JSON object, a part of the old object (clear_keys). A column whose
+-- value is already such a result is never rewritten. erased_at does not freeze the row, because one row can name several
+-- subjects (a version names a partner and a contact). No catalog columns: false. p_relid is the trigger's TG_RELID.
+CREATE FUNCTION erasure_value_is_erased(p_value jsonb) RETURNS boolean LANGUAGE sql IMMUTABLE AS $$
+    SELECT p_value IS NULL OR jsonb_typeof(p_value) = 'null' OR p_value IN ('""', '[]', '{}')
+        OR (jsonb_typeof(p_value) = 'string' AND (p_value #>> '{}') ~ '^erased-[0-9a-f]{12,64}$')
+$$;
+CREATE FUNCTION erasure_update_allowed(p_relid oid, p_old jsonb, p_new jsonb, p_columns text[]) RETURNS boolean LANGUAGE plpgsql STABLE AS $$
 DECLARE
-    v_key  text;
+    v_key        text;
+    v_generated  text[];
 BEGIN
-    IF coalesce(current_setting('nativeflows.erasure_command_id', true), '') = '' OR coalesce(cardinality(p_columns), 0) = 0 THEN
+    IF coalesce(cardinality(p_columns), 0) = 0 OR coalesce(current_setting('nativeflows.erasure_command_id', true), '') = '' THEN
         RETURN false;
     END IF;
+    IF NOT erasure_marker_valid() THEN
+        RETURN false;
+    END IF;
+    SELECT coalesce(array_agg(attname::text), '{}') INTO v_generated
+        FROM pg_attribute WHERE attrelid = p_relid AND attgenerated <> '' AND NOT attisdropped;
     FOR v_key IN SELECT jsonb_object_keys(p_new) LOOP
         CONTINUE WHEN (p_old -> v_key) IS NOT DISTINCT FROM (p_new -> v_key);
-        CONTINUE WHEN v_key = ANY (p_columns);
-        CONTINUE WHEN v_key IN ('erased_at', 'body_removed_at') AND jsonb_typeof(p_old -> v_key) = 'null';
+        CONTINUE WHEN v_key = ANY (v_generated);
+        IF v_key IN ('erased_at', 'body_removed_at') THEN
+            CONTINUE WHEN jsonb_typeof(p_old -> v_key) = 'null';
+            RETURN false;
+        END IF;
+        IF NOT v_key = ANY (p_columns) OR erasure_value_is_erased(p_old -> v_key) THEN
+            RETURN false;
+        END IF;
+        CONTINUE WHEN erasure_value_is_erased(p_new -> v_key);
+        CONTINUE WHEN jsonb_typeof(p_old -> v_key) = 'object' AND jsonb_typeof(p_new -> v_key) = 'object' AND (p_old -> v_key) @> (p_new -> v_key);
         RETURN false;
     END LOOP;
     RETURN true;
@@ -1589,7 +1638,7 @@ $$;
 -- Optional argument: the table's catalog columns, which an erasure may rewrite (ADR-0079 rule 7).
 CREATE FUNCTION platform_reject_change() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
-    IF TG_OP = 'UPDATE' AND TG_NARGS > 0 AND erasure_update_allowed(to_jsonb(OLD), to_jsonb(NEW), TG_ARGV[0]::text[]) THEN
+    IF TG_OP = 'UPDATE' AND TG_NARGS > 0 AND erasure_update_allowed(TG_RELID, to_jsonb(OLD), to_jsonb(NEW), TG_ARGV[0]::text[]) THEN
         RETURN NEW;
     END IF;
     RAISE EXCEPTION '% rows are never updated or deleted', TG_TABLE_NAME USING ERRCODE = 'restrict_violation';
@@ -1607,7 +1656,7 @@ BEGIN
         RETURN OLD;
     END IF;
     IF OLD.state IN ('posted', 'reversed', 'canceled', 'closed') THEN
-        IF TG_NARGS > 0 AND erasure_update_allowed(to_jsonb(OLD), to_jsonb(NEW), TG_ARGV[0]::text[]) THEN
+        IF TG_NARGS > 0 AND erasure_update_allowed(TG_RELID, to_jsonb(OLD), to_jsonb(NEW), TG_ARGV[0]::text[]) THEN
             RETURN NEW;   -- ADR-0079 rule 7: the argument is the catalog columns
         END IF;
         IF OLD.state = 'posted' AND NEW.state = 'reversed' AND (to_jsonb(OLD) - 'state') = (to_jsonb(NEW) - 'state') THEN
@@ -1636,7 +1685,7 @@ BEGIN
     IF TG_OP <> 'DELETE' THEN v_ids := v_ids || (to_jsonb(NEW) ->> TG_ARGV[0])::uuid; END IF;
     FOR v_state IN SELECT state FROM document WHERE id = ANY (v_ids) LOOP
         IF v_state IN ('posted', 'reversed', 'canceled', 'closed', 'issuing', 'sending')
-           AND NOT (TG_OP = 'UPDATE' AND TG_NARGS > 1 AND erasure_update_allowed(to_jsonb(OLD), to_jsonb(NEW), TG_ARGV[1]::text[])) THEN
+           AND NOT (TG_OP = 'UPDATE' AND TG_NARGS > 1 AND erasure_update_allowed(TG_RELID, to_jsonb(OLD), to_jsonb(NEW), TG_ARGV[1]::text[])) THEN
             RAISE EXCEPTION '% of a document in state % is immutable (ADR-0009 rule 14)', TG_TABLE_NAME, v_state
                 USING ERRCODE = 'restrict_violation';
         END IF;
@@ -1649,7 +1698,7 @@ $$;
 -- may clear catalog keys of content and set erased_at (ADR-0079 rules 6-7; the argument is the catalog columns).
 CREATE FUNCTION document_version_check_change() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
-    IF TG_OP = 'UPDATE' AND TG_NARGS > 0 AND erasure_update_allowed(to_jsonb(OLD), to_jsonb(NEW), TG_ARGV[0]::text[]) THEN
+    IF TG_OP = 'UPDATE' AND TG_NARGS > 0 AND erasure_update_allowed(TG_RELID, to_jsonb(OLD), to_jsonb(NEW), TG_ARGV[0]::text[]) THEN
         RETURN NEW;
     END IF;
     IF TG_OP = 'DELETE'
@@ -1851,6 +1900,8 @@ CREATE TRIGGER trg_bank_statement_line_append_only BEFORE UPDATE OR DELETE ON ba
 CREATE TRIGGER trg_bank_statement_line_check_match BEFORE INSERT OR UPDATE ON bank_statement_line FOR EACH ROW EXECUTE FUNCTION bank_statement_line_check_match();
 CREATE TRIGGER trg_bank_statement_append_only BEFORE UPDATE OR DELETE ON bank_statement FOR EACH ROW
     EXECUTE FUNCTION platform_check_append_only('{}', '{}', '{}');
+-- ADR-0013 rules 2, 15: events never change; retention drops whole partitions, which no row trigger sees (S2 schema review note N6).
+CREATE TRIGGER trg_outbox_event_append_only BEFORE UPDATE OR DELETE ON outbox_event FOR EACH ROW EXECUTE FUNCTION platform_reject_change();
 CREATE CONSTRAINT TRIGGER trg_bank_statement_balance AFTER INSERT ON bank_statement DEFERRABLE INITIALLY DEFERRED
     FOR EACH ROW EXECUTE FUNCTION bank_statement_check_balance();
 CREATE CONSTRAINT TRIGGER trg_bank_statement_line_balance AFTER INSERT ON bank_statement_line DEFERRABLE INITIALLY DEFERRED
@@ -1921,14 +1972,15 @@ $$;
 CREATE TRIGGER trg_document_register AFTER INSERT OR UPDATE OF number, is_barcoded OR DELETE ON document
     FOR EACH ROW EXECUTE FUNCTION barcode_register('document', 'number', 'id');
 
--- ===== recorded_at on update (D13; ADR-0007 rules 9, 16 and the rule 16 note) =====
+-- ===== recorded_at on update (ADR-0007 rules 9, 16 and their notes) =====
 -- Every table of this file has recorded_at timestamptz NOT NULL DEFAULT now(). The DO block attaches the trigger
 -- trg_<table>_set_recorded_at (BEFORE UPDATE, function set_recorded_at) to every table of v_tables except v_append_only,
--- so recorded_at is the instant of the last write (D8). Append-only tables are those whose guard trigger refuses every
--- update outside an erasure, and pure logs; they need no trigger (here: document_version_check_change, platform_check_append_only, platform_reject_change, pure log).
--- Guards on in-place tables sort before set_recorded_at, so they compare rows before it runs. v_tables lists the file's
--- tables in file order; lab gen_overview.py --check verifies both lists against the table definitions of the file, and
--- schema_phase_b.py writes the section. The function is defined in every file because the labs load subsets.
+-- so recorded_at is the instant of the last write (ADR-0007 rule 9 note). Append-only tables are those whose guard
+-- trigger refuses every update outside an erasure, and pure logs; they need no trigger (here: document_version_check_change, platform_check_append_only, platform_reject_change).
+-- Row guards without UPDATE OF on in-place tables sort before set_recorded_at, so they compare rows before it runs.
+-- v_tables lists the file's tables in file order; lab gen_overview.py --check verifies both lists against the table
+-- definitions of the file, and schema_phase_b.py writes the section. The function is defined in every file because the
+-- labs load subsets.
 CREATE OR REPLACE FUNCTION set_recorded_at() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 BEGIN
     NEW.recorded_at := now();

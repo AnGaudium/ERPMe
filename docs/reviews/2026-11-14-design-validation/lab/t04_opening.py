@@ -22,7 +22,7 @@ for k, code, kind in [("sa_cash", "cash_on_hand", "none"), ("sa_bank", "cash_in_
     ins_system_account(X, I[k], code + '_' + tag, kind)
 for a, s, code in [("a_cash", "sa_cash", "111"), ("a_bank", "sa_bank", "1122"), ("a_rec", "sa_rec", "131"), ("a_clr", "sa_clr", "999"), ("a_eq", "sa_eq", "4111")]:
     ins_account(X, I[a], I["co"], code, I[s])
-# ADR-0044 rule 2: a one-day migration fiscal year before the first operating fiscal year (is_migration, D3)
+# ADR-0044 rule 2: a one-day migration fiscal year before the first operating fiscal year (is_migration, ADR-0012 rule 1 note)
 ins_fiscal_year(X, I["fym"], I["co"], "M2026", "2026-12-31", "2026-12-31", is_migration=True)
 ins_fiscal_year(X, I["fy27"], I["co"], "2027", "2027-01-01", "2027-12-31")
 ins_posting_period(X, I["mig"], I["co"], I["fym"], 1, "2026-12-31", "2026-12-31")

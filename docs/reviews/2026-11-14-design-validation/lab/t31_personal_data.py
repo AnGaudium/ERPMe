@@ -52,6 +52,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 LAB = os.environ.get("NATIVEFLOWS_LAB_DIR", HERE)
 sys.path.insert(0, LAB)
 from fx_adr74 import DOCS, RESULTS, build, check, conn, ins, new, reset_and_load, trial  # noqa: E402
+from lab import erasure_marker  # noqa: E402
 
 # The personal-name pattern of rule 2: a column whose name matches it is in the catalog or in the exclusions. Free-text names
 # (note, comment, remark, description, reason) and every name column are in it (ADR-0079 rule 2, review fix G9).
@@ -703,8 +704,8 @@ if "--load" in sys.argv:
     ins(c, "document_version", id=ver, company_id=I["co"], document_id=pd, version=1, content='{"partner_name": "Sample Person", "lines": []}',
         version_hash="0" * 64, actor_kind="human", actor_id=I["user"], is_tainted=False, recorded_at=NOW)
 
-    def erasing(cx):
-        cx.execute("select set_config('nativeflows.erasure_command_id', %s, true)", (str(new()),))
+    def erasing(cx):        # a valid marker: an erasure command's idempotency record of this transaction (finding B1)
+        erasure_marker(cx.execute, company_id=I["co"])
     trial("X41 a document in a final state refuses a change of its catalog column without the erasure marker",
           lambda cx: cx.execute("update document set canceled_note = null where id=%s", (cd,)), "immutable")
     trial("X42 under the erasure marker the final document's catalog column is blanked (rolled back afterwards)",
@@ -732,6 +733,72 @@ if "--load" in sys.argv:
           lambda cx: (scratch(cx, "document_check_frozen('id', '{note}')"), erasing(cx), cx.execute("update lab_frozen set note = ''"), cx.execute("select 1/0")), "division by zero")
     trial("X53 document_check_frozen: without the marker the same change is refused", lambda cx: (scratch(cx, "document_check_frozen('id', '{note}')"), cx.execute("update lab_frozen set note = ''")), "immutable")
     trial("X54 platform_reject_change with no catalog columns refuses even under the marker", lambda cx: (scratch(cx, "platform_reject_change()"), erasing(cx), cx.execute("update lab_frozen set note = ''")), "never updated")
+
+    # ---- S2 schema review B1: the marker must name an erasure command's idempotency record written in this transaction
+    def forged(cx, marker):
+        cx.execute("select set_config('nativeflows.erasure_command_id', %s, true)", (marker,))
+    old_rec = new()     # an erasure command's record committed in an earlier transaction
+    X("insert into idempotency_record (id, company_id, actor_kind, actor_id, scope, idempotency_key, request_hash) values (%s,%s,'human',%s,'EraseDataSubject',%s,%s)",
+      (old_rec, I["co"], I["user"], "lab-old-" + I["t"], "0" * 64))
+    jr = "journal_reject_change('{note}')"
+    trial("X55 B1: a marker that names no idempotency record (a random uuid) is refused",
+          lambda cx: (scratch(cx, jr), forged(cx, str(new())), cx.execute("update lab_frozen set note = null")), "append-only")
+    trial("X56 B1: a marker that is not a uuid is refused", lambda cx: (scratch(cx, jr), forged(cx, "forged"), cx.execute("update lab_frozen set note = null")), "append-only")
+    trial("X57 B1: a marker naming an erasure command's record of another, committed transaction is refused (same transaction only)",
+          lambda cx: (scratch(cx, jr), forged(cx, str(old_rec)), cx.execute("update lab_frozen set note = null")), "append-only")
+    trial("X58 B1: a marker naming a record of another command type in this transaction is refused",
+          lambda cx: (scratch(cx, jr), erasure_marker(cx.execute, scope="PostSalesInvoice", company_id=I["co"]), cx.execute("update lab_frozen set note = null")), "append-only")
+
+    def temp_stand_in(cx):
+        rid = new()
+        cx.execute("create temp table idempotency_record (id uuid, scope text, transaction_id xid8) on commit drop")
+        cx.execute("insert into pg_temp.idempotency_record values (%s, 'EraseDataSubject', pg_current_xact_id())", (rid,))
+        forged(cx, str(rid))
+    trial("X59 B1: a temporary table named idempotency_record cannot stand in for the real one",
+          lambda cx: (scratch(cx, jr), temp_stand_in(cx), cx.execute("update lab_frozen set note = null")), "append-only")
+    trial("X60 B1: a DestroyRetainedPersonalData record of this transaction is a valid marker (rolled back afterwards)",
+          lambda cx: (scratch(cx, jr), erasure_marker(cx.execute, scope="DestroyRetainedPersonalData", company_id=I["co"]), cx.execute("update lab_frozen set note = null"),
+                      cx.execute("select 1/0")), "division by zero")
+    trial("X61 B1: a forged marker does not open the erasure-only columns of platform_check_append_only (audit_record.reason)",
+          lambda cx: (cx.execute("create temp table lab_ao (id uuid primary key, reason text) on commit drop"),
+                      cx.execute("create trigger lab_ao_guard before update or delete on lab_ao for each row execute function platform_check_append_only('{}', '{}', '{reason}')"),
+                      cx.execute("insert into lab_ao values (%s, 'Sample Person')", (new(),)), forged(cx, str(new())), cx.execute("update lab_ao set reason = null")), "append-only")
+    trial("X62 B1: a valid marker opens them (rolled back afterwards)",
+          lambda cx: (cx.execute("create temp table lab_ao (id uuid primary key, reason text) on commit drop"),
+                      cx.execute("create trigger lab_ao_guard before update or delete on lab_ao for each row execute function platform_check_append_only('{}', '{}', '{reason}')"),
+                      cx.execute("insert into lab_ao values (%s, 'Sample Person')", (new(),)), erasing(cx), cx.execute("update lab_ao set reason = null"), cx.execute("select 1/0")),
+          "division by zero")
+
+    # ---- S2 schema review S2: only an erasure result of rule 6, and an erased column is never rewritten
+    trial("X63 S2: under a valid marker a catalog column cannot take another person's name", lambda cx: (scratch(cx, jr), erasing(cx), cx.execute("update lab_frozen set note = 'Mrs Y'")), "append-only")
+    trial("X64 S2: the token form erased-<hex> is accepted (tokenize; rolled back afterwards)",
+          lambda cx: (scratch(cx, jr), erasing(cx), cx.execute("update lab_frozen set note = 'erased-' || left(md5(id::text), 12)"), cx.execute("select 1/0")), "division by zero")
+    trial("X65 S2: a blanked column is never rewritten, not even within the erasure",
+          lambda cx: (scratch(cx, jr), erasing(cx), cx.execute("update lab_frozen set note = null"), cx.execute("update lab_frozen set note = 'again'")), "append-only")
+    trial("X66 S2: a tokenized column is never tokenized again",
+          lambda cx: (scratch(cx, jr), erasing(cx), cx.execute("update lab_frozen set note = 'erased-0123456789ab'"), cx.execute("update lab_frozen set note = 'erased-ba9876543210'")), "append-only")
+    trial("X67 S2: clear_keys may remove keys from a JSON column but never add one",
+          lambda cx: (erasing(cx), cx.execute("""update document_version set content = content || '{"partner_name": "Mrs Y"}' where id=%s""", (ver,))), "never updated")
+    trial("X68 S2: an erasure flag already set is never set again",
+          lambda cx: (erasing(cx), cx.execute("update document_version set content = content - 'partner_name', erased_at = now() where id=%s", (ver,)),
+                      cx.execute("update document_version set erased_at = now() + interval '1 day' where id=%s", (ver,))), "never updated")
+
+    # ---- S2 schema review S1: generated columns are skipped, so a posted payment's snapshot can be erased
+    from lab import ins_account, ins_system_account
+    sa, acc, mac, pay = new(), new(), new(), new()
+    ins_system_account(X, sa, "lab_cash_" + I["t"])
+    ins_account(X, acc, I["co"], "1111" + I["t"], sa, "VND")
+    ins(c, "money_account", id=mac, company_id=I["co"], code="CASH" + I["t"], name="Cash", kind="cash", currency="VND", account_id=acc)
+    ins(c, "document", id=pay, company_id=I["co"], document_type="cash_payment", state="draft", version=1, document_date="2026-11-10", created_by_user_id=I["user"], recorded_at=NOW)
+    ins(c, "payment", id=pay, company_id=I["co"], document_type="cash_payment", money_account_id=mac, transaction_currency="VND", document_date="2026-11-10",
+        posting_date="2026-11-10", counterparty_name="Sample Person")
+    X("update document set state = 'posted', posted_at = now() where id=%s", (pay,))
+    trial("X69 S1: under a valid marker a posted payment's counterparty name is blanked, money_account_kind (generated) untouched (rolled back afterwards)",
+          lambda cx: (erasing(cx), cx.execute("update payment set counterparty_name = null where id=%s", (pay,)), cx.execute("select 1/0")), "division by zero")
+    trial("X70 S1: without the marker the same change is refused", lambda cx: cx.execute("update payment set counterparty_name = null where id=%s", (pay,)), "immutable")
+    trial("X71 B1: a load without idempotency_record refuses every marker (the table renamed away inside the transaction)",
+          lambda cx: (scratch(cx, jr), erasing(cx), cx.execute("alter table idempotency_record rename to lab_idempotency_record_away"),
+                      cx.execute("update lab_frozen set note = null")), "append-only")
     c.close()
 
 passed = sum(1 for ok_, *_ in RESULTS if ok_)

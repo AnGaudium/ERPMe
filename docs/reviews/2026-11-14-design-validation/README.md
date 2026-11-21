@@ -24,10 +24,10 @@ The scripts are in [lab/](lab/):
 
 | File | What it does |
 | --- | --- |
-| `00_stubs.sql` | Schemas, domains (ADR-0006 rule 8), and stubs for tables that other design items define: `user_account`, `document`, `material_document` and its lines as minimal stubs, and the five DS-05 tables `fiscal_year`, `posting_period`, `posting_period_area_state`, `close_task` and `tax_code` with their design columns (D6; t15 check A02b), for the loads without DS-05 |
+| `00_stubs.sql` | Schemas, domains (ADR-0006 rule 8), and stubs for tables that other design items define: `user_account`, `document`, `material_document` and its lines as minimal stubs, and the five DS-05 tables `fiscal_year`, `posting_period`, `posting_period_area_state`, `close_task` and `tax_code` with their design columns (t15 check A02b), for the loads without DS-05 |
 | `load_ds06.py` | Orders DS-06's statements by table dependency and reports external references |
 | `load_all.py` | The combined loader: `00_stubs.sql` without the stub tables a DDL file defines, `btree_gist` and `pg_trgm` in schema `nativeflows`, every DDL file of `design/` in one dependency order (as `load_ds06.py` orders them; it refuses a trailing comment after a semicolon and a table defined twice), then `search_path`; prints the table count. `python3 load_all.py <dsn> <docs dir>`, or `load_all(dsn, docs_dir)` as a module |
-| `lab.py`, `t01_journal.py` | 18 posting scenarios against the DS-06 triggers, including the signed open item checks, a line whose posting date differs from its entry (INV-99) and the account marker refreshing `recorded_at` (D8); `lab.py` also holds the ledger and period fixture helpers |
+| `lab.py`, `t01_journal.py` | 18 posting scenarios against the DS-06 triggers, including the signed open item checks, a line whose posting date differs from its entry (INV-99) and the account marker refreshing `recorded_at` (ADR-0007 rule 9 note); `lab.py` also holds the ledger and period fixture helpers |
 | `t02_subledger.py` | 6 scenarios on the `cost_object` gated kind after subledger activation |
 | `t03_cost_object_area.py` | 4 scenarios: cost-object lines in area `inventory`, the company check, append-only activation rows |
 | `t04_opening.py` | The DS-06 triggers against the shape of [ADR-0044](../../adr/0044-data-migration-and-export.md) rules 2, 7, 8 and 12: per-currency opening documents in a one-day migration fiscal year, the per-currency balance check, a full opening leaving clearing at zero in company currency, the locked migration period (L-12) |

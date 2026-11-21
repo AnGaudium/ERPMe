@@ -9,9 +9,10 @@
 -- (DS-20-master-data.sql); document (DS-05-platform.sql); fiscal_year, posting_period, posting_period_area_state, close_task
 -- and tax_code (DS-05-platform.sql, owners periods and tax); material_document and material_document_line
 -- (DS-22-09-42-commercial-inventory.sql). The labs that load this file without DS-05 keep lab stubs for the five DS-05 tables.
+-- Functions of DS-05 used here: erasure_update_allowed (journal_reject_change, only under the erasure marker).
 -- IDs of journal rows come from context.new_id (ADR-0014 rule 14), so there are no ID defaults.
 -- Owner module of each table in brackets on its CREATE TABLE line (ADR-0022 rules 2, 7).
--- recorded_at convention (D13, ADR-0007 rules 9, 16): every table of every design file has recorded_at timestamptz NOT NULL
+-- recorded_at convention (ADR-0007 rules 9, 16 and the rule 16 note): every table of every design file has recorded_at timestamptz NOT NULL
 -- DEFAULT now(); a table whose rows are updated in place also gets the trigger trg_<table>_set_recorded_at, BEFORE UPDATE,
 -- which runs the shared function set_recorded_at(), so recorded_at is the instant of the last write. Append-only tables
 -- (a guard trigger refuses every update outside an erasure, or a pure log) need no trigger. The last section of each design
@@ -134,7 +135,8 @@ CREATE TRIGGER trg_account_posted_immutable
 
 -- ===== Applied rates [ledger] (ADR-0011 rules 3, 9-10, 12; ADR-0048 rule 12) =====
 -- One conversion that journal lines used; the lines of one document share it (rule 3). Written at posting (rule 1) and
--- never updated, so it has no recorded_at trigger. Company data; row-level security in the last section.
+-- never updated or deleted: trg_applied_rate_append_only refuses both, so it has no recorded_at trigger (S2 schema review
+-- finding S3). Company data; row-level security in the last section.
 CREATE TABLE applied_rate (                                -- [ledger] ADR-0011 rule 3
     id                       uuid PRIMARY KEY,
     company_id               uuid NOT NULL REFERENCES company (id),
@@ -162,13 +164,14 @@ CREATE TABLE cost_object (                                 -- [production] ADR-0
     name                 text NOT NULL,
     kind                 text NOT NULL CONSTRAINT ck_cost_object_kind CHECK (kind IN ('production_order', 'cost_pool')),
     production_order_id  uuid,   -- FK to production_order (ADR-0034), added by DS-43-54-planning-production.sql
-    cost_center_id       uuid REFERENCES cost_center (id),
+    cost_center_id       uuid,
     state                text NOT NULL DEFAULT 'open' CONSTRAINT ck_cost_object_state CHECK (state IN ('open', 'closed')),
     recorded_at          timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, code),
     CONSTRAINT uq_cost_object_company_id_id_production_order_id UNIQUE (company_id, id, production_order_id),   -- an order's cost_object_id names the cost object that names it (DS-43-54)
     CONSTRAINT ck_cost_object_kind_reference CHECK ((kind = 'production_order') = (production_order_id IS NOT NULL)
-        AND (kind = 'cost_pool') = (cost_center_id IS NOT NULL))
+        AND (kind = 'cost_pool') = (cost_center_id IS NOT NULL)),
+    FOREIGN KEY (company_id, cost_center_id) REFERENCES cost_center (company_id, id)   -- company key (S2 schema review S4)
 );
 CREATE UNIQUE INDEX uq_cost_object_cost_center_id ON cost_object (cost_center_id) WHERE cost_center_id IS NOT NULL;
 CREATE UNIQUE INDEX uq_cost_object_production_order_id ON cost_object (production_order_id) WHERE production_order_id IS NOT NULL;
@@ -188,22 +191,23 @@ CREATE TABLE subledger_activation (                        -- [ledger] ADR-0025 
     company_id                     uuid NOT NULL REFERENCES company (id),
     control_kind                   text NOT NULL CONSTRAINT ck_subledger_activation_control_kind CHECK (control_kind IN ('cost_object', 'fixed_asset', 'loan')),
     effective_from                 date NOT NULL,
-    reclassification_document_id   uuid NOT NULL REFERENCES document (id),
+    reclassification_document_id   uuid NOT NULL,
     recorded_at                    timestamptz NOT NULL DEFAULT now(),
-    CONSTRAINT uq_subledger_activation_company_id_control_kind UNIQUE (company_id, control_kind)
+    CONSTRAINT uq_subledger_activation_company_id_control_kind UNIQUE (company_id, control_kind),
+    FOREIGN KEY (company_id, reclassification_document_id) REFERENCES document (company_id, id)   -- company key (S2 schema review S4)
 );
 -- Row-level security in the last section; append-only (trigger below, after journal_reject_change).
 
 CREATE TABLE journal_entry (                               -- [ledger] ADR-0014 rule 1
     id                           uuid        PRIMARY KEY,
     company_id                   uuid        NOT NULL REFERENCES company (id),
-    document_id                  uuid        NOT NULL REFERENCES document (id),
+    document_id                  uuid        NOT NULL,
     posting_date                 date        NOT NULL,
     document_date                date        NOT NULL,
     posting_period_id            uuid        NOT NULL,
     fiscal_year_id               uuid        NOT NULL,
     is_closing_entry             boolean     NOT NULL DEFAULT false,
-    close_task_id                uuid        REFERENCES close_task (id),
+    close_task_id                uuid,
     database_transaction_number  xid8        NOT NULL,
     line_count                   integer     NOT NULL CHECK (line_count >= 2),
     business_unit_trace_id       uuid,       -- ADR-0069 rule 12, composite key below: the entry's business unit derivation (rule_code business_unit_derivation); journal_line.derivation_trace_id stays costing's
@@ -211,8 +215,10 @@ CREATE TABLE journal_entry (                               -- [ledger] ADR-0014 
     recorded_at                  timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT uq_journal_entry_document_id UNIQUE (document_id),
     FOREIGN KEY (company_id, business_unit_trace_id) REFERENCES derivation_trace (company_id, id),   -- the trace is of the entry's company (ADR-0069 rule 12)
-    FOREIGN KEY (company_id, posting_period_id) REFERENCES posting_period (company_id, id),   -- company key (S2 schema phase B)
-    FOREIGN KEY (company_id, fiscal_year_id) REFERENCES fiscal_year (company_id, id)   -- company key (S2 schema phase B)
+    FOREIGN KEY (company_id, fiscal_year_id, posting_period_id) REFERENCES posting_period (company_id, fiscal_year_id, id),   -- the period belongs to the entry's fiscal year (S2 schema review N1)
+    FOREIGN KEY (company_id, fiscal_year_id) REFERENCES fiscal_year (company_id, id),   -- company key (S2 schema phase B)
+    FOREIGN KEY (company_id, document_id) REFERENCES document (company_id, id),   -- company key (S2 schema review S4)
+    FOREIGN KEY (company_id, close_task_id) REFERENCES close_task (company_id, id)   -- company key (S2 schema review S4)
 );
 
 CREATE INDEX ix_journal_entry_company_id_posting_date
@@ -247,12 +253,12 @@ CREATE TABLE payment_term_line (                           -- [ledger] ADR-0026 
 CREATE TABLE open_item (                                   -- [ledger] ADR-0026 rule 1
     id                          uuid PRIMARY KEY,
     company_id                  uuid NOT NULL REFERENCES company (id),
-    partner_id                  uuid NOT NULL REFERENCES partner (id),
+    partner_id                  uuid NOT NULL,
     account_id                  uuid NOT NULL,
     open_item_kind              text NOT NULL CONSTRAINT ck_open_item_open_item_kind CHECK (open_item_kind IN ('invoice', 'credit', 'advance', 'payment_on_account', 'loan', 'other')),
     natural_side                text NOT NULL CONSTRAINT ck_open_item_natural_side CHECK (natural_side IN ('debit', 'credit')),
     transaction_currency        text NOT NULL REFERENCES currency (code),
-    origin_document_id          uuid NOT NULL REFERENCES document (id),
+    origin_document_id          uuid NOT NULL,
     origin_journal_line_id      uuid NOT NULL UNIQUE,   -- FK below, deferred: the item is inserted before its line
     installment_number          integer NOT NULL DEFAULT 1,
     payment_term_id             uuid REFERENCES payment_term (id),
@@ -275,15 +281,19 @@ CREATE TABLE open_item (                                   -- [ledger] ADR-0026 
     is_settled                  boolean NOT NULL DEFAULT false,
     is_reversed                 boolean NOT NULL DEFAULT false,
     last_settlement_date        date,
-    predecessor_open_item_id    uuid REFERENCES open_item (id),
+    predecessor_open_item_id    uuid,
     recorded_at                 timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (company_id, id),                             -- target of company-composite references (journal_line, payment_line, open_item_collection)
     CONSTRAINT ck_open_item_due_date CHECK ((open_item_kind IN ('invoice', 'credit') AND due_date IS NOT NULL)
                                            OR (open_item_kind IN ('advance', 'payment_on_account', 'loan') AND due_date IS NULL)
                                            OR open_item_kind = 'other'),
     -- Amounts are signed like journal amounts (debit positive); comparisons use magnitudes (ADR-0026 rule 1 note).
     CONSTRAINT ck_open_item_original_transaction_amount CHECK (sign(original_transaction_amount) = CASE natural_side WHEN 'debit' THEN 1 ELSE -1 END),
     CONSTRAINT ck_open_item_is_settled CHECK (NOT is_settled OR (open_transaction_amount = 0 AND open_company_amount = 0 AND coalesce(open_group_amount, 0) = 0)),
-    FOREIGN KEY (company_id, account_id) REFERENCES account (company_id, id)   -- company key (S2 schema phase B)
+    FOREIGN KEY (company_id, account_id) REFERENCES account (company_id, id),   -- company key (S2 schema phase B)
+    FOREIGN KEY (company_id, partner_id) REFERENCES partner (company_id, id),   -- company key (S2 schema review S4)
+    FOREIGN KEY (company_id, origin_document_id) REFERENCES document (company_id, id),   -- company key (S2 schema review S4)
+    FOREIGN KEY (company_id, predecessor_open_item_id) REFERENCES open_item (company_id, id)   -- company key (S2 schema review S4)
 );
 CREATE INDEX ix_open_item_company_id_partner_id ON open_item (company_id, partner_id) WHERE NOT is_settled AND NOT is_reversed;
 CREATE INDEX ix_open_item_company_id_account_id ON open_item (company_id, account_id) WHERE NOT is_settled AND NOT is_reversed;
@@ -309,23 +319,23 @@ CREATE TABLE journal_line (                                -- [ledger] ADR-0014 
     company_amount             types.amount  NOT NULL,
     group_currency             text          REFERENCES currency (code),
     group_amount               types.amount,
-    company_applied_rate_id    uuid          REFERENCES applied_rate (id),
-    group_applied_rate_id      uuid          REFERENCES applied_rate (id),
-    branch_id                  uuid          REFERENCES branch (id),
-    partner_id                 uuid          REFERENCES partner (id),
-    item_id                    uuid          REFERENCES item (id),
-    warehouse_id               uuid          REFERENCES warehouse (id),
-    cost_center_id             uuid          REFERENCES cost_center (id),
-    project_id                 uuid          REFERENCES project (id),
+    company_applied_rate_id    uuid,
+    group_applied_rate_id      uuid,
+    branch_id                  uuid,
+    partner_id                 uuid,
+    item_id                    uuid,
+    warehouse_id               uuid,
+    cost_center_id             uuid,
+    project_id                 uuid,
     cost_object_id             uuid          REFERENCES cost_object (id),   -- ADR-0025; production orders and pools (ADR-0035), Phase 1
     fixed_asset_id             uuid          REFERENCES fixed_asset (id),   -- ADR-0025, empty until Phase 3
-    salesperson_id             uuid          REFERENCES partner (id),   -- partner with the employee role (ADR-0027 rule 6)
+    salesperson_id             uuid,   -- partner with the employee role (ADR-0027 rule 6)
     tax_code_id                uuid          REFERENCES tax_code (id),
-    material_document_line_id  uuid          REFERENCES material_document_line (id),
-    open_item_id               uuid          REFERENCES open_item (id),
+    material_document_line_id  uuid,          -- company key in DS-22-09-42 (S2 schema review S4)
+    open_item_id               uuid,
     purchase_order_line_id     uuid,         -- ADR-0030 rule 3: GR/IR per order line; FK to purchase_order_line added at step 5
     evidence_method            text          CONSTRAINT ck_journal_line_evidence_method CHECK (evidence_method IS NULL OR (open_item_id IS NOT NULL AND evidence_method IN ('cash', 'bank_transfer', 'card', 'offset', 'third_party', 'none'))),   -- lines of ADR-0048 rule 18; how a settlement was paid, in any regime (ADR-0053 rule 11)
-    derivation_trace_id        uuid          REFERENCES derivation_trace (id),
+    derivation_trace_id        uuid,
     business_unit_id           uuid,         -- ADR-0069 rule 4; composite key to business_unit below (the unit is of the line's company); profit-and-loss lines only in Phase 1 (rule 5, posting logic)
     business_unit_source       text          CONSTRAINT ck_journal_line_business_unit_source CHECK (business_unit_source IN ('line', 'item', 'cost_center', 'project', 'document', 'site', 'company_default', 'reversal', 'closing')),   -- the derivation step that set it (ADR-0069 rules 9, 11)
     description                text,
@@ -344,7 +354,18 @@ CREATE TABLE journal_line (                                -- [ledger] ADR-0014 
                OR sign(transaction_amount) = sign(company_amount)),
     FOREIGN KEY (company_id, posting_period_id) REFERENCES posting_period (company_id, id),   -- company key (S2 schema phase B)
     FOREIGN KEY (company_id, fiscal_year_id) REFERENCES fiscal_year (company_id, id),   -- company key (S2 schema phase B)
-    FOREIGN KEY (company_id, account_id) REFERENCES account (company_id, id)   -- company key (S2 schema phase B)
+    FOREIGN KEY (company_id, account_id) REFERENCES account (company_id, id),   -- company key (S2 schema phase B)
+    FOREIGN KEY (company_id, company_applied_rate_id) REFERENCES applied_rate (company_id, id),   -- company key (S2 schema review S4)
+    FOREIGN KEY (company_id, group_applied_rate_id) REFERENCES applied_rate (company_id, id),   -- company key (S2 schema review S4)
+    FOREIGN KEY (company_id, branch_id) REFERENCES branch (company_id, id),   -- company key (S2 schema review S4)
+    FOREIGN KEY (company_id, partner_id) REFERENCES partner (company_id, id),   -- company key (S2 schema review S4)
+    FOREIGN KEY (company_id, item_id) REFERENCES item (company_id, id),   -- company key (S2 schema review S4)
+    FOREIGN KEY (company_id, warehouse_id) REFERENCES warehouse (company_id, id),   -- company key (S2 schema review S4)
+    FOREIGN KEY (company_id, cost_center_id) REFERENCES cost_center (company_id, id),   -- company key (S2 schema review S4)
+    FOREIGN KEY (company_id, project_id) REFERENCES project (company_id, id),   -- company key (S2 schema review S4)
+    FOREIGN KEY (company_id, salesperson_id) REFERENCES partner (company_id, id),   -- company key (S2 schema review S4)
+    FOREIGN KEY (company_id, open_item_id) REFERENCES open_item (company_id, id),   -- company key (S2 schema review S4)
+    FOREIGN KEY (company_id, derivation_trace_id) REFERENCES derivation_trace (company_id, id)   -- company key (S2 schema review S4)
 );
 
 CREATE INDEX ix_journal_line_company_id_account_id_posting_period_id
@@ -364,11 +385,13 @@ CREATE INDEX ix_journal_line_company_id_business_unit_id_posting_period_id
     ON journal_line (company_id, business_unit_id, posting_period_id) WHERE business_unit_id IS NOT NULL;
 
 -- Rule 13: append-only.
--- ADR-0079 rule 7: under the erasure marker an update may blank the argument's catalog columns (erasure_update_allowed, DS-05).
+-- ADR-0079 rule 7: under a valid erasure marker an update may blank the argument's catalog columns (erasure_update_allowed
+-- of DS-05, which checks the marker with erasure_marker_valid). The function is called only when the marker is set, so a
+-- load of this file without DS-05 still loads and refuses every erasure.
 CREATE FUNCTION journal_reject_change() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
     IF TG_OP = 'UPDATE' AND TG_NARGS > 0 AND coalesce(current_setting('nativeflows.erasure_command_id', true), '') <> '' THEN
-        IF erasure_update_allowed(to_jsonb(OLD), to_jsonb(NEW), TG_ARGV[0]::text[]) THEN
+        IF erasure_update_allowed(TG_RELID, to_jsonb(OLD), to_jsonb(NEW), TG_ARGV[0]::text[]) THEN
             RETURN NEW;
         END IF;
     END IF;
@@ -391,6 +414,28 @@ CREATE TRIGGER trg_subledger_activation_append_only
 CREATE TRIGGER trg_journal_line_no_truncate
     BEFORE TRUNCATE ON journal_line
     FOR EACH STATEMENT EXECUTE FUNCTION journal_reject_change();
+-- ADR-0011 rule 3: a rate journal lines used never changes (S2 schema review finding S3).
+CREATE TRIGGER trg_applied_rate_append_only
+    BEFORE UPDATE OR DELETE ON applied_rate
+    FOR EACH ROW EXECUTE FUNCTION journal_reject_change();
+-- ADR-0027 rule 3: a derivation trace is evidence and never changes (S2 schema review note N6).
+CREATE TRIGGER trg_derivation_trace_append_only
+    BEFORE UPDATE OR DELETE ON derivation_trace
+    FOR EACH ROW EXECUTE FUNCTION journal_reject_change();
+
+-- ADR-0012 rule 1; ADR-0014 rule 1: the posting date lies in the entry's posting period (S2 schema review note N1).
+CREATE FUNCTION journal_entry_check_period() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM posting_period p WHERE p.id = NEW.posting_period_id
+                   AND NEW.posting_date BETWEEN p.start_date AND p.end_date) THEN
+        RAISE EXCEPTION 'posting date % lies outside the entry''s posting period (ADR-0012 rule 1)', NEW.posting_date
+            USING ERRCODE = 'check_violation';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER trg_journal_entry_check_period
+    BEFORE INSERT ON journal_entry
+    FOR EACH ROW EXECUTE FUNCTION journal_entry_check_period();
 
 -- Rule 1: the creating transaction is set by the database, never by a client.
 CREATE FUNCTION journal_entry_set_transaction() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -419,7 +464,7 @@ DECLARE
     v_sign           int;
     v_activation     subledger_activation%ROWTYPE;
 BEGIN
-    -- ADR-0010 rule 12: mark the account first; this locks its row and freezes its mapping. recorded_at is the last write (D8).
+    -- ADR-0010 rule 12: mark the account first; this locks its row and freezes its mapping. recorded_at is the last write (ADR-0007 rule 9 note).
     UPDATE account SET has_posting = true, recorded_at = now() WHERE id = NEW.account_id AND NOT has_posting;
 
     SELECT * INTO v_entry FROM journal_entry WHERE id = NEW.journal_entry_id;
@@ -653,7 +698,7 @@ END $$;
 CREATE TRIGGER trg_journal_line_check_open_item
     BEFORE INSERT ON journal_line FOR EACH ROW EXECUTE FUNCTION journal_line_check_open_item();
 
--- ===== Row-level security (ADR-0017 rule 19; ADR-0022 rule 8; D9) =====
+-- ===== Row-level security (ADR-0017 rule 19 and its note; ADR-0022 rule 8) =====
 -- rls_v1 as in DS-05-platform.sql: the company policy, compared as text and failing closed, and the read-only company_ids
 -- policy for registered cross-company queries. Every company table of this file is listed; system_account and
 -- transaction_key are global catalogs without company_id.
@@ -672,14 +717,15 @@ BEGIN
 END
 $$;
 
--- ===== recorded_at on update (D13; ADR-0007 rules 9, 16 and the rule 16 note) =====
+-- ===== recorded_at on update (ADR-0007 rules 9, 16 and their notes) =====
 -- Every table of this file has recorded_at timestamptz NOT NULL DEFAULT now(). The DO block attaches the trigger
 -- trg_<table>_set_recorded_at (BEFORE UPDATE, function set_recorded_at) to every table of v_tables except v_append_only,
--- so recorded_at is the instant of the last write (D8). Append-only tables are those whose guard trigger refuses every
--- update outside an erasure, and pure logs; they need no trigger (here: journal_reject_change, pure log).
--- Guards on in-place tables sort before set_recorded_at, so they compare rows before it runs. v_tables lists the file's
--- tables in file order; lab gen_overview.py --check verifies both lists against the table definitions of the file, and
--- schema_phase_b.py writes the section. The function is defined in every file because the labs load subsets.
+-- so recorded_at is the instant of the last write (ADR-0007 rule 9 note). Append-only tables are those whose guard
+-- trigger refuses every update outside an erasure, and pure logs; they need no trigger (here: journal_reject_change).
+-- Row guards without UPDATE OF on in-place tables sort before set_recorded_at, so they compare rows before it runs.
+-- v_tables lists the file's tables in file order; lab gen_overview.py --check verifies both lists against the table
+-- definitions of the file, and schema_phase_b.py writes the section. The function is defined in every file because the
+-- labs load subsets.
 CREATE OR REPLACE FUNCTION set_recorded_at() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 BEGIN
     NEW.recorded_at := now();
@@ -690,7 +736,7 @@ DECLARE
     v_tables       text[] := ARRAY['derivation_trace', 'system_account', 'transaction_key', 'account', 'applied_rate', 'cost_object', 'fixed_asset',
         'subledger_activation', 'journal_entry', 'payment_term', 'payment_term_line', 'open_item', 'journal_line',
         'account_period_balance', 'opening_turnover'];
-    v_append_only  text[] := ARRAY['derivation_trace', 'journal_entry', 'journal_line', 'subledger_activation']::text[];
+    v_append_only  text[] := ARRAY['applied_rate', 'derivation_trace', 'journal_entry', 'journal_line', 'subledger_activation']::text[];
     v_table        text;
 BEGIN
     FOREACH v_table IN ARRAY v_tables LOOP

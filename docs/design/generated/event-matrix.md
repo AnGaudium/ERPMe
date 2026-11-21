@@ -8,7 +8,7 @@ Event types named in backticks in the ADRs, recognised by the event forms of the
 | --- | --- | --- | --- | --- |
 | `AgentRunCompleted` | `agent_run` | agent_runs | — | ADR-0050:194, ADR-0060:269 |
 | `AgentRunStarted` | `agent_run` | agent_runs | — | ADR-0050:168, ADR-0050:178 |
-| `AttachmentCreated` | `attachment` | attachments | — | ADR-0038:144, ADR-0038:152 |
+| `AttachmentCreated` | `attachment` | attachments | — | ADR-0038:146, ADR-0038:154 |
 | `BankLineSuggestionRecorded` | — | — | a consumer in `cash` | ADR-0048:126, ADR-0051:198, ADR-0051:202 |
 | `ChangeProposalApproved` | `change_proposal` | documents | — | ADR-0029:48 |
 | `ComplaintClosed` | `complaint` | crm | a consumer in `cash` | ADR-0048:243, ADR-0052:233, ADR-0052:373 |

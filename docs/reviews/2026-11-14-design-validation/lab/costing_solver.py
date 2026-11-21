@@ -195,38 +195,57 @@ def share(V, Q, r, q):
 
 
 def cost_period(k, op, Q, final, prelim, offs):
-    """One period over all areas. Pass 1: each area's actual average from its opening and receipts only, and its issues
-    (at the preliminary price when the closing quantity is zero, rule 13). Pass 2: every return takes its cumulative share of
-    its original's value: this period's value when the original is in this period (case a, or another area), else the
-    final value (case b). Pass 3: closing values; a return kept outside the area's average (case b, or another area than its
-    original's) keeps its difference in the closing value, and the rounding residual is measured after setting it aside.
-    Returns ({area: (p, (closing q, v), posted residual)}, line targets)."""
-    tg, base = {}, {}
+    """One period over all areas (ADR-0020 rules 12, 13 and the rule 12 note as decided in the S2 schema review, S7 and S8).
+    Pass 1: each area's actual average A from its opening and receipts only (returns never enter it). Rule 13 replaces A by
+    the preliminary price when the area has no quantity base (no opening quantity, no receipts) or the average would be
+    negative. Every issue, returned units issued again included, is valued at A. Pass 2: every return takes its cumulative
+    share of its original's value: this period's value when the original is in this period and area (case a), else the
+    final value (case b, or another area). Pass 3: closing values. A return kept outside the average leaves its difference in
+    the closing value: target = round(A x (closing q - kept q)) + kept values. When the closing quantity is zero, the target
+    is 0 and whatever value remains (rounding and the set-aside difference) is the posted rule 13 residual, with the issues
+    still at A. When the target would be negative (rule 13), the issues take the preliminary price and the area closes at
+    round(preliminary x closing q). The posted residual is the book value minus the target.
+    Returns ({area: (A, (closing q, target), posted residual)}, line targets)."""
+    base = {}
     for ar in sorted(Q):
         X = Q[ar]; q0, v0 = op.get(ar, (F(0), F(0)))
         rq = sum(F(q) for q, _ in X["receipts"]); rv = sum(F(v) for _, v in X["receipts"])
-        p = (v0 + rv) / (q0 + rq)
-        cq = q0 + rq - sum(l["q"] for l in X["issues"]) + sum(l["q"] for l in X["returns"])
-        price = prelim[ar] if cq == 0 else p
-        for ln in X["issues"]:
-            tg[ln["id"]] = round_amount(ln["q"] * price)
-        base[ar] = (p, cq, v0 + rv)
-    fin = dict(final); fin.update(tg)
-    for ar in sorted(Q):
-        for ln in Q[ar]["returns"]:
-            o = ln["orig"]
-            tg[ln["id"]] = share(fin[o["id"]], o["q"], offs[ln["id"]], ln["q"])
-    res = {}
-    for ar in sorted(Q):
-        X = Q[ar]; p, cq, vin = base[ar]
-        value = vin - sum(tg[l["id"]] for l in X["issues"]) + sum(tg[l["id"]] for l in X["returns"])
-        kept = [l for l in X["returns"] if l["orig"]["period"] != k or l["orig"]["area"] != ar]
-        if cq == 0:
-            res[ar] = (p, (cq, 0), value)
-            continue
-        target = round_amount(p * (cq - sum(l["q"] for l in kept))) + sum(tg[l["id"]] for l in kept)
-        res[ar] = (p, (cq, target), value - target)
-    return res, tg
+        bq, bv = q0 + rq, v0 + rv
+        p = bv / bq if bq > 0 and bv >= 0 else prelim[ar]        # rule 13: no quantity base, or a negative average
+        cq = bq - sum(l["q"] for l in X["issues"]) + sum(l["q"] for l in X["returns"])
+        if cq < 0:
+            raise ValueError(f"negative closing quantity in area {ar}")
+        base[ar] = (p, cq, bv)
+    negative = set()                     # areas whose target would be negative: rule 13, issues at the preliminary price
+    while True:
+        tg = {}
+        for ar in sorted(Q):
+            p = prelim[ar] if ar in negative else base[ar][0]
+            for ln in Q[ar]["issues"]:
+                tg[ln["id"]] = round_amount(ln["q"] * p)
+        fin = dict(final); fin.update(tg)
+        for ar in sorted(Q):
+            for ln in Q[ar]["returns"]:
+                o = ln["orig"]
+                tg[ln["id"]] = share(fin[o["id"]], o["q"], offs[ln["id"]], ln["q"])
+        res, flipped = {}, set()
+        for ar in sorted(Q):
+            X = Q[ar]; _, cq, vin = base[ar]
+            p = prelim[ar] if ar in negative else base[ar][0]
+            kept = [l for l in X["returns"] if l["orig"]["period"] != k or l["orig"]["area"] != ar]
+            if cq == 0:
+                target = 0
+            elif ar in negative:
+                target = round_amount(p * cq)
+            else:
+                target = round_amount(p * (cq - sum(l["q"] for l in kept))) + sum(tg[l["id"]] for l in kept)
+                if target < 0:
+                    flipped.add(ar)
+            value = vin - sum(tg[l["id"]] for l in X["issues"]) + sum(tg[l["id"]] for l in X["returns"])
+            res[ar] = (p, (cq, target), value - target)
+        if not flipped:
+            return res, tg
+        negative |= flipped
 
 
 def _prelim(k, out, op0, Q):
@@ -283,6 +302,81 @@ def incremental(periods, opening, prelim, posted=None, done=None):
     return cur, _flat(out), adjustments, resid_posted
 
 
+def independent_values(periods, opening):
+    """An independent naive recomputation (S2 schema review finding S6): its own code path from the rules' text (ADR-0020
+    rules 12, 13 and the rule 12 note), sharing nothing with cost_period, share, return_offsets, _norm or _prelim but
+    round_amount. It walks the periods in order, keeps a ledger of every line's value and of each original's returned
+    quantity, and values each line from its definition. Returns (line values, [{area: (price, (closing q, v), residual)}])."""
+    ledger, returned, history = {}, {}, []
+    stock = {}                                            # area -> (quantity, value) carried into the next period
+    first_unit = {}                                       # area -> opening unit value, the preliminary price of period 0
+    if isinstance(opening, tuple):
+        opening = {"A": opening}
+    for area, (q, v) in opening.items():
+        stock[area] = (F(q), F(v))
+        first_unit[area] = F(v) / F(q) if q else F(0)
+    last_avg = {}
+    for k, period in enumerate(periods):
+        areas = {"A": period} if "receipts" in period else period
+        where = {}                                        # line id -> area, for this period's issues
+        for area, rows in areas.items():
+            for line in rows["issues"]:
+                where[line["id"]] = area
+        prelim = {a_: last_avg.get(a_, first_unit.get(a_, F(0))) for a_ in areas}
+        avg, qty_base, val_base, closing_q = {}, {}, {}, {}
+        for area, rows in areas.items():
+            q_open, v_open = stock.get(area, (F(0), F(0)))
+            q_in = q_open + sum(F(q) for q, _ in rows["receipts"])
+            v_in = v_open + sum(F(v) for _, v in rows["receipts"])
+            qty_base[area], val_base[area] = q_in, v_in
+            avg[area] = v_in / q_in if q_in > 0 and v_in >= 0 else prelim[area]
+            closing_q[area] = q_in - sum(F(l["q"]) for l in rows["issues"]) + sum(F(l["q"]) for l in rows["returns"])
+        at_prelim = set()
+        while True:
+            values = {}
+            for area, rows in areas.items():
+                unit = prelim[area] if area in at_prelim else avg[area]
+                for line in rows["issues"]:
+                    values[line["id"]] = round_amount(F(line["q"]) * unit)
+            done = dict(returned)
+            for area in sorted(areas):
+                for line in areas[area]["returns"]:
+                    orig = line["orig"]
+                    worth = values[orig["id"]] if orig["id"] in values else ledger[orig["id"]]
+                    before = done.get(orig["id"], F(0))
+                    after = before + F(line["q"])
+                    values[line["id"]] = round_amount(worth * after / F(orig["q"])) - round_amount(worth * before / F(orig["q"]))
+                    done[orig["id"]] = after
+            result, again = {}, set()
+            for area, rows in areas.items():
+                unit = prelim[area] if area in at_prelim else avg[area]
+                book = val_base[area] - sum(values[l["id"]] for l in rows["issues"]) + sum(values[l["id"]] for l in rows["returns"])
+                outside = [l for l in rows["returns"] if where.get(l["orig"]["id"]) != area]
+                if closing_q[area] == 0:
+                    target = 0
+                elif area in at_prelim:
+                    target = round_amount(unit * closing_q[area])
+                else:
+                    rest_q = closing_q[area] - sum(F(l["q"]) for l in outside)
+                    target = round_amount(unit * rest_q) + sum(values[l["id"]] for l in outside)
+                    if target < 0:
+                        again.add(area)
+                result[area] = (unit, (closing_q[area], target), book - target)
+            if not again:
+                break
+            at_prelim |= again
+        ledger.update(values)
+        returned = done
+        last_avg = {}                                     # the preliminary price is the previous period's price
+        for area, (unit, closing, _) in result.items():
+            stock[area] = closing
+            last_avg[area] = unit
+        history.append(result)
+    if all(set(h) == {"A"} for h in history):
+        history = [h["A"] for h in history]
+    return ledger, history
+
+
 def issue_return_example():
     """Three periods in one area. P1: opening 100 @ 1,000; receipt 100 for 1,400; delivery D1 of 50; a return of 10 of D1
     in P1 (case a). P2: receipt 40 for 600; delivery D2 of 30; a return of 5 of D1 (case b). P3: receipt 25 for 400;
@@ -296,8 +390,11 @@ def issue_return_example():
 
 
 def check_issue_returns():
-    """The checks of the issue_return role against a naive recomputation. Returns [(ok, name, detail)]."""
+    """The checks of the issue_return role. Hand-computed values are the independent evidence, with independent_values (its
+    own code path, S2 schema review S6); the comparisons of the two posting paths with naive_periods share cost_period and
+    prove path independence only. Returns [(ok, name, detail)]."""
     R = []
+    examples = []                                         # (name, periods, opening) for the independent recomputation
     periods, opening = issue_return_example()
     fin, nv = naive_periods(periods, opening)
     p1, p2, p3 = (x[0] for x in nv)
@@ -308,9 +405,10 @@ def check_issue_returns():
     for k in range(3):
         pre = [F(10)] + [nv[j][0] for j in range(k)]
         acc, out2, adj2, done = incremental(periods[:k + 1], opening, prelim=pre + [pre[-1]] * 3, posted=acc, done=done)
+    examples.append(("three periods", periods, opening))
     R.append((cur1 == fin == acc and [o[:2] for o in out1] == [o[:2] for o in nv] == [o[:2] for o in out2],
-              "both posting paths end at the naive recomputation: line values and closing (quantity, value) per period",
-              (p1, p2, p3)))
+              "path independence (same cost_period, not an independent check): posting everything first at stale prices and costing "
+              "each period before the next both end at the values of costing every period from scratch", (p1, p2, p3)))
     # case (a): D1 and R1 revalued together at P1's average, the pair nets to an issue of 40, no residual
     R.append((p1 == 12 and fin["D1"] == 600 and fin["R1"] == 120 and fin["D1"] - fin["R1"] == round_amount(40 * p1)
               and nv[0][1] == (160, 1920) and nv[0][2] == 0,
@@ -328,26 +426,29 @@ def check_issue_returns():
     # absorption: P3's opening value carries the residual
     R.append((p3 == F(2602, 200) and nv[2][1][1] == round_amount(p3 * 180),
               "next period: P3's average (2,202 + 400)/200 = 13.01 absorbs the residual through the opening value", p3))
-    # rule 13: a closing quantity of zero posts the residual
+    # rule 13 as decided in the S2 schema review (S8): a closing quantity of zero posts what remains, the issues stay at A
     z = [dict(receipts=[], issues=[dict(id="X", period=0, q=F(10), kind="issue")], returns=[]),
          dict(receipts=[(10, 150)], issues=[dict(id="Y", period=1, q=F(10), kind="issue")], returns=[])]
     z[1]["returns"] = [dict(id="RX", q=F(4), kind="return", orig=z[0]["issues"][0])]
     z[1]["issues"][0]["q"] = F(14)
     fz, nz = naive_periods(z, (F(10), F(100)))
     cz, oz, _, _ = incremental(z, (F(10), F(100)), prelim=[F(10), F(10)])
-    R.append((nz[1][1] == (0, 0) and fz["Y"] == 140 and nz[1][2] == 150 - 140 + 40 and fz == cz
-              and [o[:2] for o in oz] == [o[:2] for o in nz],
-              "case (b) with closing quantity zero: rule 13 keeps the preliminary price 10 for the issue of 14 (140), the return "
-              "keeps 40, and the residual 150 - 140 + 40 = 50 is posted, closing value 0", nz[1]))
+    examples.append(("closing quantity zero after a return", z, (F(10), F(100))))
+    R.append((nz[1][0] == 15 and nz[1][1] == (0, 0) and fz["Y"] == 210 and fz["RX"] == 40 and nz[1][2] == 150 - 210 + 40 == -20
+              and fz == cz and [o[:2] for o in oz] == [o[:2] for o in nz],
+              "case (b) with closing quantity zero (S2 review S8): the issue of 14, the 4 returned units included, stays at the actual "
+              "average 15 (210), the return keeps 40, and the set-aside difference 4 x (10 - 15) = -20 is the posted rule 13 residual, "
+              "closing value 0", nz[1]))
     # case (c): a backdated receipt in P1 reruns P1 to P3; R2 follows D1 by a value-only adjustment in P2's rerun
     late = [dict(P) for P in periods]; late[0] = dict(late[0], receipts=late[0]["receipts"] + [(50, 900)])
     fin_l, nv_l = naive_periods(late, opening)
+    examples.append(("backdated receipt", late, opening))
     cur_r, out_r, adj_r, _ = incremental(late, opening, prelim=[F(10)] * 3, posted=cur1)
     r2_adj = [a for a in adj_r if a[1] == "R2"]
     R.append((cur_r == fin_l and [o[:2] for o in out_r] == [o[:2] for o in nv_l] and r2_adj == [(1, "R2", fin_l["R2"] - fin["R2"])]
               and fin_l["R2"] == round_amount(5 * fin_l["D1"] / 50),
               "case (c): a backdated receipt of 50 for 900 in P1 moves P1's average to 13.2; the rerun posts only differences, "
-              "R2 follows D1 by one value-only line in P2 (60 -> 66), and every value equals the naive recomputation",
+              "R2 follows D1 by one value-only line in P2 (60 -> 66), and every value equals costing from scratch (path independence)",
               (nv_l[0][0], r2_adj)))
     # multi-area: the exact solve over areas linked by transfers is unchanged by issue returns
     m = Model()
@@ -369,6 +470,7 @@ def check_issue_returns():
     c2, o2, _, _ = incremental(two, op2, prelim=[F(10)])
     two_l = [{"A": dict(two[0]["A"], receipts=[(100, 1400), (50, 900)]), "B": two[0]["B"]}]
     f2l, n2l = naive_periods(two_l, op2)
+    examples += [("return into another area", two, op2), ("return into another area, backdated receipt", two_l, op2)]
     c2l, o2l, adj2l, _ = incremental(two_l, op2, prelim=[F(10)], posted=c2)
     R.append((n2[0]["A"][0] == 12 and n2[0]["B"][0] == 16 and f2["DA"] == 360 and f2["RB"] == 120 and n2[0]["B"][1] == (110, 1720)
               and n2[0]["B"][2] == 0 and f2 == c2 and o2 == n2
@@ -376,7 +478,7 @@ def check_issue_returns():
               and [a_ for a_ in adj2l if a_[1] == "RB"] == [(0, "RB", 12)],
               "case 1: a delivery of 30 from area A (average 12, value 360) returned 10 into area B in the same period takes 120, "
               "B's average stays 16 = 1,600/100, B closes 110 for 1,720 = 100 x 16 + 120 with the -40 kept; a backdated receipt in A "
-              "(average 13.2) moves the return to 132 by one value-only line, all equal to the naive recomputation", (n2[0], adj2l)))
+              "(average 13.2) moves the return to 132 by one value-only line; both paths agree (path independence)", (n2[0], adj2l)))
     # case 2: partial returns take cumulative shares, so the returns of a whole line total exactly its value
     d3 = dict(id="D3", period=0, q=F(3), kind="issue")
     cum = [dict(receipts=[], issues=[d3], returns=[]),
@@ -385,11 +487,60 @@ def check_issue_returns():
                                                            dict(id="Q3", q=F(1), kind="return", orig=d3)])]
     fc, nc = naive_periods(cum, (F(30), F(1000)))
     cc, oc, _, _ = incremental(cum, (F(30), F(1000)), prelim=[F(30)] * 3)
+    examples.append(("cumulative partial returns", cum, (F(30), F(1000))))
     per_line = 3 * round_amount(F(1) * fc["D3"] / 3)
     R.append((fc["D3"] == 100 and [fc[x] for x in ("Q1", "Q2", "Q3")] == [33, 34, 33] and fc["Q1"] + fc["Q2"] + fc["Q3"] == fc["D3"]
               and per_line == 99 and fc == cc and oc == nc,
               "case 2: a delivery of 3 valued 100 returned 1, 1 and 1 over two periods takes 33, 34 and 33 (cumulative shares), "
-              "exactly 100; rounding each return alone would give 99; equal to the naive recomputation", [fc[x] for x in ("Q1", "Q2", "Q3")]))
+              "exactly 100; rounding each return alone would give 99; both paths agree (path independence)", [fc[x] for x in ("Q1", "Q2", "Q3")]))
+    # ---- S2 schema review S7: rule 13 as written, in the three reproduced cases
+    sold = [dict(receipts=[(10, 300)], issues=[dict(id="S1", period=0, q=F(20), kind="issue")], returns=[])]
+    fs, ns = naive_periods(sold, (F(10), F(100)))
+    examples.append(("sold out, no value left", sold, (F(10), F(100))))
+    R.append((ns[0][0] == 20 and fs["S1"] == 400 and ns[0][1] == (0, 0) and ns[0][2] == 0,
+              "S7 (i): opening 10 for 100, a receipt of 10 for 300 and an issue of 20 close at quantity 0 with no value left after the "
+              "actual average: the issue takes 20 (400), nothing is posted (before the fix: 200 at the preliminary 10, residual 200)", ns[0]))
+    dE = dict(id="DE", period=0, area="A", q=F(10), kind="issue")
+    empty = [{"A": dict(receipts=[], issues=[dE], returns=[]),
+              "B": dict(receipts=[], issues=[], returns=[dict(id="RE", q=F(4), kind="return", orig=dE)])}]
+    ope = {"A": (F(20), F(240))}
+    try:
+        fe, ne = naive_periods(empty, ope); err = None
+    except ZeroDivisionError as e:
+        fe, ne, err = {}, [{}], e
+    examples.append(("return into an empty area", empty, ope))
+    R.append((err is None and fe["DE"] == 120 and fe["RE"] == 48 and ne[0]["B"][1] == (4, 48) and ne[0]["B"][2] == 0,
+              "S7 (ii): a return of 4 into area B, which has no opening and no receipts, takes 48 of the issue of 10 for 120 from A; B "
+              "has no quantity base, so rule 13 gives it the preliminary price, and it closes 4 for 48 with nothing posted (before "
+              "the fix: ZeroDivisionError)", err or ne[0].get("B")))
+    dN = dict(id="DN", period=0, q=F(10), kind="issue")
+    neg = [dict(receipts=[], issues=[dN], returns=[]),
+           dict(receipts=[(10, 500)], issues=[dict(id="N2", period=1, q=F(12), kind="issue")], returns=[dict(id="RN", q=F(5), kind="return", orig=dN)])]
+    fn_, nn = naive_periods(neg, (F(10), F(100)))
+    examples.append(("negative closing value", neg, (F(10), F(100))))
+    R.append((fn_["RN"] == 50 and nn[1][0] == 10 and fn_["N2"] == 120 and nn[1][1] == (3, 30) and nn[1][2] == 500 - 120 + 50 - 30,
+              "S7 (iii): a return of 5 at 10 (50) into an area averaging 50, then an issue of 12 that takes 2 returned units, would "
+              "close 3 units at 50 x (3 - 5) + 50 = -50; rule 13: the issue takes the preliminary price 10 (120), the area closes "
+              "3 x 10 = 30 and 400 is posted (before the fix: -50 stayed as the closing value)", nn[1]))
+    # ---- S8: returned units issued again are issues at A; the return's difference stays in the closing value
+    dR = dict(id="DR", period=0, q=F(10), kind="issue")
+    reiss = [dict(receipts=[], issues=[dR], returns=[]),
+             dict(receipts=[(20, 300)], issues=[dict(id="I2", period=1, q=F(22), kind="issue")], returns=[dict(id="RR", q=F(5), kind="return", orig=dR)])]
+    fr, nr = naive_periods(reiss, (F(10), F(100)))
+    examples.append(("returned units issued again", reiss, (F(10), F(100))))
+    R.append((fr["I2"] == 330 and fr["RR"] == 50 and nr[1][0] == 15 and nr[1][1] == (3, 20) and nr[1][2] == 0,
+              "S8: a return of 5 at 10 into an area averaging 15, then an issue of 22 that takes 2 returned units: the issue is "
+              "22 x 15 = 330, the area closes 3 for 15 x (3 - 5) + 50 = 20 with the -25 difference kept, nothing posted", nr[1]))
+    # ---- S6: the independent recomputation agrees with cost_period on every example
+    bad = []
+    for name, ps_, op_ in examples:
+        f_a, h_a = naive_periods(ps_, op_)
+        f_b, h_b = independent_values(ps_, op_)
+        if f_a != f_b or h_a != h_b:
+            bad.append(name)
+    R.append((not bad and len(examples) == 10,
+              "S6: an independent recomputation (independent_values, its own code path from the rules) gives the same line values, "
+              "prices, closing (quantity, value) and residuals as cost_period on all 10 examples", bad or len(examples)))
     return R
 
 if __name__ == "__main__":

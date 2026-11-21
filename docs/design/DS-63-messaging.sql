@@ -70,7 +70,9 @@ CREATE TABLE message (                                     -- [work] ADR-0076 ru
     CONSTRAINT ck_message_body_present CHECK (body <> '' OR withdrawn_at IS NOT NULL OR body_removed_at IS NOT NULL)
 );
 CREATE INDEX ix_message_parent_message_id ON message (parent_message_id) WHERE parent_message_id IS NOT NULL;
-CREATE INDEX ix_message_company_id_recorded_at ON message (company_id, recorded_at) WHERE body <> '';
+-- Creation order is the UUIDv7 id (ADR-0006 rule 2); recorded_at is the last write (ADR-0007 rule 9), so it does not order
+-- rows updated in place (S2 schema review note N7). The same holds for the two notification indexes below.
+CREATE INDEX ix_message_company_id_id ON message (company_id, id) WHERE body <> '';
 
 CREATE TABLE message_mention (                             -- [work] ADR-0076 rule 5; at most 20 per message, picked in the composer
     id               uuid PRIMARY KEY,
@@ -99,7 +101,7 @@ CREATE TABLE notification_email (                          -- [work] ADR-0076 ru
     UNIQUE (company_id, id),
     CONSTRAINT ck_notification_email_outcome_at CHECK ((outcome IS NULL) = (outcome_at IS NULL) AND (failure_reason IS NULL OR outcome = 'failed'))
 );
-CREATE INDEX ix_notification_email_open ON notification_email (company_id, recorded_at) WHERE outcome IS NULL;
+CREATE INDEX ix_notification_email_open ON notification_email (company_id, id) WHERE outcome IS NULL;
 
 CREATE TABLE notification (                                -- [work] ADR-0076 rule 6; written only by CreateNotification, from the fan-out consumer
     id                          uuid PRIMARY KEY,
@@ -127,7 +129,7 @@ CREATE TABLE notification (                                -- [work] ADR-0076 ru
 CREATE UNIQUE INDEX ux_notification_recipient_message ON notification (recipient_user_account_id, message_id) WHERE message_id IS NOT NULL;
 CREATE UNIQUE INDEX ux_notification_recipient_work_item ON notification (recipient_user_account_id, work_item_id) WHERE work_item_id IS NOT NULL AND read_at IS NULL;
 CREATE INDEX ix_notification_recipient_unread ON notification (company_id, recipient_user_account_id, id) WHERE read_at IS NULL;
-CREATE INDEX ix_notification_email_pending ON notification (company_id, recorded_at) WHERE email_pending;
+CREATE INDEX ix_notification_email_pending ON notification (company_id, id) WHERE email_pending;
 
 
 CREATE TABLE notification_preference (                     -- [work] ADR-0076 rule 7; a missing row takes the kind's default; SetNotificationPreferences replaces a person's list
@@ -146,14 +148,15 @@ CREATE FUNCTION direct_key_valid(k text) RETURNS boolean LANGUAGE sql IMMUTABLE 
 $$;
 ALTER TABLE conversation ADD CONSTRAINT ck_conversation_direct_key_sorted CHECK (direct_key IS NULL OR direct_key_valid(direct_key));
 
--- ===== recorded_at on update (D13; ADR-0007 rules 9, 16 and the rule 16 note) =====
+-- ===== recorded_at on update (ADR-0007 rules 9, 16 and their notes) =====
 -- Every table of this file has recorded_at timestamptz NOT NULL DEFAULT now(). The DO block attaches the trigger
 -- trg_<table>_set_recorded_at (BEFORE UPDATE, function set_recorded_at) to every table of v_tables except v_append_only,
--- so recorded_at is the instant of the last write (D8). Append-only tables are those whose guard trigger refuses every
--- update outside an erasure, and pure logs; they need no trigger.
--- Guards on in-place tables sort before set_recorded_at, so they compare rows before it runs. v_tables lists the file's
--- tables in file order; lab gen_overview.py --check verifies both lists against the table definitions of the file, and
--- schema_phase_b.py writes the section. The function is defined in every file because the labs load subsets.
+-- so recorded_at is the instant of the last write (ADR-0007 rule 9 note). Append-only tables are those whose guard
+-- trigger refuses every update outside an erasure, and pure logs; they need no trigger.
+-- Row guards without UPDATE OF on in-place tables sort before set_recorded_at, so they compare rows before it runs.
+-- v_tables lists the file's tables in file order; lab gen_overview.py --check verifies both lists against the table
+-- definitions of the file, and schema_phase_b.py writes the section. The function is defined in every file because the
+-- labs load subsets.
 CREATE OR REPLACE FUNCTION set_recorded_at() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 BEGIN
     NEW.recorded_at := now();

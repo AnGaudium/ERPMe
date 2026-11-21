@@ -93,8 +93,11 @@ try:
 except Exception as e:
     loaded = str(e).splitlines()[0]
 check("A2 the ordered DDL executes on PostgreSQL 18", loaded, "loaded")
-check("A3 DS-06's journal_line follows the draft's material_document_line and purchase_order_line in the order",
-      order.index(" material_document_line,") < order.index(" journal_line,") and "purchase_order_line" in order, True)
+# S2 schema review S4: journal_line's key to material_document_line is the company key the draft adds by ALTER TABLE (the
+# std-load stub of material_document_line has no company_id), so the check follows that key instead of the table order.
+check("A3 the draft adds journal_line's company key to material_document_line after both tables, and orders purchase_order_line",
+      "ALTER TABLE journal_line ADD CONSTRAINT fk_journal_line_material_document_line_id\n    FOREIGN KEY (company_id, material_document_line_id) "
+      "REFERENCES material_document_line (company_id, id);" in ddl22 and "purchase_order_line" in order, True)
 
 # ======================================================================= M: coverage
 tables = re.findall(r"^CREATE TABLE (\w+)", ddl22, re.M)

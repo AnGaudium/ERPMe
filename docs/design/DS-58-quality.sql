@@ -338,14 +338,15 @@ BEGIN
 END
 $$;
 
--- ===== recorded_at on update (D13; ADR-0007 rules 9, 16 and the rule 16 note) =====
+-- ===== recorded_at on update (ADR-0007 rules 9, 16 and their notes) =====
 -- Every table of this file has recorded_at timestamptz NOT NULL DEFAULT now(). The DO block attaches the trigger
 -- trg_<table>_set_recorded_at (BEFORE UPDATE, function set_recorded_at) to every table of v_tables except v_append_only,
--- so recorded_at is the instant of the last write (D8). Append-only tables are those whose guard trigger refuses every
--- update outside an erasure, and pure logs; they need no trigger.
--- Guards on in-place tables sort before set_recorded_at, so they compare rows before it runs. v_tables lists the file's
--- tables in file order; lab gen_overview.py --check verifies both lists against the table definitions of the file, and
--- schema_phase_b.py writes the section. The function is defined in every file because the labs load subsets.
+-- so recorded_at is the instant of the last write (ADR-0007 rule 9 note). Append-only tables are those whose guard
+-- trigger refuses every update outside an erasure, and pure logs; they need no trigger.
+-- Row guards without UPDATE OF on in-place tables sort before set_recorded_at, so they compare rows before it runs.
+-- v_tables lists the file's tables in file order; lab gen_overview.py --check verifies both lists against the table
+-- definitions of the file, and schema_phase_b.py writes the section. The function is defined in every file because the
+-- labs load subsets.
 CREATE OR REPLACE FUNCTION set_recorded_at() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 BEGIN
     NEW.recorded_at := now();

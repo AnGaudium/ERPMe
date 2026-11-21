@@ -30,7 +30,7 @@ PLATFORM = os.environ.get("NATIVEFLOWS_PLATFORM_DDL", os.path.join(DESIGN, "DS-0
 DS22 = os.environ.get("NATIVEFLOWS_DS22", os.path.join(DESIGN, "DS-22-09-42-commercial-inventory.sql"))
 DS43 = os.environ.get("NATIVEFLOWS_DS43", os.path.join(DESIGN, "DS-43-54-planning-production.sql"))
 sys.path.insert(0, LAB)
-from lab import RESULTS, conn, new, ins_system_account, ins_account, ins_fiscal_year, ins_posting_period, ins_area_state  # noqa: E402
+from lab import RESULTS, conn, erasure_marker, new, ins_system_account, ins_account, ins_fiscal_year, ins_posting_period, ins_area_state  # noqa: E402
 
 RLS_ROLE = "nativeflows_lab_rls"
 
@@ -70,7 +70,8 @@ TODAY = date(2026, 11, 15)
 # ======================================================================= A: load
 stubs = open(os.path.join(LAB, "00_stubs.sql"), encoding="utf-8").read()
 USER_STUB = "CREATE TABLE user_account (id uuid PRIMARY KEY);\n"                  # DS-15 (as t12)
-DOC_STUB = "CREATE TABLE document (id uuid PRIMARY KEY, company_id uuid NOT NULL, document_type text NOT NULL, state text NOT NULL DEFAULT 'draft');\n"
+DOC_STUB = ("CREATE TABLE document (id uuid PRIMARY KEY, company_id uuid NOT NULL, document_type text NOT NULL, state text NOT NULL DEFAULT 'draft',\n"
+            "  UNIQUE (company_id, id));\n")
 MOVED = [
     "CREATE TABLE material_document (id uuid PRIMARY KEY, document_id uuid NOT NULL UNIQUE REFERENCES document(id));\n",
     "CREATE TABLE material_document_line (id uuid PRIMARY KEY, material_document_id uuid NOT NULL REFERENCES material_document(id));\n",
@@ -81,7 +82,7 @@ for line in [USER_STUB, DOC_STUB] + MOVED:
 platform = open(PLATFORM, encoding="utf-8").read()
 FILES = ("DS-20-master-data.sql", "DS-06-universal-journal.sql", "DS-15-access.sql", "DS-35-crm.sql", "DS-56-product-configuration.sql")
 base = {f: open(os.path.join(DESIGN, f), encoding="utf-8").read() for f in FILES}
-# The stubs of the DS-05 tables (fiscal_year, posting_period, posting_period_area_state, close_task, tax_code; D6) serve the labs
+# The stubs of the DS-05 tables (fiscal_year, posting_period, posting_period_area_state, close_task, tax_code) serve the labs
 # that load DS-06 without DS-05. Here the platform file defines them, so their stubs are dropped (each stub may span lines).
 DEFINED = set(re.findall(r"^CREATE TABLE (\w+)", platform + "".join(base.values()), flags=re.M))
 STUB_DEFS = {m.group(1): m.group(0) for m in re.finditer(r"^CREATE TABLE (\w+) \(.*?\);\n", stubs, flags=re.M | re.S)}
@@ -162,7 +163,7 @@ for t_, d_ in sorted(DS05_STUBS.items()):
         "select column_name, data_type, is_nullable from information_schema.columns where table_schema='nativeflows' and table_name=%s", (t_,))}
     if stub_columns(d_) != real:
         drift.append(t_)
-check(f"A02b the {len(DS05_STUBS)} lab stubs of DS-05 tables (D6) have the design columns, types and NOT NULLs", len(DS05_STUBS) == 5 and drift == [],
+check(f"A02b the {len(DS05_STUBS)} lab stubs of DS-05 tables have the design columns, types and NOT NULLs", len(DS05_STUBS) == 5 and drift == [],
       sorted(DS05_STUBS) if drift == [] else drift)
 
 tables = re.findall(r"^CREATE TABLE (\w+)", platform, flags=re.M)
@@ -554,8 +555,8 @@ trial("F03 a request body only on a request row", lambda cx: cx.execute(
     """insert into agent_run_step (id, company_id, agent_run_id, ordinal, step_code, kind, request_step_id, tool_name, request_body, recorded_at)
        values (%s,%s,%s,5,'x','tool_result',%s,'T','{}',now())""", (new(), I["co"], R2, TREQ)), True, "ck_agent_run_step_bodies")
 trial("F04 steps are append-only; erasure may blank bodies", lambda cx: cx.execute("update agent_run_step set step_code='y' where id=%s", (REQ,)), True, "append-only")
-trial("F05 ... with nativeflows.erasure_command_id the bodies are blanked", lambda cx: (
-    cx.execute("select set_config('nativeflows.erasure_command_id', %s, true)", (str(new()),)),
+trial("F05 ... with a valid erasure marker (an erasure command's idempotency record of this transaction) the bodies are blanked", lambda cx: (
+    erasure_marker(cx.execute, company_id=I["co"]),
     cx.execute("update agent_run_step set request_body=null, erased_at=now() where id=%s", (REQ,))), False)
 trial("F06 rule 17: a completed run cannot carry a stop outcome", lambda cx: run(cx, new(), state="completed", outcome="budget_exceeded", wi=WIR), True, "ck_agent_run_outcome")
 trial("F07 the third denial stops a run; a fourth is never counted", lambda cx: run(cx, new(), wi=WIR, denials=4), True, "ck_agent_run_denial_count")
@@ -693,6 +694,8 @@ X("insert into event_subject values (uuidv7(), 'bank_statement',%s,1,now())", (S
 X("""insert into event_delivery (id, consumer, event_id, subject_table, subject_id, subject_sequence, company_id, next_attempt_at, recorded_at)
      values (%s,'cash_bank_matching',%s,'bank_statement',%s,1,%s,now(),now())""", (new(), EV, ST, I["co"]))
 check("H01 an event and its delivery are written (ADR-0013 rules 2, 6)", X("select count(*) from event_delivery where event_id=%s", (EV,)).fetchone()[0] == 1)
+trial("H01a events are never updated (ADR-0013 rule 2; S2 schema review N6)", lambda cx: cx.execute("update outbox_event set payload='{\"x\": 1}' where id=%s", (EV,)), True, "never updated")
+trial("H01b ... nor deleted row by row: retention drops whole partitions (ADR-0013 rule 15)", lambda cx: cx.execute("delete from outbox_event where id=%s", (EV,)), True, "never updated")
 trial("H02 one delivery per consumer and event", lambda cx: cx.execute(
     "insert into event_delivery (id, consumer, event_id, subject_table, subject_id, subject_sequence, company_id, next_attempt_at, recorded_at) values (%s,'cash_bank_matching',%s,'bank_statement',%s,1,%s,now(),now())",
     (new(), EV, ST, I["co"])), True, "uq_event_delivery_consumer_event_id")
@@ -703,11 +706,11 @@ trial("H04 a consumer name is snake_case of at most 48 characters", lambda cx: c
     "insert into event_consumer (consumer, kind, queue, recorded_at) values (%s,'transactional','events',now())", ("c" * 49,)), True, "ck_event_consumer_consumer")
 AUD = audit(X0, command="ApproveChangeProposal", effect="other", reason="looks right", actor_kind="human", actor=I["uOwner"])
 trial("H05 audit records are append-only (ADR-0038 rule 4)", lambda cx: cx.execute("update audit_record set reason='x' where id=%s", (AUD,)), True, "append-only")
-trial("H06 ... except that erasure masks reason under nativeflows.erasure_command_id", lambda cx: (
-    cx.execute("select set_config('nativeflows.erasure_command_id', %s, true)", (str(new()),)),
+trial("H06 ... except that erasure masks reason under a valid erasure marker", lambda cx: (
+    erasure_marker(cx.execute, company_id=I["co"]),
     cx.execute("update audit_record set reason='[erased]', erased_at=now() where id=%s", (AUD,))), False)
 trial("H07 ... and erasure changes nothing else", lambda cx: (
-    cx.execute("select set_config('nativeflows.erasure_command_id', %s, true)", (str(new()),)),
+    erasure_marker(cx.execute, company_id=I["co"]),
     cx.execute("update audit_record set command_type='X' where id=%s", (AUD,))), True, "append-only")
 trial("H08 a draft-only command is never of a posting effect class (ADR-0050 rule 26)", lambda cx: audit(cx, effect="posting", draft_only=True), True, "ck_audit_record_draft_only")
 check("H09 audit records with installation scope have no company and live in the default partition",

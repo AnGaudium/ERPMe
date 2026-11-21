@@ -5,18 +5,19 @@ Not product code. Idempotent: a second run changes nothing.
 
 What it does to every CREATE TABLE of docs/design/*.sql (partitions inherit from their parent and are skipped):
 
-1. recorded_at (ADR-0007 rule 9; D13; the ADR-0007 rule 16 note): a table without the column gets
+1. recorded_at (ADR-0007 rule 9; the ADR-0007 rule 16 note): a table without the column gets
    `recorded_at timestamptz NOT NULL DEFAULT now()`; an existing `recorded_at ... NOT NULL` without a default gains
    `DEFAULT now()`.
-2. Keys (ADR-0006 rule 1 and its note of 2026-11-21; D10-D12): a table whose primary key is not the single column `id`
+2. Keys (ADR-0006 rule 1 and its note of 2026-11-21): a table whose primary key is not the single column `id`
    gets `id uuid PRIMARY KEY` as its first column, and the old key becomes the named unique constraint
    `uq_<table>_<columns>` (`uq_<table>_key` where that name would exceed 63 bytes, ADR-0004 rule 6); a key column that was
    nullable gains NOT NULL, as the primary key implied. Foreign keys that target the old key keep working against the
    unique constraint. Exception class E1 (gen_overview.KEY_ALLOWLIST) keeps its natural key. E2 registries get a comment that the
    loader computes the id as uuid5; E3 (one row per company) is the general case with the old key UNIQUE (company_id).
    `id` has no default (ADR-0006 rule 2) except on DB_WRITTEN tables, whose rows database code inserts.
-3. Company keys (S06 of lab t16): a single-column foreign key to account, posting_period or fiscal_year in a table with
-   `company_id ... NOT NULL` becomes `FOREIGN KEY (company_id, <column>) REFERENCES <table> (company_id, id)`.
+3. Company keys (S06 of lab t16; S2 schema review finding S4): a single-column foreign key to account, posting_period,
+   fiscal_year or any table whose CREATE TABLE declares UNIQUE (company_id, id) (except COMPANY_KEYED_EXCEPT), in a table
+   with `company_id ... NOT NULL`, becomes `FOREIGN KEY (company_id, <column>) REFERENCES <table> (company_id, id)`.
 4. The recorded_at trigger: each file ends with one section that defines set_recorded_at() and runs one DO block, which
    attaches `trg_<table>_set_recorded_at` (BEFORE UPDATE) to every table of the file except its append-only tables. The
    phase A CREATE TRIGGER ... set_recorded_at statements and the function definitions at the top of the files are
@@ -36,41 +37,35 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
 from gen_overview import KEY_ALLOWLIST, PURE_LOGS, RECORDED_AT_END as SECTION_END, RECORDED_AT_SECTION as SECTION_START  # noqa: E402
-from gen_overview import mask_sql as mask, table_spans  # noqa: E402
+from gen_overview import classify, mask_sql as mask, table_spans  # noqa: E402
 
 REGISTRIES = {"setting_definition", "setting_preset", "setting_preset_item", "extension_point", "event_consumer",
-              "public_mail_domain"}   # E2 (D11)
+              "public_mail_domain"}   # E2 (ADR-0006 rule 1 note)
 DB_WRITTEN = {"barcode": "barcode_register inserts the rows"}   # id DEFAULT uuidv7() (ADR-0006 rule 2)
 COMPANY_KEYED = ("account", "posting_period", "fiscal_year")
-ALWAYS_REFUSE = {"platform_reject_change", "inventory_reject_change", "journal_reject_change", "audit_refuse_change",
-                 "document_reader_reject_change", "document_version_check_change", "product_configuration_immutable"}
-ARG_GUARDS = {"platform_check_append_only", "crm_check_append_only"}
+# Rule 3 extension (S2 schema review finding S4): every target whose CREATE TABLE has UNIQUE (company_id, id) is company
+# keyed too, except these, whose lab stub (00_stubs.sql, the standard load of DS-06 without DS-22) has no company_id; the
+# file that defines the target adds the composite keys to it by ALTER TABLE.
+COMPANY_KEYED_EXCEPT = {"material_document_line": "DS-22-09-42-commercial-inventory.sql adds the composite keys"}
 
 
 def line_start(text, pos):
     return text.rfind("\n", 0, pos) + 1
 
 
-def classify(stmts):
-    """Append-only tables of all files: (table -> reason)."""
-    out = {t: "pure log" for t in PURE_LOGS}
-    for code in stmts:
-        m = re.match(r"\s*CREATE (?:OR REPLACE )?TRIGGER (\w+)\s+BEFORE\s+(.*?)\s+ON (\w+).*?EXECUTE FUNCTION (\w+)\((.*?)\)\s*;?\s*$", code, re.S)
-        if not m or "UPDATE" not in m.group(2):
-            continue
-        table, fn, args = m.group(3), m.group(4), m.group(5)
-        if fn in ALWAYS_REFUSE:
-            out[table] = fn
-        elif fn in ARG_GUARDS:
-            arrays = re.findall(r"'\{([^}]*)\}'", args)
-            mutable = {c.strip() for c in arrays[0].split(",") if c.strip()}
-            set_once = {c.strip() for c in arrays[1].split(",") if c.strip()}
-            if mutable <= {"recorded_at"} and not set_once:
-                out[table] = fn
-    return out
+def company_keyed_targets(files):
+    """COMPANY_KEYED plus every table whose CREATE TABLE declares UNIQUE (company_id, id), minus COMPANY_KEYED_EXCEPT."""
+    out = set(COMPANY_KEYED)
+    for p in files:
+        text = open(p, encoding="utf-8").read()
+        masked = mask(text)
+        for table, _, _, spans in table_spans(text, masked):
+            if any(re.fullmatch(r"(?:CONSTRAINT \w+ )?UNIQUE \(company_id, id\)", " ".join(masked[a:b].split())) for a, b in spans):
+                out.add(table)
+    return sorted(out - set(COMPANY_KEYED_EXCEPT))
 
 
-def convert_file(path, append_only):
+def convert_file(path, append_only, keyed=COMPANY_KEYED):
     text = open(path, encoding="utf-8").read()
     name = os.path.basename(path)
     # drop the phase A trigger statements and the function definitions; the end section replaces them
@@ -163,16 +158,17 @@ def convert_file(path, append_only):
         if "company_id" in cols and "NOT NULL" in codes[cols["company_id"]]:
             for col, k in cols.items():
                 s, e = spans[k]
-                rm = re.search(r"\s+REFERENCES (" + "|".join(COMPANY_KEYED) + r") \(id\)", masked[s:e])
+                rm = re.search(r"\s+REFERENCES (" + "|".join(keyed) + r") \(id\)", masked[s:e])
                 if rm:
                     edits.append((s + rm.start(), s + rm.end(), ""))
+                    why = "S2 schema phase B" if rm.group(1) in COMPANY_KEYED else "S2 schema review S4"
                     appended.append((f"FOREIGN KEY (company_id, {col}) REFERENCES {rm.group(1)} (company_id, id)",
-                                     "   -- company key (S2 schema phase B)"))
+                                     f"   -- company key ({why})"))
                     report.append(f"company key {table}.{col} -> {rm.group(1)}")
         else:
             for col, k in cols.items():
                 s, e = spans[k]
-                if re.search(r"\s+REFERENCES (" + "|".join(COMPANY_KEYED) + r") \(id\)", masked[s:e]):
+                if re.search(r"\s+REFERENCES (" + "|".join(keyed) + r") \(id\)", masked[s:e]):
                     report.append(f"company key {table}.{col}: kept single-column (company_id nullable or absent)")
         if appended:
             ls, le = spans[-1]
@@ -220,11 +216,13 @@ def section(tables, ao, append_only):
         SECTION_START,
         "-- Every table of this file has recorded_at timestamptz NOT NULL DEFAULT now(). The DO block attaches the trigger",
         "-- trg_<table>_set_recorded_at (BEFORE UPDATE, function set_recorded_at) to every table of v_tables except v_append_only,",
-        "-- so recorded_at is the instant of the last write (D8). Append-only tables are those whose guard trigger refuses every",
-        "-- update outside an erasure, and pure logs; they need no trigger" + (f" (here: {', '.join(reasons)})." if reasons else "."),
-        "-- Guards on in-place tables sort before set_recorded_at, so they compare rows before it runs. v_tables lists the file's",
-        "-- tables in file order; lab gen_overview.py --check verifies both lists against the table definitions of the file, and",
-        "-- schema_phase_b.py writes the section. The function is defined in every file because the labs load subsets.",
+        "-- so recorded_at is the instant of the last write (ADR-0007 rule 9 note). Append-only tables are those whose guard",
+        "-- trigger refuses every update outside an erasure, and pure logs; they need no trigger"
+        + (f" (here: {', '.join(reasons)})." if reasons else "."),
+        "-- Row guards without UPDATE OF on in-place tables sort before set_recorded_at, so they compare rows before it runs.",
+        "-- v_tables lists the file's tables in file order; lab gen_overview.py --check verifies both lists against the table",
+        "-- definitions of the file, and schema_phase_b.py writes the section. The function is defined in every file because the",
+        "-- labs load subsets.",
         "CREATE OR REPLACE FUNCTION set_recorded_at() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$",
         "BEGIN",
         "    NEW.recorded_at := now();",
@@ -257,9 +255,10 @@ def main():
     for p in files:
         stmts += [re.sub(r"--[^\n]*", "", s) for s, _ in split_statements(open(p, encoding="utf-8").read(), os.path.basename(p))[0]]
     append_only = classify(stmts)
+    keyed = company_keyed_targets(files)
     n_tables = n_ao = 0
     for p in files:
-        new, report, tables, ao = convert_file(p, append_only)
+        new, report, tables, ao = convert_file(p, append_only, keyed)
         n_tables += len(tables); n_ao += len(ao)
         for r in report:
             print(f"{os.path.basename(p)}: {r}")

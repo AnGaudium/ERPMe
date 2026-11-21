@@ -18,7 +18,7 @@
 -- Rules that need the registry or other tables (a loosening's direction, the scope reference naming a company record,
 -- a period start, the outdated evidence) are enforced by commands and named in ADR-0063; the rules a row can hold are
 -- checks here.
--- Every table follows the recorded_at convention of D13 (DS-06-universal-journal.sql header; ADR-0007 rule 16 note); the last
+-- Every table follows the recorded_at convention of the ADR-0007 rule 16 note (DS-06-universal-journal.sql header); the last
 -- section of this file attaches the trigger.
 
 -- ===== Setting definitions [registry] (ADR-0063 rule 1) =====
@@ -398,14 +398,15 @@ ALTER TABLE module_activation FORCE ROW LEVEL SECURITY;
 CREATE POLICY company_policy ON module_activation USING (company_id::text = current_setting('nativeflows.company_id', true));
 CREATE POLICY company_ids_policy ON module_activation FOR SELECT USING (company_id::text = ANY (string_to_array(current_setting('nativeflows.company_ids', true), ',')));
 
--- ===== recorded_at on update (D13; ADR-0007 rules 9, 16 and the rule 16 note) =====
+-- ===== recorded_at on update (ADR-0007 rules 9, 16 and their notes) =====
 -- Every table of this file has recorded_at timestamptz NOT NULL DEFAULT now(). The DO block attaches the trigger
 -- trg_<table>_set_recorded_at (BEFORE UPDATE, function set_recorded_at) to every table of v_tables except v_append_only,
--- so recorded_at is the instant of the last write (D8). Append-only tables are those whose guard trigger refuses every
--- update outside an erasure, and pure logs; they need no trigger (here: platform_reject_change).
--- Guards on in-place tables sort before set_recorded_at, so they compare rows before it runs. v_tables lists the file's
--- tables in file order; lab gen_overview.py --check verifies both lists against the table definitions of the file, and
--- schema_phase_b.py writes the section. The function is defined in every file because the labs load subsets.
+-- so recorded_at is the instant of the last write (ADR-0007 rule 9 note). Append-only tables are those whose guard
+-- trigger refuses every update outside an erasure, and pure logs; they need no trigger (here: platform_reject_change).
+-- Row guards without UPDATE OF on in-place tables sort before set_recorded_at, so they compare rows before it runs.
+-- v_tables lists the file's tables in file order; lab gen_overview.py --check verifies both lists against the table
+-- definitions of the file, and schema_phase_b.py writes the section. The function is defined in every file because the
+-- labs load subsets.
 CREATE OR REPLACE FUNCTION set_recorded_at() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 BEGIN
     NEW.recorded_at := now();

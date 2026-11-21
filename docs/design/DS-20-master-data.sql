@@ -487,8 +487,8 @@ CREATE TABLE product_category (
     company_id                 uuid NOT NULL REFERENCES company (id),
     code                       text NOT NULL,
     name                       text NOT NULL,
-    parent_id                  uuid REFERENCES product_category (id),
-    default_item_group_id      uuid REFERENCES item_group (id),
+    parent_id                  uuid,
+    default_item_group_id      uuid,
     default_valuation_class_id uuid REFERENCES valuation_class (id),
     default_item_tax_group_id  uuid REFERENCES item_tax_group (id),
     default_inventory_uom_id   uuid REFERENCES uom (id),
@@ -496,7 +496,9 @@ CREATE TABLE product_category (
     is_active                  boolean NOT NULL DEFAULT true,
     recorded_at                timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, code),
-    UNIQUE (company_id, id)
+    UNIQUE (company_id, id),
+    FOREIGN KEY (company_id, parent_id) REFERENCES product_category (company_id, id),   -- company key (S2 schema review S4)
+    FOREIGN KEY (company_id, default_item_group_id) REFERENCES item_group (company_id, id)   -- company key (S2 schema review S4)
 );
 CREATE TABLE storage_condition (                           -- ADR-0023 rule 3
     id uuid PRIMARY KEY, company_id uuid NOT NULL REFERENCES company (id), code text NOT NULL, name text NOT NULL,
@@ -529,9 +531,9 @@ CREATE TABLE product (
     product_type                   text NOT NULL CONSTRAINT ck_product_type CHECK (product_type IN ('stock', 'non_stock', 'service')),
     is_sellable                    boolean NOT NULL DEFAULT true,
     is_purchasable                 boolean NOT NULL DEFAULT true,
-    product_category_id            uuid REFERENCES product_category (id),
+    product_category_id            uuid,
     buyer_id                       uuid,                            -- an employee partner (ADR-0018 rule 3)
-    item_group_id                  uuid NOT NULL REFERENCES item_group (id),
+    item_group_id                  uuid NOT NULL,
     valuation_class_id             uuid REFERENCES valuation_class (id),
     inventory_uom_id               uuid NOT NULL REFERENCES uom (id),
     purchase_uom_id                uuid NOT NULL REFERENCES uom (id),
@@ -560,7 +562,9 @@ CREATE TABLE product (
     CONSTRAINT ck_product_valuation_class CHECK ((product_type = 'stock') = (valuation_class_id IS NOT NULL)),
     CONSTRAINT ck_product_tracking_stock CHECK (tracking = 'none' OR product_type = 'stock'),
     CONSTRAINT ck_product_configurable CHECK (NOT is_configurable OR (is_item_created_on_order AND product_type = 'stock')),
-    FOREIGN KEY (company_id, business_unit_id) REFERENCES business_unit (company_id, id)
+    FOREIGN KEY (company_id, business_unit_id) REFERENCES business_unit (company_id, id),
+    FOREIGN KEY (company_id, product_category_id) REFERENCES product_category (company_id, id),   -- company key (S2 schema review S4)
+    FOREIGN KEY (company_id, item_group_id) REFERENCES item_group (company_id, id)   -- company key (S2 schema review S4)
 );
 CREATE TABLE product_uom (                                 -- other units of one product, or of one item: the item master's conversions (ADR-0018 rule 10; ADR-0056 rules 4-5, 15)
     id                    uuid PRIMARY KEY,
@@ -591,6 +595,17 @@ CREATE TABLE product_uom (                                 -- other units of one
         AND (factor_source <> 'packaging' OR contains_uom_id IS NOT NULL)),
     CONSTRAINT ck_product_uom_retired CHECK (is_active = (retired_at IS NULL) AND (is_active OR NOT is_default_pick_unit))
 );
+-- INV-603 reads created_at as the start of validity, so it never changes (S2 schema review note N2). The factor stays
+-- correctable while nothing uses the row (ADR-0056 rule 5); that check needs other rows and is a command check.
+CREATE FUNCTION product_uom_check_created_at() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF NEW.created_at IS DISTINCT FROM OLD.created_at THEN
+        RAISE EXCEPTION 'product_uom.created_at is set once at insert (INV-603; ADR-0056 rule 4 note)' USING ERRCODE = 'restrict_violation';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER trg_product_uom_created_at_immutable BEFORE UPDATE OF created_at ON product_uom
+    FOR EACH ROW EXECUTE FUNCTION product_uom_check_created_at();
 -- At most one default pick unit per product, or per item for item-level rows (ADR-0056 rule 15).
 CREATE UNIQUE INDEX ux_product_uom_default_pick_unit ON product_uom (company_id, product_id, item_id) NULLS NOT DISTINCT WHERE is_default_pick_unit;
 -- At most one active row per product, item (a null item counting as one value) and unit; retired rows of the unit stay for
@@ -1165,14 +1180,15 @@ CREATE TABLE reason (                                      -- [master_data] ADR-
     UNIQUE (company_id, id, kind)                          -- a column that takes one kind names it, so the key holds the kind
 );
 
--- ===== recorded_at on update (D13; ADR-0007 rules 9, 16 and the rule 16 note) =====
+-- ===== recorded_at on update (ADR-0007 rules 9, 16 and their notes) =====
 -- Every table of this file has recorded_at timestamptz NOT NULL DEFAULT now(). The DO block attaches the trigger
 -- trg_<table>_set_recorded_at (BEFORE UPDATE, function set_recorded_at) to every table of v_tables except v_append_only,
--- so recorded_at is the instant of the last write (D8). Append-only tables are those whose guard trigger refuses every
--- update outside an erasure, and pure logs; they need no trigger.
--- Guards on in-place tables sort before set_recorded_at, so they compare rows before it runs. v_tables lists the file's
--- tables in file order; lab gen_overview.py --check verifies both lists against the table definitions of the file, and
--- schema_phase_b.py writes the section. The function is defined in every file because the labs load subsets.
+-- so recorded_at is the instant of the last write (ADR-0007 rule 9 note). Append-only tables are those whose guard
+-- trigger refuses every update outside an erasure, and pure logs; they need no trigger.
+-- Row guards without UPDATE OF on in-place tables sort before set_recorded_at, so they compare rows before it runs.
+-- v_tables lists the file's tables in file order; lab gen_overview.py --check verifies both lists against the table
+-- definitions of the file, and schema_phase_b.py writes the section. The function is defined in every file because the
+-- labs load subsets.
 CREATE OR REPLACE FUNCTION set_recorded_at() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 BEGIN
     NEW.recorded_at := now();

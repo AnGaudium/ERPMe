@@ -68,7 +68,7 @@ CREATE TABLE promotion (
     price_list_kind          text NOT NULL DEFAULT 'sale' CONSTRAINT ck_promotion_price_list_kind CHECK (price_list_kind = 'sale'),
     item_id                  uuid,                          -- scope: exactly one of item, product, item group
     product_id               uuid,
-    item_group_id            uuid REFERENCES item_group (id),
+    item_group_id            uuid,
     minimum_line_quantity    types.quantity NOT NULL DEFAULT 0 CONSTRAINT ck_promotion_minimum_line_quantity CHECK (minimum_line_quantity >= 0),
     kind                     text NOT NULL CONSTRAINT ck_promotion_kind CHECK (kind IN ('percent', 'amount_per_unit', 'free_goods')),
     discount_percent         types.percent,                 -- percent off the base price
@@ -91,7 +91,8 @@ CREATE TABLE promotion (
         (kind = 'percent' AND discount_percent IS NOT NULL AND discount_percent > 0 AND discount_percent <= 100 AND amount_per_unit IS NULL AND free_item_id IS NULL)
         OR (kind = 'amount_per_unit' AND amount_per_unit IS NOT NULL AND amount_per_unit > 0 AND discount_percent IS NULL AND free_item_id IS NULL)
         OR (kind = 'free_goods' AND free_item_id IS NOT NULL AND free_quantity IS NOT NULL AND qualifying_quantity IS NOT NULL
-            AND free_quantity > 0 AND qualifying_quantity > 0 AND discount_percent IS NULL AND amount_per_unit IS NULL))
+            AND free_quantity > 0 AND qualifying_quantity > 0 AND discount_percent IS NULL AND amount_per_unit IS NULL)),
+    FOREIGN KEY (company_id, item_group_id) REFERENCES item_group (company_id, id)   -- company key (S2 schema review S4)
 );
 
 -- ===== Sales: quotation [sales] (ADR-0047 rule 3; holistic review B1, S4) =====
@@ -1509,7 +1510,7 @@ CREATE TABLE material_document_line (
     company_amount          types.amount NOT NULL CONSTRAINT ck_material_document_line_company_amount CHECK (company_amount >= 0),   -- the value moved; zero for non-owned stock
     valuation_warehouse_id  uuid,                            -- the area at level warehouse; null at levels company and site (ADR-0020 rule 2; ADR-0068 rule 8)
     valuation_site_id       uuid,                            -- the area at level site; null at levels company and warehouse; set by the stock lock helper (ADR-0068 rule 8; INV-810)
-    derivation_trace_id     uuid REFERENCES derivation_trace (id),
+    derivation_trace_id     uuid,
     bin_id                  uuid NOT NULL,                   -- the default bin outside bin-managed warehouses (ADR-0031 rule 8)
     stock_status            text NOT NULL DEFAULT 'available' CONSTRAINT ck_material_document_line_stock_status CHECK (stock_status IN ('available', 'quality_inspection', 'blocked')),
     handling_unit_id        uuid,
@@ -1533,7 +1534,8 @@ CREATE TABLE material_document_line (
     CONSTRAINT ck_material_document_line_catch_weight CHECK (catch_weight_quantity IS NULL),
     CONSTRAINT ck_material_document_line_valuation_type CHECK (valuation_type IS NULL),   -- reserved until split valuation (ADR-0020 rule 17)
     FOREIGN KEY (company_id, valuation_site_id) REFERENCES site (company_id, id),
-    CONSTRAINT ck_material_document_line_valuation_area CHECK (valuation_site_id IS NULL OR valuation_warehouse_id IS NULL)
+    CONSTRAINT ck_material_document_line_valuation_area CHECK (valuation_site_id IS NULL OR valuation_warehouse_id IS NULL),
+    FOREIGN KEY (company_id, derivation_trace_id) REFERENCES derivation_trace (company_id, id)   -- company key (S2 schema review S4)
 );
 -- The dated negative-stock check reads posting_date per key (ADR-0020 rule 10; ADR-0031 rule 14).
 CREATE INDEX ix_material_document_line_company_id_item_id_warehouse_id_posting_date
@@ -1591,7 +1593,7 @@ CREATE TABLE preliminary_price (
     posting_period_id       uuid NOT NULL,
     unit_price              types.unit_price NOT NULL CONSTRAINT ck_preliminary_price_unit_price CHECK (unit_price >= 0),   -- company currency per inventory unit
     price_source            text NOT NULL CONSTRAINT ck_preliminary_price_price_source CHECK (price_source IN ('prior_actual', 'area_receipt', 'company_receipt', 'cost_estimate', 'purchase_list', 'last_purchase_invoice', 'opening', 'manual')),   -- interim: not stated in ADR-0020 (which branch of rule 11 gave the price; purchase_list and last_purchase_invoice: its rule 11 note of the UoM simulation review)
-    derivation_trace_id     uuid REFERENCES derivation_trace (id),
+    derivation_trace_id     uuid,
     set_by_user_id          uuid REFERENCES user_account (id),   -- UpdatePreliminaryPrice is human_only, audited
     recorded_at             timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT uq_preliminary_price_key UNIQUE NULLS NOT DISTINCT (company_id, item_id, valuation_site_id, valuation_warehouse_id, posting_period_id),   -- the area's pair (ADR-0068 rule 8)
@@ -1600,7 +1602,8 @@ CREATE TABLE preliminary_price (
     CONSTRAINT ck_preliminary_price_manual CHECK ((price_source = 'manual') = (set_by_user_id IS NOT NULL)),
     FOREIGN KEY (company_id, valuation_site_id) REFERENCES site (company_id, id),
     CONSTRAINT ck_preliminary_price_valuation_area CHECK (valuation_site_id IS NULL OR valuation_warehouse_id IS NULL),
-    FOREIGN KEY (company_id, posting_period_id) REFERENCES posting_period (company_id, id)   -- company key (S2 schema phase B)
+    FOREIGN KEY (company_id, posting_period_id) REFERENCES posting_period (company_id, id),   -- company key (S2 schema phase B)
+    FOREIGN KEY (company_id, derivation_trace_id) REFERENCES derivation_trace (company_id, id)   -- company key (S2 schema review S4)
 );
 
 -- ===== Reservations and warehouse tasks [inventory] (ADR-0023 rules 13-15, 20; ADR-0028 rule 2; ADR-0031 rule 6) =====
@@ -1813,6 +1816,17 @@ CREATE INDEX ix_pending_receipt_adjustment_purchase_order_line_id ON pending_rec
 -- GR/IR lines name their purchase order line; the column exists in DS-06 from step 1, the key comes with the table.
 ALTER TABLE journal_line ADD CONSTRAINT fk_journal_line_purchase_order_line
     FOREIGN KEY (company_id, purchase_order_line_id) REFERENCES purchase_order_line (company_id, id);
+-- Journal and production lines name their material document line in their own company (S2 schema review finding S4). The
+-- key comes with the table: the lab stub of material_document_line, used where DS-06 or DS-43-54 load without this file,
+-- has no company_id.
+ALTER TABLE journal_line ADD CONSTRAINT fk_journal_line_material_document_line_id
+    FOREIGN KEY (company_id, material_document_line_id) REFERENCES material_document_line (company_id, id);
+ALTER TABLE production_issue_line ADD CONSTRAINT fk_production_issue_line_material_document_line_id
+    FOREIGN KEY (company_id, material_document_line_id) REFERENCES material_document_line (company_id, id);
+ALTER TABLE production_receipt_line ADD CONSTRAINT fk_production_receipt_line_material_document_line_id
+    FOREIGN KEY (company_id, material_document_line_id) REFERENCES material_document_line (company_id, id);
+ALTER TABLE operation_progress_component ADD CONSTRAINT fk_operation_progress_component_material_document_line_id
+    FOREIGN KEY (company_id, material_document_line_id) REFERENCES material_document_line (company_id, id);
 -- demand_supply_line has the step 5 line columns from step 3; their keys are added with the line tables.
 ALTER TABLE demand_supply_line ADD CONSTRAINT fk_demand_supply_line_sales_order_line
     FOREIGN KEY (company_id, sales_order_line_id) REFERENCES sales_order_line (company_id, id);
@@ -2286,14 +2300,15 @@ CREATE INDEX ix_transfer_order_line_company_id_item_id ON transfer_order_line (c
 ALTER TABLE demand_supply_line ADD CONSTRAINT fk_demand_supply_line_transfer_order_line
     FOREIGN KEY (company_id, transfer_order_line_id) REFERENCES transfer_order_line (company_id, id);
 
--- ===== recorded_at on update (D13; ADR-0007 rules 9, 16 and the rule 16 note) =====
+-- ===== recorded_at on update (ADR-0007 rules 9, 16 and their notes) =====
 -- Every table of this file has recorded_at timestamptz NOT NULL DEFAULT now(). The DO block attaches the trigger
 -- trg_<table>_set_recorded_at (BEFORE UPDATE, function set_recorded_at) to every table of v_tables except v_append_only,
--- so recorded_at is the instant of the last write (D8). Append-only tables are those whose guard trigger refuses every
--- update outside an erasure, and pure logs; they need no trigger (here: inventory_reject_change).
--- Guards on in-place tables sort before set_recorded_at, so they compare rows before it runs. v_tables lists the file's
--- tables in file order; lab gen_overview.py --check verifies both lists against the table definitions of the file, and
--- schema_phase_b.py writes the section. The function is defined in every file because the labs load subsets.
+-- so recorded_at is the instant of the last write (ADR-0007 rule 9 note). Append-only tables are those whose guard
+-- trigger refuses every update outside an erasure, and pure logs; they need no trigger (here: inventory_reject_change).
+-- Row guards without UPDATE OF on in-place tables sort before set_recorded_at, so they compare rows before it runs.
+-- v_tables lists the file's tables in file order; lab gen_overview.py --check verifies both lists against the table
+-- definitions of the file, and schema_phase_b.py writes the section. The function is defined in every file because the
+-- labs load subsets.
 CREATE OR REPLACE FUNCTION set_recorded_at() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 BEGIN
     NEW.recorded_at := now();

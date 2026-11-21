@@ -33,7 +33,7 @@ from datetime import date, datetime, timezone
 HERE = os.path.dirname(os.path.abspath(__file__))
 LAB = os.environ.get("NATIVEFLOWS_LAB_DIR", HERE)
 sys.path.insert(0, LAB)
-from lab import RESULTS, conn, new  # noqa: E402
+from lab import RESULTS, conn, erasure_marker, new  # noqa: E402
 
 DOCS = os.path.expanduser(os.environ.get("NATIVEFLOWS_DOCS", "~/Projects/NativeFlows/docs"))
 
@@ -1048,7 +1048,7 @@ if "--load" in sys.argv:
     trial("X55 without the erasure setting a field's value and evidence cannot be blanked", lambda cx: cx.execute(blank, (FX,)), True, "append-only")
 
     def erase(cx):
-        cx.execute("select set_config('nativeflows.erasure_command_id', %s, true)", (str(new()),))
+        erasure_marker(cx.execute, company_id=I["co"])      # a valid marker (S2 schema review B1)
         cx.execute(blank, (FX,))
         cx.execute("update extraction_word set text='' where document_extraction_id=%s", (I["ex2"],))
     trial("X56 erasure blanks a field's value and evidence and the words' text, keeping the rows (rule 19)", erase, False)

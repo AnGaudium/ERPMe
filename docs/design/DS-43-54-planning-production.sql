@@ -1188,7 +1188,7 @@ CREATE TABLE production_issue_line (
     scrap_reason_kind              text NOT NULL DEFAULT 'scrap' CONSTRAINT ck_production_issue_line_scrap_reason_kind CHECK (scrap_reason_kind = 'scrap'),
     FOREIGN KEY (company_id, scrap_reason_id, scrap_reason_kind) REFERENCES reason (company_id, id, kind),
     cost_object_id                 uuid NOT NULL,
-    material_document_line_id      uuid REFERENCES material_document_line (id),   -- interim: not stated in ADR-0034 (the posted movement)
+    material_document_line_id      uuid,   -- interim: not stated in ADR-0034 (the posted movement); company key in DS-22-09-42 (S2 schema review S4)
     recorded_at                    timestamptz NOT NULL DEFAULT now(),
     UNIQUE (production_issue_id, line_number),
     CONSTRAINT fk_production_issue_line_issue FOREIGN KEY (company_id, production_issue_id, production_order_id) REFERENCES production_issue (company_id, id, production_order_id),
@@ -1316,7 +1316,7 @@ CREATE TABLE production_receipt_line (
     stock_status                text NOT NULL DEFAULT 'available' CONSTRAINT ck_production_receipt_line_status CHECK (stock_status IN ('available', 'quality_inspection')),
     movement_type               text NOT NULL CONSTRAINT ck_production_receipt_line_movement CHECK (movement_type IN ('production_receipt', 'co_product_receipt', 'by_product_receipt', 'disassembly_receipt')),
     cost_object_id              uuid NOT NULL,
-    material_document_line_id   uuid REFERENCES material_document_line (id),   -- interim: not stated in ADR-0034
+    material_document_line_id   uuid,   -- interim: not stated in ADR-0034; company key in DS-22-09-42 (S2 schema review S4)
     recorded_at                 timestamptz NOT NULL DEFAULT now(),
     UNIQUE (production_receipt_id, line_number),
     CONSTRAINT fk_production_receipt_line_receipt FOREIGN KEY (company_id, production_receipt_id, production_order_id) REFERENCES production_receipt (company_id, id, production_order_id),
@@ -1357,7 +1357,7 @@ CREATE TABLE operation_progress_component (
     lot_id                         uuid REFERENCES lot (id),   -- backflush never takes serials (serial_component_backflush)
     bin_id                         uuid NOT NULL,              -- the supply bin, or the processor's default bin
     cost_object_id                 uuid NOT NULL,
-    material_document_line_id      uuid NOT NULL REFERENCES material_document_line (id),   -- movement type production_issue
+    material_document_line_id      uuid NOT NULL,   -- movement type production_issue; company key in DS-22-09-42 (S2 schema review S4)
     recorded_at                    timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT fk_operation_progress_component_confirmation FOREIGN KEY (company_id, operation_confirmation_id, production_order_id) REFERENCES operation_confirmation (company_id, id, production_order_id),
     CONSTRAINT fk_operation_progress_component_receipt FOREIGN KEY (company_id, production_receipt_id, production_order_id) REFERENCES production_receipt (company_id, id, production_order_id),
@@ -1860,14 +1860,15 @@ ALTER TABLE production_order ADD CONSTRAINT fk_production_order_cost_object FORE
 --     lot_id; its generated component lines live in operation_progress_component above.
 --   stock_reservation (DS-42): destination_bin_id and release_sequence passed by production (ADR-0034 rule 9).
 
--- ===== recorded_at on update (D13; ADR-0007 rules 9, 16 and the rule 16 note) =====
+-- ===== recorded_at on update (ADR-0007 rules 9, 16 and their notes) =====
 -- Every table of this file has recorded_at timestamptz NOT NULL DEFAULT now(). The DO block attaches the trigger
 -- trg_<table>_set_recorded_at (BEFORE UPDATE, function set_recorded_at) to every table of v_tables except v_append_only,
--- so recorded_at is the instant of the last write (D8). Append-only tables are those whose guard trigger refuses every
--- update outside an erasure, and pure logs; they need no trigger.
--- Guards on in-place tables sort before set_recorded_at, so they compare rows before it runs. v_tables lists the file's
--- tables in file order; lab gen_overview.py --check verifies both lists against the table definitions of the file, and
--- schema_phase_b.py writes the section. The function is defined in every file because the labs load subsets.
+-- so recorded_at is the instant of the last write (ADR-0007 rule 9 note). Append-only tables are those whose guard
+-- trigger refuses every update outside an erasure, and pure logs; they need no trigger.
+-- Row guards without UPDATE OF on in-place tables sort before set_recorded_at, so they compare rows before it runs.
+-- v_tables lists the file's tables in file order; lab gen_overview.py --check verifies both lists against the table
+-- definitions of the file, and schema_phase_b.py writes the section. The function is defined in every file because the
+-- labs load subsets.
 CREATE OR REPLACE FUNCTION set_recorded_at() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 BEGIN
     NEW.recorded_at := now();

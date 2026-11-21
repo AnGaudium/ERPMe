@@ -497,9 +497,10 @@ CREATE INDEX ix_personal_data_processing_log_subject_id ON personal_data_process
 -- Arguments: columns that may change; columns that may be set once from null; columns only the erasure command may
 -- change; optionally the column naming the row's document, for the content tables whose rows the generated Delete of a
 -- draft removes (rule 7): the dispatcher sets nativeflows.document_delete_id to that document's ID for Delete alone, and the
--- delete is allowed only while the document is a draft. Generated columns follow their sources and are skipped. The dispatcher sets nativeflows.erasure_command_id only for
--- EraseDataSubject (ADR-0038 rule 4); DS-36 adds the check that it names an idempotency record of that command in the
--- same transaction.
+-- delete is allowed only while the document is a draft. Generated columns follow their sources and are skipped. Columns
+-- only the erasure command may change need a valid erasure marker: erasure_marker_valid() of DS-05-platform.sql (ADR-0038
+-- rule 4; ADR-0079 rule 7). It is called only when the marker is set, so a load without DS-05 keeps working and refuses
+-- every erasure.
 CREATE FUNCTION crm_check_append_only() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE
     v_mutable       text[];
@@ -524,7 +525,10 @@ BEGIN
     v_erasure_only := TG_ARGV[2]::text[];
     SELECT coalesce(array_agg(attname::text), '{}') INTO v_generated
         FROM pg_attribute WHERE attrelid = TG_RELID AND attgenerated <> '' AND NOT attisdropped;
-    v_is_erasing := coalesce(current_setting('nativeflows.erasure_command_id', true), '') <> '';
+    v_is_erasing := false;
+    IF coalesce(current_setting('nativeflows.erasure_command_id', true), '') <> '' THEN
+        v_is_erasing := erasure_marker_valid();
+    END IF;
     v_old := to_jsonb(OLD);
     v_new := to_jsonb(NEW);
     FOR v_key IN SELECT jsonb_object_keys(v_new) LOOP
@@ -566,14 +570,15 @@ $$;
 CREATE TRIGGER trg_personal_data_processing_log_append_only BEFORE UPDATE OR DELETE ON personal_data_processing_log FOR EACH ROW
     EXECUTE FUNCTION audit_refuse_change();
 
--- ===== recorded_at on update (D13; ADR-0007 rules 9, 16 and the rule 16 note) =====
+-- ===== recorded_at on update (ADR-0007 rules 9, 16 and their notes) =====
 -- Every table of this file has recorded_at timestamptz NOT NULL DEFAULT now(). The DO block attaches the trigger
 -- trg_<table>_set_recorded_at (BEFORE UPDATE, function set_recorded_at) to every table of v_tables except v_append_only,
--- so recorded_at is the instant of the last write (D8). Append-only tables are those whose guard trigger refuses every
--- update outside an erasure, and pure logs; they need no trigger (here: audit_refuse_change, crm_check_append_only).
--- Guards on in-place tables sort before set_recorded_at, so they compare rows before it runs. v_tables lists the file's
--- tables in file order; lab gen_overview.py --check verifies both lists against the table definitions of the file, and
--- schema_phase_b.py writes the section. The function is defined in every file because the labs load subsets.
+-- so recorded_at is the instant of the last write (ADR-0007 rule 9 note). Append-only tables are those whose guard
+-- trigger refuses every update outside an erasure, and pure logs; they need no trigger (here: audit_refuse_change, crm_check_append_only).
+-- Row guards without UPDATE OF on in-place tables sort before set_recorded_at, so they compare rows before it runs.
+-- v_tables lists the file's tables in file order; lab gen_overview.py --check verifies both lists against the table
+-- definitions of the file, and schema_phase_b.py writes the section. The function is defined in every file because the
+-- labs load subsets.
 CREATE OR REPLACE FUNCTION set_recorded_at() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 BEGIN
     NEW.recorded_at := now();

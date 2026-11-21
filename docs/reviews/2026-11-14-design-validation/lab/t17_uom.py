@@ -774,13 +774,14 @@ for i, (ok_, name_, detail_) in enumerate(check_issue_returns()):   # U73-U80, t
 ck_role = ds22.split("CONSTRAINT ck_movement_type_costing_role CHECK", 1)[1].split("\n", 1)[0]
 st = {r["key"]: r for r in read_csv(os.path.join(CAT, "settings.csv"))}
 srr = st["movement_type.sales_return_receipt.costing_role"]
+# The interim seed's wording is the catalog's (it follows SAP since the author's decision of 2026-11-21); the check holds the
+# structure only: value source and costing role set by regime, the three pairs with (document, issue_return) optional.
 check("U81 the role is in the catalog and the DDL: the CHECK on movement_type.costing_role admits issue_return; the sales return "
       "receipt's costing role setting allows receipt, revalued_issue and issue_return with the pair (document, issue_return), "
-      "stays fail_closed with no core default; the catalog's interim seed is the original issue cost as an issue return",
+      "stays fail_closed with no core default; the catalog row sets value source and costing role by regime",
       "'issue_return'" in ck_role and srr["bounds"].split("|") == ["receipt", "revalued_issue", "issue_return"]
       and srr["core_default"] == "fail_closed" and "(document, issue_return)" in srr["meaning"]
-      and mt["sales_return_receipt"]["costing_role"] == "regime"
-      and "document value (the original issue cost), issue return" in mt["sales_return_receipt"]["meaning"],
+      and mt["sales_return_receipt"]["value_source"] == "regime" and mt["sales_return_receipt"]["costing_role"] == "regime",
       (srr["bounds"], ck_role.strip()[:120]))
 
 # ======================================================================= D: database checks (--load)
@@ -978,6 +979,8 @@ if "--load" in sys.argv:
           lambda cx: cx.execute("update product_uom set is_active=false, retired_at=now() where id=%s", (I["pu_pack"],)))
     X_bad("D19 at most one default pick unit per product", "ux_product_uom_default_pick_unit",
           lambda cx: cx.execute("update product_uom set is_default_pick_unit=true where id=%s", (I["pu_ct"],)))
+    X_bad("D19a created_at, the start of validity INV-603 reads, never changes (S2 schema review N2)", "set once at insert",
+          lambda cx: cx.execute("update product_uom set created_at = created_at - interval '1 day' where id=%s", (I["pu_ct"],)))
     X_bad("D20 a global pair is stored once, from the larger unit: grams to kilograms at 1/1000 is refused", "ck_uom_conversion_direction",
           lambda cx: cx.execute("insert into uom_conversion (id, from_uom_id, to_uom_id, numerator, denominator) values (%s,%s,%s,1,1000)", (new(), U["GRM"], U["KGM"])))
     X_bad("D21 ... and a pair already stored cannot be stored again in either direction", "ux_uom_conversion_pair",
