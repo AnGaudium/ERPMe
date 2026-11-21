@@ -114,8 +114,9 @@ At package level under `tax/` ([ADR-0041](../adr/0041-tax-engine.md) rules 1–3
 | `package_kinds.csv` | `code` (never a core kind's code), `tax_kind` (the core kind it belongs to), names, basis columns ([ADR-0053](../adr/0053-core-neutrality.md) rule 2) |
 | `deductibility_rules.yaml` | A YAML list: `code`, `condition_type`, `applies_to` (`tax_kind`, `directions`), `parameters` (the condition type's schema), `effective_from`, and the basis fields of regime settings. Per tax kind and direction, the entry with the latest `effective_from` on or before the tax date is in force, across codes; an entry with `condition_type: none` and no parameters ends the rule before it; two entries may not share tax kind, direction and `effective_from` ([ADR-0053](../adr/0053-core-neutrality.md) rule 3 and its notes) |
 | `tax_rates.csv` | `tax_code`, `effective_from`, `rate_percent` |
-| `tax_matrix.csv` | `direction`, `partner_tax_group`, `item_tax_group`, `effective_from`, `tax_codes` (separated by `;`) |
-| `item_tax_groups.csv`, `partner_tax_groups.csv` | `code`, names, and for partner groups the `directions` they apply to |
+| `tax_matrix.csv` | `direction`, `tax_treatment`, `item_tax_group`, `effective_from`, `tax_codes` (separated by `;`), optional `is_adjustable` ([ADR-0080](../adr/0080-tax-treatment-determination.md) rule 2; a package not yet reworked keeps the column name `partner_tax_group`, read as `tax_treatment` until its rework) |
+| `item_tax_groups.csv`, `tax_treatments.csv`, `partner_tax_statuses.csv` | `code`, names, and for treatments the `directions` they apply to ([ADR-0080](../adr/0080-tax-treatment-determination.md) rule 1; `partner_tax_groups.csv` is read as `tax_treatments.csv` until a package's rework) |
+| `tax_treatment_rules.csv` | `direction`, `document_type`, `ship_from_country`, `ship_to_country`, `is_tax_zone`, `partner_tax_status`, `item_kind` (each empty for any), `priority`, `effective_from`, `tax_treatment` (empty ends a rule), optional `is_adjustable`, basis ([ADR-0080](../adr/0080-tax-treatment-determination.md) rule 3) |
 | `returns/<form>.csv` | `box`, labels, `source`: `base:<code>`, `tax:<code>`, `deductible:<code>`, `prior_decrease`, `prior_increase`, `formula:<expression over [box]>` with `+`, `-`, `pos()`, `neg()`, or `carry:<box>`, separated by `;` |
 
 Every row carries the basis columns.

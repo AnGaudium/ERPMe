@@ -171,7 +171,7 @@ tables = re.findall(r"^CREATE TABLE (\w+) \(", platform, flags=re.M)   # default
 # installation tables (ADR-0041 rules 2-4 notes, S2 closure 2026-11-21): a design change, so A04 and A05 follow it.
 INSTALLATION = {"event_subject", "event_consumer", "agent_type", "agent_type_version", "regime_setting", "tax_matrix"}
 NULLABLE = {"outbox_event", "event_delivery", "audit_record", "audit_change", "audit_denial", "agent_budget_usage", "idempotency_record",
-            "tax_code", "tax_rate"}
+            "tax_code", "tax_rate", "tax_treatment_rule"}
 
 
 def cols(t):

@@ -21,7 +21,8 @@
 -- section writes them as the rls_v1 helper would (ADR-0022 rule 8), the default partitions included. Tables whose company_id is nullable
 -- (outbox_event, event_delivery, audit_record, audit_change, audit_denial, agent_budget_usage, idempotency_record) show their
 -- null rows only under the setting value `installation` (ADR-0017 rule 19; ADR-0013 rule 14; ADR-0008 rule 16); tax_code and
--- tax_rate, whose null rows are package rows, are shared reference catalogs that every company reads (S2 closure, 2026-11-21).
+-- tax_rate and tax_treatment_rule, whose null rows are package rows, are shared reference catalogs that every company reads
+-- (S2 closure, 2026-11-21; ADR-0080).
 -- Installation tables, without company_id: event_subject, event_consumer, agent_type, agent_type_version, regime_setting,
 -- tax_matrix. The lab checks this list.
 -- payment_method_money_account (ADR-0068 rule 16) refers to payment_method and branch, and payment and payment_line to
@@ -1063,18 +1064,19 @@ CREATE TABLE tax_rate (                                    -- package rule (comp
     FOREIGN KEY (company_id, change_proposal_id) REFERENCES change_proposal (company_id, id),
     CONSTRAINT ck_tax_rate_scope CHECK ((source = 'package') = (company_id IS NULL) AND (company_id IS NULL) = (change_proposal_id IS NULL))
 );
--- ADR-0041 rule 3: the package matrix, (direction, partner tax group, item tax group, effective_from) -> tax codes. Installation
--- data like regime_setting: no company_id and no row-level security; application roles get SELECT only. The groups are named by
--- code, because a company's groups are copies of the package's templates (rule 3). Import codes are never determined, so the
+-- ADR-0041 rule 3 as amended by ADR-0080 rule 2: the package matrix, (direction, tax treatment, item tax group, effective_from)
+-- -> tax codes; the tax treatment replaced the partner tax group as the first axis (the author's two dimensions, product and
+-- transaction). Installation data like regime_setting: no company_id and no row-level security; application roles get SELECT
+-- only. The treatment and the group are named by code, because a company's lists are copies of the package's templates. Import codes are never determined, so the
 -- direction is sale or purchase. tax_code_ids lists codes of the same package and direction (trigger below). is_adjustable is
 -- the package's mark that a company may define its own row for this key (the rule 4 note of 2026-11-21, the mark of
 -- retention_rule, ADR-0079 rule 9). The value columns never change after insert (trigger below; ADR-0016 rule 13).
--- id = uuid5(f244ce09-3c6c-4c82-af14-918bdeca6be3, '<package>:tax_matrix:<direction>:<partner group>:<item group>:<effective_from>').
+-- id = uuid5(f244ce09-3c6c-4c82-af14-918bdeca6be3, '<package>:tax_matrix:<direction>:<treatment>:<item group>:<effective_from>').
 CREATE TABLE tax_matrix (                                  -- installation data (package rule)
     id                      uuid PRIMARY KEY,              -- uuid5 (above)
     localization_package    text NOT NULL,
     direction               text NOT NULL CONSTRAINT ck_tax_matrix_direction CHECK (direction IN ('sale', 'purchase')),
-    partner_tax_group_code  text NOT NULL,
+    tax_treatment_code      text NOT NULL,                 -- ADR-0080 rule 2 (was partner_tax_group_code)
     item_tax_group_code     text NOT NULL,
     effective_from          date NOT NULL,
     tax_code_ids            uuid[] NOT NULL CONSTRAINT ck_tax_matrix_tax_code_ids CHECK (cardinality(tax_code_ids) >= 1),
@@ -1082,11 +1084,11 @@ CREATE TABLE tax_matrix (                                  -- installation data 
     basis                   jsonb NOT NULL,                -- ADR-0016 rule 6
     recorded_at             timestamptz NOT NULL DEFAULT now(),
     -- Named by hand: the convention name would exceed 63 bytes (ADR-0004 rule 6).
-    CONSTRAINT uq_tax_matrix_key UNIQUE (localization_package, direction, partner_tax_group_code, item_tax_group_code, effective_from)
+    CONSTRAINT uq_tax_matrix_key UNIQUE (localization_package, direction, tax_treatment_code, item_tax_group_code, effective_from)
 );
--- ADR-0041 rule 3, company rows, with the rule 4 note of 2026-11-21: a company's own matrix rows, keyed on its own groups. A row
--- is refused with tax_matrix_row_invalid where the company's package has a row for the same key (package, direction, both group
--- codes) not marked is_adjustable, so a company row never silently shadows the legal mapping; with no package row the key
+-- ADR-0041 rule 3, company rows, with the rule 4 note of 2026-11-21: a company's own matrix rows, keyed on its own treatments and
+-- groups (ADR-0080 rule 2). A row is refused with tax_matrix_row_invalid where the company's package has a row for the same key
+-- (package, direction, treatment code, group code) not marked is_adjustable, so a company row never silently shadows the legal mapping; with no package row the key
 -- contains a group the company added itself (the package covers all its own groups, rule 20). Codes are the package's or the
 -- company's own, of the row's direction. Written only by executing a proposal another person approved (INV-302). Append-only:
 -- a change is a new dated row; where a company row and a package row are in force for one key, the company row is used.
@@ -1094,7 +1096,7 @@ CREATE TABLE company_tax_matrix (                          -- company data; neve
     id                    uuid PRIMARY KEY,
     company_id            uuid NOT NULL REFERENCES company (id),
     direction             text NOT NULL CONSTRAINT ck_company_tax_matrix_direction CHECK (direction IN ('sale', 'purchase')),
-    partner_tax_group_id  uuid NOT NULL,
+    tax_treatment_id      uuid NOT NULL,                   -- ADR-0080 rule 2 (was partner_tax_group_id)
     item_tax_group_id     uuid NOT NULL,
     effective_from        date NOT NULL,
     tax_code_ids          uuid[] NOT NULL CONSTRAINT ck_company_tax_matrix_tax_code_ids CHECK (cardinality(tax_code_ids) >= 1),
@@ -1102,11 +1104,175 @@ CREATE TABLE company_tax_matrix (                          -- company data; neve
     change_proposal_id    uuid NOT NULL,                   -- the executed proposal another person approved (INV-302)
     recorded_at           timestamptz NOT NULL DEFAULT now(),
     -- Named by hand: the convention name would exceed 63 bytes (ADR-0004 rule 6).
-    CONSTRAINT uq_company_tax_matrix_key UNIQUE (company_id, direction, partner_tax_group_id, item_tax_group_id, effective_from),
-    FOREIGN KEY (company_id, partner_tax_group_id) REFERENCES partner_tax_group (company_id, id),
+    CONSTRAINT uq_company_tax_matrix_key UNIQUE (company_id, direction, tax_treatment_id, item_tax_group_id, effective_from),
+    FOREIGN KEY (company_id, tax_treatment_id) REFERENCES tax_treatment (company_id, id),
     FOREIGN KEY (company_id, item_tax_group_id) REFERENCES item_tax_group (company_id, id),
     FOREIGN KEY (company_id, change_proposal_id) REFERENCES change_proposal (company_id, id)
 );
+-- ADR-0080 rule 3: the dated rules that derive a transaction's tax treatment. Package rows (company_id null, uuid5 of
+-- '<package>:tax_treatment_rule:<direction>:<determinants>:<effective_from>') and a company's own rows under the protection of the
+-- ADR-0041 rule 4 note (change_proposal_id, source company; a company row is refused where its package has a row with the same
+-- determinants not marked is_adjustable: tax_treatment_rule_invalid). An empty determinant matches any value. Among the rows
+-- in force on the date (per determinant set, the latest effective_from, a company row before a package row), the row with
+-- the most filled determinants wins; equal counts go to the higher priority; a remaining tie raises tax_treatment_ambiguous and
+-- no match tax_treatment_missing (tax_treatment_derive below). A null tax_treatment_code ends a rule from its date. Treatment
+-- and status are named by code, as on tax_matrix. The rule reads no Incoterm (ADR-0068). Shared-reference row-level security.
+CREATE TABLE tax_treatment_rule (                          -- package rule (company_id null) or a company's own rule
+    id                       uuid PRIMARY KEY,
+    company_id               uuid REFERENCES company (id),
+    source                   text NOT NULL DEFAULT 'package' CONSTRAINT ck_tax_treatment_rule_source CHECK (source IN ('package', 'company')),
+    localization_package     text,                         -- package rows; null on company rows
+    direction                text NOT NULL CONSTRAINT ck_tax_treatment_rule_direction CHECK (direction IN ('sale', 'purchase')),
+    document_type            text CONSTRAINT ck_tax_treatment_rule_document_type CHECK (document_type ~ '^[a-z][a-z0-9_]*$'),
+    ship_from_country        text CONSTRAINT ck_tax_treatment_rule_ship_from_country CHECK (ship_from_country ~ '^[A-Z]{2}$'),
+    ship_to_country          text CONSTRAINT ck_tax_treatment_rule_ship_to_country CHECK (ship_to_country ~ '^[A-Z]{2}$'),
+    is_tax_zone              boolean,                      -- the destination address or site is in a tax zone (partner_address, site)
+    partner_tax_status_code  text,                         -- the partner's tax status (ADR-0080 rule 1)
+    item_kind                text CONSTRAINT ck_tax_treatment_rule_item_kind CHECK (item_kind IN ('goods', 'service')),
+    priority                 integer NOT NULL DEFAULT 0,   -- breaks ties between rows with as many filled determinants; higher wins
+    effective_from           date NOT NULL,
+    tax_treatment_code       text,                         -- null ends the rule from effective_from
+    is_adjustable            boolean NOT NULL DEFAULT false,   -- package rows: a company may define its own row for these determinants
+    basis                    jsonb NOT NULL,               -- ADR-0016 rule 6; company_decision on a company row
+    change_proposal_id       uuid,                         -- company rows: the executed proposal another person approved (INV-302)
+    recorded_at              timestamptz NOT NULL DEFAULT now(),
+    FOREIGN KEY (company_id, change_proposal_id) REFERENCES change_proposal (company_id, id),
+    CONSTRAINT ck_tax_treatment_rule_scope CHECK ((source = 'package') = (company_id IS NULL) AND (company_id IS NULL) = (localization_package IS NOT NULL)
+        AND (company_id IS NULL) = (change_proposal_id IS NULL)),
+    -- Named by hand: the convention name would exceed 63 bytes (ADR-0004 rule 6).
+    CONSTRAINT uq_tax_treatment_rule_key UNIQUE NULLS NOT DISTINCT (company_id, localization_package, direction, document_type, ship_from_country,
+        ship_to_country, is_tax_zone, partner_tax_status_code, item_kind, effective_from)
+);
+-- ADR-0080 rule 4: the tax treatment of a document's header (line_number null) and of each line, part of the document's content
+-- like document_line_tax and frozen with it (ADR-0041 rule 6; trigger trg_document_tax_treatment_frozen). source rule: derived
+-- by tax_treatment_derive, with the rule used; manual: set by a person (derived_tax_treatment_id keeps what the rule gave, and
+-- differs_from_rule raises the check result tax_treatment_differs_from_rule); original: copied from the corrected or reversed
+-- document (ADR-0041 rule 8). The header defaults the lines; a line may differ (goods and a service on one document). Every line
+-- with tax rows has a row (INV-303). A correction's header copies the original's header (trigger below).
+CREATE TABLE document_tax_treatment (
+    id                        uuid PRIMARY KEY,
+    company_id                uuid NOT NULL,
+    document_id               uuid NOT NULL,
+    line_number               integer CONSTRAINT ck_document_tax_treatment_line_number CHECK (line_number > 0),   -- null: the header
+    tax_treatment_id          uuid NOT NULL,
+    source                    text NOT NULL CONSTRAINT ck_document_tax_treatment_source CHECK (source IN ('rule', 'manual', 'original')),
+    tax_treatment_rule_id     uuid REFERENCES tax_treatment_rule (id),   -- the rule used, or that gave derived_tax_treatment_id
+    derived_tax_treatment_id  uuid,                        -- what the rule gave (rule: equal to tax_treatment_id; manual: the rule's proposal, if any)
+    differs_from_rule         boolean GENERATED ALWAYS AS (source = 'manual' AND tax_treatment_id IS DISTINCT FROM derived_tax_treatment_id) STORED,
+    recorded_at               timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_document_tax_treatment_document_id_line_number UNIQUE NULLS NOT DISTINCT (document_id, line_number),
+    FOREIGN KEY (company_id, document_id) REFERENCES document (company_id, id),
+    FOREIGN KEY (company_id, tax_treatment_id) REFERENCES tax_treatment (company_id, id),
+    FOREIGN KEY (company_id, derived_tax_treatment_id) REFERENCES tax_treatment (company_id, id),
+    CONSTRAINT ck_document_tax_treatment_rule CHECK (CASE source
+        WHEN 'rule' THEN tax_treatment_rule_id IS NOT NULL AND derived_tax_treatment_id = tax_treatment_id
+        WHEN 'original' THEN tax_treatment_rule_id IS NULL AND derived_tax_treatment_id IS NULL
+        ELSE (tax_treatment_rule_id IS NULL) = (derived_tax_treatment_id IS NULL) END)
+);
+-- A company rule names a treatment and a status of its company, and does not shadow a package rule with the same determinants
+-- unless the package marks it adjustable (ADR-0080 rule 3; ADR-0041 rule 4 note).
+CREATE FUNCTION tax_treatment_rule_check_insert() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
+DECLARE
+    v_package  text;
+BEGIN
+    IF NEW.company_id IS NULL THEN
+        RETURN NEW;
+    END IF;
+    SELECT co.localization_package INTO v_package FROM nativeflows.company co WHERE co.id = NEW.company_id;
+    IF NEW.tax_treatment_code IS NOT NULL AND NOT EXISTS (SELECT 1 FROM nativeflows.tax_treatment g
+            WHERE g.company_id = NEW.company_id AND g.code = NEW.tax_treatment_code AND NEW.direction = ANY (g.directions)) THEN
+        RAISE EXCEPTION 'tax_treatment_rule_invalid: % is not a % treatment of the company', NEW.tax_treatment_code, NEW.direction USING ERRCODE = 'check_violation';
+    END IF;
+    IF NEW.partner_tax_status_code IS NOT NULL AND NOT EXISTS (SELECT 1 FROM nativeflows.partner_tax_status s
+            WHERE s.company_id = NEW.company_id AND s.code = NEW.partner_tax_status_code) THEN
+        RAISE EXCEPTION 'tax_treatment_rule_invalid: % is not a partner tax status of the company', NEW.partner_tax_status_code USING ERRCODE = 'check_violation';
+    END IF;
+    IF EXISTS (SELECT 1 FROM nativeflows.tax_treatment_rule r WHERE r.company_id IS NULL AND r.localization_package = v_package
+                AND r.direction = NEW.direction AND NOT r.is_adjustable
+                AND r.document_type IS NOT DISTINCT FROM NEW.document_type AND r.ship_from_country IS NOT DISTINCT FROM NEW.ship_from_country
+                AND r.ship_to_country IS NOT DISTINCT FROM NEW.ship_to_country AND r.is_tax_zone IS NOT DISTINCT FROM NEW.is_tax_zone
+                AND r.partner_tax_status_code IS NOT DISTINCT FROM NEW.partner_tax_status_code AND r.item_kind IS NOT DISTINCT FROM NEW.item_kind) THEN
+        RAISE EXCEPTION 'tax_treatment_rule_invalid: package % has a rule with the same determinants and does not mark it adjustable', v_package
+            USING ERRCODE = 'check_violation';
+    END IF;
+    RETURN NEW;
+END
+$$;
+CREATE TRIGGER trg_tax_treatment_rule_check_insert BEFORE INSERT ON tax_treatment_rule FOR EACH ROW EXECUTE FUNCTION tax_treatment_rule_check_insert();
+-- ADR-0080 rule 4 with ADR-0041 rule 8: a correction's or reversal's header takes the original's header treatment (source
+-- original), and only such a document has source original.
+CREATE FUNCTION document_tax_treatment_check_insert() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
+DECLARE
+    v_original  uuid;
+BEGIN
+    SELECT coalesce(d.correction_of_id, d.reversal_of_id) INTO v_original FROM nativeflows.document d
+     WHERE d.company_id = NEW.company_id AND d.id = NEW.document_id;
+    IF NEW.source = 'original' AND v_original IS NULL THEN
+        RAISE EXCEPTION 'document_tax_treatment: source original needs a corrected or reversed document' USING ERRCODE = 'check_violation';
+    END IF;
+    IF v_original IS NOT NULL AND NEW.line_number IS NULL AND (NEW.source <> 'original' OR NEW.tax_treatment_id IS DISTINCT FROM (
+           SELECT o.tax_treatment_id FROM nativeflows.document_tax_treatment o WHERE o.document_id = v_original AND o.line_number IS NULL)) THEN
+        RAISE EXCEPTION 'document_tax_treatment: a correction or reversal copies the original''s header treatment (ADR-0041 rule 8)' USING ERRCODE = 'check_violation';
+    END IF;
+    RETURN NEW;
+END
+$$;
+CREATE TRIGGER trg_document_tax_treatment_check_insert BEFORE INSERT ON document_tax_treatment FOR EACH ROW EXECUTE FUNCTION document_tax_treatment_check_insert();
+-- ADR-0080 rule 3: the tax treatment of a transaction, from the package's and the company's rules in force on the date. The
+-- inputs are the document's (the command reads them): direction, document type, ship-from country (the site's or warehouse's
+-- address), ship-to country and zone flag (the destination address chosen by tax.destination_party, or for a service line
+-- by tax.services_place_of_supply), the partner's tax status code, and goods or service. Returns the company's treatment and
+-- the rule used. No side effects; STABLE.
+CREATE FUNCTION tax_treatment_derive(p_company_id uuid, p_direction text, p_document_type text, p_ship_from_country text,
+                                     p_ship_to_country text, p_is_tax_zone boolean, p_partner_tax_status_code text, p_item_kind text, p_date date)
+    RETURNS TABLE (tax_treatment_id uuid, tax_treatment_code text, tax_treatment_rule_id uuid)
+    LANGUAGE plpgsql STABLE SET search_path = nativeflows, pg_temp AS $$
+DECLARE
+    v_package  text;
+    v_first    record;
+    v_second   record;
+    v_id       uuid;
+    v_count    integer := 0;
+BEGIN
+    SELECT co.localization_package INTO v_package FROM nativeflows.company co WHERE co.id = p_company_id;
+    FOR v_second IN
+        WITH in_force AS (
+            SELECT DISTINCT ON (r.document_type, r.ship_from_country, r.ship_to_country, r.is_tax_zone, r.partner_tax_status_code, r.item_kind)
+                   r.id, r.tax_treatment_code, r.priority,
+                   (r.document_type IS NOT NULL)::int + (r.ship_from_country IS NOT NULL)::int + (r.ship_to_country IS NOT NULL)::int
+                   + (r.is_tax_zone IS NOT NULL)::int + (r.partner_tax_status_code IS NOT NULL)::int + (r.item_kind IS NOT NULL)::int AS filled
+              FROM nativeflows.tax_treatment_rule r
+             WHERE ((r.company_id IS NULL AND r.localization_package = v_package) OR r.company_id = p_company_id)
+               AND r.direction = p_direction AND r.effective_from <= p_date
+               AND (r.document_type IS NULL OR r.document_type = p_document_type)
+               AND (r.ship_from_country IS NULL OR r.ship_from_country = p_ship_from_country)
+               AND (r.ship_to_country IS NULL OR r.ship_to_country = p_ship_to_country)
+               AND (r.is_tax_zone IS NULL OR r.is_tax_zone = p_is_tax_zone)
+               AND (r.partner_tax_status_code IS NULL OR r.partner_tax_status_code = p_partner_tax_status_code)
+               AND (r.item_kind IS NULL OR r.item_kind = p_item_kind)
+             ORDER BY r.document_type, r.ship_from_country, r.ship_to_country, r.is_tax_zone, r.partner_tax_status_code, r.item_kind,
+                      r.effective_from DESC, (r.company_id IS NOT NULL) DESC)
+        SELECT * FROM in_force WHERE in_force.tax_treatment_code IS NOT NULL ORDER BY filled DESC, priority DESC LIMIT 2
+    LOOP
+        v_count := v_count + 1;
+        IF v_count = 1 THEN
+            v_first := v_second;
+        ELSIF v_second.filled = v_first.filled AND v_second.priority = v_first.priority THEN
+            RAISE EXCEPTION 'tax_treatment_ambiguous: rules % and % match equally (determinants and priority)', v_first.id, v_second.id
+                USING ERRCODE = 'cardinality_violation';
+        END IF;
+    END LOOP;
+    IF v_count = 0 THEN
+        RAISE EXCEPTION 'tax_treatment_missing: no tax treatment rule matches % for % on %', p_direction, p_company_id, p_date USING ERRCODE = 'no_data_found';
+    END IF;
+    SELECT g.id INTO v_id FROM nativeflows.tax_treatment g WHERE g.company_id = p_company_id AND g.code = v_first.tax_treatment_code AND g.is_active;
+    IF v_id IS NULL THEN
+        RAISE EXCEPTION 'tax_treatment_missing: rule % names treatment %, which the company does not have', v_first.id, v_first.tax_treatment_code
+            USING ERRCODE = 'no_data_found';
+    END IF;
+    RETURN QUERY SELECT v_id, v_first.tax_treatment_code, v_first.id;
+END
+$$;
 -- A rate's code has the rate's company (both null, or the same company): a company dates only its own codes' rates, and a
 -- package never dates a company code (ADR-0041 rule 4 note, 2026-11-21).
 CREATE FUNCTION tax_rate_check_insert() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
@@ -1125,7 +1291,7 @@ CREATE TRIGGER trg_tax_rate_check_insert BEFORE INSERT ON tax_rate FOR EACH ROW 
 CREATE FUNCTION tax_matrix_check_insert() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 DECLARE
     v_package  text;
-    v_partner  text;
+    v_treatment  text;
     v_item     text;
 BEGIN
     IF TG_TABLE_NAME = 'tax_matrix' THEN
@@ -1137,7 +1303,7 @@ BEGIN
         RETURN NEW;
     END IF;
     SELECT co.localization_package INTO v_package FROM nativeflows.company co WHERE co.id = NEW.company_id;
-    SELECT g.code INTO v_partner FROM nativeflows.partner_tax_group g WHERE g.company_id = NEW.company_id AND g.id = NEW.partner_tax_group_id;
+    SELECT g.code INTO v_treatment FROM nativeflows.tax_treatment g WHERE g.company_id = NEW.company_id AND g.id = NEW.tax_treatment_id;
     SELECT g.code INTO v_item FROM nativeflows.item_tax_group g WHERE g.company_id = NEW.company_id AND g.id = NEW.item_tax_group_id;
     IF EXISTS (SELECT 1 FROM unnest(NEW.tax_code_ids) AS x(id) WHERE NOT EXISTS (SELECT 1 FROM nativeflows.tax_code c
                 WHERE c.id = x.id AND c.direction = NEW.direction
@@ -1145,9 +1311,9 @@ BEGIN
         RAISE EXCEPTION 'tax_matrix_row_invalid: every code of a company matrix row is a % code of package % or of the company', NEW.direction, v_package USING ERRCODE = 'check_violation';
     END IF;
     IF EXISTS (SELECT 1 FROM nativeflows.tax_matrix m WHERE m.localization_package = v_package AND m.direction = NEW.direction
-                AND m.partner_tax_group_code = v_partner AND m.item_tax_group_code = v_item AND NOT m.is_adjustable) THEN
+                AND m.tax_treatment_code = v_treatment AND m.item_tax_group_code = v_item AND NOT m.is_adjustable) THEN
         RAISE EXCEPTION 'tax_matrix_row_invalid: package % maps (%, %, %) and does not mark it adjustable; a company row may not shadow it',
-            v_package, NEW.direction, v_partner, v_item USING ERRCODE = 'check_violation';
+            v_package, NEW.direction, v_treatment, v_item USING ERRCODE = 'check_violation';
     END IF;
     RETURN NEW;
 END
@@ -1203,6 +1369,33 @@ BEGIN
     END IF;
     RAISE EXCEPTION 'item_tax_group_missing: product % has no item tax group on itself, its category chain or the company default', p_product_id
         USING ERRCODE = 'no_data_found';
+END
+$$;
+-- The tax codes of a key on a tax date (ADR-0041 rules 3, 7; ADR-0080 rule 2): a company row in force for the company's
+-- treatment and item tax group wins (an adjustable key or the company's own lists); else the package row in force for their
+-- codes; none raises tax_matrix_missing. Returns the codes, the matrix row (its id goes into the derivation trace, rule 6) and
+-- whether it was a company or a package row. No side effects; STABLE.
+CREATE FUNCTION tax_matrix_codes(p_company_id uuid, p_direction text, p_tax_treatment_id uuid, p_item_tax_group_id uuid, p_date date)
+    RETURNS TABLE (tax_code_ids uuid[], matrix_row_id uuid, source text)
+    LANGUAGE plpgsql STABLE SET search_path = nativeflows, pg_temp AS $$
+BEGIN
+    RETURN QUERY SELECT m.tax_code_ids, m.id, 'company'::text FROM nativeflows.company_tax_matrix m
+     WHERE m.company_id = p_company_id AND m.direction = p_direction AND m.tax_treatment_id = p_tax_treatment_id
+       AND m.item_tax_group_id = p_item_tax_group_id AND m.effective_from <= p_date
+     ORDER BY m.effective_from DESC LIMIT 1;
+    IF FOUND THEN
+        RETURN;
+    END IF;
+    RETURN QUERY SELECT m.tax_code_ids, m.id, 'package'::text FROM nativeflows.tax_matrix m
+      JOIN nativeflows.company co ON co.id = p_company_id AND co.localization_package = m.localization_package
+      JOIN nativeflows.tax_treatment tt ON tt.company_id = p_company_id AND tt.id = p_tax_treatment_id AND tt.code = m.tax_treatment_code
+      JOIN nativeflows.item_tax_group g ON g.company_id = p_company_id AND g.id = p_item_tax_group_id AND g.code = m.item_tax_group_code
+     WHERE m.direction = p_direction AND m.effective_from <= p_date
+     ORDER BY m.effective_from DESC LIMIT 1;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'tax_matrix_missing: no matrix row for % / treatment % / item tax group % on %', p_direction, p_tax_treatment_id, p_item_tax_group_id, p_date
+            USING ERRCODE = 'no_data_found';
+    END IF;
 END
 $$;
 -- The rate of a code in force on a tax date (ADR-0041 rules 2, 7): the latest effective_from on or before it; none raises
@@ -2196,6 +2389,7 @@ CREATE TRIGGER trg_change_proposal_frozen BEFORE INSERT OR UPDATE OR DELETE ON c
 CREATE TRIGGER trg_change_proposal_item_frozen BEFORE INSERT OR UPDATE OR DELETE ON change_proposal_item FOR EACH ROW EXECUTE FUNCTION document_check_frozen('change_proposal_id', '{payload,field_changes}');
 CREATE TRIGGER trg_period_unlock_request_frozen BEFORE INSERT OR UPDATE OR DELETE ON period_unlock_request FOR EACH ROW EXECUTE FUNCTION document_check_frozen('id', '{reason}');
 CREATE TRIGGER trg_document_line_tax_frozen BEFORE INSERT OR UPDATE OR DELETE ON document_line_tax FOR EACH ROW EXECUTE FUNCTION document_check_frozen('document_id');
+CREATE TRIGGER trg_document_tax_treatment_frozen BEFORE INSERT OR UPDATE OR DELETE ON document_tax_treatment FOR EACH ROW EXECUTE FUNCTION document_check_frozen('document_id');
 CREATE TRIGGER trg_payment_frozen BEFORE INSERT OR UPDATE OR DELETE ON payment FOR EACH ROW EXECUTE FUNCTION document_check_frozen('id', '{partner_name,partner_tax_id,partner_address,counterparty_name}');
 CREATE TRIGGER trg_payment_line_frozen BEFORE INSERT OR UPDATE OR DELETE ON payment_line FOR EACH ROW EXECUTE FUNCTION document_check_frozen('payment_id', '{supplier_name,supplier_tax_id,description}');
 CREATE TRIGGER trg_payment_line_payment_block BEFORE INSERT OR UPDATE OF open_item_id, line_kind, payment_id ON payment_line FOR EACH ROW EXECUTE FUNCTION payment_line_check_payment_block();
@@ -2205,6 +2399,7 @@ CREATE TRIGGER trg_tax_line_adjustment_immutable BEFORE UPDATE OR DELETE ON tax_
 CREATE TRIGGER trg_tax_rate_check_change BEFORE UPDATE ON tax_rate FOR EACH ROW EXECUTE FUNCTION platform_check_append_only('{basis}', '{}');
 CREATE TRIGGER trg_tax_matrix_check_change BEFORE UPDATE ON tax_matrix FOR EACH ROW EXECUTE FUNCTION platform_check_append_only('{basis}', '{}');
 CREATE TRIGGER trg_company_tax_matrix_immutable BEFORE UPDATE OR DELETE ON company_tax_matrix FOR EACH ROW EXECUTE FUNCTION platform_reject_change();
+CREATE TRIGGER trg_tax_treatment_rule_check_change BEFORE UPDATE ON tax_treatment_rule FOR EACH ROW EXECUTE FUNCTION platform_check_append_only('{basis}', '{}');
 CREATE TRIGGER trg_audit_record_append_only BEFORE UPDATE OR DELETE ON audit_record FOR EACH ROW
     EXECUTE FUNCTION platform_check_append_only('{}', '{}', '{reason,erased_at}');
 CREATE TRIGGER trg_audit_change_append_only BEFORE UPDATE OR DELETE ON audit_change FOR EACH ROW
@@ -2286,10 +2481,11 @@ DECLARE
         'posting_intent', 'change_proposal', 'change_proposal_item', 'change_proposal_execution',
         'change_proposal_execution_item', 'event_subject', 'event_consumer', 'outbox_event', 'event_delivery',
         'audit_record', 'audit_change', 'audit_denial', 'attachment', 'attachment_link', 'tax_code', 'tax_rate',
-        'tax_matrix', 'company_tax_matrix', 'document_line_tax', 'tax_line', 'tax_line_adjustment',
-        'agent_promotion_evidence', 'money_account', 'payment_method_money_account', 'bank_statement',
-        'bank_statement_line', 'payment', 'payment_line', 'open_item_collection', 'business_date_override',
-        'idempotency_record', 'regime_setting', 'fiscal_year', 'posting_period', 'posting_period_area_state', 'close_task'];
+        'tax_matrix', 'company_tax_matrix', 'tax_treatment_rule', 'document_tax_treatment', 'document_line_tax',
+        'tax_line', 'tax_line_adjustment', 'agent_promotion_evidence', 'money_account', 'payment_method_money_account',
+        'bank_statement', 'bank_statement_line', 'payment', 'payment_line', 'open_item_collection',
+        'business_date_override', 'idempotency_record', 'regime_setting', 'fiscal_year', 'posting_period',
+        'posting_period_area_state', 'close_task'];
     v_append_only       text[] := ARRAY['agent_promotion_evidence', 'agent_run_step', 'agent_type_version', 'approval', 'audit_change', 'audit_record',
         'auto_post_confirmation', 'bank_statement', 'change_proposal_execution', 'change_proposal_execution_item',
         'company_tax_matrix', 'document_version', 'outbox_event', 'policy_decision', 'taint_clearance', 'tax_line',
@@ -2298,9 +2494,9 @@ DECLARE
         'policy_rule_version', 'document', 'document_version', 'taint_clearance', 'policy_decision', 'approval',
         'auto_post_confirmation', 'period_unlock_request', 'posting_intent', 'change_proposal', 'change_proposal_item',
         'change_proposal_execution', 'change_proposal_execution_item', 'outbox_event', 'audit_record', 'audit_change',
-        'audit_denial', 'attachment', 'company_tax_matrix', 'document_line_tax', 'tax_line', 'tax_line_adjustment',
-        'agent_promotion_evidence', 'bank_statement', 'bank_statement_line', 'payment', 'payment_line',
-        'outbox_event_default', 'audit_record_default', 'audit_change_default', 'agent_run_step_default']::text[];
+        'audit_denial', 'attachment', 'company_tax_matrix', 'document_tax_treatment', 'document_line_tax', 'tax_line',
+        'tax_line_adjustment', 'agent_promotion_evidence', 'bank_statement', 'bank_statement_line', 'payment',
+        'payment_line', 'outbox_event_default', 'audit_record_default', 'audit_change_default', 'agent_run_step_default']::text[];
     v_table             text;
 BEGIN
     FOREACH v_table IN ARRAY v_tables LOOP
@@ -2333,14 +2529,15 @@ DECLARE
         'policy_decision', 'approval', 'auto_post_confirmation', 'period_unlock_request', 'posting_intent',
         'change_proposal', 'change_proposal_item', 'change_proposal_execution', 'change_proposal_execution_item',
         'outbox_event', 'event_delivery', 'audit_record', 'audit_change', 'audit_denial', 'attachment', 'attachment_link',
-        'tax_code', 'tax_rate', 'company_tax_matrix', 'document_line_tax', 'tax_line', 'tax_line_adjustment',
-        'agent_promotion_evidence', 'money_account', 'payment_method_money_account', 'bank_statement',
-        'bank_statement_line', 'payment', 'payment_line', 'open_item_collection', 'business_date_override',
-        'idempotency_record', 'fiscal_year', 'posting_period', 'posting_period_area_state', 'close_task',
-        'outbox_event_default', 'audit_record_default', 'audit_change_default', 'agent_run_step_default'];
+        'tax_code', 'tax_rate', 'company_tax_matrix', 'tax_treatment_rule', 'document_tax_treatment', 'document_line_tax',
+        'tax_line', 'tax_line_adjustment', 'agent_promotion_evidence', 'money_account', 'payment_method_money_account',
+        'bank_statement', 'bank_statement_line', 'payment', 'payment_line', 'open_item_collection',
+        'business_date_override', 'idempotency_record', 'fiscal_year', 'posting_period', 'posting_period_area_state',
+        'close_task', 'outbox_event_default', 'audit_record_default', 'audit_change_default', 'agent_run_step_default'];
     v_nullable  text[] := ARRAY['agent_budget_usage', 'outbox_event', 'event_delivery', 'audit_record', 'audit_change', 'audit_denial', 'tax_code',
-        'tax_rate', 'idempotency_record', 'outbox_event_default', 'audit_record_default', 'audit_change_default']::text[];
-    v_shared    text[] := ARRAY['tax_code', 'tax_rate']::text[];
+        'tax_rate', 'tax_treatment_rule', 'idempotency_record', 'outbox_event_default', 'audit_record_default',
+        'audit_change_default']::text[];
+    v_shared    text[] := ARRAY['tax_code', 'tax_rate', 'tax_treatment_rule']::text[];
     v_table     text;
 BEGIN
     FOREACH v_table IN ARRAY v_tables LOOP

@@ -188,6 +188,7 @@ CREATE TABLE site (                                        -- [master_data] ADR-
     address              jsonb,                               -- the columns of partner_address as keys (ADR-0045 rule 8)
     working_calendar_id  uuid,                                -- record default for new warehouses and work centers of the site
     business_unit_id     uuid,                                -- default unit of profit-and-loss lines from its warehouses (ADR-0069 rules 7, 9)
+    is_tax_zone          boolean NOT NULL DEFAULT false,      -- the site lies in a zone the tax rules treat apart (ADR-0080 rule 3)
     is_active            boolean NOT NULL DEFAULT true,       -- deactivation refused while an active warehouse names the site (site_in_use)
     recorded_at          timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, code),
@@ -215,12 +216,23 @@ CREATE TABLE partner_group (
     recorded_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT uq_partner_group_company_id_id UNIQUE (company_id, id)   -- target of company keys (ADR-0017 rule 19 note, 2026-11-21)
 );
-CREATE TABLE partner_tax_group (                           -- read by the tax matrix (ADR-0041 rule 3)
+-- ADR-0080 rule 1: the partner tax group of ADR-0041 rule 3 is split in two. partner_tax_status says what a party is (e.g.
+-- registered, not registered, foreign, exempt entity), an input of the treatment derivation and no longer a matrix key;
+-- tax_treatment says what a transaction is (e.g. domestic, export of goods, sale into a zone, cross-border service, reverse
+-- charge), the first axis of the tax matrix. Both lists are package templates copied into the company; the company may add
+-- its own (basis company_decision). The core seeds neither.
+CREATE TABLE partner_tax_status (                          -- [master_data] ADR-0080 rule 1; read by tax_treatment_rule
     id uuid PRIMARY KEY, company_id uuid NOT NULL REFERENCES company (id), code text NOT NULL, name text NOT NULL,
-    directions text[] NOT NULL CONSTRAINT ck_partner_tax_group_directions CHECK (directions <@ ARRAY['sale','purchase']::text[] AND cardinality(directions) > 0),
     basis jsonb NOT NULL, is_active boolean NOT NULL DEFAULT true, UNIQUE (company_id, code),
     recorded_at timestamptz NOT NULL DEFAULT now(),
-    CONSTRAINT uq_partner_tax_group_company_id_id UNIQUE (company_id, id)   -- target of company keys (ADR-0017 rule 19 note, 2026-11-21)
+    CONSTRAINT uq_partner_tax_status_company_id_id UNIQUE (company_id, id)   -- target of company keys (ADR-0017 rule 19 note, 2026-11-21)
+);
+CREATE TABLE tax_treatment (                               -- [master_data] ADR-0080 rule 1; the first axis of the tax matrix (ADR-0041 rule 3)
+    id uuid PRIMARY KEY, company_id uuid NOT NULL REFERENCES company (id), code text NOT NULL, name text NOT NULL,
+    directions text[] NOT NULL CONSTRAINT ck_tax_treatment_directions CHECK (directions <@ ARRAY['sale','purchase']::text[] AND cardinality(directions) > 0),
+    basis jsonb NOT NULL, is_active boolean NOT NULL DEFAULT true, UNIQUE (company_id, code),
+    recorded_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_tax_treatment_company_id_id UNIQUE (company_id, id)   -- target of company keys (ADR-0017 rule 19 note, 2026-11-21)
 );
 CREATE TABLE item_group (
     id uuid PRIMARY KEY, company_id uuid NOT NULL REFERENCES company (id), code text NOT NULL, name text NOT NULL,
@@ -253,7 +265,7 @@ CREATE TABLE partner (
     represents_company_id     uuid REFERENCES company (id),
     country                   text NOT NULL CONSTRAINT ck_partner_country CHECK (country ~ '^[A-Z]{2}$'),   -- ISO 3166-1 alpha-2
     partner_group_id          uuid,
-    partner_tax_group_id      uuid,
+    partner_tax_status_id     uuid,                               -- what the party is, an input of the treatment derivation (ADR-0080 rule 1)
     preferred_language        text,
     superseded_by_partner_id  uuid,                               -- ADR-0019 rule 19 (interim)
     is_active                 boolean NOT NULL DEFAULT true,
@@ -265,7 +277,7 @@ CREATE TABLE partner (
     FOREIGN KEY (company_id, superseded_by_partner_id) REFERENCES partner (company_id, id),
     CONSTRAINT ck_partner_not_own_parent CHECK (parent_partner_id IS NULL OR parent_partner_id <> id),
     FOREIGN KEY (company_id, partner_group_id) REFERENCES partner_group (company_id, id),   -- company key (ADR-0017 rule 19 note, 2026-11-21)
-    FOREIGN KEY (company_id, partner_tax_group_id) REFERENCES partner_tax_group (company_id, id)   -- company key (ADR-0017 rule 19 note, 2026-11-21)
+    FOREIGN KEY (company_id, partner_tax_status_id) REFERENCES partner_tax_status (company_id, id)   -- company key (ADR-0017 rule 19 note, 2026-11-21)
 );
 -- Tax ID duplicates are a check result, not a unique constraint (ADR-0019 rule 4).
 CREATE INDEX ix_partner_company_id_tax_id ON partner (company_id, tax_id) WHERE tax_id IS NOT NULL;
@@ -448,6 +460,7 @@ CREATE TABLE partner_address (
     subdivision_code  text,                                          -- package list of administrative units
     postal_code       text,
     country           text NOT NULL CONSTRAINT ck_partner_address_country CHECK (country ~ '^[A-Z]{2}$'),
+    is_tax_zone       boolean NOT NULL DEFAULT false,                -- inside a zone the tax rules treat apart, e.g. an export-processing zone (ADR-0080 rule 3)
     is_active         boolean NOT NULL DEFAULT true,
     recorded_at       timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, partner_id, id),                             -- a document names its ship-to or bill-to address with its partner (ADR-0074 rules 1-3)
@@ -1234,15 +1247,16 @@ DO $$
 DECLARE
     v_tables            text[] := ARRAY['currency', 'company_currency_activation', 'uom', 'uom_conversion', 'uom_alias', 'company', 'branch',
         'print_profile', 'business_unit', 'cost_center', 'working_calendar', 'working_calendar_holiday', 'site',
-        'data_translation', 'partner_group', 'partner_tax_group', 'item_group', 'valuation_class', 'item_tax_group',
-        'partner', 'project', 'partner_role', 'payment_method', 'incoterm', 'delivery_method', 'price_list',
-        'customer_profile', 'supplier_profile', 'employee_profile', 'partner_address', 'partner_bank_account', 'contact',
-        'product_category', 'storage_condition', 'handling_unit_type', 'product', 'product_uom', 'variant_attribute',
-        'variant_attribute_value', 'product_variant_attribute', 'product_attribute_value', 'item', 'item_variant_value',
-        'item_barcode', 'partner_item', 'item_manufacturer_part', 'code_series', 'product_category_requirement',
-        'classification_scheme', 'classification_value', 'product_classification', 'warehouse', 'zone', 'bin', 'lot',
-        'serial_number', 'price_list_entry', 'price_list_option_extra', 'barcode', 'gs1_company_prefix',
-        'partner_relationship', 'external_id_map', 'custom_field_definition', 'reason'];
+        'data_translation', 'partner_group', 'partner_tax_status', 'tax_treatment', 'item_group', 'valuation_class',
+        'item_tax_group', 'partner', 'project', 'partner_role', 'payment_method', 'incoterm', 'delivery_method',
+        'price_list', 'customer_profile', 'supplier_profile', 'employee_profile', 'partner_address',
+        'partner_bank_account', 'contact', 'product_category', 'storage_condition', 'handling_unit_type', 'product',
+        'product_uom', 'variant_attribute', 'variant_attribute_value', 'product_variant_attribute',
+        'product_attribute_value', 'item', 'item_variant_value', 'item_barcode', 'partner_item', 'item_manufacturer_part',
+        'code_series', 'product_category_requirement', 'classification_scheme', 'classification_value',
+        'product_classification', 'warehouse', 'zone', 'bin', 'lot', 'serial_number', 'price_list_entry',
+        'price_list_option_extra', 'barcode', 'gs1_company_prefix', 'partner_relationship', 'external_id_map',
+        'custom_field_definition', 'reason'];
     v_append_only       text[] := ARRAY[]::text[];
     v_refuse_truncate   text[] := ARRAY[]::text[];
     v_table             text;
@@ -1273,16 +1287,16 @@ END $$;
 DO $$
 DECLARE
     v_tables    text[] := ARRAY['company_currency_activation', 'uom', 'uom_alias', 'branch', 'print_profile', 'business_unit', 'cost_center',
-        'working_calendar', 'working_calendar_holiday', 'site', 'data_translation', 'partner_group', 'partner_tax_group',
-        'item_group', 'valuation_class', 'item_tax_group', 'partner', 'project', 'partner_role', 'payment_method',
-        'delivery_method', 'price_list', 'customer_profile', 'supplier_profile', 'employee_profile', 'partner_address',
-        'partner_bank_account', 'contact', 'product_category', 'storage_condition', 'handling_unit_type', 'product',
-        'product_uom', 'variant_attribute', 'variant_attribute_value', 'product_variant_attribute',
-        'product_attribute_value', 'item', 'item_variant_value', 'item_barcode', 'partner_item', 'item_manufacturer_part',
-        'code_series', 'product_category_requirement', 'classification_scheme', 'classification_value',
-        'product_classification', 'warehouse', 'zone', 'bin', 'lot', 'serial_number', 'price_list_entry',
-        'price_list_option_extra', 'barcode', 'gs1_company_prefix', 'partner_relationship', 'external_id_map',
-        'custom_field_definition', 'reason'];
+        'working_calendar', 'working_calendar_holiday', 'site', 'data_translation', 'partner_group', 'partner_tax_status',
+        'tax_treatment', 'item_group', 'valuation_class', 'item_tax_group', 'partner', 'project', 'partner_role',
+        'payment_method', 'delivery_method', 'price_list', 'customer_profile', 'supplier_profile', 'employee_profile',
+        'partner_address', 'partner_bank_account', 'contact', 'product_category', 'storage_condition',
+        'handling_unit_type', 'product', 'product_uom', 'variant_attribute', 'variant_attribute_value',
+        'product_variant_attribute', 'product_attribute_value', 'item', 'item_variant_value', 'item_barcode',
+        'partner_item', 'item_manufacturer_part', 'code_series', 'product_category_requirement', 'classification_scheme',
+        'classification_value', 'product_classification', 'warehouse', 'zone', 'bin', 'lot', 'serial_number',
+        'price_list_entry', 'price_list_option_extra', 'barcode', 'gs1_company_prefix', 'partner_relationship',
+        'external_id_map', 'custom_field_definition', 'reason'];
     v_nullable  text[] := ARRAY['uom']::text[];
     v_shared    text[] := ARRAY['uom']::text[];
     v_self      text[] := ARRAY['company']::text[];

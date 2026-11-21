@@ -921,7 +921,8 @@ if "--load" in sys.argv:
     trial("Y04 (a) under installation a core unit is inserted (rolled back afterwards)", lambda cx: (as_role(cx, "installation"), cx.execute(
         "insert into uom (id, code, name, quantity_kind, decimal_places) values (%s,%s,'Core 2','count',0)", (new(), "YD" + I["t"])), cx.execute("select 1/0")), "division by zero")
     pol = {r[0] for r in X("select tablename from pg_policies where schemaname = 'nativeflows' and policyname = 'shared_read_policy'").fetchall()}
-    check("Y05 (a) shared_read_policy is on exactly uom, tax_code and tax_rate, the reference catalogs with a nullable company_id", pol == {"uom", "tax_code", "tax_rate"}, sorted(pol))
+    check("Y05 (a) shared_read_policy is on exactly uom, tax_code, tax_rate and tax_treatment_rule (ADR-0080), the reference catalogs with a nullable company_id",
+          pol == {"uom", "tax_code", "tax_rate", "tax_treatment_rule"}, sorted(pol))
     cos = {r[0] for r in seen(str(I["co"]), "select id from company where id = any(%s)", ([I["co"], I["co2"]],))}
     cx_ = conn()
     with cx_.transaction():

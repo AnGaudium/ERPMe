@@ -108,7 +108,8 @@ item_group,*,covers: name; a code or configuration table that describes no perso
 item_tax_group,*,covers: name; a code or configuration table that describes no person
 movement_type,*,covers: name; a code or configuration table that describes no person
 partner_group,*,covers: name; a code or configuration table that describes no person
-partner_tax_group,*,covers: name; a code or configuration table that describes no person
+partner_tax_status,*,covers: name; a code or configuration table that describes no person
+tax_treatment,*,covers: name; a code or configuration table that describes no person
 payment_method,*,covers: name; a code or configuration table that describes no person
 payment_term,*,covers: name; a code or configuration table that describes no person
 price_list,*,covers: name; a code or configuration table that describes no person

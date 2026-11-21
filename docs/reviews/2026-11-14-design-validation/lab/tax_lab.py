@@ -121,6 +121,8 @@ def main(pkg):
     tdir = os.path.join(pkg, 'tax')
     def load(n): return list(csv.DictReader(open(os.path.join(tdir, n), encoding='utf-8')))
     rate_rows = load('tax_rates.csv'); matrix = load('tax_matrix.csv')
+    for x in matrix:   # ADR-0080: column tax_treatment; a package not yet reworked keeps partner_tax_group, read as the treatment
+        x.setdefault('partner_tax_group', x.get('tax_treatment', ''))
     def rate(code, date):
         rows = sorted((x for x in rate_rows if x['tax_code'] == code and x['effective_from'] <= date), key=lambda x: x['effective_from'])
         return D(rows[-1]['rate_percent']) if rows else None

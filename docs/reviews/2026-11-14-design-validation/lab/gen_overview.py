@@ -95,6 +95,7 @@ RLS_SHARED_READ = {
     "uom": "core units (company_id null, ADR-0018 rule 8) and a company's own units",
     "tax_code": "package tax codes (company_id null) and a company's own codes (ADR-0041 rule 4 note, 2026-11-21)",
     "tax_rate": "package rates (company_id null) and the rates of a company's own codes (ADR-0041 rule 4 note, 2026-11-21)",
+    "tax_treatment_rule": "package treatment rules (company_id null) and a company's own rules (ADR-0080 rule 3)",
 }
 # Tables whose row is a company itself (no company_id): the policies compare id with the settings (S2 closure, 2026-11-21).
 RLS_SELF = {
@@ -210,6 +211,7 @@ COMPANY_KEY_ALLOWLIST = {
     "outbox_event": "target: installation-scoped events have company_id null (ADR-0013 rule 14)",
     "tax_code": "target: package codes have company_id null (ADR-0041 rule 4 note, 2026-11-21); a composite key would refuse them",
     "tax_rate": "both sides: package rates and codes have company_id null (ADR-0041 rule 4 note, 2026-11-21)",
+    "tax_treatment_rule": "target: package treatment rules have company_id null (ADR-0080 rule 3); a composite key would refuse them",
     "event_delivery": "referencing table: installation-scoped deliveries have company_id null (ADR-0013 rule 14)",
 }
 FK_ELEMENT_RE = re.compile(r"(?:CONSTRAINT \w+ )?FOREIGN KEY \(([^)]*)\) REFERENCES (\w+) \(([^)]*)\)")

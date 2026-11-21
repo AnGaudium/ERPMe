@@ -72,6 +72,8 @@ Goods and services are modeled at two levels: a `product` holds everything that 
 
     Note (chief architect, 2026-11-21, under the author's delegation of that day): "each product has an `item_tax_group_id`" now reads: each product has an effective item tax group, its own or inherited from its category chain or the company default ([ADR-0041](0041-tax-engine.md) rule 7 note of this date). A company may also add its own tax codes, dated rates and matrix rows for its own groups through an approved change proposal ([ADR-0041](0041-tax-engine.md) rule 4 note).
 
+    Note (chief architect, 2026-11-21, under the author's delegation of that day; the author's request of that day that tax have two dimensions, product and transaction): "each partner, and each document where it differs, has a partner tax group" no longer holds; no document column for it ever existed. A partner has a `partner_tax_status` (what it is); a document's header and each line have a `tax_treatment` (what the transaction is), derived by rules and overridable by a person as a check result. The matrix is direction × treatment × item tax group ([ADR-0080](0080-tax-treatment-determination.md) rules 1 to 4).
+
 **Names and lifecycle**
 
 17. Names that users enter for company data in more than one language — product names and descriptions, variant attribute values, company units, classification values — are rows of `data_translation` (`table_name`, `row_id`, `field`, `language`, `text`), one mechanism for all. Printed documents use the partner's language and fall back to the company's language (ADR-0016 rule 19). These are user data, entered, not translated by the system.

@@ -140,7 +140,7 @@ A module name here means the ADR speaks of a consumer of that module without nam
 | a consumer in `quality` | 4 | ADR-0057:51, ADR-0070:14, ADR-0070:102 |
 | `render_worker` | 2 | ADR-0013:25, ADR-0049:199 |
 | a consumer in `sales` | 3 | ADR-0047:114, ADR-0047:252, ADR-0048:262 |
-| a consumer in `tax` | 2 | ADR-0041:166, ADR-0057:261 |
+| a consumer in `tax` | 2 | ADR-0041:170, ADR-0057:261 |
 | `tax_payment_evidence` | 2 | ADR-0044:150, ADR-0053:182 |
 | `usage_decision_auto_drafter` | 1 | ADR-0070:138 |
 | `usage_decision_executor` | 1 | ADR-0070:140 |
