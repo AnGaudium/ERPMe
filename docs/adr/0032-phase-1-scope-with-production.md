@@ -32,6 +32,8 @@ On 2026-11-14 the author decided that every capability a customer cannot operate
    - actual cost settled to stock and to cost of goods sold through the existing exact solver (ADR-0025 rule 6).
 
    The cost estimate is a benchmark for variances; stock stays valued at periodic actual cost (ADR-0020 rule 12). Whether standard cost becomes a valuation method stays the author's (spec 09 costing row, spec 08). Methods, normal capacity, overhead allocation and WIP valuation are accounting choices. DS-53 proposes them as flagged interims for the author (ADR-0005 item 1). Note: "best practice and Vietnamese rules together" reads "best practice; regimes configure" ([ADR-0053](0053-core-neutrality.md) rule 13).
+
+   Note (the author, 2026-11-21: costing follows SAP): the method question of this rule is answered. As in SAP, standard price with variance postings becomes a price-control option beside periodic actual costing, which stays the default (D6); the released cost estimate gives the standard price. It is designed by an ADR after step 5, on the seam of [ADR-0072](0072-costing-sheet-and-cost-component-structure.md) rule 21; until then stock stays at periodic actual cost ([decisions.md](../decisions.md), note of 2026-11-21; [open-questions.md](../open-questions.md), DS-53 entries). Whether TT99 permits it is the Vietnam package's rule and stays with the Vietnam work.
 4. **ADR-0025 is superseded in part.** Production no longer waits for Phase 2 or for "design when built". Superseded:
    - the opening sentence;
    - rule 2's "kinds and lifecycle are designed in Phase 2";
