@@ -38,7 +38,7 @@ class LintMutations(LintBase):
 
     def test_l0_sections(self):
         self.assertEqual(self.checks(self.run_lint(self.sub("## Invariants", "## Invariant list"))), ["L0"])
-        edge = "## Edge cases\n\nNone (stated with the owned rows under Settings).\n\n"
+        edge = "## Edge cases\n\nNone (the module owns no edge case).\n\n"
         self.assertEqual(self.checks(self.run_lint(self.sub(edge, ""))), ["L0"])
         swapped = self.sub("## Invariants", "## TMP").replace("## Edge cases", "## Invariants").replace(
             "## TMP", "## Edge cases")
@@ -49,7 +49,7 @@ class LintMutations(LintBase):
         front = "\n".join(self.spec.split("\n")[:3])
         trace_head = "## Trace\n\n| Source | Where |\n| --- | --- |\n"
         chunk1 = head.replace("Chunk: whole", "Chunk: 1 of 2") + trace_head
-        chunk2 = (front + "\n## Purpose\n\nChunk two.\n\n## Invariants" + tail).replace("Chunk: whole", "Chunk: 2 of 2")
+        chunk2 = (front + "\n## Purpose\n\nChunk two holds the rows.\n\n## Invariants" + tail).replace("Chunk: whole", "Chunk: 2 of 2")
         p1, p2 = os.path.join(self.tmp, "c1.md"), os.path.join(self.tmp, "c2.md")
         for p, t in ((p1, chunk1), (p2, chunk2)):
             with open(p, "w", encoding="utf-8") as fh:
@@ -85,7 +85,7 @@ class LintMutations(LintBase):
         self.assertEqual(self.checks(self.run_lint(self.as_ref(r, "ref: ADR-0999.R1"))), ["L7"])
 
     def test_l1_note_may_be_not_applicable_within_the_cap(self):
-        note = next(r for r in self.units if r["kind"] == "note" and not superseding(r) and not r["conflict_flag"])
+        note = self.quiet_note()
         dropped = self.drop_source(note["id"])
         self.assertEqual(self.run_lint(self.set_where(note["id"], "not applicable: review credit, history", dropped)),
                          [])
@@ -131,9 +131,9 @@ class LintMutations(LintBase):
         self.assertEqual(self.checks(self.run_lint(self.sub(f"- `{self.tables[0]}`\n", ""))), ["L2"])
 
     def test_l2_rows_of_other_modules_not_required(self):
-        not_owned = [c for c in self.scope["catalog_rows"] if c not in self.scope["owned_rows"]]
-        self.assertTrue(not_owned, "precondition: the module references rows it does not own")
-        self.assertNotIn(f"`{not_owned[0].split(':', 1)[1]}`", self.spec)
+        not_owned = [c.split(":", 1)[1] for c in self.scope["catalog_rows"] if c not in self.cat_rows]
+        self.assertTrue([k for k in not_owned if f"`{k}`" not in self.spec],
+                        "precondition: the module references rows it does not own and the spec leaves out")
         self.assertEqual(self.run_lint(self.spec), [])
 
     def test_l2_catalog_row_not_mentioned(self):
@@ -216,7 +216,8 @@ class LintMutations(LintBase):
         for bad in (f"FALSE-POSITIVE {note['id']}: the note only renames a term, nothing more",
                     f"CONFLICT {note['id']}: kept as it is written in the source text", ""):
             self.assertEqual(self.checks(self.run_lint(self.sub(line, bad))), ["L5"], bad)
-        question = doc_lint.docs_model(nfdocs.DEFAULT_DOCS)["questions"]["open"][0][:60]
+        question = self.open_question(f"Decide whether the wording of {note['id'][:8]} rule text or of its "
+                                      f"later note governs here.")[:60]
         self.assertEqual(self.run_lint(self.sub(line, f'OPEN {note["id"]}: asked as "{question}"')), [])
         if MODULE not in note["primary_module"]:
             ref_ok = self.set_where(note["id"], f"ref: {note['parent']}", self.drop_source(note["id"],

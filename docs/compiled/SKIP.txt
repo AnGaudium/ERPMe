@@ -1,0 +1,7 @@
+# One module per line, then a reason. Modules listed here need no compiled spec (see tools/docs/lint_all.sh).
+api no rule of its own (dossier holds no units)
+db no rule of its own (dossier holds no units)
+errors no rule of its own (dossier holds no units)
+i18n no rule of its own (dossier holds no units)
+ids no rule of its own (dossier holds no units)
+sdk no rule of its own (dossier holds no units)

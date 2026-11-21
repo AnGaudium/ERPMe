@@ -7,49 +7,67 @@ Usage: doc_lint.py SPEC.md [SPEC-2.md ...] --module M [--index CSV] [--index-com
 
 Stance: the lint connects the trace table to the rule bodies and closes the known shortcuts. Whether a statement
 says what its sources say is the different-model spot check of the template; the lint prints what that check and
-the chief architect must read: the REVIEW LIST (every Conflicts entry, counted per kind), the SUPERSEDED RULES and
-the stable-key mismatches.
+the chief architect must read: the REVIEW LIST (every Conflicts entry, counted per kind), the NOT APPLICABLE rows,
+the SUPERSEDED RULES and the stable-key mismatches.
 
 Output. Line 1: `LINT PASS findings=0`, `LINT FAIL findings=N` or, with --partial on an incomplete chunk set,
-`LINT PARTIAL findings=0 deferred=N`. Line 2: `measured: ...` (units, rules, primary rules, notes, sections, tables,
-R-numbers, trace rows, files). Then one finding per line (`L<n> <file>:<line>: <message>`), warnings (`W2`), the
-deferred counts, sizes, the identifier retention and size ratio per file, and the lists. With --json: line 1, then
-one line of JSON. Exit 0 on PASS and PARTIAL, 1 on FAIL, 2 on bad input.
+`LINT PARTIAL findings=0 deferred=N (NOT A PASS)`. Line 2: `measured: ...` (units, rules, primary rules, notes,
+sections, tables, R-numbers, trace rows, files). Then one finding per line (`L<n> <file>:<line>: <message>`),
+warnings (`W2`), the deferred counts, sizes, the identifier retention and size ratio per file, the `substance` line
+of the module (size ratio, retention, lowest rule ratios, with their floors), and the lists. With --json: line 1,
+then one line of JSON. Exit 0 on PASS, 1 on FAIL, 2 on bad input, exit 3 on PARTIAL: only exit 0 with
+`LINT PASS` passes.
 
 Refused with exit 2: a missing or repeated file; a module without units; `--module cross` and any module that is
 primary for no rule (their units are compiled in their primary modules); `process` without --allow-process.
 
 Before every check: invisible characters (zero-width, joiners, soft hyphen, bidi marks, variation selectors) are
-removed and no-break and other Unicode spaces become a space; HTML comments (count markers kept), ``` and ~~~
-fences, and indented code blocks (4 spaces or a tab after a blank line, outside a list) are blanked. Nothing inside
-them counts for any check, front matter included.
+removed, no-break and other Unicode spaces become a space and the hyphens U+2010 and U+2011 a hyphen; HTML comments
+(count markers kept), ``` and ~~~ fences, and indented code blocks (4 spaces or a tab after a blank line, outside a
+list) are blanked. Nothing inside them counts for any check; the one exception is the front matter (L0).
 
 Several files are the chunks of one module: every module-level check runs over all of them together.
 
 Checks:
   L0  front matter: `Module:` (equal to --module), `Chunk:` (`whole` or `k of n`), `Source ADRs:`, `Build step(s):`,
-      `Generated from index:` and `Compiled by:`.
+      `Generated from index:` and `Compiled by:`, as plain lines before the first heading or inside one code fence
+      that opens on the first non-blank line.
       - Index: `Generated from index` (7 or more hex digits) must be the last commit of the index file, or
         --index-commit, which must be a commit of the repository; the index file must equal its version in that
         commit. An index that differs, or a commit that cannot be read, is a finding.
       - Chunks: one file is `whole` or `1 of 1`; several files are `k of n` with one n, each k once, 1..n all given.
-        An incomplete set (a lone chunk of n > 1) is a finding and prints a NOTICE; with --partial the module-level
-        checks that need the other chunks are counted as `deferred`, not reported, and line 1 says `LINT PARTIAL`.
+        An incomplete set (a lone chunk of n > 1, or chunks 1 and 2 of 3) is a finding and prints a NOTICE; with
+        --partial the module-level checks that need the other chunks are counted as `deferred`, not reported, and
+        line 1 says `LINT PARTIAL ... (NOT A PASS)` (exit 3). The lint cannot know the true n.
+      - Front matter against the units: every ADR of the units a file traces to an R-number (not `ref:` rows) is
+        listed in its `Source ADRs` (an extra ADR is not a finding); `Build step(s)` names a step (digits, an
+        optional letter) or says `not stated`, and each step is a `build_step` value of the index rows of the
+        module's units (lenient: when no unit of the module has a step in the index there is nothing to compare).
       - Sections: the template's eleven `##` sections, in its order, no others; every file has `## Purpose` and
-        `## Trace`, all eleven appear across the chunks. Every section present has content (a `###` heading is not
-        content). `None` is allowed for Commands and queries, Invariants, Edge cases, Settings and UI annotations
+        `## Trace`, all eleven appear across the chunks. Every section present has content: a sentence of 3 or more
+        words, a list item or a table row with a letter or digit (a `###` heading, `---`, `-` or one word is not).
+        A reason of `None (<reason>)` or `None: <reason>`, wherever given, has a word of 3 letters or more that is
+        not none, nothing, nil, empty, not, applicable (`n/a`, `none` are no reasons). `None` is allowed for Commands and queries, Invariants, Edge cases, Settings and UI annotations
         with a reason (`None (reason)` or `None: reason`), bare for Conflicts and Proposed (not law); for Entities
-        and tables only when the module owns no table; never for Purpose, Rules and Trace.
+        and tables only when the module owns no table; never for Purpose, Rules and Trace. (Invariants, Edge cases
+        and Settings: see L2.)
   L1  trace and rule bodies.
       - Every rule, note and Decision text ID of the module appears in the `## Trace` table. The trace table and the
         set of R-numbers are not empty.
-      - An R-number is defined by `R<n>.` (at most 3 spaces of indent, optional list marker or bold) in `## Rules`
-        or `## Proposed (not law)`, outside a `Reads` paragraph; it runs to the next blank line. It is defined once
-        in the module's files.
+      - An R-number definition starts at a line `R<n>. ` (at most 3 spaces of indent, optional list marker or bold)
+        in `## Rules` or `## Proposed (not law)`, outside a `Reads` paragraph, that follows a blank line, a heading
+        or the last line of the definition before it. It runs to the end of the line or paragraph that holds its
+        `Source:`, so a list or a table may stand inside it before `Source:`. A line `R<n>.` inside a paragraph (a
+        hard wrap) is text. A definition without `Source:` before the next definition or heading is its first
+        paragraph only. `R02` and `R2` are one R-number; each is defined once in the module's files.
       - Statement (the text before `Source:`): 12 or more letters and digits after markup, tags and entities are
-        removed; 2 or more distinct words (3 letters or more) that occur in the ADRs; no placeholder (`TBD`, `TODO`,
-        `FIXME`, `to be compiled|written|defined|added|done|filled`, `see|per|as in|follows the source`, `as
-        stated|written|given in the source`, `lorem ipsum`) outside backticks; it repeats no other.
+        removed; 2 or more distinct words (3 letters or more) that occur in the ADRs; no placeholder outside
+        backticks (`TBD`, `TODO`, `FIXME`, `to be compiled|written|defined|added|done|filled`, `see|per|as in|follows
+        the source`, `as stated|written|given in the source`, `lorem ipsum`, `content|text|statement|rule|details
+        pending`, `pending compilation`, `placeholder for the rule|statement|text|content|law`, `omitted here|for`,
+        `for brevity`, `same as the ADR|source|rule`, `see ADR-nnnn ... for the full statement|text|rule|...`,
+        `refer to the ADR|source text|source rule`, `will be compiled|stated|written|added|filled`); it repeats no
+        other.
       - `Source:` is required. Its IDs (`ADR-nnnn.Rk`, `.Nj` after an ID for a note of it) exist in the index (L7)
         and are units of the module (L7).
       - Source/trace agreement, both directions, across chunks: a unit traced to R-n is in the Source of R-n, and a
@@ -61,40 +79,76 @@ Checks:
         refused (a note is folded into its rule's R-number).
       - `Where` of a Decision text unit (`.D*`, `.W`): also an existing heading of the spec (any chunk).
       - Any other `Where` part, a heading that does not exist, `Reads` and an empty cell are findings.
-      - `ref: ADR-nnnn.Rk` is the unit's own ID, its parent rule's ID or an ID the unit's index row cross-references.
-        `ref: <module> R-<n>` names a primary module of the unit (so `process` and `cross` only when primary); when
-        that module's compiled spec lies beside the linted file (`<module>.md` or `<module>-<k>.md`), R-n is defined
-        there and its Source holds the unit's ID.
-      - At most 15% of the module's units are `not applicable`.
+      - `ref: ADR-nnnn.Rk` is the unit's own ID or its parent rule's ID. `ref: <module> R-<n>` names a primary
+        module of the unit (so `process` and `cross` only when primary); when that module's compiled spec lies
+        beside the linted file (`<module>.md` or `<module>-<k>.md`), R-n is defined there and its Source holds the
+        unit's ID.
+      - `not applicable` is refused for a rule, needs a reason, and is refused for a note whose relation is
+        `supersedes` or `superseded-by`, that carries a conflict flag, or whose text holds a code-span identifier
+        (as in L11) that its parent rule's text does not hold. Every accepted row is printed with its reason under
+        NOT APPLICABLE. At most 15% of the module's units are `not applicable`.
       - Coverage: the rule units mapped to an R-number whose Source cites them, counting at most 4 IDs per
         R-number, are 60% or more of the rule units not traced as `ref:`.
       - A Source cell may carry the unit's `#<stable_key>` (index column); a mismatch is warning W2 and is listed
         after the REVIEW LIST (--strict makes it a finding).
-  L2  every table the module owns and every catalog row it owns (module_scope `owned_rows`) is backticked in the
-      body outside `Reads` paragraphs and the trace table;
+  L2  owned names in their sections, outside `Reads` paragraphs:
+      - every table the module owns is backticked under `## Entities and tables` of some chunk (a line `Defined by
+        rule, without DDL: `t`` there serves);
+      - every catalog row the module owns is backticked in the body outside the trace table. Owned: an
+        `invariants` or `edge-cases` row whose `area` is the module; any other row of module_scope `owned_rows`
+        whose catalog row has a `module` or `area` column naming the module, or else whose key is not a module
+        name, a table name, a column name, an authorization verb or level, or a key of another catalog (the index
+        summary's ambiguous names); the authorization-verb-levels catalog is never owned. The index is unchanged;
+        the lint filters;
+      - `## Invariants`, `## Edge cases` and `## Settings` are not `None` in every chunk while the module owns rows
+        of that kind;
+      - an `INV-nn`, `EC-nn` or setting key has its row in one chunk only: the first cell of a table row, or the
+        leading backticked ID of a list item, under `## Invariants`, `## Edge cases` or `## Settings`.
   L3  a line citing a rule of a proposed ADR (`ADR-0070.R12`, `ADR-0070 rule 12`, `ADR-0070, rule 12`, `rule 12 of
-      ADR-0070`, `rule 12 in ADR-0070`, `ADR-0070 (rule 12)`, `ADR 0070 rule 12`, `ADR-0070 §12`, `Rule`, `rules 12
-      through 14`) is under `## Proposed (not law)` or carries `[proposed]`; a line citing only accepted rules
-      carries neither; a proposed unit's R-numbers are defined under `## Proposed (not law)` or carry `[proposed]`,
-      an accepted unit's R-numbers are defined under `## Rules` without `[proposed]`; a proposed Decision text unit
-      names only headings of `## Proposed (not law)`;
+      ADR-0070`, `rule 12 in ADR-0070`, `ADR-0070 (rule 12)`, `rule 12 (ADR-0070)`, `R12 of ADR-0070`, `ADR 0070
+      rule 12`, `ADR-0070/R12`, `ADR-0070 r. 12`, `ADR-0070 §12`, `Rule`, `rules 12 through 14`) is under
+      `## Proposed (not law)` or carries `[proposed]`; a line citing only accepted rules carries neither; a proposed
+      unit's R-numbers are defined under `## Proposed (not law)` or carry `[proposed]`, an accepted unit's R-numbers
+      are defined under `## Rules` without `[proposed]`; a proposed Decision text unit names only headings of
+      `## Proposed (not law)`;
   L4  no typed count: a number (digits, number words from two, `twenty-one`, `a dozen`, Roman numerals of I, V, X)
       before a counted noun, up to three words between, or after it (`Tables owned: 10`, `Tables owned — 10`,
-      `Owned tables (10)`), glued to it (`16tables`, `16-table`), or in a table row (`| ... tables | 16 |`,
-      `| 16 | owned tables |`), is a finding. Bold, italics, backticks, links, tags and `&nbsp;` are removed first.
-      `one` is not a count; citations (`rule 15 note`, `7 of rule`, `INV-12`) and `at most|at least|up to|more
-      than|fewer than|less than` thresholds pass; `exactly` and `only` do not.
+      `Owned tables (10)`), glued to it (`16tables`, `16-table`), in a table row (`| ... tables | 16 |`,
+      `| 16 | owned tables |`), `all 16 of its tables`, `the table count is 16`, `tables, 16 in all`, `Tables owned
+      (sixteen in all)`, `commands number 12`, `12 (twelve) tables`, `Tables x12` or `a couple of tables`, is a
+      finding. The nouns are tables, rules, columns, settings, commands, queries, notes, invariants, edge cases,
+      modules, catalog rows, events, chunks, units, sections, entities, relations. Digits also read `12.0`,
+      `1.2e1`, `0x0C`. A number alone on its line (or `| Owned | 12 |`) under a line that ends with a plural noun
+      (`Owned tables:`, a `Tables` header cell) is a count too. The lines of a paragraph are
+      read joined (a count split by a hard wrap is one count). Before the count patterns the text is folded: NFKC
+      (fullwidth, Roman-numeral, circled and superscript digits, ligatures), marks dropped, Cyrillic and Greek
+      lookalikes of Latin letters made Latin, CJK numerals made digits; the same fold is read before the placeholder
+      test (`ТBD`, `ＴＢＤ`), never in an ID. Bold, italics, backticks, links, tags
+      and `&nbsp;` are removed first. `one` is not a count; citations (`rule 15 note`, `7 of rule`, `INV-12`) and
+      `at most|at least|up to|more than|fewer than|less than` thresholds pass; `exactly` and `only` do not.
+      Values of law pass under `## Rules`, `## Invariants`, `## Edge cases` and `## Settings`: a number followed by
+      a unit (`s`, `ms`, seconds, minutes, hours, days, weeks, months, quarters, years, `%`, percent, bytes, `KB`,
+      characters, digits, decimals, decimal places, rows per, times per), the number of a standard (`ISO 4217`,
+      `RFC`, `IEC`, `IAS`, `IFRS`, `GS1`, `EN`), and a number+noun phrase that also occurs (same number, same noun,
+      at most 4 words between) in a source unit cited by the `Source:` of the R-number it stands in, or in the
+      catalog row of an `INV-nn`, `EC-nn` or backticked setting key named in the same row or paragraph. A phrase
+      whose noun is table, rule, catalog row or setting is never a quote when its number is the module's own count
+      of that kind or the context says owns, owned, module, spec, total or in all (for units, sections and entities
+      only the module's own count denies a quote). Elsewhere the strict reading stays.
       `<!-- count:KIND -->N<!-- /count -->` is recomputed (tables, rules, catalog-rows, settings; also notes,
-      sections, columns, invariants, edge-cases);
-  L5  `## Conflicts`: every line is an entry, its continuation, a `###` heading, a blank line or the single line
-      `None`. An entry is `CONFLICT <id>: <reason>`, `FALSE-POSITIVE <id>: <reason>` or `OPEN <id>: <text>`; a list
-      marker, bold, backticks, `CONFLICT: <id>` and a table row `| CONFLICT | <id> | <reason> |` are read as
-      entries; any other line, and an entry line outside `## Conflicts`, is a finding.
+      sections, columns, invariants, edge-cases, units, entities); the noun after a marker (up to two adjectives)
+      must be of its kind: `count:tables` then `rules` is a finding;
+  L5  `## Conflicts`: every line is an entry, an indented continuation of one, a `###` heading, a blank line or the
+      single line `None`. An entry is `CONFLICT <id>: <reason>`, `FALSE-POSITIVE <id>: <reason>` or `OPEN <id>:
+      <text>`; a list marker, bold, backticks, `CONFLICT: <id>` and a table row `| CONFLICT | <id> | <reason> |` are
+      read as entries; any other line (also a list item or an entry-like line, indented or not), and an entry line
+      outside `## Conflicts`, is a finding.
       - Every ID is a unit of the module; one ID has entries of one kind.
       - A CONFLICT or FALSE-POSITIVE reason has 25 characters or more and 4 or more distinct words (3 letters or
         more) that occur in the ADRs; one reason, or one more than 0.8 similar, serves at most 3 entries of its kind.
       - OPEN quotes, in double quotes, 20 or more characters of an unchecked entry of docs/open-questions.md (the
-        file numbers no questions; an `OQ-nnn` counts only when an unchecked entry starts with it); an
+        file numbers no questions; an `OQ-nnn` counts only when an unchecked entry starts with it); that entry
+        names the ADR of the unit or of a unit that supersedes it (`ADR-0013`, `ADR 0013` or `0013-<file>`); an
         `open-questions.md#anchor` must be a heading of that file.
       - FALSE-POSITIVE is for conflict-flagged notes only; an ID without flag, marker or supersession may be
         CONFLICT or OPEN.
@@ -103,7 +157,8 @@ Checks:
         the governing text, an ADR unit ID or R-number, or OPEN, on the note or its parent rule; FALSE-POSITIVE is
         refused) unless its Where is `ref:`;
   L6  each file is within the hard budget (16,000 tokens, bytes / 3.5); sizes per `## ` section are reported;
-  L7  every ID in the trace table and in a `Source:` exists in the index and is a unit of the module;
+  L7  every ID in the trace table and in a `Source:` exists in the index and is a unit of the module; an ID cited
+      anywhere else in the body (statements, Conflicts reasons, `ADR-0004.R99`, `rule 99 of ADR-0004`) exists too;
   L8  a cross-module reference `<module> R-<n>` (template rule 6) names a module and a numeric rule; `R-scrap`, a bare
       `R-3` and `nosuch R-1` are findings; a backticked `<word> ADR-nnnn` must name a module;
   L9  every setting key referenced by the module's units is backticked in the body (a `Reads` paragraph serves for
@@ -112,10 +167,17 @@ Checks:
       superseded has, unless its Where is `ref:`, an OPEN entry or a CONFLICT that names a superseding ID (any ADR
       unit ID or R-number when the index names none); with a CONFLICT, the named superseding ID is in the Source of
       every R-number the rule is traced to. Every such rule is printed under SUPERSEDED RULES for the spot check;
-  L11 identifier retention: a source rule (not superseded, no superseding note) whose text holds 3 or more distinct
-      identifiers in backticks, traced to R-numbers whose statements hold none of them in backticks, is a finding.
-      An identifier is a code span that is one name of 4 or more characters (`inspection_lot`, `quality.deviation`).
-      Per file the lint prints the share of source rule identifiers kept and statement bytes / source rule bytes.
+  L11 substance of the statements (source rules whose index text is unchanged):
+      - identifier retention per rule: a source rule (not superseded, no superseding note) whose text holds 3 or
+        more distinct identifiers in backticks, traced to R-numbers whose statements hold none of them in
+        backticks, is a finding. An identifier is a code span that is one name of 4 or more characters
+        (`inspection_lot`, `quality.deviation`);
+      - per source rule (not superseded) whose text plus the notes traced to R-numbers is 500 bytes or more: the
+        statements of all R-numbers the rule and those notes are traced to total 0.10 or more of that size;
+      - per module (all chunks; deferred with --partial): size ratio (statement bytes / source rule bytes) 0.30 or
+        more, and identifier retention (identifiers of the source rules kept in backticks) 40% or more.
+      Calibration (S4 corpus, 21 complete modules): lowest rule ratio 0.28, lowest size ratio 0.90, lowest
+      retention 89%.
 """
 
 import argparse
@@ -124,6 +186,7 @@ import glob
 import json
 import os
 import re
+import unicodedata
 import subprocess
 import sys
 from collections import Counter
@@ -143,6 +206,7 @@ MIN_REASON = 25             # characters of a CONFLICT or FALSE-POSITIVE reason
 MIN_REASON_WORDS = 4        # distinct ADR-vocabulary words in a reason
 MIN_STATEMENT_CHARS = 12    # letters and digits of an R-number statement, markup removed
 MIN_STATEMENT_WORDS = 2     # distinct ADR-vocabulary words in a statement
+MIN_SENTENCE_WORDS = 3      # words of a prose line that is real content of a section
 MAX_REASON_REUSE = 3
 REASON_SIMILARITY = 0.8
 MIN_COVERAGE = 0.60
@@ -151,10 +215,18 @@ MAX_NA_SHARE = 0.15
 MIN_QUOTE = 20              # characters of an open question quoted by an OPEN entry
 RETENTION_MIN_IDS = 3       # L11: a source rule with this many identifiers and none kept is a finding
 IDENT_MIN_LEN = 4
+SUBSTANCE_MIN_BYTES = 500   # L11: a source rule (with its notes) of this size has a floor on its statements
+MIN_RULE_RATIO = 0.10       # L11: statement bytes of its R-numbers / bytes of the rule and its notes
+MIN_SIZE_RATIO = 0.30       # L11, per module: statement bytes / source rule bytes
+MIN_RETENTION = 0.40        # L11, per module: share of source rule identifiers kept in backticks
+EXIT_PARTIAL = 3            # LINT PARTIAL is not a pass
+ROW_SECTIONS = {"Invariants": "invariants", "Edge cases": "edge-cases", "Settings": "settings"}
+LAW_SECTIONS = ("Rules",) + tuple(ROW_SECTIONS)   # L4 reads values of law here; elsewhere the old strictness
 
 INVISIBLE_RE = re.compile("[\u00ad\u034f\u061c\u115f\u1160\u17b4\u17b5\u180b-\u180e\u200b-\u200f\u202a-\u202e"
                           "\u2060-\u206f\ufe00-\ufe0f\ufeff\U000e0000-\U000e007f]")
 SPACE_RE = re.compile("[\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]")
+HYPHEN_RE = re.compile("[\u2010\u2011]")
 
 UNIT_ID_RE = re.compile(r"ADR-\d{4}\.(?:L\d+\.)?(?:R\d+[a-z]?|D\d+|W\d*|[A-Z]\d*)(?:\.N\d+)?")
 COUNT_RE = re.compile(r"<!--\s*count:([\w-]+)\s*-->\s*(\d+)\s*<!--\s*/count\s*-->")
@@ -162,12 +234,12 @@ TENS = "twenty thirty forty fifty sixty seventy eighty ninety".split()
 UNITS = "two three four five six seven eight nine".split()
 NUMBER_WORDS = UNITS + ("ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen hundred "
                         "dozen").split() + TENS
-NUM = (r"(?:\d[\d,]*|(?:" + "|".join(TENS) + r")-(?:one|" + "|".join(UNITS) + r")|(?:a\s+)?(?:" +
+NUM = (r"(?:0[xX][0-9a-fA-F]+|\d+(?:\.\d+)?[eE]\d+|\d[\d,]*(?:\.0+)?|(?:" + "|".join(TENS) + r")-(?:one|" + "|".join(UNITS) + r")|(?:a\s+)?(?:" +
        "|".join(NUMBER_WORDS) + r"))")
 NOUNS = r"(?:tables?|rules?|columns?|settings?|commands?|queries|query|notes?|invariants?|edge cases?|modules?|" \
-        r"catalog rows?|events?|chunks?)"
+        r"catalog rows?|events?|chunks?|units?|sections?|entit(?:y|ies)|relations?)"
 PLURAL_NOUNS = r"(?:tables|rules|columns|settings|commands|queries|invariants|edge cases|modules|catalog rows|" \
-               r"events|chunks)"
+               r"events|chunks|units|sections|entities|relations)"
 COUNT_BEFORE_RE = re.compile(r"(?<![\w.\-/])(" + NUM + r")\s+(?!of\b|to\b)(?:[^\s|:;.()]+\s+){0,3}?" + NOUNS +
                              r"\b(?![-/]|\.\w)(?!\s*\(?\d)", re.I)
 # 'rule 3' and 'note (2)' are citations, 'setting-presets.csv' is a name: not counts
@@ -181,6 +253,52 @@ COUNT_CELL_REV_RE = re.compile(r"\|\s*(" + NUM + r")\s*\|\s*(?:[\w-]+\s+){0,2}" 
 CITATION_WORDS = {"rule", "rules", "step", "steps", "phase", "layer", "layers", "section", "sections", "class", "level",
                   "floor", "round", "pass", "finding", "item", "items", "note", "notes", "chunk", "part", "version",
                   "wave", "principle", "spec", "stage", "page", "line", "lines", "s"}
+COUNT_OF_RE = re.compile(r"(?<![\w.\-/])(" + NUM + r")\s+of\s+(?:its|the|these|those|their)\s+(?:[a-z-]+\s+){0,2}?" +
+                         PLURAL_NOUNS + r"\b", re.I)                    # all 16 of its tables
+COUNT_IS_RE = re.compile(r"\b(?:" + NOUNS + r"\s+(?:count|total)|(?:number|count|total)\s+of\s+(?:[a-z-]+\s+){0,2}?" +
+                         PLURAL_NOUNS + r")\s+(?:is|are|was|of|=|:)\s*(" + NUM + r")\b", re.I)   # the table count is 16
+_IN_ALL = r"(?:in all|in total|altogether|total)"
+COUNT_TAIL_RE = re.compile(r"\b" + PLURAL_NOUNS + r"(?:\s+[A-Za-z]\w*)?\s*(?:,\s*|\(\s*)(" + NUM + r")\s+" + _IN_ALL +
+                           r"\b", re.I)                                 # tables, 16 in all; Tables owned (16 in all)
+COUNT_VERB_RE = re.compile(r"\b" + PLURAL_NOUNS + r"\s+(?:number|numbering|total|totalling|come to)\s+(" + NUM +
+                           r")\b", re.I)                                # its commands number 12
+COUNT_PAIR_RE = re.compile(r"(?<![\w.\-/])(?:a\s+)?couple\s+of\s+(?:[a-z-]+\s+){0,2}?" + PLURAL_NOUNS +
+                           r"\b", re.I)          # a couple of tables ('a pair of segregation rules' is a kind, not a count)
+COUNT_MULT_RE = re.compile(r"\b" + PLURAL_NOUNS + r"\s*[x\u00d7]\s*(" + NUM + r")\b", re.I)   # Tables x12
+NOUN_RE = re.compile(NOUNS, re.I)
+NUM_RE = re.compile(r"(?<![\w.\-/])" + NUM + r"\b", re.I)
+# values of law, not counts (inside a rule definition): a number with a unit, the number of a standard
+UNIT_RE = re.compile(r"\s*(?:%|(?:s|ms|sec(?:ond)?s?|min(?:ute)?s?|h|hours?|days?|weeks?|months?|quarters?|years?|"
+                     r"percent|bytes?|[kMGT]i?B|characters?|chars?|digits?|decimals?|decimal\s+places?|"
+                     r"rows?\s+per|times?\s+per)(?![\w-]))", re.I)
+STANDARD_RE = re.compile(r"\b(?:ISO(?:/IEC)?|IEC|RFC|IAS|IFRS|GS1|EN)[ -]?$")
+INVENTORY_NOUNS = {"table": "tables", "rule": "rules", "catalog row": "catalog-rows", "setting": "settings"}
+OWN_COUNT_NOUNS = {"unit": "units", "section": "sections", "entity": "tables"}   # 'total' is ordinary text here
+MARKER_NOUNS = {"table": {"tables", "entities"}, "rule": {"rules"}, "note": {"notes"}, "section": {"sections"},
+                "setting": {"settings"}, "invariant": {"invariants"}, "edge case": {"edge-cases"},
+                "catalog row": {"catalog-rows"}, "column": {"columns"}, "unit": {"units"}, "entity": {"tables"}}
+KIND_ALIAS = {"rule": "rules", "note": "notes", "table": "tables", "setting": "settings", "invariant": "invariants",
+              "edge-case": "edge-cases", "catalog-row": "catalog-rows", "column": "columns", "section": "sections",
+              "unit": "units", "entity": "entities"}
+NOUN_AFTER_RE = re.compile(r"^\s*((?:[A-Za-z-]+\s+){0,2}?)(" + NOUNS + r")\b", re.I)
+LONE_NUM_RE = re.compile(r"^(?:[-*+]\s+|\d+[.)]\s+)?(" + NUM + r")\.?$", re.I)
+NOUN_END_RE = re.compile(r"\b(" + PLURAL_NOUNS + r")\s*[:\-\u2014\u2013]?\s*$", re.I)
+HEADER_NOUN_RE = re.compile(r"^(?:[A-Za-z-]+\s+)?(" + PLURAL_NOUNS + r")$", re.I)
+STEP_RE = re.compile(r"(?<![\w.])\d+[a-z]?(?![\w.])")
+WEAK_REASON_WORDS = set("none nothing nil empty not applicable the and for".split())
+MARKER_STOP = set("of in the and or for with to from by on per a an its their these those that is are was were as at "
+                  "not no".split())
+LONE_LABELS = set("owned own owns count counts total number module spec all value size".split())
+CJK_DIGITS = {"零": 0, "〇": 0, "一": 1, "二": 2, "两": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9}
+CJK_UNITS = {"十": 10, "百": 100}
+CJK_RUN_RE = re.compile("[零〇一二两三四五六七八九十百]+")
+# lookalikes of Latin letters (Cyrillic, Greek) that a reader takes for the Latin letter
+CONFUSABLES = str.maketrans(
+    "аеорсухіјѕԁһԛԝАВЕКМНОРСТХІЈЅ" "ΑΒΕΖΗΙΚΜΝΟΡΤΥΧ" "οινυρκ",
+    "aeopcyxijsdhqwABEKMHOPCTXIJS" "ABEZHIKMNOPTYX" "oivupk")
+INVENTORY_WORD_RE = re.compile(r"\b(?:owns?|owned|module|spec|in all|in total|total|altogether)\b", re.I)
+WORD_VALUE = {w: k for k, w in enumerate("two three four five six seven eight nine ten eleven twelve thirteen "
+                                         "fourteen fifteen sixteen seventeen eighteen nineteen twenty".split(), 2)}
 THRESHOLD_RE = re.compile(r"(?:at most|at least|up to|more than|fewer than|less than)\s*$", re.I)
 XREF_R_RE = re.compile(r"(?:(?<![\w-])([A-Za-z_][\w]*)\s+)?(?<![\w-])R-([\w-]*)")
 XREF_ADR_RE = re.compile(r"`([a-z][a-z0-9_]*)`?\s+`?ADR-\d{4}")
@@ -198,13 +316,22 @@ ENTRY_RE = re.compile(r"^\s*(?:(?:[-*+]|\d+[.)])\s+)?" + _MARK + r"(CONFLICT|FAL
                       r"\s*[:\-–—]?\s*(.*)$")
 ENTRY_LIKE_RE = re.compile(r"^\s*(?:(?:[-*+]|\d+[.)])\s+)?[*_`|\s]*(?:conflict|false[- ]positive|open)\b[*_`|\s]*:?"
                            r"[*_`|\s]*ADR-\d{4}", re.I)
+ENTRY_WORD_RE = re.compile(r"^[*_`|\s]*(?:conflict|false[- ]positive|open)\b.{0,24}?ADR-\d{4}", re.I)
+ROW_ID_RE = {"Invariants": re.compile(r"INV-\d+"), "Edge cases": re.compile(r"EC-\d+"),
+             "Settings": re.compile(r"[a-z][a-z0-9_]*(?:\.(?:[a-z0-9_]+|<[^>]+>))+")}
 NONE_RE = re.compile(r"^None(?:\.|\s*\(([^)]+)\)\.?|\s*[:.,;]\s*(\S.*))?$")
 KEY_IN_CELL_RE = re.compile(r"#([0-9a-f]{12})\b")
 GOVERNING_RE = re.compile(r"ADR-\d{4}\.|\bR\d+[a-z]?\b")
 PLACEHOLDER_RE = re.compile(
     r"\b(?:TBD|TODO|FIXME)\b|\bto be (?:compiled|written|defined|added|done|filled)\b|\blorem ipsum\b|"
     r"\b(?:see|per|as in|as per|follows) the source(?: text| rules?| ADRs?)?\b|"
-    r"\bas (?:stated|written|given) in the source\b", re.I)
+    r"\bas (?:stated|written|given) in the source\b|"
+    r"\b(?:content|text|statement|rule|details?) (?:is |are )?pending\b|\bpending compilation\b|"
+    r"\bplaceholder for (?:the |this |a )?(?:rule|statement|text|content|law)\b|"
+    r"\bomitted (?:here|for)\b|\bfor brevity\b|\bsame as (?:in )?the (?:ADR|source|rule)\b|"
+    r"\bsee ADR[- ]\d{4}\b[^.;]{0,40}\bfor (?:the |its |a )?(?:full |complete |exact )?"
+    r"(?:statement|text|rule|details?|wording|content)\b|\brefer to the (?:ADR|source text|source rules?)\b|"
+    r"\bwill be (?:compiled|stated|written|added|filled)\b", re.I)
 WORD_RE = re.compile(r"[A-Za-z]{3,}")
 IDENT_RE = re.compile(r"[A-Za-z_][\w.]*")
 QUOTE_RE = re.compile(r"\"([^\"]+)\"|“([^”]+)”")
@@ -213,15 +340,63 @@ OQ_ITEM_RE = re.compile(r"^- \[([ xX])\]\s+(.*)$")
 
 
 def clean(text):
-    """What a reader sees of the characters: no invisible characters, every Unicode space a plain space."""
+    """What a reader sees of the characters: no invisible characters, every Unicode space a plain space, the
+    Unicode hyphens U+2010 and U+2011 a plain hyphen."""
     text = text.replace("\r\n", "\n").replace("\r", "\n")
-    return INVISIBLE_RE.sub("", SPACE_RE.sub(" ", text))
+    return HYPHEN_RE.sub("-", INVISIBLE_RE.sub("", SPACE_RE.sub(" ", text)))
+
+
+def cjk_value(run):
+    """Value of a run of CJK numerals (十二 = 12, 二十 = 20, 三百零五 = 305, 二三 = 23)."""
+    if not any(c in CJK_UNITS for c in run):
+        return int("".join(str(CJK_DIGITS[c]) for c in run))
+    total, cur = 0, None
+    for c in run:
+        if c in CJK_UNITS:
+            total += (1 if cur is None else cur) * CJK_UNITS[c]
+            cur = None
+        else:
+            cur = CJK_DIGITS[c]
+    return total + (cur or 0)
+
+
+def fold(text):
+    """What the count and placeholder checks read: NFKC (fullwidth forms, roman-numeral, circled and superscript
+    digits, ligatures), marks dropped, Cyrillic and Greek lookalikes of Latin letters made Latin, CJK numerals made
+    digits (`one` for 一, so that it stays not a count). Used for L4 and the placeholder test only: an ID is never
+    folded, so a homoglyph in an ID stays a finding."""
+    t = unicodedata.normalize("NFKD", unicodedata.normalize("NFKC", text))
+    t = "".join(c for c in t if not unicodedata.combining(c)).translate(CONFUSABLES)
+
+    def cjk(m):
+        v = cjk_value(m.group(0))
+        return "one" if v == 1 else str(v)
+
+    return CJK_RUN_RE.sub(cjk, t)
+
+
+def num_value(word):
+    """Integer value of a count word as NUM reads it, or None."""
+    w = word.lower().strip()
+    try:
+        if w.startswith("0x"):
+            return int(w, 16)
+        if w[0].isdigit():
+            v = float(w.replace(",", ""))
+            return int(v) if v == int(v) else None
+    except (ValueError, OverflowError):
+        return None
+    return WORD_VALUE.get(w)
 
 
 def norm_citations(text):
     """Citation forms nfdocs.find_refs does not read, rewritten to the ones it reads (S4 review R3-S2)."""
     t = re.sub(r"\bADR (\d{4})\b", r"ADR-\1", text)
     t = re.sub(r"\bRules?\b", lambda m: m.group(0).lower(), t)
+    t = re.sub(r"(ADR-\d{4})/R(?=\d)", r"\1.R", t)                                    # ADR-0047/R9
+    t = re.sub(r"(ADR-\d{4}),?\s+r\.\s*(?=\d)", r"\1 rule ", t)                       # ADR-0047 r. 9
+    t = re.sub(r"(?<![\w.-])R(\d+[a-z]?)\s+(?:of|in)\s+(\[?ADR-\d{4})", r"rule \1 of \2", t)   # R9 of ADR-0047
+    t = re.sub(r"\b(rules?\s+\d[\w, –-]*?)\s*\(\s*(\[?ADR-\d{4}[^)]*)\)", r"\1 of \2", t)   # rule 9 (ADR-0047)
     t = re.sub(r"(ADR-\d{4}(?:\]\([^)]*\))?)\s*\(\s*(rules?\s+[^)]*)\)", r"\1 \2", t)
     t = re.sub(r"(ADR-\d{4}(?:\]\([^)]*\))?)\s*§+\s*(?=\d)", r"\1 rule ", t)
     t = re.sub(r"\b(rules?\s+\d[\w, –-]*?)\s+(?:in|from|under)\s+(\[?ADR-\d{4})", r"\1 of \2", t)
@@ -231,8 +406,9 @@ def norm_citations(text):
 def unit_ids_in(text):
     """IDs written as `ADR-0070.R12`, `ADR-0070 rule 12`, `ADR-0070, rule 12`, `rule 12 of ADR-0070` and the forms of
     norm_citations."""
-    ids = set(UNIT_ID_RE.findall(text))
-    ids.update(nfdocs.find_refs(norm_citations(text))[1])
+    normed = norm_citations(text)
+    ids = set(UNIT_ID_RE.findall(text)) | set(UNIT_ID_RE.findall(normed))
+    ids.update(nfdocs.find_refs(normed)[1])
     return ids
 
 
@@ -314,6 +490,28 @@ def plain(text):
     return re.sub(r"[*`]|(?<![A-Za-z0-9])_+|_+(?![A-Za-z0-9])", "", t)
 
 
+def real_reason(reason):
+    """A reason of 'None (<reason>)' holds a word of 3 letters or more that is not none, nothing, nil, empty,
+    not, applicable (so not 'n/a', 'none', 'nil', 'not applicable')."""
+    return any(w not in WEAK_REASON_WORDS for w in re.findall(r"[a-z]{3,}", fold(plain(reason)).lower()))
+
+
+def has_substance(content):
+    """True when the visible lines of a section hold a real sentence (MIN_SENTENCE_WORDS words of 2 letters or more
+    in one line), a list item or a table row, with a letter or digit after the marker."""
+    if any(c.startswith("|") and re.search(r"[A-Za-z0-9]", c) for c in content):
+        return True                 # a table row with a letter or digit (a header alone: L1 reports an empty Trace)
+    for c in content:
+        body = LIST_ITEM_RE.sub("", c, count=1) if LIST_ITEM_RE.match(c) else c
+        if LIST_ITEM_RE.match(c) and re.search(r"[A-Za-z0-9]", body):
+            return True
+        if c.startswith("|"):
+            continue
+        if len(re.findall(r"[A-Za-z0-9]{2,}", plain(c))) >= MIN_SENTENCE_WORDS:
+            return True
+    return False
+
+
 def vocab_words(text, vocab):
     return {w for w in WORD_RE.findall(plain(text).lower()) if w in vocab}
 
@@ -324,7 +522,7 @@ def statement_problem(statement, vocab):
     chars = len(re.findall(r"[A-Za-z0-9]", p))
     if chars < MIN_STATEMENT_CHARS:
         return f"has no real statement ({chars} letters and digits; {MIN_STATEMENT_CHARS} or more are needed)"
-    m = PLACEHOLDER_RE.search(plain(re.sub(r"`[^`\n]*`", " ", statement)))
+    m = PLACEHOLDER_RE.search(fold(plain(re.sub(r"`[^`\n]*`", " ", statement))))
     if m:
         return f"holds the placeholder '{m.group(0)}'"
     words = vocab_words(statement, vocab)
@@ -379,25 +577,58 @@ class Spec:
         self._find_defs()
 
     def _find_defs(self):
-        i = 0
-        while i < len(self.vis):
-            m = RULE_DEF_RE.match(self.vis[i])
-            sec = self.section_of(i)
-            if not (m and sec in ("Rules", PROPOSED_HEADING) and i not in self.reads):
+        """A definition starts at a line `R<n>. ` that follows a blank line, a heading or the Source paragraph of
+        the definition before it, and runs to the end of the paragraph that holds its `Source:`. Without a
+        `Source:` before the next definition or heading it is its first paragraph only (and a finding)."""
+        vis, n = self.vis, len(self.vis)
+        self.def_at = {}       # line index -> the definition (with a Source) the line belongs to
+        self.inner = {}        # R-number of a line `R<n>. ` read as text of a definition -> (line, that definition)
+
+        def start(i):
+            if self.section_of(i) in ("Rules", PROPOSED_HEADING) and i not in self.reads:
+                return RULE_DEF_RE.match(vis[i])
+            return None
+
+        i, boundary = 0, True
+        while i < n:
+            m = start(i) if boundary else None
+            if not m:
+                boundary = not vis[i].strip() or vis[i].startswith("#")
                 i += 1
                 continue
+            sec = self.section_of(i)
             parts, j = [m.group(2) or ""], i + 1
-            while j < len(self.vis) and self.vis[j].strip() and not RULE_DEF_RE.match(self.vis[j]) \
-                    and not self.vis[j].startswith("#"):
-                parts.append(self.vis[j].strip())
+            has_source, first_end, prev_blank = bool(SOURCE_SPLIT_RE.search(parts[0])), None, False
+            while j < n and not vis[j].startswith("#"):
+                blank = not vis[j].strip()
+                if has_source and (blank or RULE_DEF_RE.match(vis[j])):
+                    break
+                if not has_source and prev_blank and start(j):
+                    break
+                if blank:
+                    if first_end is None:
+                        first_end = (len(parts), j)
+                else:
+                    inner = RULE_DEF_RE.match(vis[j])
+                    if inner:
+                        self.inner.setdefault(inner.group(1).lstrip("0") or "0", (j, m.group(1)))
+                    parts.append(vis[j].strip())
+                    has_source = has_source or bool(SOURCE_SPLIT_RE.search(vis[j]))
+                prev_blank = blank
                 j += 1
+            if not has_source and first_end is not None:
+                parts, j = parts[:first_end[0]], first_end[1]
             text = " ".join(parts)
             cut = SOURCE_SPLIT_RE.split(text, maxsplit=1)
-            self.defs.append({"n": m.group(1), "section": sec, "line": i, "text": text, "file": self.path,
-                              "statement": cut[0].strip(), "has_source": len(cut) > 1,
-                              "sources": source_ids(cut[1]) if len(cut) > 1 else [],
-                              "proposed": sec == PROPOSED_HEADING or "[proposed]" in text})
-            i = j
+            d = {"n": m.group(1).lstrip("0") or "0", "section": sec, "line": i, "end": j, "text": text,
+                 "file": self.path, "statement": cut[0].strip(), "has_source": len(cut) > 1,
+                 "sources": source_ids(cut[1]) if len(cut) > 1 else [],
+                 "proposed": sec == PROPOSED_HEADING or "[proposed]" in text}
+            self.defs.append(d)
+            if d["has_source"]:
+                for k in range(i, j):
+                    self.def_at[k] = d
+            i, boundary = j, True
 
     def section_of(self, i):
         for h, a, b in self.sections:
@@ -417,7 +648,19 @@ class Spec:
                 if i >= self.first_heading and self.section_of(i) != "Trace"]
 
     def front(self):
-        text = "\n".join(self.vis[:self.first_heading])
+        """Front matter fields -> (value, line index). Read from the visible lines before the first heading and,
+        when the file starts with a code fence, from the lines inside that one fence (the template shows it so)."""
+        lines = list(self.vis[:self.first_heading])
+        first = next((i for i, l in enumerate(self.lines) if l.strip()), None)
+        m = FENCE_RE.match(self.lines[first]) if first is not None and first < self.first_heading else None
+        if m:
+            for j in range(first + 1, self.first_heading):
+                c = FENCE_RE.match(self.lines[j])
+                if c and c.group(1)[0] == m.group(1)[0] and len(c.group(1)) >= len(m.group(1)) \
+                        and not self.lines[j].strip().strip(m.group(1)[0]):
+                    break
+                lines[j] = self.lines[j]
+        text = "\n".join(lines)
         out = {}
         for name in FRONT_FIELDS:
             others = "|".join(re.escape(n) for n in FRONT_FIELDS if n != name)
@@ -443,6 +686,28 @@ class Spec:
             for uid in ids:
                 rows.append((i, uid, cells[1] if len(cells) > 1 else "", key.group(1) if key else None))
         return rows
+
+    def row_ids(self):
+        """[(key, line index)] of the rows that define an `INV-nn`, an `EC-nn` or a setting key: under
+        `## Invariants`, `## Edge cases` and `## Settings`, the IDs in the first cell of a table row or the leading
+        backticked ID of a list item. An ID cited inside a rule or in another row's text is not a definition."""
+        out = []
+        for h in ROW_SECTIONS:
+            want = ROW_ID_RE[h]
+            for i, l in self.section_lines(h) or []:
+                s = l.strip()
+                if i in self.reads:
+                    continue
+                if s.startswith("|"):
+                    cell = s.strip("|").split("|")[0]
+                    keys = [x.strip() for x in nfdocs.CODE_SPAN_RE.findall(cell)] or [cell.strip(" *")]
+                else:
+                    m = re.match(r"^(?:[-*+]|\d+[.)])\s+[*_]*`([^`]+)`", s)
+                    keys = [m.group(1).strip()] if m else []
+                for k in keys:
+                    if want.fullmatch(k):
+                        out.append((k, i))
+        return out
 
     def conflicts(self):
         """-> (entries [{line, word, id, reason}], problems [(line, message)], None lines)."""
@@ -473,11 +738,13 @@ class Spec:
             elif NONE_RE.match(s):
                 nones.append(i)
                 cur = None
-            elif cur is not None and not s.startswith("|"):
-                cur["reason"] = (cur["reason"] + " " + s).strip()
+            elif cur is not None and l[:1] in (" ", "\t") and not s.startswith("|") \
+                    and not LIST_ITEM_RE.match(s) and not ENTRY_WORD_RE.match(s):
+                cur["reason"] = (cur["reason"] + " " + s).strip()      # an indented continuation line
             else:
-                problems.append((i, "is not an entry ('CONFLICT|FALSE-POSITIVE|OPEN <unit id>: <reason>') or "
-                                    "the single word 'None'"))
+                cur = None
+                problems.append((i, "is not an entry ('CONFLICT|FALSE-POSITIVE|OPEN <unit id>: <reason>'), an "
+                                    "indented continuation of one, or the single word 'None'"))
         return entries, problems, nones
 
 
@@ -585,7 +852,17 @@ def docs_model(docs):
         vocab = set()
         for u in units:
             vocab.update(WORD_RE.findall(u["text"].lower()))
-        _CACHE[key] = {"modules": modules, "owners": owners, "cats": cats, "vocab": vocab,
+        key_cats = {}
+        for cat, entries in cats.items():
+            for k in entries:
+                key_cats.setdefault(k, set()).add(cat)
+        ambiguous = set(modules) | nfdocs.NON_CODE_MODULES | set(owners)
+        for cols in nfdocs.table_columns(docs).values():
+            ambiguous.update(cols)
+        for verb, (_line, row) in cats.get("authorization-verb-levels", {}).items():
+            ambiguous.update((verb, verb.lower(), row.get("level", "")))
+        _CACHE[key] = {"modules": modules, "owners": owners, "cats": cats, "vocab": vocab, "key_cats": key_cats,
+                       "ambiguous": ambiguous,
                        "texts": {u["id"]: u["text"] for u in units}, "questions": open_questions(docs)}
     return _CACHE[key]
 
@@ -620,19 +897,44 @@ def open_questions(docs):
     return out
 
 
-def open_problem(reason, questions):
-    """Why an OPEN entry names no open question, or None."""
+def open_problem(reason, questions, adrs=()):
+    """Why an OPEN entry names no open question of its unit, or None. `adrs`: the ADR numbers (`0013`) of the unit
+    and of the units that supersede it; the quoted entry of docs/open-questions.md must name one of them."""
     for a in ANCHOR_RE.findall(reason):
         if a not in questions["anchors"]:
             return f"'open-questions.md#{a}' is not a heading of docs/open-questions.md"
     quotes = [squash(a or b) for a, b in QUOTE_RE.findall(reason)]
-    if any(len(q) >= MIN_QUOTE and any(q in item for item in questions["open"]) for q in quotes):
-        return None
+    items = [item for item in questions["open"] if any(len(q) >= MIN_QUOTE and q in item for q in quotes)]
     for n in re.findall(r"\bOQ-\d+\b", reason):
-        if any(re.match(r"\(?" + n + r"\b", item) for item in questions["open"]):
-            return None
-    return (f"names no open question: quote, in double quotes, {MIN_QUOTE} or more characters of an unchecked "
-            f"entry of docs/open-questions.md (the file numbers no questions)")
+        items += [item for item in questions["open"] if re.match(r"\(?" + n + r"\b", item)]
+    if not items:
+        return (f"names no open question: quote, in double quotes, {MIN_QUOTE} or more characters of an unchecked "
+                f"entry of docs/open-questions.md (the file numbers no questions)")
+    if adrs and not any(re.search(r"ADR[- ]?" + n + r"(?!\d)|(?<!\d)" + n + r"-[a-z]", item)
+                        for item in items for n in adrs):
+        return ("quotes an open question that does not name " + " or ".join(f"ADR-{n}" for n in sorted(adrs))
+                + "; the entry of docs/open-questions.md must be about the unit")
+    return None
+
+
+def owned_catalog_rows(scope, model, module):
+    """The catalog rows a compiled spec of the module must state (L2), filtered from module_scope `owned_rows`:
+    - invariants and edge cases: only those whose `area` is the module (a mention by a rule does not own them);
+    - any other row: kept when its catalog row has a `module` or `area` column naming the module; otherwise dropped
+      when the catalog is authorization-verb-levels or its key is also a module name, a table name, a column name
+      or a key of another catalog (a one-word match such as `inventory` or `production` proves nothing)."""
+    cats, out = model["cats"], []
+    for c in scope["owned_rows"]:
+        cat, key = c.split(":", 1)
+        row = cats.get(cat, {}).get(key, (None, {}))[1]
+        named = module in (row.get("module"), row.get("area"))
+        if cat in ("invariants", "edge-cases"):
+            if row.get("area") == module:
+                out.append(c)
+        elif named or not (cat == "authorization-verb-levels" or key in model["ambiguous"]
+                           or len(model["key_cats"].get(key, ())) > 1):
+            out.append(c)
+    return out
 
 
 def beside_specs(path, module):
@@ -761,7 +1063,14 @@ def lint(paths, module, index_path, docs, index_sha=None, partial=False, allow_p
             content = [s.vis[i].strip() for i in range(a + 1, b)
                        if s.vis[i].strip() and not s.vis[i].startswith("###")]
             none = NONE_RE.match(content[0]) if len(content) == 1 else None
-            if not content:
+            if none and (none.group(1) or none.group(2)) and not real_reason(none.group(1) or none.group(2)):
+                f("L0", s.path, a + 1, f"section '## {h}': the reason of 'None' is empty or a non-reason "
+                                       f"('none', 'n/a'); give a word of 3 letters or more that says why")
+            elif content and not none and not has_substance(content):
+                f("L0", s.path, a + 1, f"section '## {h}' has no real content (a sentence of {MIN_SENTENCE_WORDS} "
+                                       f"or more words, a list item or a table row with data); '---', '-' or one "
+                                       f"word is not content")
+            elif not content:
                 how = " or 'None (<reason>)'" if h in NONE_WITH_REASON else (" or 'None'" if h in NONE_BARE else "")
                 f("L0", s.path, a + 1, f"section '## {h}' is empty; write its content{how}")
             elif none and h in NONE_WITH_REASON and not (none.group(1) or none.group(2)):
@@ -809,6 +1118,8 @@ def lint(paths, module, index_path, docs, index_sha=None, partial=False, allow_p
 
     # L7 and L1: the trace table
     traced, refs_of, rs_of, na_ids, row_line, keys_bad = {}, set(), {}, set(), {}, []
+    texts = model["texts"]
+    na_list = []
     trace_rows = 0
     for s in specs:
         for i, uid, where, key in s.trace() or []:
@@ -846,6 +1157,22 @@ def lint(paths, module, index_path, docs, index_sha=None, partial=False, allow_p
                         f("L1", s.path, i + 1, f"trace row {uid}: 'not applicable' is refused for a rule")
                     elif not na.group(1).strip():
                         f("L1", s.path, i + 1, f"trace row {uid}: 'not applicable' needs a reason")
+                    else:
+                        na_list.append(f"{uid} ({kind}): {na.group(1).strip()}")
+                    if kind == "note":
+                        parent_text = texts.get(row["parent"]) or ""
+                        new = sorted(x for x in identifiers(texts.get(uid) or "") if x not in parent_text)
+                        why = None
+                        if row["relation"] in ("supersedes", "superseded-by"):
+                            why = f"its relation is '{row['relation']}'"
+                        elif row["conflict_flag"]:
+                            why = "it carries a conflict flag"
+                        elif new:
+                            why = (f"it introduces {', '.join('`' + x + '`' for x in new[:3])}"
+                                   f"{'…' if len(new) > 3 else ''}, absent from its rule's text")
+                        if why:
+                            f("L1", s.path, i + 1, f"trace row {uid}: 'not applicable' is refused for this note: "
+                                                   f"{why}; fold it into its rule's R-number")
                 elif ref:
                     has_ref = True
                     refs_of.add(uid)
@@ -871,9 +1198,9 @@ def lint(paths, module, index_path, docs, index_sha=None, partial=False, allow_p
                         target = ref.group(3)
                         if target not in by_id:
                             f("L7", s.path, i + 1, f"trace row {uid}: 'ref: {target}' is not in the rule index")
-                        elif target not in {uid, row["parent"]} | set(row["xrefs_rules"]):
-                            f("L1", s.path, i + 1, f"trace row {uid}: 'ref: {target}' is not {uid}, its parent "
-                                                   f"rule or a rule its text cites")
+                        elif target not in {uid, row["parent"]}:
+                            f("L1", s.path, i + 1, f"trace row {uid}: 'ref: {target}' is not {uid} or its parent "
+                                                   f"rule (template row 11)")
                 elif p.lower().startswith("reads"):
                     f("L1", s.path, i + 1, f"trace row {uid}: a 'Reads' list does not state a rule")
                 elif rs is not None:
@@ -883,7 +1210,10 @@ def lint(paths, module, index_path, docs, index_sha=None, partial=False, allow_p
                             deferred["R-numbers of other chunks"] += 1
                             has_r = True
                         else:
-                            f("L1", s.path, i + 1, f"trace row {uid}: R{n} is not defined in the spec")
+                            hint = next((f" (the line 'R{n}.' at {x.path}:{x.inner[n][0] + 1} is read as text of "
+                                         f"R{x.inner[n][1]}: a definition starts after a blank line, a heading or "
+                                         f"the Source of the rule before it)" for x in specs if n in x.inner), "")
+                            f("L1", s.path, i + 1, f"trace row {uid}: R{n} is not defined in the spec{hint}")
                     for n in got:
                         has_r = True
                         rs_of.setdefault(uid, set()).add(n)
@@ -908,7 +1238,9 @@ def lint(paths, module, index_path, docs, index_sha=None, partial=False, allow_p
                                        f"another module is primary)")
     if not trace_rows:
         f("L1", specs[0].path, 0, f"the trace table is empty; module {module} has {len(units)} units")
-    if not defined:
+    if not defined and incomplete:
+        deferred["R-numbers of other chunks"] += 1
+    elif not defined:
         f("L1", specs[0].path, 0, f"no R-number is defined; module {module} is primary for "
                                   f"{len(primary_rules)} rules")
     missing_ids = sorted(unit_ids - set(traced), key=nfdocs.rule_sort_key)
@@ -917,6 +1249,30 @@ def lint(paths, module, index_path, docs, index_sha=None, partial=False, allow_p
     else:
         for uid in missing_ids:
             f("L1", specs[0].path, 0, f"{uid} ({by_id[uid]['kind']}) is missing from the trace table")
+
+    # L0: front matter against the units the file traces
+    steps = {r["build_step"] for r in units if r["build_step"]}
+    for s in specs:
+        fm = s.front()
+        mine = {uid for _i, uid, _w, _k in s.trace() or [] if uid in unit_ids and uid in rs_of}   # stated, not ref:
+        listed, line = {x for x in re.findall(r"ADR[- ]?(\d{4})", fm.get("Source ADRs", ("",))[0])}, \
+            fm.get("Source ADRs", ("", 0))[1] + 1
+        if "Source ADRs" in fm and fm["Source ADRs"][0]:
+            lack = sorted({by_id[u]["adr"] for u in mine if by_id[u]["adr"][4:] not in listed})
+            if lack:
+                f("L0", s.path, line, f"front matter 'Source ADRs' does not list {', '.join(lack)}, the ADR of "
+                                      f"units this file traces")
+        if "Build step(s)" in fm and fm["Build step(s)"][0]:     # lenient: nothing to compare with an empty index
+            value, line = fm["Build step(s)"][0], fm["Build step(s)"][1] + 1
+            if not value.lower().startswith("not stated"):
+                given = STEP_RE.findall(value)
+                if not given:
+                    f("L0", s.path, line, f"front matter 'Build step(s)' names no step ('0, 5' or 'not stated')")
+                bad = [x for x in given if steps and x not in steps]
+                if bad:
+                    f("L0", s.path, line, f"front matter 'Build step(s)': step {', '.join(bad)} is in no index "
+                                          f"row of the units of {module} (steps there: "
+                                          f"{', '.join(sorted(steps)) or 'none'}); write the steps or 'not stated'")
 
     # L1 and L7: Source/trace agreement
     traced_to = {}
@@ -965,9 +1321,10 @@ def lint(paths, module, index_path, docs, index_sha=None, partial=False, allow_p
             f("L1", specs[0].path, 0, f"{len(na_ids & unit_ids)} of {len(units)} units are 'not applicable' (more "
                                       f"than {int(MAX_NA_SHARE * 100)}%)")
 
-    # L11: identifier retention and size ratio
-    texts = model["texts"]
+    # L11: identifier retention, size ratio, substance floors
     info["retention"] = {}
+    mod_ids = mod_kept = mod_src = mod_stmt = 0
+    rule_ratios = []
     for s in specs:
         total = kept_total = src_bytes = rules_n = changed = 0
         low = []
@@ -991,13 +1348,25 @@ def lint(paths, module, index_path, docs, index_sha=None, partial=False, allow_p
             kept_total += len(kept)
             exempt = superseded(r) or any(c["relation"] in ("supersedes", "superseded-by")
                                           for c in children.get(uid, []))
+            rlist = ", ".join("R" + n for n in sorted(rs_of[uid], key=r_key))
             if len(ids) >= RETENTION_MIN_IDS:
                 low.append((len(kept) / len(ids), uid, len(kept), len(ids)))
                 if not kept and not exempt:
-                    rlist = ", ".join("R" + n for n in sorted(rs_of[uid], key=r_key))
                     f("L11", s.path, i + 1, f"{uid} holds {len(ids)} identifiers in backticks "
                                             f"({', '.join(sorted(ids)[:3])}…); the statements of {rlist} hold "
                                             f"none of them; state the rule's content or correct the trace")
+            # substance floor: the rule with the notes folded into R-numbers against the statements of those
+            notes = [c["id"] for c in children.get(uid, []) if c["id"] in rs_of]
+            law = len(text.encode("utf-8")) + sum(len((texts.get(c) or "").encode("utf-8")) for c in notes)
+            ns = set(rs_of[uid]).union(*(rs_of[c] for c in notes))
+            stated = sum(len(defined[n]["statement"].encode("utf-8")) for n in ns)
+            if law >= SUBSTANCE_MIN_BYTES:
+                rule_ratios.append((round(stated / law, 3), uid, stated, law))
+                if stated < MIN_RULE_RATIO * law and not superseded(r):
+                    f("L11", s.path, i + 1,
+                      f"{uid} and its notes are {law} bytes; the statements of "
+                      f"{', '.join('R' + n for n in sorted(ns, key=r_key))} are {stated} bytes "
+                      f"({stated / law:.2f}; {MIN_RULE_RATIO:.2f} or more is required): state the rule's content")
         stmt_bytes = sum(len(d["statement"].encode("utf-8")) for d in s.defs if defined.get(d["n"]) is d)
         low.sort(key=lambda x: (x[0], nfdocs.rule_sort_key(x[1])))
         info["retention"][s.path] = {
@@ -1006,6 +1375,25 @@ def lint(paths, module, index_path, docs, index_sha=None, partial=False, allow_p
             "lowest": [f"{u} {k}/{t}" for _sh, u, k, t in low[:5]],
             "statement_bytes": stmt_bytes, "source_rule_bytes": src_bytes,
             "size_ratio": round(stmt_bytes / src_bytes, 3) if src_bytes else None}
+        mod_ids, mod_kept, mod_src, mod_stmt = mod_ids + total, mod_kept + kept_total, mod_src + src_bytes, \
+            mod_stmt + stmt_bytes
+    rule_ratios.sort(key=lambda x: (x[0], nfdocs.rule_sort_key(x[1])))
+    info["substance"] = {
+        "identifiers": mod_ids, "kept": mod_kept, "share": round(mod_kept / mod_ids, 3) if mod_ids else None,
+        "statement_bytes": mod_stmt, "source_rule_bytes": mod_src,
+        "size_ratio": round(mod_stmt / mod_src, 3) if mod_src else None,
+        "rules_measured": len(rule_ratios), "lowest_rule_ratios": [f"{u} {st}/{law}={x:.2f}"
+                                                                    for x, u, st, law in rule_ratios[:5]]}
+    if incomplete:
+        deferred["module size ratio and identifier retention not evaluated"] += 1
+    else:
+        if mod_src and mod_stmt < MIN_SIZE_RATIO * mod_src:
+            f("L11", specs[0].path, 0, f"size ratio {mod_stmt / mod_src:.2f}: the statements are {mod_stmt} bytes, "
+                                       f"the source rules {mod_src} bytes; {MIN_SIZE_RATIO:.2f} or more is required")
+        if mod_ids and mod_kept < MIN_RETENTION * mod_ids:
+            f("L11", specs[0].path, 0, f"identifier retention {mod_kept / mod_ids:.0%}: {mod_kept} of {mod_ids} "
+                                       f"identifiers of the source rules are kept in backticks; "
+                                       f"{MIN_RETENTION:.0%} or more is required")
 
     # L2 and L9
     def spans_of(with_reads):
@@ -1022,20 +1410,84 @@ def lint(paths, module, index_path, docs, index_sha=None, partial=False, allow_p
         else:
             f(check, specs[0].path, 0, msg)
 
+    owned_rows = owned_catalog_rows(scope, model, module)
+    info["owned_rows_dropped"] = sorted(set(scope["owned_rows"]) - set(owned_rows))
+    entities = "\n".join(sp for s in specs for sp in nfdocs.code_spans(
+        "\n".join(l for i, l in s.section_lines("Entities and tables") or [] if i not in s.reads)))
     for t in tables:
-        if not nfdocs.key_regex(t).search(proper):
-            absent("L2", f"owned table `{t}` is not mentioned in backticks outside 'Reads'")
-    for c in scope["owned_rows"]:
+        if not nfdocs.key_regex(t).search(entities):
+            where = "" if nfdocs.key_regex(t).search(proper) else " (nor anywhere in the body)"
+            absent("L2", f"owned table `{t}` is not mentioned in backticks under '## Entities and tables' outside 'Reads'"
+                         f"{where}; give it a row, or name it on a 'Defined by rule, without DDL' line there")
+    for c in owned_rows:
         if not nfdocs.key_regex(c.split(":", 1)[1]).search(proper):
             absent("L2", f"owned catalog row {c} is not mentioned in backticks outside 'Reads'")
     for c in scope["settings"]:
         key = c.split(":", 1)[1]
-        if c not in scope["owned_rows"] and not nfdocs.key_regex(key).search(with_reads):
+        if c not in owned_rows and not nfdocs.key_regex(key).search(with_reads):
             absent("L9", f"setting `{key}` is referenced by the module's rules but not in the body or `Reads`")
+    # a section that says None while the module owns rows of its kind
+    for h, cat in ROW_SECTIONS.items():
+        own = [c for c in owned_rows if c.startswith(cat + ":")]
+        said = []
+        for s in specs:
+            for h2, a2, b2 in s.sections:
+                if h2 == h:
+                    content = [s.vis[i].strip() for i in range(a2 + 1, b2)
+                               if s.vis[i].strip() and not s.vis[i].startswith("###")]
+                    said.append((s.path, a2 + 1, len(content) == 1 and bool(NONE_RE.match(content[0]))))
+        if own and said and all(x[2] for x in said):
+            if incomplete:
+                deferred["owned names not in these chunks"] += 1
+            else:
+                f("L2", said[0][0], said[0][1], f"section '## {h}' says None, but the module owns {len(own)} "
+                                                f"row(s) of {cat} ({', '.join(c.split(':', 1)[1] for c in own[:3])}"
+                                                f"{'…' if len(own) > 3 else ''})")
+    # one row per INV-nn, EC-nn and setting key in the module's chunks
+    first_row = {}
+    for s in specs:
+        for key, i in s.row_ids():
+            if key in first_row and first_row[key][0] != s.path:
+                f("L2", s.path, i + 1, f"`{key}` has a row in this chunk and in {first_row[key][0]}:"
+                                       f"{first_row[key][1] + 1}; define it in one chunk and cite it elsewhere")
+            else:
+                first_row.setdefault(key, (s.path, i))
 
     # L3, L4, L8 per file
     columns = None
+    own_counts = {k: expected_count(k, scope, None) for k in (INVENTORY_NOUNS | OWN_COUNT_NOUNS).values()}
     for s in specs:
+        def law_of(first, text, d):
+            if d is not None:
+                if "quotes" not in d:
+                    d["quotes"] = [" ".join(count_text(texts[u]).lower().split()) for u in d["sources"] if u in texts]
+                return {"quotes": d["quotes"], "own": own_counts}
+            if s.section_of(first) in LAW_SECTIONS:
+                return {"quotes": row_quotes(text, cats), "own": own_counts}
+            return None
+
+        for i, phrase in lone_counts(s):
+            law = law_of(i, s.vis[i], s.def_at.get(i))
+            if law is None or not is_quote(phrase, law, "owns " + phrase):
+                f("L4", s.path, i + 1, f"typed count '{phrase}' (a number alone on its line under a counted noun); "
+                                       f"write <!-- count:KIND -->N<!-- /count --> or list it")
+        for first, text, d in count_segments(s):
+            law = law_of(first, text, d)
+            for kind, n, off in count_matches(text, law):
+                i = first + off
+                if kind is None:
+                    f("L4", s.path, i + 1, f"typed count '{n}'; write <!-- count:KIND -->N<!-- /count --> or list it")
+                    continue
+                if kind == "!noun":
+                    f("L4", s.path, i + 1, n)
+                    continue
+                if kind == "columns" and columns is None:
+                    columns = nfdocs.table_columns(docs)
+                want = expected_count(kind, scope, columns)
+                if want is None:
+                    f("L4", s.path, i + 1, f"count kind '{kind}' cannot be computed from the index")
+                elif want != n:
+                    f("L4", s.path, i + 1, f"count:{kind} says {n}, the index gives {want}")
         for i, line in s.body_lines():
             sec = s.section_of(i)
             for m in XREF_R_RE.finditer(line):
@@ -1050,21 +1502,16 @@ def lint(paths, module, index_path, docs, index_sha=None, partial=False, allow_p
             for m in XREF_ADR_RE.finditer(line):
                 if m.group(1) not in known_modules:
                     f("L8", s.path, i + 1, f"cross-module reference '{m.group(1)} ADR-…' names no module")
-            for kind, n in count_findings(line):
-                if kind is None:
-                    f("L4", s.path, i + 1, f"typed count '{n}'; write <!-- count:KIND -->N<!-- /count --> or list it")
-                    continue
-                if kind == "columns" and columns is None:
-                    columns = nfdocs.table_columns(docs)
-                want = expected_count(kind, scope, columns)
-                if want is None:
-                    f("L4", s.path, i + 1, f"count kind '{kind}' cannot be computed from the index")
-                elif want != n:
-                    f("L4", s.path, i + 1, f"count:{kind} says {n}, the index gives {want}")
             if sec == "Conflicts":
+                entry = ENTRY_RE.match(line)
+                for u in sorted(unit_ids_in(line) - set(by_id) - ({entry.group(2)} if entry else set())):
+                    f("L7", s.path, i + 1, f"the text cites {u}, which is not in the rule index")
                 continue
             if ENTRY_RE.match(line) or ENTRY_LIKE_RE.match(line):
                 f("L5", s.path, i + 1, f"a Conflicts entry outside '## Conflicts'; it is not read there")
+            d_here = s.def_at.get(i)
+            for u in sorted(unit_ids_in(line) - set(by_id) - set(d_here["sources"] if d_here else ())):
+                f("L7", s.path, i + 1, f"the text cites {u}, which is not in the rule index")
             cited = [u for u in unit_ids_in(line) if u in by_id]
             prop = sorted(u for u in cited if by_id[u]["status"] == "proposed")
             marked = "[proposed]" in line
@@ -1102,7 +1549,8 @@ def lint(paths, module, index_path, docs, index_sha=None, partial=False, allow_p
                 f("L5", path, line, f"{word} {uid}: the reason needs {MIN_REASON_WORDS} or more distinct words "
                                     f"of the ADRs' vocabulary")
         else:
-            problem = open_problem(reason, model["questions"])
+            adrs = {x[4:8] for x in [uid] + (list(r["superseded_by"]) if r else [])}
+            problem = open_problem(reason, model["questions"], adrs)
             if problem:
                 f("L5", path, line, f"OPEN {uid}: {problem}")
         if word == "FALSE-POSITIVE" and r is not None and uid in unit_ids and not (
@@ -1201,9 +1649,9 @@ def lint(paths, module, index_path, docs, index_sha=None, partial=False, allow_p
                 "notes": sum(1 for r in units if r["kind"] == "note"),
                 "sections": sum(1 for r in units if r["kind"] == "section"), "tables": len(tables),
                 "r_numbers": len(defined), "trace_rows": trace_rows, "traced_units": len(traced)}
-    info.update(module=module, module_ids=len(unit_ids), tables=len(tables), owned_rows=len(scope["owned_rows"]),
+    info.update(module=module, module_ids=len(unit_ids), tables=len(tables), owned_rows=len(owned_rows),
                 settings=len(scope["settings"]), defined_r=len(defined), mapped_rules=mapped,
-                not_applicable=len(na_ids & unit_ids), warnings=warnings, review=review, measured=measured,
+                not_applicable=len(na_ids & unit_ids), not_applicable_list=na_list, warnings=warnings, review=review, measured=measured,
                 review_counts={w: sum(1 for e in entries if e["word"] == w) for w in of},
                 superseded_rules=superseded_list, key_mismatches=keys_bad, deferred=dict(sorted(deferred.items())),
                 incomplete=incomplete, partial=bool(partial and incomplete))
@@ -1211,12 +1659,14 @@ def lint(paths, module, index_path, docs, index_sha=None, partial=False, allow_p
     return findings, info
 
 
-def count_findings(line):
-    """-> [(kind, n)] for count markers and [(None, text)] for typed counts in one line."""
-    out = [(m.group(1), int(m.group(2))) for m in COUNT_RE.finditer(line)]
-    text = COUNT_RE.sub(" ", clean(line))
+def count_text(text):
+    """The text the count patterns read: markers, markup, links, tags and IDs removed; newlines kept."""
+    text = COUNT_RE.sub(" ", fold(clean(text)))
     text = re.sub(r"&nbsp;|&#160;|&#x0*a0;", " ", text, flags=re.I)
-    text = re.sub(r"<[^>]*>", " ", text)                       # <br>
+    text = re.sub(r"\\(?=\s)", "", text)                                    # '12\ tables' (an escaped space)
+    text = re.sub(r"(?<![\w.\-/])(" + NUM + r")\s*\(\s*" + NUM + r"\s*\)", r"\1", text, flags=re.I)  # 12 (twelve) tables
+    text = re.sub(r"(?<![\w.\-/])[x\u00d7](?=\d+\s+" + NOUNS + r"\b)", " ", text, flags=re.I)   # x12 tables
+    text = re.sub(r"<[^>\n]*>", " ", text)                     # <br>
     text = re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", text)       # [tables](#anchor)
     text = re.sub(r"ADR-\d{4}(?:\.[\w.]+)?|\b(?:INV|EC|DS|OQ)-\d+|\bR-?\d+[a-z]?\b", " ", text)
     # a code span that is a number, a word or a phrase is read as text (`16` tables, `12 tables`); any other span
@@ -1224,7 +1674,71 @@ def count_findings(line):
     text = re.sub(r"`([^`\n]+)`", lambda m: m.group(1) if re.fullmatch(r"[A-Za-z0-9 ,]+", m.group(1)) else "code",
                   text)
     text = re.sub(r"[*`]|(?<![A-Za-z0-9])_+|_+(?![A-Za-z0-9])", "", text)
-    text = re.sub(r"-(?=" + NOUNS + r"\b)", " ", text, flags=re.I)   # 16-table, owned-tables
+    return re.sub(r"-(?=" + NOUNS + r"\b)", " ", text, flags=re.I)   # 16-table, owned-tables
+
+
+def row_quotes(text, cats):
+    """count_text of the catalog rows that a piece of `## Invariants`, `## Edge cases`, `## Settings` or `## Rules`
+    names: `INV-nn` and `EC-nn` (matched by number) and setting keys in backticks."""
+    out = []
+    for cat, prefix in (("invariants", "INV"), ("edge-cases", "EC")):
+        nums = {int(x) for x in re.findall(r"\b" + prefix + r"-(\d+)\b", text)}
+        for k, (line, _row) in cats.get(cat, {}).items():
+            m = re.fullmatch(prefix + r"-(\d+)", k)
+            if m and int(m.group(1)) in nums:
+                out.append(line)
+    spans = {x.strip() for x in nfdocs.CODE_SPAN_RE.findall(text)}
+    out += [line for k, (line, _row) in cats.get("settings", {}).items() if k in spans]
+    return [" ".join(count_text(t).lower().split()) for t in out]
+
+
+def noun_stem(noun):
+    n = " ".join(noun.lower().split())
+    if n.startswith("entit"):
+        return "entity"
+    return "quer" if n.startswith("quer") else re.sub(r"s$", "", n)
+
+
+def is_quote(phrase, law, context):
+    """True when the number+noun phrase is a quote of a source unit of the R-number: the same number followed by
+    the same noun (at most 4 words between), or the phrase itself, occurs in a cited source text. A phrase on
+    tables, rules, catalog rows or settings that reads as an inventory of the spec (its number is the module's
+    own count, or the sentence says owns, module, spec, total or in all) is never a quote."""
+    num, nouns = NUM_RE.search(phrase), NOUN_RE.findall(phrase)
+    if not num or not nouns:
+        return False
+    stem = noun_stem(nouns[-1])
+    if stem in INVENTORY_NOUNS or stem in OWN_COUNT_NOUNS:
+        value = num_value(num.group(0))
+        if value == law["own"].get((INVENTORY_NOUNS | OWN_COUNT_NOUNS)[stem]) or (
+                stem in INVENTORY_NOUNS and INVENTORY_WORD_RE.search(context)):
+            return False
+    squashed = " ".join(phrase.lower().split())
+    rx = re.compile(r"(?<![\w.\-/])" + r"\s+".join(map(re.escape, num.group(0).split())) + r"\s+(?:[^\s|]+\s+){0,4}?"
+                    + stem.replace(" ", r"\s+"), re.I)
+    return any(squashed in t or rx.search(t) for t in law["quotes"])
+
+
+def count_matches(text, law=None):
+    """-> [(kind, n, line offset)] for count markers and [(None, text, line offset)] for typed counts. `text` is one
+    line or the joined lines of a paragraph. `law` (inside a rule definition): {"quotes": [count_text of the source
+    units, lower case, one space], "own": {kind: the module's count}}; then a number with a unit, a standard's
+    number and a quote of the source are values of law, not counts."""
+    out = [(m.group(1), int(m.group(2)), text[:m.start()].count("\n")) for m in COUNT_RE.finditer(text)]
+    for m in COUNT_RE.finditer(text):              # the noun after a marker must be the marker's kind (L4)
+        after = NOUN_AFTER_RE.match(fold(clean(text[m.end():m.end() + 80])))
+        if after and not any(w.lower() in MARKER_STOP for w in after.group(1).split()):
+            noun = noun_stem(after.group(2))
+            if KIND_ALIAS.get(m.group(1), m.group(1)) not in MARKER_NOUNS.get(noun, ()):
+                out.append(("!noun", f"count:{m.group(1)} is followed by '{' '.join(after.group(0).split())}', a "
+                                     f"count of {noun}s", text[:m.start()].count("\n")))
+    text = count_text(text)
+
+    def add(m):
+        if law is not None and is_quote(m.group(0), law, text[max(0, m.start() - 80):m.end() + 40]):
+            return
+        out.append((None, " ".join(m.group(0).split()), text[:m.start()].count("\n")))
+
     for rx in (COUNT_BEFORE_RE, ROMAN_RE):
         for m in rx.finditer(text):
             before = text[:m.start()]
@@ -1233,25 +1747,95 @@ def count_findings(line):
                 continue
             if THRESHOLD_RE.search(before):
                 continue
-            out.append((None, m.group(0).strip()))
-    for rx in (COUNT_AFTER_RE, COUNT_PAREN_RE, COUNT_GLUED_RE, COUNT_CELL_RE, COUNT_CELL_REV_RE):
+            if law is not None and rx is COUNT_BEFORE_RE and (
+                    UNIT_RE.match(m.group(0), len(m.group(1))) or STANDARD_RE.search(before)):
+                continue
+            add(m)
+    for rx in (COUNT_AFTER_RE, COUNT_PAREN_RE, COUNT_GLUED_RE, COUNT_CELL_RE, COUNT_CELL_REV_RE, COUNT_OF_RE,
+               COUNT_IS_RE, COUNT_TAIL_RE, COUNT_VERB_RE, COUNT_PAIR_RE, COUNT_MULT_RE):
         for m in rx.finditer(text):
-            out.append((None, m.group(0).strip()))
+            add(m)
     return out
+
+
+def count_findings(line):
+    """-> [(kind, n)] for count markers and [(None, text)] for typed counts in one line, read strictly."""
+    return [(kind, n) for kind, n, _off in count_matches(line)]
+
+
+def lone_counts(spec):
+    """[(line index, 'N noun')]: a number alone on its line (or `| Owned | 12 |`, a row whose other cells are only
+    count words) whose context is a counted noun: the line above ends with a plural counted noun (`Owned tables:`)
+    or, for a table row, a header cell of the table is one (`Tables`). The same count as `owns 12 tables`, split
+    over two lines."""
+    lines = [(i, l) for i, l in spec.body_lines() if l.strip() and i not in spec.reads]
+    out = []
+    for k in range(1, len(lines)):
+        i, line = lines[k]
+        raw = " ".join(count_text(line).split())
+        if raw.startswith("|"):
+            cells = [c.strip() for c in raw.strip("|").split("|")]
+            nums = [c for c in cells if re.fullmatch(NUM, c, re.I)]
+            rest = [w for c in cells if c not in nums for w in re.findall(r"[A-Za-z]+", c.lower())]
+            if len(nums) != 1 or any(w not in LONE_LABELS for w in rest):
+                continue
+            num, first = nums[0], k
+            while first > 0 and lines[first - 1][0] == lines[first][0] - 1 and lines[first - 1][1].strip().startswith("|"):
+                first -= 1
+            noun = None
+            header = [c.strip() for c in count_text(lines[first][1]).strip().strip("|").split("|")]
+            for c in header if first < k else []:
+                m = HEADER_NOUN_RE.match(" ".join(c.split()))
+                noun = noun or (m and m.group(1))
+            if noun is None and first > 0:
+                m = NOUN_END_RE.search(" ".join(count_text(lines[first - 1][1]).split()).lstrip("#").strip())
+                noun = m and m.group(1)
+        else:
+            m = LONE_NUM_RE.match(raw)
+            if not m or raw.startswith("#"):
+                continue
+            num = m.group(1)
+            prev = " ".join(count_text(lines[k - 1][1]).split())
+            prev = re.sub(r"^(?:[-*+]\s+|\d+[.)]\s+|#+\s*)", "", prev)
+            mm = NOUN_END_RE.search(prev) if not prev.startswith("|") else None
+            noun = mm and mm.group(1)
+        if noun and spec.section_of(i) == spec.section_of(lines[k - 1][0]):
+            out.append((i, f"{num} {noun}"))
+    return out
+
+
+def count_segments(spec):
+    """The body in pieces for the count check: [(first line index, text, definition or None)]. The lines of a
+    paragraph are joined (a count split by a line wrap is one count); a table row, a list item and the first line
+    of a rule definition start a new piece."""
+    out, cur = [], None
+    for i, line in spec.body_lines():
+        st = line.strip()
+        d = spec.def_at.get(i)
+        if not st or st.startswith("#"):
+            cur = None
+            continue
+        if cur is None or st.startswith("|") or cur[1][-1].strip().startswith("|") or LIST_ITEM_RE.match(line) \
+                or cur[2] is not d or (d is not None and d["line"] == i) or cur[0] + len(cur[1]) != i:
+            cur = (i, [line], d)
+            out.append(cur)
+        else:
+            cur[1].append(line)
+    return [(i, "\n".join(lines), d) for i, lines, d in out]
 
 
 def expected_count(kind, scope, columns):
     units, tables, cat_rows = scope["units"], scope["tables"], scope["catalog_rows"]
-    k = {"rule": "rules", "note": "notes", "table": "tables", "setting": "settings", "invariant": "invariants",
-         "edge-case": "edge-cases", "catalog-row": "catalog-rows", "column": "columns",
-         "section": "sections"}.get(kind, kind)
+    k = KIND_ALIAS.get(kind, kind)
     if k == "rules":
         return sum(1 for r in units if r["kind"] == "rule")
     if k == "notes":
         return sum(1 for r in units if r["kind"] == "note")
     if k == "sections":
         return sum(1 for r in units if r["kind"] == "section")
-    if k == "tables":
+    if k == "units":
+        return len(units)
+    if k in ("tables", "entities"):
         return len(tables)
     if k == "columns":
         return sum(len(columns.get(t, [])) for t in tables)
@@ -1297,13 +1881,14 @@ def main(argv=None):
     if findings:
         head = f"LINT FAIL findings={len(findings)}"
     elif info["partial"]:
-        head = f"LINT PARTIAL findings=0 deferred={n_deferred}"
+        head = f"LINT PARTIAL findings=0 deferred={n_deferred} (NOT A PASS)"
     else:
         head = "LINT PASS findings=0"
+    code = 1 if findings else (EXIT_PARTIAL if info["partial"] else 0)
     print(head)
     if args.json:
         print(json.dumps({"result": head, "findings": findings, "info": info}, sort_keys=True))
-        return 1 if findings else 0
+        return code
     ms = info["measured"]
     print("measured: " + " ".join(f"{k}={ms[k]}" for k in (
         "module", "files", "units", "rules", "primary_rules", "notes", "sections", "tables", "r_numbers",
@@ -1328,10 +1913,20 @@ def main(argv=None):
         ratio = "n/a" if rt["size_ratio"] is None else f"{rt['size_ratio']:.2f}"
         print(f"size-ratio {p}: statements {rt['statement_bytes']} bytes / source rules "
               f"{rt['source_rule_bytes']} bytes = {ratio}")
+    sub = info["substance"]
+    print(f"substance {info['module']}: size ratio "
+          + ("n/a" if sub["size_ratio"] is None else f"{sub['size_ratio']:.2f}") + f" (floor {MIN_SIZE_RATIO:.2f}), "
+          f"identifier retention " + ("n/a" if sub["share"] is None else f"{sub['share']:.0%}")
+          + f" (floor {MIN_RETENTION:.0%}); {sub['rules_measured']} source rules of {SUBSTANCE_MIN_BYTES} bytes or "
+          f"more (floor {MIN_RULE_RATIO:.2f} each)"
+          + (f"; lowest: {', '.join(sub['lowest_rule_ratios'])}" if sub["lowest_rule_ratios"] else ""))
     rc = info["review_counts"]
     print(f"REVIEW LIST ({len(info['review'])} entries for the chief architect; template acceptance step 3): "
           f"CONFLICT={rc['CONFLICT']} FALSE-POSITIVE={rc['FALSE-POSITIVE']} OPEN={rc['OPEN']}")
     for e in info["review"]:
+        print(f"  {e}")
+    print(f"NOT APPLICABLE (read each; template acceptance steps 2 and 3): {len(info['not_applicable_list'])}")
+    for e in info["not_applicable_list"]:
         print(f"  {e}")
     print(f"SUPERSEDED RULES (read each; template acceptance step 2): {len(info['superseded_rules'])}")
     for e in info["superseded_rules"]:
@@ -1339,7 +1934,7 @@ def main(argv=None):
     print(f"STABLE-KEY MISMATCHES (the text behind a trace row changed or moved): {len(info['key_mismatches'])}")
     for e in info["key_mismatches"]:
         print(f"  {e}")
-    return 1 if findings else 0
+    return code
 
 
 if __name__ == "__main__":

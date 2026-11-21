@@ -127,43 +127,60 @@ The lint connects the trace table to the rule bodies and closes the known shortc
 its sources say is the template's different-model spot check; the lint prints what that check and the chief
 architect must read. The full list, with every threshold, is the docstring of `doc_lint.py`; in short:
 
-**Output.** Line 1 is `LINT PASS findings=0`, `LINT FAIL findings=N` or `LINT PARTIAL findings=0 deferred=N`. Line 2
-is `measured: module=… files=… units=… rules=… primary_rules=… notes=… sections=… tables=… r_numbers=… trace_rows=…
-traced_units=…`, so a pass that measured nothing is visible. Then the findings (`L<n> <file>:<line>: <message>`),
-warnings, deferred counts, sizes, and per file `retention` (share of source rule identifiers kept) and `size-ratio`
-(statement bytes / source rule bytes). Last: the REVIEW LIST (entries counted per kind), the SUPERSEDED RULES and
-the STABLE-KEY MISMATCHES. Exit 0 on PASS and PARTIAL, 1 on FAIL, 2 on bad input.
+**Output.** Line 1 is `LINT PASS findings=0`, `LINT FAIL findings=N` or `LINT PARTIAL findings=0 deferred=N (NOT A
+PASS)`. Line 2 is `measured: module=… files=… units=… rules=… primary_rules=… notes=… sections=… tables=… r_numbers=…
+trace_rows=… traced_units=…`, so a pass that measured nothing is visible. Then the findings (`L<n> <file>:<line>:
+<message>`), warnings, deferred counts, sizes, per file `retention` and `size-ratio`, and the module's `substance`
+line (size ratio, retention, the lowest rule ratios, each with its floor). Last: the REVIEW LIST (entries counted per
+kind), NOT APPLICABLE (every such row with its reason), SUPERSEDED RULES and STABLE-KEY MISMATCHES. Exit 0 on PASS, 1
+on FAIL, 2 on bad input, exit 3 on PARTIAL. Only exit 0 with `LINT PASS` passes; a gate never gives `--partial`.
 
 **Refused (exit 2).** A missing file or the same file twice; `--module cross` and any module that is primary for no
 rule (their units are compiled in their primary modules); `process` without `--allow-process`.
 
 **Before every check** invisible characters (zero-width, joiners, soft hyphen, bidi marks) are removed, Unicode
 spaces become a space, and HTML comments (count markers kept), ```` ``` ```` and `~~~` fences and indented code
-blocks (4 spaces or a tab after a blank line, outside a list) are blanked. Nothing inside them counts, front matter
-included.
+blocks (4 spaces or a tab after a blank line, outside a list) are blanked. Nothing inside them counts, except the
+front matter in one leading fence (L0).
 
 - **L0** front matter (`Module` equal to `--module`, `Chunk`, `Source ADRs`, `Build step(s)`, `Generated from index`,
-  `Compiled by`).
+  `Compiled by`), as plain lines before the first heading or inside one code fence that opens on the first non-blank
+  line.
   - Index: `Generated from index` (7 or more hex digits) is the last commit of the index file, or `--index-commit`,
     which must be a commit; the index file must equal its version in that commit. An index that differs and a commit
     that cannot be read are findings.
-  - Chunks: one file is `whole` or `1 of 1`; several files are `k of n` with one n, each k once, 1..n all given. A
-    lone chunk of n > 1 is a finding and prints a NOTICE; with `--partial` the module-level checks that need the
-    other chunks (missing IDs, missing sections, owned names, coverage, R-numbers and entries of other chunks) are
-    counted as `deferred` and line 1 says `LINT PARTIAL`. The chunk's own checks still run.
+  - Chunks: one file is `whole` or `1 of 1`; several files are `k of n` with one n, each k once, 1..n all given. An
+    incomplete set is a finding and prints a NOTICE; with `--partial` the module-level checks that need the other
+    chunks (missing IDs, missing sections, owned names, coverage, the substance floors of the module, R-numbers and
+    entries of other chunks) are counted as `deferred`, line 1 says `LINT PARTIAL … (NOT A PASS)` and the exit is 3.
+    The chunk's own checks still run. The lint cannot know the true n, so a phantom chunk can hide missing units:
+    PARTIAL is never a pass.
+  - Front matter against the units: every ADR of the units a file traces to an R-number (not `ref:` rows) is
+    listed in its `Source ADRs` (an extra ADR is not a finding). `Build step(s)` names a step or says `not stated`;
+    each step is a `build_step` of the index rows of the module's units (lenient: nothing is compared when no unit
+    of the module has a step in the index; honest specs wrote the steps as they judged).
   - Sections: the template's eleven, in order, no others; `Purpose` and `Trace` in every chunk, all eleven across
-    the chunks. Each has content (a `###` heading is not content). `None` needs a reason (`None (reason)` or
+    the chunks. Each has content: a sentence of 3 or more words, a list item or a table row with a letter or digit
+    (a `###` heading, `---`, `-` or one word such as `Clock.` is not). A reason of any `None (<reason>)` /
+    `None: <reason>` has a word of 3 letters or more that is not none, nothing, nil, empty, not, applicable
+    (`None (n/a).` and `None: none.` are findings). `None` needs a reason (`None (reason)` or
     `None: reason`) for Commands and queries, Invariants, Edge cases, Settings and UI annotations; it may stand bare
     for Conflicts and Proposed (not law); for Entities and tables only when the module owns no table; never for
     Purpose, Rules and Trace.
 - **L1** trace and rule bodies.
   - Every module ID is traced; the trace table and the set of R-numbers are not empty.
-  - An R-number is defined by `R<n>.` (at most 3 spaces of indent) in `## Rules` or `## Proposed (not law)`, outside
-    a `Reads` paragraph, up to the next blank line, once in the module's files.
-  - Its statement (the text before `Source:`) has 12 or more letters and digits after markup, tags and entities are
-    removed, 2 or more distinct words (3 letters or more) that occur in the ADRs, no placeholder (`TBD`, `TODO`,
-    `FIXME`, `to be compiled|written|…`, `see|per|as in|follows the source`, `as stated|written|given in the
-    source`, `lorem ipsum`) outside backticks, and repeats no other.
+  - **Definition.** An R-number definition starts at a line `R<n>. ` (at most 3 spaces of indent) in `## Rules` or
+    `## Proposed (not law)`, outside a `Reads` paragraph, that follows a blank line, a heading or the last line of
+    the definition before it. It runs to the end of the paragraph that holds its `Source:`, so a list or a Markdown
+    table may stand inside the rule before `Source:`. A line starting `R18.` inside a paragraph (a hard wrap) is
+    text; when a trace row then points to an undefined R18, the finding says where that line is. `R02` and `R2` are
+    one R-number, defined once in the module's files.
+  - **Statement** (the text before `Source:`): 12 or more letters and digits after markup, tags and entities are
+    removed, 2 or more distinct words (3 letters or more) that occur in the ADRs, no placeholder outside backticks
+    (`TBD`, `TODO`, `FIXME`, `to be compiled|written|…`, `see|per|as in|follows the source`, `as stated|written|given
+    in the source`, `lorem ipsum`, `content|text|statement pending`, `placeholder for the rule`, `omitted here|for`,
+    `for brevity`, `same as the ADR`, `see ADR-nnnn … for the full statement`, `refer to the ADR|source text`, `will
+    be compiled|stated|written`), and repeats no other.
   - `Source:` is required; its IDs (`ADR-nnnn.Rk`; `.Nj` after an ID is a note of it) exist in the index and are
     units of the module (L7).
   - **Source/trace agreement**, both directions, across chunks: a unit traced to R-n is in the Source of R-n, and a
@@ -174,39 +191,79 @@ included.
     Decision text unit (`.D*`, `.W`): also an existing heading of the spec. A heading may be added to an R-number,
     never stand alone for a rule or a note. Any other part, a heading that does not exist, `Reads` and an empty
     cell are findings.
-  - `ref: ADR-nnnn.Rk` is the unit's own ID, its parent rule's ID or an ID its index row cross-references.
-    `ref: <module> R-<n>` names a primary module of the unit; when that module's compiled spec lies beside the
-    linted file (`<module>.md`, `<module>-<k>.md`), R-n is defined there and its Source holds the unit's ID.
-  - At most 15% of the module's units are `not applicable`. Coverage: the rule units mapped to an R-number whose
-    Source cites them, counting at most 4 IDs per R-number, are 60% or more of the rule units not traced as `ref:`.
-- **L2** owned tables and **owned** catalog rows backticked in the body, outside `Reads` paragraphs and the trace
-  table. A row is owned when a unit whose primary module is this module references it, unless its catalog has a
-  `module` column naming another module; invariants and edge cases whose `area` is the module are owned too.
+  - `ref: ADR-nnnn.Rk` is the unit's own ID or its parent rule's ID (template row 11). `ref: <module> R-<n>` names a
+    primary module of the unit; when that module's compiled spec lies beside the linted file (`<module>.md`,
+    `<module>-<k>.md`), R-n is defined there and its Source holds the unit's ID.
+  - **`not applicable`** is refused for a rule, needs a reason, and is refused for a note whose relation is
+    `supersedes` or `superseded-by`, that carries a conflict flag, or whose text holds a code-span identifier its
+    parent rule's text does not hold (a mechanical sign of new law). Every accepted row is printed under NOT
+    APPLICABLE with its reason, for the spot check. At most 15% of the module's units are `not applicable`.
+  - Coverage: the rule units mapped to an R-number whose Source cites them, counting at most 4 IDs per R-number, are
+    60% or more of the rule units not traced as `ref:`.
+- **L2** owned names in their sections, outside `Reads` paragraphs.
+  - Every owned table is backticked under `## Entities and tables` of some chunk (a line `Defined by rule, without
+    DDL: `t`` there serves).
+  - Every **owned** catalog row is backticked in the body, outside the trace table. Owned: an `INV-nn` or `EC-nn`
+    row whose `area` is the module (a mention by a rule or an example does not own it: `INV-0101-2`, `INV-0042.xml`);
+    any other row of the index's module scope whose catalog row has a `module` or `area` column naming the module,
+    or else whose key is not also a module name, a table name, a column name, an authorization verb or level, or a
+    key of another catalog (the index summary's ambiguous names: `inventory`, `production`, `rounding_gain`). The
+    authorization-verb-levels catalog is never owned. The index content is unchanged; the lint filters.
+  - `## Invariants`, `## Edge cases` and `## Settings` may not say `None` in every chunk while the module owns rows
+    of that kind.
+  - An `INV-nn`, `EC-nn` or setting key has its row in one chunk only (the first cell of a table row, or the leading
+    backticked ID of a list item, under those three sections); other chunks cite it.
 - **L3** proposed rules (cited as `ADR-0070.R12`, `ADR-0070 rule 12`, `ADR-0070, rule 12`, `rule 12 of|in ADR-0070`,
-  `ADR-0070 (rule 12)`, `ADR 0070 rule 12`, `ADR-0070 §12`, `Rule`, `rules 12 through 14`) only under
+  `ADR-0070 (rule 12)`, `rule 12 (ADR-0070)`, `R12 of ADR-0070`, `ADR 0070 rule 12`, `ADR-0070/R12`, `ADR-0070 r.
+  12`, `ADR-0070 §12`, `Rule`, `rules 12 through 14`, and with the hyphens U+2010 and U+2011) only under
   `## Proposed (not law)` or with `[proposed]`, never accepted ones. A proposed unit's R-numbers are stated that
   way; an accepted unit's R-numbers are defined under `## Rules` without `[proposed]`; a proposed Decision text
   unit names only headings of `## Proposed (not law)`.
-- **L4** no typed count: digits, number words (`two` and up, `twenty-one`, `a dozen`) or Roman numerals of I, V, X
-  before a counted noun (up to three words between), after it (`Tables owned: 10`, `Tables owned — 10`,
-  `Owned tables (10)`), glued to it (`16tables`, `16-table`), or in a table row (`| Owned tables | 16 |`,
-  `| 16 | owned tables |`). Bold, italics, links, tags and `&nbsp;` are removed first; a code span that is a number,
-  a word or a phrase is read as text, any other span (`days:5`) is a name. `one` is not a count; citations
-  (`rule 15 note`, `7 of rule`, `INV-12`, `rules 22–23`) and `at most|at least|up to|more than|fewer than|less than`
-  pass; `exactly` and `only` do not. On the ADR rule and note text it fires 78 times (75 before round 3; the 3 new
-  ones are real counts, `**Settings:** 11 definitions`); on the pilot `quality` spec once, a real count. Count
-  markers are recomputed.
-- **L5** `## Conflicts`: every line is an entry, its continuation, a `###` heading, blank, or the single line
-  `None`. Entries are `CONFLICT <id>: <reason>`, `FALSE-POSITIVE <id>: <reason>`, `OPEN <id>: <text>`; a list
-  marker, bold, backticks, `CONFLICT: <id>` and a table row are read as entries; any other line, and an entry line
-  outside `## Conflicts`, is a finding.
+- **L4** no typed count: digits (also `12.0`, `1.2e1`, `0x0C`), number words (`two` and up, `twenty-one`, `a dozen`)
+  or Roman numerals of I, V, X before a counted noun (tables, rules, columns, settings, commands, queries, notes,
+  invariants, edge cases, modules, catalog rows, events, chunks, units, sections, entities, relations; up to three
+  words between), `12 (twelve) tables`, `Tables x12`, after it (`Tables owned: 10`, `Tables owned — 10`,
+  `Owned tables (10)`, `tables, 16 in all`, `Tables owned (sixteen in all)`, `commands number 12`), glued to it
+  (`16tables`, `16-table`), in a table row (`| Owned tables | 16 |`, `| 16 | owned tables |`), `all 16 of its
+  tables`, `the table count is 16`, `a couple of tables`. The lines of a paragraph are read
+  joined, so `owns 16` ⏎ `tables` is one count. A number alone on its line (`12`, `- 12`, `| Owned | 12 |`) under a
+  line that ends with a plural counted noun (`Owned tables:`, a `Tables` header cell) is the same count split over
+  two lines; inside a rule definition or a law section it is read with the quote exemption below. **Folding:** the
+  text is first folded (NFKC: fullwidth, Roman-numeral, circled and superscript digits, ligatures; combining marks
+  dropped; Cyrillic and Greek lookalikes of Latin letters made Latin; CJK numerals made digits), for the count
+  patterns and for the placeholder test (`ТBD`, `ＴＢＤ`); IDs are never folded, a homoglyph in an ID stays a
+  finding. Bold, italics, links, tags and `&nbsp;` are removed first; a code
+  span that is a number, a word or a phrase is read as text, any other span (`days:5`) is a name. `one` is not a
+  count; citations (`rule 15 note`, `7 of rule`, `INV-12`, `rules 22–23`) and `at most|at least|up to|more
+  than|fewer than|less than` pass; `exactly` and `only` do not.
+  - **Values of law** pass under `## Rules`, `## Invariants`, `## Edge cases` and `## Settings`: a number with a
+    unit (`30 s`, `300 ms`, minutes, hours, days, weeks, months, quarters, years, `%`, bytes, characters, digits,
+    decimals, `rows per`, `times per`), a standard's number (`ISO 4217`, `RFC`, `IEC`, `IAS`, `IFRS`, `GS1`, `EN`),
+    and a quote: a number+noun phrase that also occurs (same number, same noun, at most 4 words between) in a
+    source unit cited by the `Source:` of the R-number it stands in, or in the catalog row of an `INV-nn`, `EC-nn`
+    or backticked setting key named in the same row or paragraph. A phrase on tables, rules, catalog rows or
+    settings is never a quote when its number is the module's own count of that kind or the context says owns,
+    owned, module, spec, total or in all (units, sections and entities: only the module's own count denies it, since
+    `total` is ordinary text there). Elsewhere the strict reading stays.
+  - Measured: line by line over all index unit texts, the strict reading fires 210 times (178 on the round 4 code
+    by the same script; the 32 new are the nouns `units`, `sections`, `entities`, `relations`, nearly all `units` of
+    measure of ADR-0056; in a law section a quote of the cited source still passes, elsewhere write the count as a
+    marker or in other words).
+  - Count markers `<!-- count:KIND -->N<!-- /count -->` are recomputed (also `units`, `entities`). The noun that
+    follows a marker (up to two adjectives between, no `of`, `in`, `the`, …) must be of the marker's kind:
+    `<!-- count:tables -->0<!-- /count --> rules` is a finding.
+- **L5** `## Conflicts`: every line is an entry, an indented continuation of one, a `###` heading, blank, or the
+  single line `None`. Entries are `CONFLICT <id>: <reason>`, `FALSE-POSITIVE <id>: <reason>`, `OPEN <id>: <text>`;
+  a list marker, bold, backticks, `CONFLICT: <id>` and a table row are read as entries. Any other line is a
+  finding: a wrapped line that is not indented, a list item or entry-like line that does not parse (indented or
+  not), and an entry line outside `## Conflicts`.
   - Every ID is a unit of the module; one ID has entries of one kind.
   - A CONFLICT or FALSE-POSITIVE reason has 25 characters or more and 4 or more distinct words (3 letters or more)
     that occur in the ADRs; one reason, or a near copy at 0.8 similarity, serves at most 3 entries of its kind.
-  - OPEN quotes, in double quotes, 20 or more characters of an unchecked entry of `docs/open-questions.md`. That
-    file numbers no questions (entries are `- [ ]` list items under `##` headings; `OQ-074`, `OQ-116` and `OQ-150`
-    occur in it only as mentions), so an `OQ-nnn` counts only when an unchecked entry starts with it; an
-    `open-questions.md#anchor` must be a heading of the file.
+  - OPEN quotes, in double quotes, 20 or more characters of an unchecked entry of `docs/open-questions.md`, and that
+    entry names the ADR of the unit or of a unit that supersedes it (`ADR-0013`, `ADR 0013` or the file
+    `0013-…`). The file numbers no questions (entries are `- [ ]` list items under `##` headings), so an `OQ-nnn`
+    counts only when an unchecked entry starts with it; an `open-questions.md#anchor` must be a heading of the file.
   - FALSE-POSITIVE is for conflict-flagged notes only; an ID without flag, marker or supersession may be CONFLICT
     or OPEN.
   - Required: every CONFLICT-marked unit (CONFLICT or OPEN); every conflict-flagged note (its own entry; the
@@ -214,7 +271,8 @@ included.
     governing text (an ADR unit ID or an R-number) or OPEN, on the note or its parent rule, never FALSE-POSITIVE,
     unless its Where is `ref:`.
 - **L6** hard limit 16,000 tokens per file; **L7** trace, Source and `ref:` IDs exist and, for trace and Source,
-  are units of the module.
+  are units of the module; a unit ID or rule citation anywhere else in the body (a statement, a Conflicts reason:
+  `ADR-0004.R99`, `rule 99 of ADR-0004`) exists in the index too (a real but unrelated ID is not detected).
 - **L8** `<module> R-<n>` (also in `ref:`) names a module of ADR-0022 rule 2 (or `process`, `cross`) and a numeric
   rule; a backticked `` `<word> ADR-nnnn` `` names a module too.
 - **L9** every setting key referenced by any unit of the module is backticked in the body; a `Reads` paragraph
@@ -224,11 +282,18 @@ included.
   the index names none); with a CONFLICT, that superseding ID is in the Source of every R-number the rule is traced
   to. The lint cannot judge that the statement is the new text: every such rule is printed under SUPERSEDED RULES
   and belongs to the spot check (template acceptance step 2).
-- **L11** identifier retention: a source rule (not superseded, no superseding note) whose text holds 3 or more
-  distinct identifiers in backticks, traced to R-numbers whose statements hold none of them in backticks, is a
-  finding. An identifier is a code span that is one name of 4 or more characters. Calibration on the pilot
-  `quality` spec (honest text): 349 of 393 identifiers kept (89%); the lowest rule keeps 6 of 35 (its content is a
-  table of the spec); size ratio 0.81. The lazy probe keeps 0 of 382, ratio 0.01.
+- **L11** substance, on source rules whose index text is unchanged.
+  - Retention per rule: a source rule (not superseded, no superseding note) whose text holds 3 or more distinct
+    identifiers in backticks, traced to R-numbers whose statements hold none of them in backticks, is a finding. An
+    identifier is a code span that is one name of 4 or more characters.
+  - Floor per rule: a source rule (not superseded) whose text plus the notes traced to R-numbers is 500 bytes or
+    more needs statements (of all R-numbers it and those notes are traced to) of 0.10 or more of that size.
+  - Floors per module (all chunks together): size ratio (statement bytes / source rule bytes) 0.30 or more, and
+    retention (source rule identifiers kept in backticks) 40% or more.
+  - Calibration on the 21 complete modules of the S4 corpus (honest text): lowest rule ratio 0.28 (`tax`,
+    ADR-0053.R10), lowest module size ratio 0.90 (`quality`), lowest retention 89% (`tax`). The reviewer's filler
+    probes: `registry` size ratio 0.07 and retention 11%, `clock` 0.19 and 43%; a one-sentence statement of a
+    2,649-byte rule is 0.03.
 - Warning **W2**: a Source cell's `#<stable_key>` differs from the index; listed under STABLE-KEY MISMATCHES, a
   finding with `--strict`. (W0, W1 and W3 of earlier rounds are findings now: L0, L1, L10.)
 
@@ -246,6 +311,19 @@ text and lists the row under STABLE-KEY MISMATCHES.
 
 ## Blind spots
 
+- **Known gaps, left to a separate PR (chief architect's decision, review round 5).** They need a new spec form, an
+  anchor phrase per cited unit (`Source: ADR-0007.R14 "dates are shown as stored"`, to occur in the unit text and in
+  the statement); no lint change reaches them reliably.
+  - B1, a rule deleted whose unit a neighbour's `Source:` still cites: L1 and L11 see the Source and the trace
+    agree, not that the unit has text in the statement (probes `p02h`, `p02l`, `p02m`, `p02n`; `p02a` to `p02g`,
+    `p02i` to `p02k` are caught or refused).
+  - B2, a hollowed statement that keeps length, a few words or the identifiers: filler, a salad of ADR words,
+    shuffled words, every rule cut to 30% (probes `p01a`, `p01b`, `p01c`, `p01d`, `p01f-truncate-30`, `p01f-truncate-50`;
+    `p01e`, `p01g`, `p01h` are misattribution, the spot check's).
+  - B3, `INV` and `EC` rows of an area that is not a module name (`safety`, `platform`, `warehouse`,
+    `receivables_payables`, `close`; 150 catalog rows cited by a unit of a module, demanded of no spec): dropping
+    them is not a finding (probes `p14d`, `p14e`, `p14f`, `p14g`, `p14h-reporting-drop-INV413`; `p14c`: a setting
+    row stays named in a rule).
 - A bare `rule N` without an ADR number (a reference inside the same ADR) is not a cross-reference.
 - Prose that amends a rule without starting with `Note` (for example ADR-0026 rule 1, "The side table is ...") is
   rule text, not a note. The note boundary rule fixes the 8 cases of the S3 review; a note that introduces nothing
@@ -263,9 +341,15 @@ text and lists the row under STABLE-KEY MISMATCHES.
   20 rules after the overrides: 19 right (the miss: ADR-0041.R21, the Vietnamese draft, reads as localization).
 - Inbound supersession is found only in sentences with the verbs above; 11 rules are linked today.
 - `doc_lint` L4 knows number words up to `hundred` only; `cross` units reach other modules only through `cross.md`.
-- `doc_lint` cannot judge meaning. A statement that keeps the identifiers and cites the right sources but says
-  something else passes L1 and L11; a CONFLICT that names the superseding ID while the statement keeps the old text
-  passes L10. Both are the spot check's (template acceptance step 2). "Words that occur in the ADRs" is a
-  vocabulary test, not a grammar test.
-- A definition ends at the first blank line: a `Source:` in a later paragraph is not read (finding "no Source").
-  Text inside code fences and indented code blocks counts for nothing, also not for L2.
+- `doc_lint` cannot judge meaning. A statement that keeps the identifiers, is long enough and cites the right
+  sources but says something else passes L1 and L11; a CONFLICT that names the superseding ID while the statement
+  keeps the old text passes L10. Both are the spot check's (template acceptance step 2). "Words that occur in the
+  ADRs" is a vocabulary test, not a grammar test.
+- Text inside code fences and indented code blocks counts for nothing, also not for L2 and L11.
+- `not applicable` on a note without new identifiers, flag or supersession is accepted with any reason; the
+  NOT APPLICABLE list is the control. L4 count forms beyond those listed (`a few tables`, `sixteen in number`) are
+  residue (`a pair of settings` too: `a pair of segregation rules` names a kind); the count marker is the positive
+  path.
+- Owned catalog rows whose key is an ambiguous name are not demanded (`inventory`, `production`): a module that
+  really owns such a row is not reminded of it, unless the catalog row names the module in a `module` or `area`
+  column.

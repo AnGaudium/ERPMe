@@ -30,6 +30,13 @@ class R3(LintBase):
     def foreign_rule(self):
         return next(r for r in self.rules[1:] if MODULE not in r["primary_module"] and not superseding(r))
 
+    def law_bytes(self, r):
+        return len(self.texts[r["id"]].encode()) + sum(len(self.texts[n["id"]].encode()) for n in self.units
+                                                       if n["kind"] == "note" and n["parent"] == r["id"])
+
+    def small_rule(self):
+        return next(r for r in self.rules[1:] if not superseding(r) and self.law_bytes(r) < 500)
+
     def plain_note(self):
         return next(r for r in self.units if r["kind"] == "note" and not superseding(r) and not r["conflict_flag"])
 
@@ -95,13 +102,14 @@ class R3(LintBase):
             self.assertRegex(self.messages(f), r"R2 (has no real statement|holds the placeholder)", junk)
 
     def test_b1_short_real_statements_pass(self):
-        r = self.rules[1]
-        line, _st = self.statement_of(2)
+        r = self.small_rule()                    # under 500 bytes with its notes: no size floor (R4-B1)
+        n = self.rnum_of(r["id"])
+        line, _st = self.statement_of(n)
         src = " Source: " + line.split(" Source: ")[1]
         kept = sorted(doc_lint.identifiers(self.texts[r["id"]]))
         name = f"`{kept[0]}`" if kept else "`event`"
         for ok in (f"{name} is append-only.", f"The factor of {name} is exact.", f"A `TODO` state of {name} exists."):
-            self.assertEqual(self.run_lint(self.sub(line, "R2. " + ok + src)), [], ok)
+            self.assertEqual(self.run_lint(self.sub(line, f"{n}. " + ok + src)), [], ok)
 
     def test_b1_identifier_retention(self):
         rich = [r for r in self.rules[1:] if len(doc_lint.identifiers(self.texts[r["id"]])) >= 3
@@ -109,23 +117,22 @@ class R3(LintBase):
         self.assertTrue(rich, "precondition: a rule with 3 or more identifiers")
         r = rich[0]
         line, st = self.statement_of(self.rnum_of(r["id"]))
-        self.assertIn("naming `", st)
-        bare = re.sub(r", naming `[^`]+`,", "", line)
+        self.assertIn("`", st)
+        bare = line.replace(st, st.replace("`", ""))     # a name without backticks is not kept
         f = self.run_lint(self.sub(line, bare))
         self.assertEqual(self.checks(f), ["L11"])
         self.assertIn(r["id"], f[0]["message"])
-        unticked = line.replace("`", "", 2)          # the name without backticks is not kept
-        self.assertEqual(self.checks(self.run_lint(self.sub(line, unticked))), ["L11"])
+        self.assertIn("hold none of them", f[0]["message"])
         f, info = self.run_lint(self.spec, with_info=True)
         rt = list(info["retention"].values())[0]
-        self.assertGreater(rt["identifiers"], rt["kept"])
+        self.assertGreaterEqual(rt["identifiers"], rt["kept"])
         self.assertGreater(rt["kept"], 0)
         self.assertGreater(rt["size_ratio"], 0)
 
     def test_b1_retention_spares_superseded_rules(self):
         sup = next(r for r in self.rules[1:] if superseding(r))
-        line = self.rdef(self.rnum_of(sup["id"]))
-        bare = re.sub(r", naming `[^`]+`,", "", line)
+        line, st = self.statement_of(self.rnum_of(sup["id"]))
+        bare = line.replace(st, st.replace("`", ""))
         self.assertNotIn("L11", self.checks(self.run_lint(self.sub(line, bare) if bare != line else self.spec)))
 
     def test_b1_lettered_r_numbers(self):
@@ -275,7 +282,7 @@ class R3(LintBase):
 
     def test_b6_wrapped_entry_and_entry_outside_conflicts(self):
         a = self.plain_note()["id"]
-        wrapped = f"CONFLICT {a}: the later note names the period\nand that reading is kept in the statement"
+        wrapped = f"CONFLICT {a}: the later note names the period\n  and that reading is kept in the statement"
         f, info = self.run_lint(self.sub("\n\n## Proposed (not law)", "\n" + wrapped + "\n\n## Proposed (not law)"),
                                 with_info=True)
         self.assertEqual(f, [])
@@ -379,7 +386,7 @@ class R3(LintBase):
         front = "\n".join(self.spec.split("\n")[:3])
         trace_head = "## Trace\n\n| Source | Where |\n| --- | --- |\n"
         c1 = head.replace("Chunk: whole", f"Chunk: {first}") + trace_head
-        c2 = (front + "\n## Purpose\n\nChunk two.\n\n## Invariants" + tail).replace("Chunk: whole", f"Chunk: {second}")
+        c2 = (front + "\n## Purpose\n\nChunk two holds the rows.\n\n## Invariants" + tail).replace("Chunk: whole", f"Chunk: {second}")
         return self.write(c1, "c1.md"), self.write(c2, "c2.md")
 
     def lint_files(self, paths, **kw):
@@ -427,7 +434,7 @@ class R3(LintBase):
             body = front + sec("Purpose")
             if a:
                 body += sec("Entities and tables") + sec("Commands and queries")
-            body += ["## Rules", "", "### Topic", ""] + [l for l in defs if (l.split(".")[0] in first) == a] + [""]
+            body += ["## Rules", "", "### Topic", ""] + [x for l in defs if (l.split(".")[0] in first) == a for x in (l, "")]
             if not a:
                 body += sec("Invariants") + sec("Edge cases") + sec("Settings") + sec("UI annotations")
             body += ["## Conflicts", ""] + ([l for l in entries if mine(l.split()[1].rstrip(":"))] or ["None."]) + [""]
@@ -452,8 +459,8 @@ class R3(LintBase):
         rc, out, _err = self.run_cli([p1, "--module", MODULE, "--index", self.index, "--index-commit", SHA])
         self.assertEqual((rc, out.split("\n")[0]), (1, "LINT FAIL findings=1"))
         rc, out, _err = self.run_cli([p1, "--module", MODULE, "--index", self.index, "--index-commit", SHA, "--partial"])
-        self.assertEqual(rc, 0)
-        self.assertRegex(out.split("\n")[0], r"^LINT PARTIAL findings=0 deferred=\d+$")
+        self.assertEqual(rc, 3)                                  # R4-S1: PARTIAL is not a pass
+        self.assertRegex(out.split("\n")[0], r"^LINT PARTIAL findings=0 deferred=\d+ \(NOT A PASS\)$")
         self.assertNotIn("LINT PASS", out)
         whole = self.write(self.spec, "whole.md")                # --partial on a complete file changes nothing
         rc, out, _err = self.run_cli([whole, "--module", MODULE, "--index", self.index, "--index-commit", SHA,
@@ -595,7 +602,8 @@ class R3(LintBase):
         entry = next(l for l in self.spec.split("\n") if l.startswith(f"CONFLICT {note['id']}:"))
         questions = doc_lint.docs_model(nfdocs.DEFAULT_DOCS)["questions"]
         self.assertGreater(len(questions["open"]), 10)
-        q = questions["open"][0]
+        q = self.open_question(f"Decide for {note['id'][:8]} whether the rule text or its later note governs the "
+                               f"retention of delivered rows.")
         for bad in ("OQ-99999", "see OQ-123 for the question", "open-questions.md#no-such-heading-anywhere",
                     'the author is asked "whether this text exists nowhere in the file at all"',
                     f'"{q[:12]}"'):
