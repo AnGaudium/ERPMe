@@ -3,15 +3,28 @@
 -- Tables live in schema `nativeflows` (ADR-0022 rule 7); domains live in schema `types` (ADR-0006 rule 8).
 -- Primary and foreign keys are shown inline; in migrations they get names from the
 -- MetaData naming convention (ADR-0004 rule 15).
--- Referenced tables (document, account, system_account, posting_period, fiscal_year,
--- applied_rate, transaction_key, partner, item, warehouse (DS-20-master-data.sql),
--- tax_code, open_item, payment_term and payment_term_line (below, ADR-0026), cost_object and fixed_asset (stubs below, ADR-0025), material_document, material_document_line,
--- close_task, posting_period_area_state, currency) are defined by their own design items.
+-- Defined here: the system chart, transaction keys, accounts and applied rates (ADR-0010, ADR-0015, ADR-0011), the journal,
+-- open_item, payment_term and payment_term_line (ADR-0026), cost_object and fixed_asset (ADR-0025).
+-- Referenced tables defined elsewhere: company, branch, partner, item, warehouse, cost_center, project, business_unit, currency
+-- (DS-20-master-data.sql); document (DS-05-platform.sql); fiscal_year, posting_period, posting_period_area_state, close_task
+-- and tax_code (DS-05-platform.sql, owners periods and tax); material_document and material_document_line
+-- (DS-22-09-42-commercial-inventory.sql). The labs that load this file without DS-05 keep lab stubs for the five DS-05 tables.
 -- IDs of journal rows come from context.new_id (ADR-0014 rule 14), so there are no ID defaults.
+-- Owner module of each table in brackets on its CREATE TABLE line (ADR-0022 rules 2, 7).
+-- recorded_at convention (D13, ADR-0007 rules 9, 16): every table has recorded_at timestamptz NOT NULL DEFAULT now(); a table
+-- whose rows are updated in place also gets the trigger trg_<table>_set_recorded_at, BEFORE UPDATE, which runs the shared
+-- function set_recorded_at(), so recorded_at is the instant of the last write. Append-only tables need no trigger. The labs
+-- load subsets of the design files, so every file that attaches the trigger defines the function itself, with
+-- CREATE OR REPLACE, before its first use.
+CREATE OR REPLACE FUNCTION set_recorded_at() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
+BEGIN
+    NEW.recorded_at := now();
+    RETURN NEW;
+END $$;
 
 -- ADR-0027 rules 3 and 5: company, branch, cost_center and project are owned by master_data and defined in
 -- DS-20-master-data.sql (ADR-0045); the lab loads both files together. derivation_trace is owned by ledger.
-CREATE TABLE derivation_trace (
+CREATE TABLE derivation_trace (                            -- [ledger] ADR-0027 rule 3
     id            uuid PRIMARY KEY,
     company_id    uuid NOT NULL REFERENCES company (id),
     rule_code     text NOT NULL,
@@ -24,9 +37,130 @@ CREATE TABLE derivation_trace (
 );
 CREATE INDEX ix_derivation_trace_company_id_rule_code ON derivation_trace (company_id, rule_code);
 
+-- ===== System chart of accounts [ledger] (ADR-0010 rules 1-9, 16; catalog docs/catalogs/system-accounts.csv) =====
+-- Global catalog, loaded from the catalog file by nativeflows admin migrate (ADR-0022 rule 8): no company_id and no row-level
+-- security; application roles get SELECT only. id = uuid5(f244ce09-3c6c-4c82-af14-918bdeca6be3, 'system_account:<code>')
+-- (ADR-0006 rule 4; ADR-0010 rule 1); the loader computes it, so there is no ID default. One column per catalog column
+-- (ADR-0010 rule 1); the catalog's parent_code becomes parent_id, the parent's uuid5 (ADR-0004 rule 12; ADR-0010 rule 1
+-- note). The catalog CI holds the rules that need other rows (rule 16): every parent exists, no cycles, five roots, a child
+-- has its parent's type and contra flag, exactly the leaves are postable. From 1.0.0, released rows change only in the
+-- wording of name and meaning (rule 9).
+CREATE TABLE system_account (                              -- [ledger] ADR-0010 rule 1; global catalog, uuid5 IDs
+    id              uuid PRIMARY KEY,
+    code            text NOT NULL UNIQUE CONSTRAINT ck_system_account_code CHECK (code ~ '^[a-z][a-z0-9_]*$'),   -- snake_case, never an account number (rule 2)
+    parent_id       uuid REFERENCES system_account (id),   -- null for the five roots (rule 3)
+    account_type    text NOT NULL CONSTRAINT ck_system_account_account_type CHECK (account_type IN ('asset', 'liability', 'equity', 'income', 'expense')),   -- rule 3
+    normal_balance  text NOT NULL CONSTRAINT ck_system_account_normal_balance CHECK (normal_balance IN ('debit', 'credit')),
+    is_contra       boolean NOT NULL,
+    is_bilateral    boolean NOT NULL,
+    control_kind    text NOT NULL CONSTRAINT ck_system_account_control_kind CHECK (control_kind IN (
+                        'inventory', 'receivable', 'payable', 'gr_ir', 'cost_object', 'fixed_asset', 'loan', 'none')),   -- rule 5; gated kinds ADR-0025 rules 3-5
+    is_postable     boolean NOT NULL,                      -- exactly the leaves (rules 7, 16)
+    added_in        text NOT NULL CONSTRAINT ck_system_account_added_in CHECK (added_in ~ '^[0-9]+\.[0-9]+\.[0-9]+$'),   -- catalog version (rule 9)
+    name            text NOT NULL,                         -- English source, translated through i18n (rule 1)
+    meaning         text NOT NULL,
+    recorded_at     timestamptz NOT NULL DEFAULT now(),
+    -- Debit for assets and expenses, credit for the others, opposite for contra accounts (rule 4); all 117 rows of 0.1.0 pass.
+    CONSTRAINT ck_system_account_normal_balance_rule CHECK (normal_balance = CASE WHEN (account_type IN ('asset', 'expense')) <> is_contra THEN 'debit' ELSE 'credit' END),
+    CONSTRAINT ck_system_account_bilateral CHECK (NOT is_bilateral OR control_kind IN ('receivable', 'payable')),   -- rule 6
+    CONSTRAINT ck_system_account_control_kind_leaf CHECK (control_kind = 'none' OR is_postable)   -- control kinds only on leaves (rule 16)
+);
+CREATE TRIGGER trg_system_account_set_recorded_at BEFORE UPDATE ON system_account
+    FOR EACH ROW EXECUTE FUNCTION set_recorded_at();
+
+-- ===== Transaction keys [ledger] (ADR-0015 rules 1-4; ADR-0027 rule 11; catalog docs/catalogs/transaction-keys.csv) =====
+-- Global catalog loaded like system_account; id = uuid5(..., 'transaction_key:<code>') (ADR-0006 rule 4; ADR-0015 rule 1).
+-- One column per catalog column (ADR-0015 rule 1). The catalog CI holds the rules that need other rows (rule 2): every
+-- required system account exists, and a key that shares a system account's code requires only that account or its
+-- descendants. Codes in required_system_accounts are catalog codes, as movement_type.offset_transaction_key is (DS-22).
+CREATE TABLE transaction_key (                             -- [ledger] ADR-0015 rule 1; global catalog, uuid5 IDs
+    id                        uuid PRIMARY KEY,
+    code                      text NOT NULL UNIQUE CONSTRAINT ck_transaction_key_code CHECK (code ~ '^[a-z][a-z0-9_]*$'),
+    name                      text NOT NULL,
+    determinants              text[] NOT NULL CONSTRAINT ck_transaction_key_determinants CHECK (
+                                  determinants <@ ARRAY['valuation_class', 'warehouse', 'item_group', 'partner_group', 'tax_code', 'currency']::text[]),   -- ordered, most significant first; empty: one account per company (rule 3)
+    required_system_accounts  text[] NOT NULL CONSTRAINT ck_transaction_key_required_system_accounts CHECK (cardinality(required_system_accounts) >= 1),   -- leaves or nodes (rule 4)
+    required_control_kind     text CONSTRAINT ck_transaction_key_required_control_kind CHECK (required_control_kind IN (
+                                  'inventory', 'receivable', 'payable', 'gr_ir', 'cost_object', 'fixed_asset', 'loan', 'none')),   -- null: not checked (rule 4; ADR-0010 rule 13)
+    has_regime_alternatives   boolean NOT NULL,            -- ADR-0027 rule 11; ADR-0015 rule 2
+    added_in                  text NOT NULL CONSTRAINT ck_transaction_key_added_in CHECK (added_in ~ '^[0-9]+\.[0-9]+\.[0-9]+$'),   -- versioned like the system chart (rule 1)
+    meaning                   text NOT NULL,
+    recorded_at               timestamptz NOT NULL DEFAULT now()
+);
+CREATE TRIGGER trg_transaction_key_set_recorded_at BEFORE UPDATE ON transaction_key
+    FOR EACH ROW EXECUTE FUNCTION set_recorded_at();
+
+-- ===== Operational accounts [ledger] (ADR-0010 rules 5, 10-12; ADR-0035 rule 7) =====
+-- Company data; row-level security in the last section (ADR-0017 rule 19; ADR-0022 rule 8).
+-- Command rules, not held here: CreateAccount and the package CI reject a postable account mapped to an inner node
+-- (rule 11), and moving a balance to another account is a document (rule 12). The mapping gives the account its type,
+-- normal balance, control kind and flags, so they are not stored here (rule 11).
+CREATE TABLE account (                                     -- [ledger] ADR-0010 rule 10
+    id                 uuid PRIMARY KEY,
+    company_id         uuid NOT NULL REFERENCES company (id),
+    code               text NOT NULL,                      -- the company's number, e.g. 1561 (rule 10); data, never an identifier (ADR-0004 rule 5)
+    name               text NOT NULL,
+    parent_id          uuid,                               -- the operational tree used by statutory reports (rule 10)
+    is_postable        boolean NOT NULL,
+    system_account_id  uuid REFERENCES system_account (id),   -- exactly for postable accounts (rule 11)
+    currency           text REFERENCES currency (code),    -- restricts the account to one transaction currency (rule 10)
+    cost_behavior      text CONSTRAINT ck_account_cost_behavior CHECK (cost_behavior IN ('variable', 'fixed')),   -- production cost accounts (rule 5; ADR-0035 rule 7)
+    has_posting        boolean NOT NULL DEFAULT false,     -- set by the first journal line, which locks the row (rule 12; journal_line_check_insert)
+    is_active          boolean NOT NULL DEFAULT true,
+    recorded_at        timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (company_id, code),
+    UNIQUE (company_id, id),
+    FOREIGN KEY (company_id, parent_id) REFERENCES account (company_id, id),
+    CONSTRAINT ck_account_mapping CHECK (is_postable = (system_account_id IS NOT NULL))   -- rule 11
+);
+-- ADR-0010 rule 12: once has_posting is true, code, system_account_id, is_postable and currency never change. has_posting
+-- stays true, since "from then on" the freeze holds. ADR-0017 rule 18 note and ADR-0063 rule 1: the function pins
+-- search_path and names its table with the schema. It reads no table.
+CREATE FUNCTION nativeflows.account_check_posted_immutable() RETURNS trigger
+    LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
+BEGIN
+    IF OLD.has_posting AND (
+        NOT NEW.has_posting
+        OR NEW.code IS DISTINCT FROM OLD.code
+        OR NEW.system_account_id IS DISTINCT FROM OLD.system_account_id
+        OR NEW.is_postable IS DISTINCT FROM OLD.is_postable
+        OR NEW.currency IS DISTINCT FROM OLD.currency
+    ) THEN
+        RAISE EXCEPTION 'an account with postings keeps its code, mapping, postable flag and currency (ADR-0010 rule 12)'
+            USING ERRCODE = 'restrict_violation';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER trg_account_posted_immutable
+    BEFORE UPDATE ON nativeflows.account
+    FOR EACH ROW EXECUTE FUNCTION nativeflows.account_check_posted_immutable();
+CREATE TRIGGER trg_account_set_recorded_at BEFORE UPDATE ON account
+    FOR EACH ROW EXECUTE FUNCTION set_recorded_at();
+
+-- ===== Applied rates [ledger] (ADR-0011 rules 3, 9-10, 12; ADR-0048 rule 12) =====
+-- One conversion that journal lines used; the lines of one document share it (rule 3). Written at posting (rule 1) and
+-- never updated, so it has no recorded_at trigger. Company data; row-level security in the last section.
+CREATE TABLE applied_rate (                                -- [ledger] ADR-0011 rule 3
+    id                       uuid PRIMARY KEY,
+    company_id               uuid NOT NULL REFERENCES company (id),
+    from_currency            text NOT NULL REFERENCES currency (code),
+    to_currency              text NOT NULL REFERENCES currency (code),
+    rate                     types.exchange_rate NOT NULL CONSTRAINT ck_applied_rate_rate CHECK (rate > 0),   -- per unit of from_currency, rounded once by round_exchange_rate (rule 10)
+    origin                   text NOT NULL CONSTRAINT ck_applied_rate_origin CHECK (origin IN ('lookup', 'document', 'invoice', 'customs', 'settlement', 'book')),   -- rule 3
+    selection_date           date NOT NULL,                -- rule 3
+    first_exchange_rate_id   uuid,                         -- the quote used; key to exchange_rate added with DS-10's DDL (rule 9)
+    second_exchange_rate_id  uuid,                         -- the second quote of a cross rate (rule 10)
+    recorded_at              timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (company_id, id),
+    CONSTRAINT ck_applied_rate_lookup CHECK (origin <> 'lookup' OR first_exchange_rate_id IS NOT NULL),   -- a lookup records its quotes (rule 10)
+    CONSTRAINT ck_applied_rate_cross CHECK (second_exchange_rate_id IS NULL OR first_exchange_rate_id IS NOT NULL)   -- rule 10
+);
+
+-- ===== Subledgers, journal and open items (ADR-0014, ADR-0025, ADR-0026) =====
+
 -- ADR-0025 rule 2. cost_object is owned by production (ADR-0032; ADR-0034 rule 15) with kinds per ADR-0035 rule 1;
 -- fixed_asset stays a stub owned by ledger until the assets module (Phase 3). Placed after company and cost_center (lab finding L-01).
-CREATE TABLE cost_object (
+CREATE TABLE cost_object (                                 -- [production] ADR-0025 rule 2; ADR-0035 rule 1
     id                   uuid PRIMARY KEY,
     company_id           uuid NOT NULL REFERENCES company (id),
     code                 text NOT NULL,
@@ -42,17 +176,17 @@ CREATE TABLE cost_object (
 );
 CREATE UNIQUE INDEX uq_cost_object_cost_center_id ON cost_object (cost_center_id) WHERE cost_center_id IS NOT NULL;
 CREATE UNIQUE INDEX uq_cost_object_production_order_id ON cost_object (production_order_id) WHERE production_order_id IS NOT NULL;
-CREATE TABLE fixed_asset (
+CREATE TABLE fixed_asset (                                 -- [ledger] ADR-0025 rule 2; a stub until the assets module
     id          uuid PRIMARY KEY,
     company_id  uuid NOT NULL REFERENCES company (id),
     code        text NOT NULL,
     name        text NOT NULL,
     UNIQUE (company_id, code)
 );
--- Both get FORCE ROW LEVEL SECURITY and the generated company policy (ADR-0022 rule 8).
+-- Both are under row-level security (last section; ADR-0022 rule 8).
 
 -- ADR-0025 rule 4: activation of a gated control kind, read by journal_line_check_insert (lab finding L-03).
-CREATE TABLE subledger_activation (
+CREATE TABLE subledger_activation (                        -- [ledger] ADR-0025 rule 4
     id                             uuid PRIMARY KEY,
     company_id                     uuid NOT NULL REFERENCES company (id),
     control_kind                   text NOT NULL CONSTRAINT ck_subledger_activation_control_kind CHECK (control_kind IN ('cost_object', 'fixed_asset', 'loan')),
@@ -61,9 +195,9 @@ CREATE TABLE subledger_activation (
     recorded_at                    timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT uq_subledger_activation_company_id_control_kind UNIQUE (company_id, control_kind)
 );
--- FORCE ROW LEVEL SECURITY and the generated company policy; append-only (trigger below, after journal_reject_change).
+-- Row-level security in the last section; append-only (trigger below, after journal_reject_change).
 
-CREATE TABLE journal_entry (
+CREATE TABLE journal_entry (                               -- [ledger] ADR-0014 rule 1
     id                           uuid        PRIMARY KEY,
     company_id                   uuid        NOT NULL REFERENCES company (id),
     document_id                  uuid        NOT NULL REFERENCES document (id),
@@ -87,8 +221,8 @@ CREATE INDEX ix_journal_entry_posting_period_id_close_task_id
     ON journal_entry (posting_period_id, close_task_id);
 
 
--- ADR-0026: open-item core, owned by ledger. RLS: FORCE ROW LEVEL SECURITY and the generated company policy.
-CREATE TABLE payment_term (
+-- ADR-0026: open-item core, owned by ledger. Row-level security in the last section.
+CREATE TABLE payment_term (                                -- [ledger] ADR-0026 rule 5
     id          uuid PRIMARY KEY,
     company_id  uuid NOT NULL REFERENCES company (id),
     code        text NOT NULL,
@@ -96,7 +230,7 @@ CREATE TABLE payment_term (
     is_active   boolean NOT NULL DEFAULT true,
     UNIQUE (company_id, code)
 );
-CREATE TABLE payment_term_line (
+CREATE TABLE payment_term_line (                           -- [ledger] ADR-0026 rule 5
     id               uuid PRIMARY KEY,
     company_id       uuid NOT NULL REFERENCES company (id),
     payment_term_id  uuid NOT NULL REFERENCES payment_term (id),
@@ -108,7 +242,7 @@ CREATE TABLE payment_term_line (
     discount_days    integer,
     UNIQUE (payment_term_id, line_number)
 );
-CREATE TABLE open_item (
+CREATE TABLE open_item (                                   -- [ledger] ADR-0026 rule 1
     id                          uuid PRIMARY KEY,
     company_id                  uuid NOT NULL REFERENCES company (id),
     partner_id                  uuid NOT NULL REFERENCES partner (id),
@@ -152,12 +286,14 @@ CREATE INDEX ix_open_item_company_id_account_id ON open_item (company_id, accoun
 CREATE INDEX ix_open_item_company_id_due_date ON open_item (company_id, due_date) WHERE NOT is_settled AND NOT is_reversed;
 CREATE INDEX ix_open_item_origin_document_id ON open_item (origin_document_id);
 
-CREATE TABLE journal_line (
+CREATE TABLE journal_line (                                -- [ledger] ADR-0014 rule 5
     id                         uuid          PRIMARY KEY,
     journal_entry_id           uuid          NOT NULL REFERENCES journal_entry (id),
     company_id                 uuid          NOT NULL REFERENCES company (id),
     line_number                integer       NOT NULL,
     posting_period_id          uuid          NOT NULL REFERENCES posting_period (id),
+    posting_date               date          NOT NULL,     -- copied from the entry at insert (ADR-0014 rule 5 note, 2026-11-21; INV-99)
+    fiscal_year_id             uuid          NOT NULL REFERENCES fiscal_year (id),   -- copied from the entry at insert (as posting_date)
     account_id                 uuid          NOT NULL REFERENCES account (id),
     system_account_id          uuid          NOT NULL REFERENCES system_account (id),
     transaction_key_id         uuid          REFERENCES transaction_key (id),
@@ -270,8 +406,8 @@ DECLARE
     v_sign           int;
     v_activation     subledger_activation%ROWTYPE;
 BEGIN
-    -- ADR-0010 rule 12: mark the account first; this locks its row and freezes its mapping.
-    UPDATE account SET has_posting = true WHERE id = NEW.account_id AND NOT has_posting;
+    -- ADR-0010 rule 12: mark the account first; this locks its row and freezes its mapping. recorded_at is the last write (D8).
+    UPDATE account SET has_posting = true, recorded_at = now() WHERE id = NEW.account_id AND NOT has_posting;
 
     SELECT * INTO v_entry FROM journal_entry WHERE id = NEW.journal_entry_id;
     IF v_entry.database_transaction_number IS DISTINCT FROM pg_current_xact_id() THEN
@@ -281,6 +417,12 @@ BEGIN
     IF NEW.company_id IS DISTINCT FROM v_entry.company_id
        OR NEW.posting_period_id IS DISTINCT FROM v_entry.posting_period_id THEN
         RAISE EXCEPTION 'line company or period differs from its entry (ADR-0014 rule 12)'
+            USING ERRCODE = 'check_violation';
+    END IF;
+    -- ADR-0014 rule 5 note (2026-11-21); INV-99: the line's posting date and fiscal year are its entry's.
+    IF NEW.posting_date IS DISTINCT FROM v_entry.posting_date
+       OR NEW.fiscal_year_id IS DISTINCT FROM v_entry.fiscal_year_id THEN
+        RAISE EXCEPTION 'line posting date or fiscal year differs from its entry (ADR-0014 rule 5; INV-99)'
             USING ERRCODE = 'check_violation';
     END IF;
     IF NEW.line_number > v_entry.line_count THEN
@@ -422,7 +564,7 @@ CREATE CONSTRAINT TRIGGER trg_journal_entry_balance
     FOR EACH ROW EXECUTE FUNCTION journal_entry_check_balance();
 
 -- Rule 18: period balance cache, written when a period's general area is locked.
-CREATE TABLE account_period_balance (
+CREATE TABLE account_period_balance (                      -- [ledger] ADR-0014 rule 18
     id                           uuid          PRIMARY KEY,
     company_id                   uuid          NOT NULL REFERENCES company (id),
     account_id                   uuid          NOT NULL REFERENCES account (id),
@@ -447,8 +589,8 @@ CREATE TABLE account_period_balance (
 -- ADR-0044 rule 10; ADR-0049 rule 14: year-to-date turnover before a mid-year cut-over, non-posting, read by statutory
 -- reports. Owned by ledger, written by CreateOpeningTurnover in the migration's batches, unchanged after
 -- CompleteMigration. Dates instead of a fiscal year: the first fiscal year after a mid-year cut-over is short.
--- FORCE ROW LEVEL SECURITY and the generated company policy.
-CREATE TABLE opening_turnover (
+-- Row-level security in the last section.
+CREATE TABLE opening_turnover (                            -- [ledger] ADR-0044 rule 10
     id                       uuid          PRIMARY KEY,
     company_id               uuid          NOT NULL REFERENCES company (id),
     account_id               uuid          NOT NULL REFERENCES account (id),
@@ -494,3 +636,22 @@ BEGIN
 END $$;
 CREATE TRIGGER trg_journal_line_check_open_item
     BEFORE INSERT ON journal_line FOR EACH ROW EXECUTE FUNCTION journal_line_check_open_item();
+
+-- ===== Row-level security (ADR-0017 rule 19; ADR-0022 rule 8; D9) =====
+-- rls_v1 as in DS-05-platform.sql: the company policy, compared as text and failing closed, and the read-only company_ids
+-- policy for registered cross-company queries. Every company table of this file is listed; system_account and
+-- transaction_key are global catalogs without company_id.
+DO $$
+DECLARE
+    v_table text;
+BEGIN
+    FOREACH v_table IN ARRAY ARRAY[
+        'derivation_trace', 'account', 'applied_rate', 'cost_object', 'fixed_asset', 'subledger_activation', 'journal_entry',
+        'payment_term', 'payment_term_line', 'open_item', 'journal_line', 'account_period_balance', 'opening_turnover'] LOOP
+        EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', v_table);
+        EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', v_table);
+        EXECUTE format('CREATE POLICY company_policy ON %I USING (company_id::text = current_setting(''nativeflows.company_id'', true))', v_table);
+        EXECUTE format('CREATE POLICY company_ids_policy ON %I FOR SELECT USING (company_id::text = ANY (string_to_array(current_setting(''nativeflows.company_ids'', true), '','')))', v_table);
+    END LOOP;
+END
+$$;

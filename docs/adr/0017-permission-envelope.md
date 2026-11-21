@@ -87,6 +87,8 @@ Every command and query is checked against one permission model before it runs (
 
     Note: the invited user's pending list (`ListPendingUserInvitation`) is a registered cross-company query: its `nativeflows.company_ids` are the companies holding a pending invitation for that user, found by a security-definer function owned by the no-login role `nativeflows_invitation` in the pattern of `nativeflows_claim`, and it returns only that user's rows; no role gains `BYPASSRLS` ([ADR-0054](0054-users-roles-and-authorizations.md) rule 3).
 
+    Note (S2 findings closure, 2026-11-21): [DS-06-universal-journal.sql](../design/DS-06-universal-journal.sql) now writes the rls_v1 policies for its 13 company tables, as DS-05 does; `system_account` and `transaction_key` are global catalogs without them (D9). The new company tables of DS-05 (`idempotency_record` with the installation exception) and `module_activation` (DS-28-settings.sql) are under the same policies.
+
 ## Context
 
 DS-15's envelope part is needed by ADR-0008 (dispatcher checks), ADR-0009 (approvals), ADR-0012 (soft-locked periods) and ADR-0013 (consumers). Constraints:

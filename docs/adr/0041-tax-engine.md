@@ -40,6 +40,8 @@ Tax codes, dated rates and a dated tax matrix are package rules, read live. The 
      - Which return boxes a code feeds is defined by the return form (rule 19), not on the code.
 
    Note: `tax_kind` is one of `vat`, `sales_tax`, `excise`, `customs_duty` or `other`. A package keeps its own names in `package_kind`, declared in `tax/package_kinds.csv`, and `base_includes` may name core kinds or package kinds. `l10n_vn` maps `import_duty` and `trade_remedy` to `customs_duty`, and `special_consumption` and `environmental_protection` to `excise`; the base example above is `l10n_vn`'s. `fixed_asset_code` is an optional capital-goods mapping usable by any regime: the code a purchase or import line uses instead when it acquires a fixed asset, so its tax reaches the regime's capital-goods input tax account. `e_invoice_label` leaves the core `tax_code` for the data of the e-invoice add-on (DS-24); the draft column stays in DS-19 until DS-24 defines its file ([ADR-0053](0053-core-neutrality.md) rules 2, 12).
+
+   Note (S2 findings closure, 2026-11-21): the column is `transaction_key_id`, a key to the `transaction_key` catalog (ADR-0004 rule 12); the package CSV keeps the code and the loader resolves it (D5). The DDL is in [DS-05-platform.sql](../design/DS-05-platform.sql), section tax codes, owner `tax`, with the `tax_kind` values of the note above.
 2. `tax_rate`: `tax_code`, `effective_from`, `rate_percent` (ADR-0006 rule 9) and basis.
    - **Temporary rates.** A temporary reduction is a rate row followed by a row restoring the rate.
    - **Used rows never change** (ADR-0016 rule 13).

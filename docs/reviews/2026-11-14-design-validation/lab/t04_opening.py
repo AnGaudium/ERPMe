@@ -19,16 +19,17 @@ X("insert into company (id,code,legal_name,company_currency,time_zone,localizati
   " values (%s,%s,'Co4','VND','Asia/Ho_Chi_Minh','vn','tt99','warehouse',%s,'vi')", (I["co"], 'C4-' + tag, I["user"]))
 for k, code, kind in [("sa_cash", "cash_on_hand", "none"), ("sa_bank", "cash_in_bank", "none"), ("sa_rec", "receivable_trade", "receivable"),
                       ("sa_clr", "opening_balance_clearing", "none"), ("sa_eq", "owner_capital", "none")]:
-    X("insert into system_account values (%s,%s,%s)", (I[k], code + '_' + tag, kind))
+    ins_system_account(X, I[k], code + '_' + tag, kind)
 for a, s, code in [("a_cash", "sa_cash", "111"), ("a_bank", "sa_bank", "1122"), ("a_rec", "sa_rec", "131"), ("a_clr", "sa_clr", "999"), ("a_eq", "sa_eq", "4111")]:
-    X("insert into account (id,company_id,code,system_account_id) values (%s,%s,%s,%s)", (I[a], I["co"], code, I[s]))
-# ADR-0044 rule 2: a one-day migration fiscal year before the first operating fiscal year
-X("insert into fiscal_year values (%s,%s),(%s,%s)", (I["fym"], I["co"], I["fy27"], I["co"]))
-X("insert into posting_period (id,company_id,fiscal_year_id,start_date,end_date) values (%s,%s,%s,'2026-12-31','2026-12-31'),(%s,%s,%s,'2027-01-01','2027-01-31')",
-  (I["mig"], I["co"], I["fym"], I["jan"], I["co"], I["fy27"]))
+    ins_account(X, I[a], I["co"], code, I[s])
+# ADR-0044 rule 2: a one-day migration fiscal year before the first operating fiscal year (is_migration, D3)
+ins_fiscal_year(X, I["fym"], I["co"], "M2026", "2026-12-31", "2026-12-31", is_migration=True)
+ins_fiscal_year(X, I["fy27"], I["co"], "2027", "2027-01-01", "2027-12-31")
+ins_posting_period(X, I["mig"], I["co"], I["fym"], 1, "2026-12-31", "2026-12-31")
+ins_posting_period(X, I["jan"], I["co"], I["fy27"], 1, "2027-01-01", "2027-01-31")
 for p in ["mig", "jan"]:
     for area in ["general", "inventory", "receivable", "payable"]:
-        X("insert into posting_period_area_state values (%s,%s,'open')", (I[p], area))
+        ins_area_state(X, I["co"], I[p], area, "open")
 X("insert into partner (id, company_id, code, name, partner_kind, country) values (%s,%s,%s,'Old customer','organization','VN')", (I["partner"], I["co"], 'CUS-OLD-' + tag))
 c.close()
 SA = {"a_cash": "sa_cash", "a_bank": "sa_bank", "a_rec": "sa_rec", "a_clr": "sa_clr", "a_eq": "sa_eq"}
@@ -41,6 +42,7 @@ def entry(cx, d, n):
                " values (%s,%s,%s,'2026-12-31','2026-12-31',%s,%s,%s)", (e, I["co"], d, I["mig"], I["fym"], n)); return e
 def line(cx, e, n, acct, side, cur, tamt, camt, **kw):
     cols = dict(id=kw.pop("id", None) or new(), journal_entry_id=e, company_id=I["co"], line_number=n, posting_period_id=I["mig"],
+                posting_date="2026-12-31", fiscal_year_id=I["fym"],
                 account_id=I[acct], system_account_id=I[SA[acct]], side=side, transaction_currency=cur, transaction_amount=tamt,
                 company_currency="VND", company_amount=camt)
     cols.update(kw)

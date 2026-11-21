@@ -33,8 +33,8 @@ for co, ig, vc, itg in (("co", "ig", "vc", "itg"), ("co2", "ig2", "vc2", "itg2")
     X("insert into item_tax_group (id, company_id, code, name, basis) values (%s,%s,'standard','Standard',%s)", (I[itg], I[co], B))
 X("insert into partner_group (id, company_id, code, name, basis) values (%s,%s,'domestic','Domestic',%s)", (I["pg"], I["co"], B))
 X("insert into partner_tax_group (id, company_id, code, name, directions, basis) values (%s,%s,'domestic','Domestic','{sale,purchase}',%s)", (I["ptg"], I["co"], B))
-X("insert into system_account (id, code) values (%s,%s)", (I["sa"], "receivable_trade_" + t))
-X("insert into account (id, company_id, code, system_account_id) values (%s,%s,'131',%s)", (I["acct"], I["co"], I["sa"]))
+ins_system_account(X, I["sa"], "receivable_trade_" + t, "receivable")
+ins_account(X, I["acct"], I["co"], "131", I["sa"])
 for k in ("partner", "partner2"):
     X("insert into partner (id, company_id, code, name, partner_kind, country) values (%s,%s,%s,'P','organization','VN')", (I[k], I["co"], k + t))
 def product(cx, pid, ptype="stock", vc=True, company="co", tracking="none", inv="ea", pur="ctn"):

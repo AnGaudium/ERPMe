@@ -31,7 +31,7 @@ STUBS = os.path.join(DOCS, "reviews/2026-11-14-design-validation/lab/00_stubs.sq
 NEW = "DS-43-54-planning-production.sql"
 FILES = ["DS-20-master-data.sql", "DS-56-product-configuration.sql", "DS-06-universal-journal.sql", "DS-15-access.sql", NEW]
 STUB_TABLES = {"document", "material_document", "material_document_line", "posting_period", "posting_period_area_state", "fiscal_year",
-               "account", "system_account", "applied_rate", "close_task", "tax_code", "transaction_key"}
+               "close_task", "tax_code"}   # the ledger tables are DS-06's (S2 schema phase A)
 # Lab-only stub additions: the shared document row's columns and composite key of ADR-0052 rule 18.
 EXTRA_STUBS = """SET search_path = nativeflows;
 ALTER TABLE document ADD COLUMN IF NOT EXISTS partner_id uuid, ADD COLUMN IF NOT EXISTS document_date date;
@@ -113,7 +113,7 @@ check(f"S11 each of the {len(interims)} interim markers cites the silent ADR", i
 I = {k: new() for k in """user co co2 ea kg hr ig vc itg pFG pC1 pC2 pSV pK iFG iC1 iC2 iSV iK iX2 pX2 S1 P1 E1 cal cc cc2
     WP WD WX zP zD zX bP bD bX SB OB bP2 setup machine WC1 B BK R1 RK RT RR1 RR2 op10 op20 PV ds_so ds_po FR PR
     PO_P PO_C1 PO_RP poc1 poc2 doc PO L1 L2 OUT OP10 OP20 CO CO_POOL doc_i ISS md_i mdl_i doc_c CONF md_c mdl_c doc_r REC
-    LOT1 SER1 SER2 CE per settle doc_s RQ""".split()}
+    LOT1 SER1 SER2 CE fy per settle doc_s RQ""".split()}
 t = str(I["co"])[-8:]
 H = lambda s: (s * 64)[:64]
 B_ = '{"kind": "company_decision"}'
@@ -325,7 +325,9 @@ step("P12 a production receipt of the main output (serial S-1) into the output b
      (new(), I["co"], I["doc_r"], I["doc"], I["OUT"], I["iFG"], I["WP"], I["ea"], I["SER1"], I["OB"], I["CO"])),
 ])
 step("P13 a cost estimate with a costing lot quantity and lines is released; rates, a pool allocation rule and normal capacity are set", [
-    ("insert into posting_period (id, company_id, start_date, end_date) values (%s,%s,'2026-12-01','2026-12-31')", (I["per"], I["co"])),
+    ("insert into fiscal_year (id, company_id, code, start_date, end_date) values (%s,%s,'2026','2026-01-01','2026-12-31')", (I["fy"], I["co"])),
+    ("insert into posting_period (id, company_id, fiscal_year_id, number, kind, start_date, end_date) values (%s,%s,%s,12,'regular','2026-12-01','2026-12-31')",
+     (I["per"], I["co"], I["fy"])),
     # the four default detailed components CreateCompany seeds (ADR-0072 rule 2)
     ("insert into cost_component_detail (id, company_id, code, name, cost_component, is_default, recorded_at) select gen_random_uuid(), %s, c, c, c, true, now()"
      " from unnest(array['material','labor','overhead','other']) c", (I["co"],)),

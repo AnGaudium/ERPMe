@@ -165,7 +165,7 @@ The [module cards](generated/module-cards.md) are generated. Layers and modules:
 - **Layer 5, Interfaces**: `api` (REST and MCP from the registry), `query` (read-only views and the analysis layer), `agents` (gateway, runtime, workflows), `sdk`, `imports`, `automation`.
 - **Layer 6**: `app`, the composition root.
 
-Generated counts from the DDL drafts: 345 tables, of which 329 have a stated owner in 22 modules; the largest are `master_data` (70), `production` (44), `inventory` (28) and `crm` (24) ([data map](generated/data-map.md)).
+Generated counts from the DDL drafts (2026-11-21): 399 tables, each with a stated owner, in 25 modules; the largest are `master_data` (74), `production` (53), `inventory` (44) and `crm` (24) ([data map](generated/data-map.md)).
 
 ## B6. Data architecture
 
@@ -269,12 +269,11 @@ erDiagram
 
 ### Ownership and stub tables
 
-Each table has exactly one owning module (ADR-0022 rule 7). Ownership exists today only in SQL comments, which the generator parses. It found:
-- 6 tables in DS-06 with no stated owner (`journal_entry`, `journal_line`, `open_item`, `payment_term_line`, `subledger_activation`, `account_period_balance`);
-- 10 tables in sections that name two owners (`[policy, documents]`, `[sales, purchasing]`, `[planning, production]`);
-- 9 lab stubs that no design DDL defines: `account`, `applied_rate`, `close_task`, `fiscal_year`, `posting_period`, `posting_period_area_state`, `system_account`, `tax_code`, `transaction_key`.
+Each table has exactly one owning module (ADR-0022 rule 7). Ownership exists today only in SQL comments, which the generator parses. Since S2 schema phase A (2026-11-21) every table has one owner and every lab stub has design DDL (findings 5 to 7):
+- every CREATE TABLE line of DS-06-universal-journal.sql, and the 10 tables of sections that name two owners, carry a `[module]` bracket;
+- `account`, `system_account`, `transaction_key` and `applied_rate` are in DS-06-universal-journal.sql; `fiscal_year`, `posting_period`, `posting_period_area_state`, `close_task` and `tax_code` are in DS-05-platform.sql. Their five lab stubs stay only for the labs that load DS-06 without DS-05, with the design columns (D6; lab check t15 A02b).
 
-The generator fails on any new unowned or stub table; the known ones are listed as findings, with no owner invented.
+The generator fails on any new unowned or stub table; its list of acknowledged findings is empty.
 
 **Generation.** Part C is written now by the lab script `docs/reviews/2026-11-14-design-validation/lab/gen_overview.py` (with `--check`), because `nativeflows-dev generate` does not exist yet. `nativeflows-dev generate` takes this over at build step 0 (ADR-0022 rules 14, 17), reading the registry and `tables.py` instead of the DDL drafts.
 
@@ -660,13 +659,13 @@ The production core step proposed by ADR-0032 rule 7 has no number yet ([open-qu
 
 ## B17. Product shape and separability
 
-**What the documents say.** "One edition only" ([18-license-governance](../spec/18-license-governance.md):16); "no closed edition" (D3, [decisions](../decisions.md):9); no split between open and paid features ([01-vision](../spec/01-vision.md):15). No ADR defines a CRM-only edition or deployment.
+**What the documents say.** "One edition only" ([18-license-governance](../spec/18-license-governance.md):16); "no closed edition" (D3, [decisions](../decisions.md):9); no split between open and paid features ([01-vision](../spec/01-vision.md):15). No ADR defines a CRM-only edition; ADR-0052 (rule 1 note) defines the CRM-only deployment profile.
 
 **What the design allows today**
 - `crm` is a layer-4 module. It imports no other layer-4 module (`sales`, `purchasing`, `cash`) and composes documents through the layer-2 `documents` contract ([ADR-0052](../adr/0052-minimal-crm.md):25, :192). Layer 4 may import layer-3 contracts (ADR-0022 rule 2).
-- `customer_profile.receivable_account_id` and `supplier_profile.payable_account_id` are `NOT NULL` foreign keys to the ledger's `account` (DS-20-master-data.sql:252, :270). So master data cannot hold a customer or supplier without a ledger account.
+- `customer_profile.receivable_account_id` and `supplier_profile.payable_account_id` are nullable foreign keys to the ledger's `account` (DS-20-master-data.sql), required while module `ledger` is activated for the company (`module_activation`, DS-28-settings.sql; INV-38; [ADR-0015](../adr/0015-account-determination.md) rule 11 note).
 
-**What a CRM-only deployment would need** (for the author's decision; no rule here): a decision that such a deployment is wanted at all, given "one edition"; then at least nullable or deferred account references on the profiles, a check that `crm` and `master_data` run without `ledger` data, and an import rule for `crm` against layer 3 stated by ADR. This is listed as an open decision in B18. Work cases ([ADR-0066](../adr/0066-work-cases.md), proposed) state a consequence, not a rule: a CRM-only deployment would use the case list and case view as its main surface, since its work is mostly external exceptions.
+**Decided (author's direction, 2026-11-17):** CRM-only is a deployment profile of the one product, not an edition: the kernel, `master_data` partners and contacts, `crm`, `agents` and `query`, intake, analysis and automation ([ADR-0052](../adr/0052-minimal-crm.md) rule 1 note). `crm` never depends on `ledger`, `tax`, `inventory`, `cash` or `production` (ADR-0022 rule 2 note). Not yet written: the import-linter contract, the degraded commercial screens and timeline, and the Phase 2 CRM features on the backlog. Work cases ([ADR-0066](../adr/0066-work-cases.md)) state a consequence, not a rule: a CRM-only deployment would use the case list and case view as its main surface.
 
 ## B18. Open decisions and known limits
 
@@ -680,14 +679,13 @@ The production core step proposed by ADR-0032 rule 7 has no number yet ([open-qu
 - Typed columns on `demand_supply_line` before step 3 (:70).
 - Reversal by storno or swapped sides (:147).
 - Legal texts to verify for the first package (:3–5).
-- The product-shape question of B17 (new).
 - The NFR numbers of B14 (new).
 
 **Decisions with a safe interim** (examples): edge-case outcomes EC-20 to EC-22 (:6); reservations without overbooking (:12); short picks (:13); posting e-invoiced documents on acceptance (:31); who may clear taint (:36); production costing choices (:72, :74); VAT rounding per line (:91).
 
 **Spec wording awaiting the author** (examples): spec 09 outdated by ADR-0032 (:122, :64); e-invoice add-on placement (:30); spec 17 local-model wording (:41); import batch wording (:49); spec 07 approval engine (:120); customization levels in specs 10 and 16 (:249, :265); spec 03 rule 1 (:264, :271).
 
-**Known limits of this overview.** The event matrix is text extraction until the registry exists; module cards list commands found in ADR text, not a registry. ADR lists per module are "declared" (ADR-0022 rule 2 notes and the ADRs the DDL cites for the module's owned tables) plus a separate "mentions" count; declared lists miss ADRs whose tables have no DDL or no stated owner, for example ADR-0014 for `ledger` (journal tables unowned in DS-06) and ADR-0008 for `registry` (`idempotency_record` has no DDL). Failure rows for the database and object store wait for DS-37.
+**Known limits of this overview.** The event matrix is text extraction until the registry exists; module cards list commands found in ADR text, not a registry. ADR lists per module are "declared" (ADR-0022 rule 2 notes and the ADRs the DDL cites for the module's owned tables) plus a separate "mentions" count; declared lists miss ADRs whose tables have no DDL; since S2 schema phase A every table states its owner. Failure rows for the database and object store wait for DS-37.
 
 ## Findings for the review
 
@@ -697,11 +695,11 @@ Disagreements between documents, recorded and not resolved.
 2. **Primary keys.** [ADR-0006](../adr/0006-id-and-numeric-model.md) rule 1 (:13) allows only a single-column `id uuid`. DS-20 has a `code` primary key on `currency` (:21–22), a composite key on `company_currency_activation` (:27–30) and 11 more non-`id` keys (e.g. profiles keyed on `partner_id` :251, :269, :285; `barcode` :796). Other files: DS-15 (8, and no key on `role_assignment_scope` :259, `approval_stage_member` :372), DS-43-54 (23, and no key on `item_low_level_code` :612, `normal_capacity` :1316), DS-35 (9), DS-05 (4, e.g. `event_consumer` :686), DS-28-34 (4), DS-36 (4), DS-56 (4), DS-22 (3), DS-28-settings (2).
 3. **Queue lists.** ADR-0022 rule 12 lists `events|integrations|jobs|pdf` ([ADR-0022](../adr/0022-repository-and-engineering-conventions.md):188). ADR-0013 rule 13 adds `agents` ([ADR-0013](../adr/0013-outbox-and-events.md):62, and the note at :27). ADR-0022 has no note.
 4. **Partitioning.** ADR-0002 still says the ledger key is chosen for later partitioning by fiscal year (:60) and "partition by fiscal year" (:75). Its status line (:3) and ADR-0006 rules 22–23 (:56–57) supersede both; the old text remains in the body.
-5. **Stub tables.** `account`, `fiscal_year`, `posting_period`, `posting_period_area_state`, `tax_code`, `system_account`, `transaction_key`, `applied_rate`, `close_task` exist only in the lab stubs (lab/00_stubs.sql; DS-05-platform.sql:25–26).
-6. **Tables without one owner.** ADR-0022 rule 7 needs exactly one owner per table. DS-06 states none for `journal_entry` (:66), `journal_line` (:153), `open_item` (:109), `payment_term_line` (:97), `subledger_activation` (:55), `account_period_balance` (:414). Sections name two owners for `policy_decision` (DS-05:502), `auto_post_confirmation` (:603), `period_unlock_request` (:613), `document_line_price_step`, `document_line_custom_text`, `document_installment` (DS-22:1159, :1179, :1192), `planning_setting`, `planning_run`, `planning_state`, `production_structure` (DS-43-54:31, :42, :61, :67).
-7. **Platform tables without DDL.** `idempotency_record` (ADR-0008 rule 16), `business_date_override` (ADR-0007 rule 15) and `regime_setting` (ADR-0016:49) have no CREATE TABLE in any design DDL or lab stub.
+5. **Stub tables.** Fixed (S2 schema phase A, 2026-11-21): `account`, `system_account`, `transaction_key` and `applied_rate` have DDL in DS-06-universal-journal.sql; `fiscal_year`, `posting_period`, `posting_period_area_state`, `close_task` and `tax_code` in DS-05-platform.sql. The four ledger stubs left lab/00_stubs.sql; the five DS-05 stubs stay for the labs that load DS-06 without DS-05, with the design columns (D6; lab check t15 A02b).
+6. **Tables without one owner.** Fixed (S2 schema phase A, 2026-11-21): every table of DS-06-universal-journal.sql has a `[module]` bracket on its CREATE TABLE line, and so do `policy_decision` and `auto_post_confirmation` (`policy`) and `period_unlock_request` (`periods`) in DS-05-platform.sql, `document_line_price_step`, `document_line_custom_text` and `document_installment` (`documents`) in DS-22-09-42-commercial-inventory.sql, and `planning_setting`, `planning_run`, `planning_state` (`planning`) and `production_structure` (`production`) in DS-43-54-planning-production.sql; `gen_overview.py` acknowledges no table. Still open: [ADR-0029](../adr/0029-proposals-and-agent-safety.md) (:243) names `documents` as the owner of `auto_post_confirmation`, against ADR-0043 rule 1.
+7. **Platform tables without DDL.** Fixed (S2 schema phase A, 2026-11-21): `idempotency_record` (`registry`, ADR-0008 rule 16 note), `business_date_override` (`periods`, ADR-0007 rule 15 note) and `regime_setting` (`localization`, ADR-0016 rule 13 note) are in DS-05-platform.sql.
 8. **Restore point for the object store.** Addressed by the [ADR-0038](../adr/0038-audit-and-observability.md) rule 15 note (design hardening, 2026-11-16): write-once objects keyed by SHA-256, physical deletion only after a grace period at least the database recovery window, an orphan sweep, and the restore procedure. The store's product and the recovery window stay with DS-37.
-9. **CRM separability.** Spec 01 (:15), spec 18 (:16) and D3 (decisions.md:9) say one edition. ADR-0052 (:25, :192) limits only `crm`'s layer-4 imports. `customer_profile` and `supplier_profile` hold `NOT NULL` single-column foreign keys to `account` (DS-20:252, :270), which is a lab stub. Whether a CRM-only deployment is a goal is undecided (B17).
+9. **CRM separability.** Decided by the author's direction (2026-11-17): CRM-only is a deployment profile of the one edition (B17). DDL part fixed (S2 schema phase A, 2026-11-21): the profile accounts in DS-20-master-data.sql are nullable and required while `ledger` is activated, recorded in `module_activation` (DS-28-settings.sql; INV-38; notes on ADR-0015 rule 11, ADR-0019 rule 3, ADR-0022 rule 2 and ADR-0052 rule 1). Still open: the import-linter contract and the degraded screens (B17).
 10. **Frontend budgets.** The outline treated the size budgets as decided; ADR-0040 lists them as "Targets (open question)" in rule 17 (:209–212). Resolved by the author's delegation of 2026-11-19 (ADR-0040 rule 17 note).
 11. **Spec 09 and spec 11 versus ADR-0032.** Spec 09 (:12, :15) still shows production and planning as later; spec 11 has no production core step (open-questions.md:64, :122, :212).
 12. **Same-layer contract imports.** ADR-0022 rule 2 (:47) says a module imports only from lower layers and names `tax` to `ledger` as the exception within layer 3. Rule 6 (:109) allows the `contract` between modules of layers 3 and 4, and rule 4 (:87) has `inventory` handlers call `ledger.contract.write_journal_entry`.

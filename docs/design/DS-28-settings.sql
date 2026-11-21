@@ -11,13 +11,20 @@
 -- without company_id and without row-level security; application roles get SELECT only on them, so no command or trigger
 -- path can rewrite a definition. setting_value holds company rows and, with company_id null, the
 -- installation values; the last section writes out its row-level security with the installation exception of rls_v1
--- (ADR-0022 rule 8; ADR-0017 rule 19), and that of company_setup_acknowledgement (ADR-0067 rule 8).
+-- (ADR-0022 rule 8; ADR-0017 rule 19), and those of company_setup_acknowledgement (ADR-0067 rule 8) and module_activation.
 -- Referenced tables defined elsewhere: company (DS-20); user_account (DS-15); change_proposal (DS-05).
 -- Functions of DS-05-platform.sql used here: platform_reject_change.
 -- Owner module (ADR-0022 rule 2): registry owns every table here; agents and configuration read them through its contract.
 -- Rules that need the registry or other tables (a loosening's direction, the scope reference naming a company record,
 -- a period start, the outdated evidence) are enforced by commands and named in ADR-0063; the rules a row can hold are
 -- checks here.
+-- New tables follow the recorded_at convention of D13 (DS-06-universal-journal.sql header; ADR-0007 rule 16 note); the labs
+-- load subsets of the design files, so this file defines the shared function itself.
+CREATE OR REPLACE FUNCTION set_recorded_at() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
+BEGIN
+    NEW.recorded_at := now();
+    RETURN NEW;
+END $$;
 
 -- ===== Setting definitions [registry] (ADR-0063 rule 1) =====
 CREATE TABLE setting_definition (                          -- installation data; one row per registered key, written at startup
@@ -226,6 +233,24 @@ CREATE TABLE extension_point (                             -- installation data;
     recorded_at                timestamptz NOT NULL
 );
 
+-- ===== Module activation [registry] (ADR-0022 rule 2 note; ADR-0052 note, CRM-only deployment profile) =====
+-- Which modules of the one product run for a company. A deployment profile, such as CRM-only, is a set of these rows that
+-- CreateCompany writes from the chosen operating preset (ADR-0067); a module with no row, or with is_active false, is not
+-- activated for the company. Written by ActivateModule and DeactivateModule (registry, human_only, change-tracked,
+-- ADR-0038 rule 3); the command refuses to deactivate a module that has postings or open documents (module_in_use) and
+-- checks the module code against the registry. Commands read it to decide what applies, e.g. the partner commands require
+-- the profile accounts while ledger is activated (ADR-0015 rule 11 note; INV-38).
+CREATE TABLE module_activation (                           -- company data, updated in place
+    id           uuid PRIMARY KEY,
+    company_id   uuid NOT NULL REFERENCES company (id),
+    module       text NOT NULL CONSTRAINT ck_module_activation_module CHECK (module ~ '^[a-z][a-z0-9_]*$'),   -- a module of ADR-0022 rule 2
+    is_active    boolean NOT NULL,
+    recorded_at  timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (company_id, module)
+);
+CREATE TRIGGER trg_module_activation_set_recorded_at BEFORE UPDATE ON module_activation
+    FOR EACH ROW EXECUTE FUNCTION set_recorded_at();
+
 -- ===== Guards =====
 -- Values are a history: never updated or deleted (rule 2).
 CREATE TRIGGER trg_setting_value_immutable BEFORE UPDATE OR DELETE ON setting_value
@@ -371,3 +396,7 @@ ALTER TABLE company_setup_acknowledgement ENABLE ROW LEVEL SECURITY;
 ALTER TABLE company_setup_acknowledgement FORCE ROW LEVEL SECURITY;
 CREATE POLICY company_policy ON company_setup_acknowledgement USING (company_id::text = current_setting('nativeflows.company_id', true));
 CREATE POLICY company_ids_policy ON company_setup_acknowledgement FOR SELECT USING (company_id::text = ANY (string_to_array(current_setting('nativeflows.company_ids', true), ',')));
+ALTER TABLE module_activation ENABLE ROW LEVEL SECURITY;
+ALTER TABLE module_activation FORCE ROW LEVEL SECURITY;
+CREATE POLICY company_policy ON module_activation USING (company_id::text = current_setting('nativeflows.company_id', true));
+CREATE POLICY company_ids_policy ON module_activation FOR SELECT USING (company_id::text = ANY (string_to_array(current_setting('nativeflows.company_ids', true), ',')));

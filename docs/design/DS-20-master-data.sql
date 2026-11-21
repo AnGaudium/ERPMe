@@ -334,7 +334,7 @@ CREATE UNIQUE INDEX ux_price_list_by_product ON price_list (company_id) WHERE ki
 CREATE TABLE customer_profile (
     company_id                         uuid NOT NULL,
     partner_id                         uuid PRIMARY KEY,
-    receivable_account_id              uuid NOT NULL REFERENCES account (id),
+    receivable_account_id              uuid REFERENCES account (id),   -- required while ledger is activated (partner commands; INV-38; ADR-0015 rule 11 note); empty in the CRM-only profile
     payment_term_id                    uuid REFERENCES payment_term (id),
     credit_limit                       types.amount,
     credit_limit_currency              text REFERENCES currency (code),
@@ -359,7 +359,7 @@ CREATE INDEX ix_customer_profile_price_list_id ON customer_profile (price_list_i
 CREATE TABLE supplier_profile (
     company_id           uuid NOT NULL,
     partner_id           uuid PRIMARY KEY,
-    payable_account_id   uuid NOT NULL REFERENCES account (id),
+    payable_account_id   uuid REFERENCES account (id),          -- required while ledger is activated (partner commands; INV-38; ADR-0015 rule 11 note); empty in the CRM-only profile
     payment_term_id      uuid REFERENCES payment_term (id),
     buyer_id             uuid,
     price_list_id        uuid,                                    -- the supplier's purchase prices (ADR-0045 rule 2)

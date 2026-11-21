@@ -31,7 +31,7 @@ LAB = os.path.join(DOCS, "reviews/2026-11-14-design-validation/lab")
 DS22 = os.environ.get("NATIVEFLOWS_DS22", os.path.join(DESIGN, "DS-22-09-42-commercial-inventory.sql"))
 DS43 = os.environ.get("NATIVEFLOWS_DS43", os.path.join(DESIGN, "DS-43-54-planning-production.sql"))   # owns demand_supply_line
 sys.path.insert(0, LAB)
-from lab import conn, new, RESULTS  # noqa: E402
+from lab import conn, new, RESULTS, ins_system_account, ins_account, ins_fiscal_year, ins_posting_period, ins_area_state  # noqa: E402
 
 
 def check(name, got, want):
@@ -158,13 +158,13 @@ X("insert into contact (id, company_id, partner_id, name, email) values (%s,%s,%
 X("insert into price_list (id, company_id, code, name, kind, currency, is_default) values (%s,%s,'S','S','sale','VND',true),(%s,%s,'P','P','purchase','VND',true)",
   (I["sl"], I["co"], I["pl"], I["co"]))
 X("insert into payment_term (id, company_id, code, name) values (%s,%s,'2x15','Two installments')", (I["pt"], I["co"]))
-X("insert into fiscal_year (id, company_id) values (%s,%s)", (I["fy"], I["co"]))
-X("insert into posting_period (id, company_id, fiscal_year_id, start_date, end_date) values (%s,%s,%s,'2026-11-01','2026-11-30')", (I["pp"], I["co"], I["fy"]))
+ins_fiscal_year(X, I["fy"], I["co"], "2026", "2026-01-01", "2026-12-31")
+ins_posting_period(X, I["pp"], I["co"], I["fy"], 11, "2026-11-01", "2026-11-30")
 for area in ("general", "inventory", "receivable", "payable"):
-    X("insert into posting_period_area_state values (%s,%s,'open')", (I["pp"], area))
+    ins_area_state(X, I["co"], I["pp"], area, "open")
 for code, ck in (("inv", "inventory"), ("grir", "none"), ("rec", "receivable"), ("rev", "none"), ("cogs", "none"), ("bank", "none"), ("tax", "none")):
-    X("insert into system_account (id, code, control_kind) values (%s,%s,%s)", (I["sa_" + code], code + t, ck))
-    X("insert into account (id, company_id, code, system_account_id) values (%s,%s,%s,%s)", (I["a_" + code], I["co"], code, I["sa_" + code]))
+    ins_system_account(X, I["sa_" + code], code + t, ck)
+    ins_account(X, I["a_" + code], I["co"], code, I["sa_" + code])
 X("""insert into movement_type (id, code, name, direction, value_source, costing_role, offset_transaction_key, needs_reference, sap_analog, added_in)
      values (%s,%s,'Purchase receipt','in','document','receipt','gr_ir_clearing',true,'101','0.1.0'),
             (%s,%s,'Sales issue','out','preliminary_price','revalued_issue','cost_of_goods_sold',true,'601','0.1.0')""",
@@ -197,7 +197,8 @@ def journal(cx, document_id, lines, ids_in=None):
     for n, (acc, side, amount, extra) in enumerate(lines, 1):
         signed = amount if side == "debit" else -amount
         jl = ids_in[n - 1] if ids_in else new(); ids.append(jl)
-        ins(cx, "journal_line", id=jl, journal_entry_id=je, company_id=I["co"], line_number=n, posting_period_id=I["pp"], account_id=I["a_" + acc],
+        ins(cx, "journal_line", id=jl, journal_entry_id=je, company_id=I["co"], line_number=n, posting_period_id=I["pp"], posting_date="2026-11-10",
+            fiscal_year_id=I["fy"], account_id=I["a_" + acc],
             system_account_id=I["sa_" + acc], side=side, transaction_currency="VND", transaction_amount=signed, company_currency="VND", company_amount=signed, **extra)
     return ids
 def stock_in(cx, item, wh, bin_, qty, value):

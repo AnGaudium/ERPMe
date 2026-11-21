@@ -3,7 +3,9 @@
 -- refers to. The file also carries the tables of DS-13 (outbox, ADR-0013), DS-23 (document taxes and the tax subledger,
 -- ADR-0041), DS-25 (money accounts, bank statements and payments, ADR-0048), DS-28 (policy and approvals, ADR-0043 and
 -- ADR-0055; the pool tables themselves are in DS-15-access.sql), DS-29 (work queue, ADR-0042), DS-32 (agent runs,
--- ADR-0050), DS-36 (audit and attachments, ADR-0038) and DS-47 (change proposals and taint, ADR-0029).
+-- ADR-0050), DS-36 (audit and attachments, ADR-0038) and DS-47 (change proposals and taint, ADR-0029), and the tables of
+-- DS-12 (fiscal years, posting periods and close tasks, ADR-0012), the clock override, command idempotency and regime
+-- settings (DS-03, DS-04, DS-14) and the tax codes (DS-23, ADR-0041).
 -- DS-22-09-42-commercial-inventory.sql (commercial documents and inventory) refers to document, document_line_tax and
 -- the cash tables here, and defines material_document, which the lab stubs until both files are in design/.
 -- PostgreSQL 18. Loaded with DS-15, DS-20, DS-35, DS-56 and DS-06 in the design lab, and also together with the two
@@ -12,26 +14,36 @@
 -- Conventions of DS-20 and DS-15: tables in schema `nativeflows`, domains in `types`; keys inline, named by the MetaData naming
 -- convention in migrations (ADR-0004 rule 15); IDs are UUIDv7 from context.new_id (ADR-0006 rule 3), no ID defaults;
 -- references between company tables are composite on (company_id, id); recorded_at on every row (ADR-0007 rule 9).
+-- New tables follow the one convention of D13 (ADR-0007 rule 16 note): recorded_at timestamptz NOT NULL DEFAULT now(), and the
+-- trigger trg_<table>_set_recorded_at (function set_recorded_at, defined below) on tables updated in place. Older tables of
+-- this file still write recorded_at without a default; they move to the convention in one later change.
 -- Every table with company_id gets FORCE ROW LEVEL SECURITY and the company policy of ADR-0017 rule 19; the last
 -- section writes them as the rls_v1 helper would (ADR-0022 rule 8). Tables whose company_id is nullable
--- (outbox_event, event_delivery, audit_record, audit_change, audit_denial, agent_budget_usage) show their null rows only
--- under the setting value `installation` (ADR-0017 rule 19; ADR-0013 rule 14).
--- Installation tables, without company_id: event_subject, event_consumer, agent_type, agent_type_version. The lab
--- checks this list.
+-- (outbox_event, event_delivery, audit_record, audit_change, audit_denial, agent_budget_usage, idempotency_record) show their
+-- null rows only under the setting value `installation` (ADR-0017 rule 19; ADR-0013 rule 14; ADR-0008 rule 16).
+-- Installation tables, without company_id: event_subject, event_consumer, agent_type, agent_type_version, regime_setting,
+-- tax_code. The lab checks this list.
 -- payment_method_money_account (ADR-0068 rule 16) refers to payment_method and branch, and payment and payment_line to
 -- payment_method and business_unit, all in DS-20-master-data.sql.
 -- The configuration and artifact tables (ADR-0058, ADR-0059) are in DS-28-34-configuration-artifacts.sql; this file carries
 -- only their causation columns on outbox_event and audit_record and the match parameter columns of bank_statement_line.
 -- Referenced tables defined elsewhere: company, branch, partner, partner_bank_account, warehouse, cost_center, project,
 -- currency (DS-20); user_account, role, approval_pool, approval_stage, segregation_exception (DS-15); inbound_message,
--- interaction_summary (DS-35); journal_entry, open_item, derivation_trace (DS-06); account, fiscal_year, posting_period,
--- tax_code (no DDL draft yet; lab stubs). The tables of other files that this file changes are in "Keys closed after
--- their tables".
+-- interaction_summary (DS-35); journal_entry, open_item, derivation_trace, account, transaction_key (DS-06). The tables of
+-- other files that this file changes are in "Keys closed after their tables". The labs that load DS-06 without this file
+-- use lab stubs of fiscal_year, posting_period, posting_period_area_state, close_task and tax_code with the columns of this
+-- file (lab 00_stubs.sql; D6).
 -- Columns that no ADR states are marked "interim: not stated in ADR-xxxx"; a later ADR note or design item decides them.
 -- Owner module per section in brackets (ADR-0022 rule 2; ADR-0027 rule 1).
 -- Rules that need other rows or the registry (allowed targets of a proposal, stage eligibility, the matching cascade,
 -- the supplier-invoice key across tables) are enforced by commands and named in their ADRs; the rules a row can hold are
 -- checks here, and a few cross-row rules that the database can hold cheaply are triggers at the end.
+-- The labs load subsets of the design files, so this file defines the shared recorded_at function itself (as DS-06 does).
+CREATE OR REPLACE FUNCTION set_recorded_at() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
+BEGIN
+    NEW.recorded_at := now();
+    RETURN NEW;
+END $$;
 
 -- ===== Agent types [agent_runs] (ADR-0050 rules 12, 14; ADR-0027 rule 1) =====
 -- Written by the registry at startup from the workflow declarations; nobody edits them (rule 12).
@@ -568,7 +580,7 @@ CREATE TABLE taint_clearance (                             -- immutable; one per
 
 -- ===== Policy decisions and approvals [policy, documents] (ADR-0029 rules 6-7, 13; ADR-0043 rules 7-8, 13-14;
 -- ADR-0055 rules 6, 9; ADR-0028 rule 14) =====
-CREATE TABLE policy_decision (                             -- never updated or deleted (ADR-0009 rule 14)
+CREATE TABLE policy_decision (                             -- [policy] ADR-0043 rules 1, 7; ADR-0029 rule 6; never updated or deleted (ADR-0009 rule 14)
     id                            uuid PRIMARY KEY,
     company_id                    uuid NOT NULL,
     document_id                   uuid NOT NULL,           -- interim: not stated in ADR-0029 (rule 7 binds to the version; the document is kept for lookup)
@@ -673,7 +685,7 @@ CREATE TABLE approval (                                    -- owned by documents
 -- ADR-0055 rule 7 condition 6, within one decision: a person counts once.
 CREATE UNIQUE INDEX ux_approval_policy_decision_id_actor_id ON approval (policy_decision_id, actor_id) WHERE decision = 'approved';
 CREATE INDEX ix_approval_document_version_id ON approval (document_version_id);
-CREATE TABLE auto_post_confirmation (                      -- immutable (ADR-0029 rule 13; ADR-0043 rule 14)
+CREATE TABLE auto_post_confirmation (                      -- [policy] ADR-0043 rule 1; ADR-0029 rule 13; immutable (ADR-0043 rule 14)
     id                  uuid PRIMARY KEY,
     company_id          uuid NOT NULL,
     policy_decision_id  uuid NOT NULL,
@@ -683,7 +695,7 @@ CREATE TABLE auto_post_confirmation (                      -- immutable (ADR-002
     CONSTRAINT uq_auto_post_confirmation_policy_decision_id UNIQUE (policy_decision_id),
     FOREIGN KEY (company_id, policy_decision_id) REFERENCES policy_decision (company_id, id)
 );
-CREATE TABLE period_unlock_request (                       -- typed header of a non-posting document type (ADR-0043 rule 16)
+CREATE TABLE period_unlock_request (                       -- [periods] ADR-0012 rule 7; ADR-0043 rules 1, 16; typed header of a non-posting document type
     id                 uuid PRIMARY KEY,
     company_id         uuid NOT NULL,
     posting_period_id  uuid NOT NULL REFERENCES posting_period (id),
@@ -977,6 +989,45 @@ CREATE TABLE attachment_link (                             -- polymorphic target
 );
 CREATE UNIQUE INDEX ux_attachment_link_current ON attachment_link (attachment_id, target_table, target_id) WHERE ended_at IS NULL;
 CREATE INDEX ix_attachment_link_target ON attachment_link (company_id, target_table, target_id);
+
+-- ===== Tax codes [tax] (ADR-0041 rules 1, 4 and the rule 1 note; ADR-0053 rules 2, 12; ADR-0016 rules 5, 6, 13) =====
+-- Package rule read live: one row per package and code (ADR-0041 rule 1), loaded with the package version at deployment and
+-- compared by identity (ADR-0016 rules 3, 13). Installation data: no company_id and no row-level security; application roles
+-- get SELECT only, as on regime_setting. id = uuid5(f244ce09-3c6c-4c82-af14-918bdeca6be3, '<package>:tax_code:<code>'),
+-- computed by the loader, so the ID is the same in every installation (D2; ADR-0016 rule 13 note). Reading a code whose
+-- basis is unverified fails with regime_setting_unverified in a production installation (ADR-0041 rule 4).
+-- Cross-row rules are the loader's and check_package.py's (ADR-0041 rule 20; ADR-0053 rule 2):
+--   - package_kind is declared in tax/package_kinds.csv and belongs to tax_kind;
+--   - base_includes names core kinds or package kinds;
+--   - fixed_asset_code names a code of the same package and direction.
+-- The package CSV names the transaction key by its code; the loader resolves it to transaction_key_id (D5; ADR-0041 rule 1
+-- note). e_invoice_label is not a core column; it moves to the e-invoice add-on's data (ADR-0053 rule 12). tax_rate and
+-- tax_matrix (ADR-0041 rules 2-3) have no DDL yet.
+CREATE TABLE tax_code (                                    -- installation data (package rule)
+    id                    uuid PRIMARY KEY,                -- uuid5 of the package, table and code (D2)
+    localization_package  text NOT NULL,                   -- one row per package (ADR-0041 rule 1)
+    code                  text NOT NULL,
+    name                  text NOT NULL,                   -- English source, translated by the package (ADR-0041 rule 1; ADR-0016 rule 18)
+    tax_kind              text NOT NULL CONSTRAINT ck_tax_code_tax_kind CHECK (tax_kind IN ('vat', 'sales_tax', 'excise', 'customs_duty', 'other')),   -- ADR-0053 rule 2
+    package_kind          text,                            -- the package's own name for the kind (ADR-0053 rule 2)
+    direction             text NOT NULL CONSTRAINT ck_tax_code_direction CHECK (direction IN ('sale', 'purchase', 'import')),   -- import codes come from the customs declaration, never the matrix
+    calculation           text NOT NULL CONSTRAINT ck_tax_code_calculation CHECK (calculation IN ('percent', 'none', 'assessed')),
+    sequence              integer NOT NULL CONSTRAINT ck_tax_code_sequence CHECK (sequence >= 1),   -- order of codes on one line
+    base_includes         text[] NOT NULL DEFAULT '{}',    -- tax kinds of the same line added to this code's base
+    transaction_key_id    uuid NOT NULL REFERENCES transaction_key (id),   -- ADR-0041 rule 1; ADR-0004 rule 12 (D5)
+    deductibility         text CONSTRAINT ck_tax_code_deductibility CHECK (deductibility IN ('deductible', 'not_deductible')),
+    fixed_asset_code      text,                            -- capital-goods mapping usable by any regime (ADR-0053 rule 12)
+    import_treatment      text CONSTRAINT ck_tax_code_import_treatment CHECK (import_treatment IN ('capitalize', 'recoverable')),   -- ADR-0021 rule 11
+    basis                 jsonb NOT NULL,                  -- ADR-0016 rule 6
+    recorded_at           timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (localization_package, code),
+    -- Deductibility is for purchase and import VAT only (ADR-0041 rule 1; check_package.py checks VAT input codes).
+    CONSTRAINT ck_tax_code_deductibility_scope CHECK ((tax_kind = 'vat' AND direction IN ('purchase', 'import')) = (deductibility IS NOT NULL)),
+    -- Import codes carry their treatment, and no other code does (ADR-0021 rule 11; check_package.py).
+    CONSTRAINT ck_tax_code_import_treatment_scope CHECK ((direction = 'import') = (import_treatment IS NOT NULL))
+);
+CREATE TRIGGER trg_tax_code_set_recorded_at BEFORE UPDATE ON tax_code
+    FOR EACH ROW EXECUTE FUNCTION set_recorded_at();
 
 -- ===== Taxes [tax] (ADR-0041 rules 6, 11-13; ADR-0053 rule 3) =====
 -- Part of the document's content: replaced by Create and Update while the document can change, frozen with it.
@@ -1313,6 +1364,170 @@ BEGIN
     RETURN NEW;
 END
 $$;
+
+-- ===== Clock override [periods] (ADR-0007 rule 15; DS-16 rule 19; DS-17 rule 1; D1) =====
+-- Owned by periods with the fiscal calendar (D1); layer 1 modules own no tables (ADR-0022 rule 3), so clock reads the row
+-- through a hook that periods registers and app wires (ADR-0022 rule 2, hooks; ADR-0007 rule 15 note). Written only by the replay runner's command, which the dispatcher refuses unless the
+-- installation setting environment is test or simulation; in production clock.today ignores the table (ADR-0007 rule 15).
+-- The database cannot read that setting (stored at first start, ADR-0022 rule 9; storage is DS-37), so no trigger can
+-- enforce "unusable in production" here. The actor of each change is in audit_record (ADR-0038 rule 1).
+CREATE TABLE business_date_override (                      -- one row per company, updated in place
+    id             uuid PRIMARY KEY,
+    company_id     uuid NOT NULL REFERENCES company (id),
+    business_date  date NOT NULL,                          -- what clock.today(company) returns outside production (ADR-0007 rule 15)
+    recorded_at    timestamptz NOT NULL DEFAULT now(),     -- the last write (ADR-0007 rule 9; trigger below)
+    UNIQUE (company_id)
+);
+CREATE TRIGGER trg_business_date_override_set_recorded_at BEFORE UPDATE ON business_date_override
+    FOR EACH ROW EXECUTE FUNCTION set_recorded_at();
+
+-- ===== Command idempotency [registry] (ADR-0008 rules 14-19, 21; ADR-0017 rule 19; ADR-0038 rules 1, 4, 8; INV-89) =====
+-- An execution's first write after the checks: INSERT ... ON CONFLICT DO NOTHING of (actor, scope, key, request hash); the
+-- response is written into the row before commit, and a failed command rolls the row back (rule 16). Simulations never write
+-- it (rule 17). Not partitioned; a daily job deletes rows older than retention_days (installation setting, default 90), so
+-- nothing refers to it by a key: audit_record.batch_id holds a batch's id without one (rule 19; ADR-0038 rule 1).
+-- company_id is null for installation-scoped commands and follows the company policy with the installation exception
+-- (ADR-0017 rule 19); INV-89 compares it null-safely with the audit record (ADR-0038 rule 8).
+-- transaction_id is the writing transaction (D16; ADR-0008 rule 16 note): the erasure guard checks that
+-- nativeflows.erasure_command_id names a row of command type EraseDataSubject whose transaction_id is pg_current_xact_id()
+-- (ADR-0038 rule 4). xmin is not used, because freezing rewrites it.
+CREATE TABLE idempotency_record (
+    id               uuid PRIMARY KEY,                     -- for a batch, audit_record.batch_id (ADR-0038 rule 1)
+    company_id       uuid REFERENCES company (id),         -- null for installation scope (rule 16)
+    actor_kind       text NOT NULL CONSTRAINT ck_idempotency_record_actor_kind CHECK (actor_kind IN ('human', 'agent', 'integration', 'system')),   -- from the credential (rule 8)
+    actor_id         uuid NOT NULL,
+    scope            text NOT NULL CONSTRAINT ck_idempotency_record_scope CHECK (scope = 'command_batch' OR scope ~ '^[A-Z][A-Za-z0-9]+$'),   -- the command type, or command_batch (rule 14; ADR-0004 rule 17)
+    idempotency_key  text NOT NULL CONSTRAINT ck_idempotency_record_idempotency_key CHECK (idempotency_key ~ '^[A-Za-z0-9_.:-]{1,128}$'),   -- rule 14
+    request_hash     text NOT NULL CONSTRAINT ck_idempotency_record_request_hash CHECK (request_hash ~ '^[0-9a-f]{64}$'),   -- SHA-256 of the canonical request (rule 15)
+    response         jsonb,                                -- written before commit (rule 16); a batch stores its per-item summary (rule 21)
+    transaction_id   xid8 NOT NULL DEFAULT pg_current_xact_id(),   -- the writing transaction (D16)
+    recorded_at      timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (actor_kind, actor_id, scope, idempotency_key)  -- the unique constraint of rule 16
+);
+-- The retention job of rule 19 deletes by age.
+CREATE INDEX ix_idempotency_record_recorded_at ON idempotency_record (recorded_at);
+CREATE TRIGGER trg_idempotency_record_set_recorded_at BEFORE UPDATE ON idempotency_record
+    FOR EACH ROW EXECUTE FUNCTION set_recorded_at();
+
+-- ===== Regime settings [localization] (ADR-0016 rules 3, 6, 9-13; ADR-0063 rule 1) =====
+-- Package rules, loaded with the package version at deployment and compared with the installed rows by identity (rules 3,
+-- 13). The localization module is the loader (ADR-0022 rule 2). Installation data: no company_id and no row-level security;
+-- application roles get SELECT only, as on setting_definition (DS-28-settings.sql). A company's own option is a setting_value
+-- row (rule 11 note; ADR-0063 rule 2). The core reads a row only through regime_setting(company, key, date), in ADR-0063
+-- through registry.contract.get_setting (rule 10 note). A value a posting has used never changes (rule 13, loader error
+-- regime_setting_in_use). An unverified basis fails with regime_setting_unverified in production (rule 12).
+-- id = uuid5(f244ce09-3c6c-4c82-af14-918bdeca6be3, '<package>:regime_setting:<regime>:<key>:<effective_from>'), computed by
+-- the loader (D2; rule 13 note); an empty regime is written as an empty string in the name.
+CREATE TABLE regime_setting (                              -- installation data
+    id                    uuid PRIMARY KEY,                -- uuid5 of the package, table and identity (D2)
+    localization_package  text NOT NULL,                   -- l10n_<country> (rule 1), as company.localization_package
+    accounting_regime     text,                            -- null: every regime of the package; a row for the company's regime wins (rule 9)
+    key                   text NOT NULL,                   -- a key the core registers (rule 10; setting_definition), checked by the loader and CI (rule 15)
+    value                 jsonb,                           -- validated against the key's schema; null ends an earlier row (rules 9, 13)
+    effective_from        date NOT NULL,                   -- selected by the key's date_basis (rule 10)
+    basis                 jsonb NOT NULL,                  -- legal_source, author_decision or status unverified with open_question; verified_by, verified_on (rule 6)
+    recorded_at           timestamptz NOT NULL DEFAULT now(),
+    -- Named by hand: the convention name would exceed 63 bytes (ADR-0004 rule 6).
+    CONSTRAINT uq_regime_setting_identity UNIQUE NULLS NOT DISTINCT (localization_package, accounting_regime, key, effective_from)   -- identity (rule 9)
+);
+CREATE TRIGGER trg_regime_setting_set_recorded_at BEFORE UPDATE ON regime_setting
+    FOR EACH ROW EXECUTE FUNCTION set_recorded_at();
+
+-- ===== Fiscal calendar, posting periods and close tasks [periods] (ADR-0007 rules 18-22; ADR-0012 rules 1-16; ADR-0044 rule 2) =====
+-- Company data written by CreateFiscalYear, the next-year job and CreateMigration (ADR-0012 rules 1, 3; ADR-0044 rule 2).
+-- Command rules, not held here:
+--   - contiguity and the period pattern (ADR-0007 rule 18; ADR-0012 rule 1);
+--   - regular periods inside their fiscal year, and special periods dated on the year's last day (ADR-0012 rule 1);
+--   - at most four special periods (ADR-0012 rule 1);
+--   - ranges frozen once a posting exists (ADR-0007 rule 20);
+--   - a special period has only the general area (ADR-0012 rule 4).
+-- The database holds non-overlap (exclusion constraints, btree_gist, ADR-0007 rule 18) and what one row can hold.
+CREATE TABLE fiscal_year (
+    id            uuid PRIMARY KEY,
+    company_id    uuid NOT NULL REFERENCES company (id),
+    code          text NOT NULL,                           -- e.g. 2026 (ADR-0007 rule 18); M2026 for a migration year by convention (ADR-0044 rule 2)
+    start_date    date NOT NULL,
+    end_date      date NOT NULL,                           -- never null (ADR-0007 rule 18)
+    is_migration  boolean NOT NULL DEFAULT false,          -- the one-day migration year (D3; ADR-0012 rule 1 note)
+    recorded_at   timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (company_id, code),
+    UNIQUE (company_id, id),
+    CONSTRAINT ck_fiscal_year_dates CHECK (start_date <= end_date),
+    CONSTRAINT ck_fiscal_year_migration CHECK (NOT is_migration OR start_date = end_date),   -- one day (ADR-0044 rule 2)
+    CONSTRAINT ex_fiscal_year_overlap EXCLUDE USING gist (company_id WITH =, daterange(start_date, end_date, '[]') WITH &&)   -- ADR-0007 rule 18
+);
+CREATE TRIGGER trg_fiscal_year_set_recorded_at BEFORE UPDATE ON fiscal_year
+    FOR EACH ROW EXECUTE FUNCTION set_recorded_at();
+CREATE TABLE posting_period (                              -- found by range lookup, never by formula (ADR-0007 rule 19)
+    id              uuid PRIMARY KEY,
+    company_id      uuid NOT NULL REFERENCES company (id),
+    fiscal_year_id  uuid NOT NULL,
+    number          integer NOT NULL CONSTRAINT ck_posting_period_number CHECK (number >= 1),   -- regular 1..n, then special n+1.. (ADR-0012 rule 1)
+    kind            text NOT NULL CONSTRAINT ck_posting_period_kind CHECK (kind IN ('regular', 'special')),
+    start_date      date NOT NULL,
+    end_date        date NOT NULL,                         -- never null (ADR-0007 rule 18)
+    recorded_at     timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (company_id, id),
+    UNIQUE (fiscal_year_id, number),
+    FOREIGN KEY (company_id, fiscal_year_id) REFERENCES fiscal_year (company_id, id),
+    CONSTRAINT ck_posting_period_dates CHECK (start_date <= end_date),
+    CONSTRAINT ck_posting_period_special CHECK (kind = 'regular' OR start_date = end_date),   -- the fiscal year's last day as both dates (ADR-0012 rule 1)
+    -- Non-overlap applies to regular periods only (ADR-0012 rule 1).
+    CONSTRAINT ex_posting_period_overlap EXCLUDE USING gist (company_id WITH =, daterange(start_date, end_date, '[]') WITH &&) WHERE (kind = 'regular')
+);
+CREATE TRIGGER trg_posting_period_set_recorded_at BEFORE UPDATE ON posting_period
+    FOR EACH ROW EXECUTE FUNCTION set_recorded_at();
+-- Updated in place by the period commands under an exclusive lock; postings read it FOR SHARE (ADR-0012 rule 9;
+-- journal_line_check_insert, DS-06). Change-tracked (ADR-0038 rule 3). New regular periods start open, special ones soft_locked
+-- (ADR-0012 rule 6).
+CREATE TABLE posting_period_area_state (
+    id                 uuid PRIMARY KEY,
+    company_id         uuid NOT NULL REFERENCES company (id),
+    posting_period_id  uuid NOT NULL,
+    area               text NOT NULL CONSTRAINT ck_posting_period_area_state_area CHECK (area IN ('general', 'inventory', 'receivable', 'payable')),   -- ADR-0012 rule 4
+    state              text NOT NULL CONSTRAINT ck_posting_period_area_state_state CHECK (state IN ('open', 'soft_locked', 'locked')),   -- ADR-0012 rule 5
+    recorded_at        timestamptz NOT NULL DEFAULT now(),   -- the last state change (ADR-0007 rule 9; trigger below)
+    UNIQUE (posting_period_id, area),
+    FOREIGN KEY (company_id, posting_period_id) REFERENCES posting_period (company_id, id)
+);
+CREATE TRIGGER trg_posting_period_area_state_set_recorded_at BEFORE UPDATE ON posting_period_area_state
+    FOR EACH ROW EXECUTE FUNCTION set_recorded_at();
+-- Copied from the company's checklist template when the period is first restricted; a special period's tasks are copied when the
+-- year's last regular period is first restricted in general (ADR-0012 rule 11; ADR-0016 rule 7; ADR-0049 rule 23).
+-- A task goes back to pending when it is no longer current or after UnlockPostingPeriod (rule 12), and a sequential task's
+-- later periods go back with it (rule 16). Both are command rules, and they clear the actor columns.
+-- The actor who completed a task is stored as the command envelope gives it: actor_kind, actor_id and on_behalf_of_id, the
+-- columns of document_version and audit_record (D4; ADR-0012 rule 11 note), because jobs and the system complete tasks too.
+CREATE TABLE close_task (
+    id                   uuid PRIMARY KEY,
+    company_id           uuid NOT NULL REFERENCES company (id),
+    posting_period_id    uuid NOT NULL,
+    code                 text NOT NULL,
+    area                 text NOT NULL CONSTRAINT ck_close_task_area CHECK (area IN ('general', 'inventory', 'receivable', 'payable')),   -- rule 11
+    kind                 text NOT NULL CONSTRAINT ck_close_task_kind CHECK (kind IN ('job', 'check', 'manual')),   -- rule 13
+    is_required          boolean NOT NULL,                 -- a required core or regime task cannot be made optional (rule 13)
+    is_sequential        boolean NOT NULL,                 -- rule 16
+    depends_on           text[] NOT NULL DEFAULT '{}',     -- task codes of the same period (rule 11)
+    parameters           jsonb NOT NULL DEFAULT '{}',      -- copied from the template, read by the task's job (rule 11 note; ADR-0049 rule 23)
+    state                text NOT NULL DEFAULT 'pending' CONSTRAINT ck_close_task_state CHECK (state IN ('pending', 'running', 'done', 'failed', 'skipped')),   -- rule 11
+    entry_count_at_done  bigint CONSTRAINT ck_close_task_entry_count_at_done CHECK (entry_count_at_done >= 0),   -- journal entries and material documents of the period and area at done (rule 12)
+    actor_kind           text CONSTRAINT ck_close_task_actor_kind CHECK (actor_kind IN ('human', 'agent', 'integration', 'system')),   -- who completed it (rule 11; D4)
+    actor_id             uuid,
+    on_behalf_of_id      uuid REFERENCES user_account (id),   -- the human an agent or integration acted for (ADR-0008)
+    completed_at         timestamptz,                      -- rule 11 "when"
+    evidence             jsonb,                            -- a document, job run or report reference (rule 11)
+    recorded_at          timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (company_id, id),
+    UNIQUE (posting_period_id, code),
+    FOREIGN KEY (company_id, posting_period_id) REFERENCES posting_period (company_id, id),
+    CONSTRAINT ck_close_task_actor CHECK ((actor_kind IS NULL) = (actor_id IS NULL) AND (on_behalf_of_id IS NULL OR actor_kind IS NOT NULL)),
+    -- A done task names who completed it and when; a done job or check task keeps the count that later tells whether it is
+    -- current; manual tasks have none (rules 11, 12).
+    CONSTRAINT ck_close_task_done CHECK (state <> 'done' OR (completed_at IS NOT NULL AND actor_kind IS NOT NULL AND (kind = 'manual' OR entry_count_at_done IS NOT NULL))),
+    CONSTRAINT ck_close_task_skipped CHECK (state <> 'skipped' OR NOT is_required)   -- SkipCloseTask skips optional tasks only (rules 13-14)
+);
+CREATE TRIGGER trg_close_task_set_recorded_at BEFORE UPDATE ON close_task
+    FOR EACH ROW EXECUTE FUNCTION set_recorded_at();
 
 -- ===== Keys closed after their tables (cycles and tables of other design items) =====
 -- work_item -> agent_run -> work_item and document -> work_item would be cycles in a top-down load.
@@ -1658,7 +1873,8 @@ $$;
 DO $$
 DECLARE
     v_table     text;
-    v_nullable  text[] := ARRAY['outbox_event', 'event_delivery', 'audit_record', 'audit_change', 'audit_denial', 'agent_budget_usage'];
+    v_nullable  text[] := ARRAY['outbox_event', 'event_delivery', 'audit_record', 'audit_change', 'audit_denial', 'agent_budget_usage',
+                                'idempotency_record'];
 BEGIN
     FOREACH v_table IN ARRAY ARRAY[
         'work_item', 'work_item_link', 'work_item_note', 'work_case', 'work_case_link', 'agent_type_setting', 'agent_run', 'agent_run_step', 'agent_budget_usage',
@@ -1667,7 +1883,8 @@ BEGIN
         'posting_intent', 'change_proposal', 'change_proposal_item', 'change_proposal_execution', 'change_proposal_execution_item',
         'outbox_event', 'event_delivery', 'audit_record', 'audit_change', 'audit_denial', 'attachment', 'attachment_link',
         'document_line_tax', 'tax_line', 'tax_line_adjustment', 'agent_promotion_evidence', 'money_account', 'bank_statement',
-        'bank_statement_line', 'payment', 'payment_line', 'open_item_collection', 'payment_method_money_account'] LOOP
+        'bank_statement_line', 'payment', 'payment_line', 'open_item_collection', 'payment_method_money_account',
+        'business_date_override', 'idempotency_record', 'fiscal_year', 'posting_period', 'posting_period_area_state', 'close_task'] LOOP
         EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', v_table);
         EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', v_table);
         IF v_table = ANY (v_nullable) THEN

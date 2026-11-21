@@ -1428,7 +1428,7 @@ CREATE TABLE gr_ir_write_off_line (
 -- validity, or to an invoice or correction, keeps its steps with source_kind copied and the source line, and the line's
 -- is_price_copied exempts it from re-pricing when its item, unit, quantity or date changes; repricing (quotation_expired
 -- with reprice) clears the flag and writes new steps with source_kind procedure.
-CREATE TABLE document_line_price_step (
+CREATE TABLE document_line_price_step (                    -- [documents] ADR-0047 rule 16; written by sales and purchasing pricing
     company_id                uuid NOT NULL,
     document_id               uuid NOT NULL,
     line_number               integer NOT NULL,
@@ -1448,7 +1448,7 @@ CREATE TABLE document_line_price_step (
     CONSTRAINT ck_document_line_price_step_source CHECK ((source_table IS NULL) = (source_id IS NULL))
 );
 -- Free text for is_custom values (ADR-0046 rule 9; ADR-0045 rule 15): personal and untrusted.
-CREATE TABLE document_line_custom_text (
+CREATE TABLE document_line_custom_text (                   -- [documents] ADR-0046 rule 9; ADR-0045 rule 15
     company_id            uuid NOT NULL,
     document_id           uuid NOT NULL,
     line_number           integer NOT NULL,
@@ -1461,7 +1461,7 @@ CREATE TABLE document_line_custom_text (
 );
 -- The installment schedule of an invoice, part of its content (ADR-0047 rule 6; ADR-0026 rule 5); open items are
 -- derived from it at posting. interim: table not named in ADR-0047.
-CREATE TABLE document_installment (
+CREATE TABLE document_installment (                        -- [documents] ADR-0047 rule 6; ADR-0026 rule 5
     company_id            uuid NOT NULL,
     document_id           uuid NOT NULL,
     installment_number    integer NOT NULL CONSTRAINT ck_document_installment_installment_number CHECK (installment_number > 0),

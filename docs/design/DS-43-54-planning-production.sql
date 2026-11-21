@@ -31,7 +31,7 @@
 -- batches (DS-21), work items for exceptions (DS-29), by_product prices (a price_list of kind by_product, DS-20).
 
 -- ===== Company rows that serialize changes [planning, production] =====
-CREATE TABLE planning_setting (                            -- one per company (ADR-0024 rule 7; ADR-0036 rules 4, 11)
+CREATE TABLE planning_setting (                            -- [planning] ADR-0024 rule 7; ADR-0036 rules 4, 11; one per company
     company_id                 uuid PRIMARY KEY REFERENCES company (id),
     planning_owner_id          uuid NOT NULL REFERENCES user_account (id),   -- accountable human for scheduled runs (spec 03 rule 3)
     planning_horizon_days      integer NOT NULL CONSTRAINT ck_planning_setting_horizon CHECK (planning_horizon_days > 0),
@@ -42,7 +42,7 @@ CREATE TABLE planning_setting (                            -- one per company (A
     capacity_bucket            text NOT NULL DEFAULT 'week' CONSTRAINT ck_planning_setting_capacity_bucket CHECK (capacity_bucket IN ('day', 'week')),
     recorded_at                timestamptz NOT NULL
 );
-CREATE TABLE planning_run (                                -- RunPlanning, a long job (ADR-0024 rule 17)
+CREATE TABLE planning_run (                                -- [planning] ADR-0024 rule 17; RunPlanning, a long job
     id                    uuid PRIMARY KEY,
     company_id            uuid NOT NULL REFERENCES company (id),
     planning_date         date NOT NULL,                       -- explicit business date (ADR-0007 rule 17)
@@ -61,13 +61,13 @@ CREATE TABLE planning_run (                                -- RunPlanning, a lon
     FOREIGN KEY (company_id, forecast_run_id) REFERENCES forecast_run (company_id, id),
     CONSTRAINT ck_planning_run_completed CHECK ((state = 'completed') = (completed_at IS NOT NULL AND input_hash IS NOT NULL AND output_hash IS NOT NULL AND output_counts IS NOT NULL))
 );
-CREATE TABLE planning_state (                              -- the company's planning state row; RunPlanning locks it, so a second run gets planning_run_in_progress (ADR-0024 rule 17)
+CREATE TABLE planning_state (                              -- [planning] ADR-0024 rule 17; the company's planning state row; RunPlanning locks it, so a second run gets planning_run_in_progress (ADR-0024 rule 17)
     company_id             uuid PRIMARY KEY REFERENCES company (id),
     last_planning_run_id   uuid,                               -- interim: not stated in ADR-0024 (the lock row needs no column; this one names the latest completed run)
     recorded_at            timestamptz NOT NULL,
     FOREIGN KEY (company_id, last_planning_run_id) REFERENCES planning_run (company_id, id)
 );
-CREATE TABLE production_structure (                        -- created with the company; releases, version and setting saves lock it at class 3 (ADR-0033 rule 8; ADR-0027 rule 10)
+CREATE TABLE production_structure (                        -- [production] ADR-0033 rule 8; ADR-0027 rule 10; created with the company; releases, version and setting saves lock it at class 3 (ADR-0033 rule 8; ADR-0027 rule 10)
     company_id   uuid PRIMARY KEY REFERENCES company (id),
     recorded_at  timestamptz NOT NULL
 );
@@ -1388,7 +1388,7 @@ CREATE TABLE cost_component_detail_mapping (               -- [production] ADR-0
     activity_type_id          uuid,
     item_group_id             uuid,
     valuation_class_id        uuid REFERENCES valuation_class (id),
-    account_id                uuid REFERENCES account (id),    -- an operational account
+    account_id                uuid,    -- an operational account
     recorded_at               timestamptz NOT NULL,
     UNIQUE (company_id, id),
     -- one source maps to at most one detail per posting component, so the mapping is a function (rule 3)
@@ -1401,7 +1401,8 @@ CREATE TABLE cost_component_detail_mapping (               -- [production] ADR-0
         WHEN 'activity_type' THEN activity_type_id IS NOT NULL
         WHEN 'item_group' THEN item_group_id IS NOT NULL
         WHEN 'valuation_class' THEN valuation_class_id IS NOT NULL
-        ELSE account_id IS NOT NULL END)
+        ELSE account_id IS NOT NULL END),
+    FOREIGN KEY (company_id, account_id) REFERENCES account (company_id, id)   -- company key (S2 schema phase A)
 );
 -- Costing sheet (ADR-0072 rules 6-9): planned costing only; it values no stock and posts nothing.
 CREATE TABLE costing_sheet (                               -- [production] ADR-0072 rule 6; company data, master_data_change, change-tracked, proposal-bound
@@ -1626,12 +1627,13 @@ CREATE TABLE activity_rate (                               -- planned rates (rul
     company_id         uuid NOT NULL,
     work_center_id     uuid NOT NULL,
     activity_type_id   uuid NOT NULL,
-    posting_period_id  uuid NOT NULL REFERENCES posting_period (id),
+    posting_period_id  uuid NOT NULL,
     rate               types.unit_price NOT NULL CONSTRAINT ck_activity_rate_rate CHECK (rate >= 0),   -- company currency per activity unit
     recorded_at        timestamptz NOT NULL,
     PRIMARY KEY (work_center_id, activity_type_id, posting_period_id),
     FOREIGN KEY (company_id, work_center_id) REFERENCES work_center (company_id, id),
-    FOREIGN KEY (company_id, activity_type_id) REFERENCES activity_type (company_id, id)
+    FOREIGN KEY (company_id, activity_type_id) REFERENCES activity_type (company_id, id),
+    FOREIGN KEY (company_id, posting_period_id) REFERENCES posting_period (company_id, id)   -- company key (S2 schema phase A)
 );
 -- overhead_surcharge (the interim table of "a planned surcharge per cost center", ADR-0035 rule 14) is replaced by the
 -- costing sheet: a percent surcharge row crediting that cost center, on a stated base row, with dated rates (ADR-0072 rule 11).
@@ -1652,21 +1654,23 @@ CREATE TABLE normal_capacity (                             -- per (cost center, 
     cost_center_id     uuid NOT NULL,
     driver             text NOT NULL CONSTRAINT ck_normal_capacity_driver CHECK (driver IN ('activity_type', 'output_quantity', 'standard_material_quantity', 'preliminary_material_amount')),
     activity_type_id   uuid,
-    posting_period_id  uuid NOT NULL REFERENCES posting_period (id),
+    posting_period_id  uuid NOT NULL,
     quantity           types.quantity NOT NULL CONSTRAINT ck_normal_capacity_quantity CHECK (quantity > 0),
     recorded_at        timestamptz NOT NULL,
     UNIQUE NULLS NOT DISTINCT (cost_center_id, driver, activity_type_id, posting_period_id),
     FOREIGN KEY (company_id, cost_center_id) REFERENCES cost_center (company_id, id),
     FOREIGN KEY (company_id, activity_type_id) REFERENCES activity_type (company_id, id),
-    CONSTRAINT ck_normal_capacity_activity CHECK ((driver = 'activity_type') = (activity_type_id IS NOT NULL))
+    CONSTRAINT ck_normal_capacity_activity CHECK ((driver = 'activity_type') = (activity_type_id IS NOT NULL)),
+    FOREIGN KEY (company_id, posting_period_id) REFERENCES posting_period (company_id, id)   -- company key (S2 schema phase A)
 );
 CREATE TABLE production_cost_settlement (                  -- one internal document per run of the period-end job (rule 5)
     id                 uuid PRIMARY KEY,
     company_id         uuid NOT NULL,
-    posting_period_id  uuid NOT NULL REFERENCES posting_period (id),
+    posting_period_id  uuid NOT NULL,
     recorded_at        timestamptz NOT NULL,
     UNIQUE (company_id, id),
-    FOREIGN KEY (company_id, id) REFERENCES document (company_id, id)
+    FOREIGN KEY (company_id, id) REFERENCES document (company_id, id),
+    FOREIGN KEY (company_id, posting_period_id) REFERENCES posting_period (company_id, id)   -- company key (S2 schema phase A)
 );
 CREATE TABLE production_cost_settlement_line (             -- keyed by (cost object, cost component, step); reruns post differences per key (rule 5)
     company_id                     uuid NOT NULL,
@@ -1683,7 +1687,7 @@ CREATE TABLE production_cost_settlement_line (             -- keyed by (cost obj
 CREATE TABLE production_order_period_cost (                -- written only by the job; row source of the cost sheet (rules 12, 16)
     company_id                     uuid NOT NULL,
     production_order_id            uuid NOT NULL,
-    posting_period_id              uuid NOT NULL REFERENCES posting_period (id),
+    posting_period_id              uuid NOT NULL,
     cost_component                 text NOT NULL CONSTRAINT ck_production_order_period_cost_component CHECK (cost_component IN ('material', 'labor', 'overhead', 'other')),
     opening_amount                 types.amount NOT NULL,      -- company currency, as all amounts of this table
     incurred_amount                types.amount NOT NULL,
@@ -1697,7 +1701,8 @@ CREATE TABLE production_order_period_cost (                -- written only by th
     FOREIGN KEY (company_id, production_order_id) REFERENCES production_order (company_id, id),
     FOREIGN KEY (company_id, production_cost_settlement_id) REFERENCES production_cost_settlement (company_id, id),
     -- pool = opening + incurred; it goes to abnormal, residual, outputs, or stays as WIP (rules 8-11)
-    CONSTRAINT ck_production_order_period_cost_balance CHECK (closing_amount = opening_amount + incurred_amount - abnormal_amount - residual_amount - to_output_amount)
+    CONSTRAINT ck_production_order_period_cost_balance CHECK (closing_amount = opening_amount + incurred_amount - abnormal_amount - residual_amount - to_output_amount),
+    FOREIGN KEY (company_id, posting_period_id) REFERENCES posting_period (company_id, id)   -- company key (S2 schema phase A)
 );
 CREATE TABLE production_order_period_cost_detail (         -- [production] ADR-0072 rule 4; read model written by the job with its parent; sums exactly to it (INV-851)
     company_id                uuid NOT NULL,

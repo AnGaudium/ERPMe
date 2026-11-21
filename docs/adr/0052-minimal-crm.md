@@ -42,6 +42,8 @@ Leads, opportunities, marketing automation, appointments, chat connectors and se
    - interaction summaries, partner insights, tax ID lookups and partner search keys (ADR-0019 rules 18–20).
 
    `audit` owns `personal_data_processing_log` (rule 26). Partners, contacts and their commands stay in `master_data` (DS-20). The ADRs win if the DDL disagrees.
+
+   Note (S2 findings closure, 2026-11-21; CRM-only profile decided 2026-11-17): CRM can run on its own as a deployment profile of the one product, not as an edition: the kernel, `master_data` partners and contacts, `crm`, `agents` and `query`, intake, analysis and automation, recorded per company in `module_activation` ([DS-28-settings.sql](../design/DS-28-settings.sql)). `crm` never depends on `ledger`, `tax`, `inventory`, `cash` or `production` (ADR-0022 rule 2 note), partner profiles need no account while `ledger` is not activated ([ADR-0015](0015-account-determination.md) rule 11 note), and commercial screens and the timeline leave out what those modules would show.
 2. Not in Phase 1, so there is no table or command for them now:
    - **Leads, prospects, opportunities, pipeline** ([09](../spec/09-mvp-scope.md); [13](../spec/13-crm.md) says "draft leads after Phase 1"; ADR-0019 rule 21). A party known only from an e-mail becomes a partner only through rule 16's proposal, with the role it proposes; the approving person decides. Whether a quotation needs the `customer` role is DS-22's.
    - **Marketing automation:** campaigns, lists, bulk sends, unsubscribe links.

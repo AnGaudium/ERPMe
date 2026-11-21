@@ -414,7 +414,7 @@ check("S08 a blank column whose CHECK refuses both NULL and the marker is caught
       [e for e in e1e if "dispute_reason" in e])
 e1d, _, _ = catalog_problems(TABLES, F1, F2.rstrip("\n") + "\ncontact,*,lab self-test\n")
 check("S07 a whole-table exclusion (*) of a table that has catalog rows is caught", any("('contact', '*')" in e for e in e1d), [e for e in e1d if "'*'" in e][:2])
-broken_ddl3 = [(n, t.replace("CREATE TABLE fixed_asset (\n", "CREATE TABLE fixed_asset (\n    custodian_name text,\n", 1)) for n, t in FILES]
+broken_ddl3 = [(n, re.sub(r"(CREATE TABLE fixed_asset \([^\n]*\n)", r"\1    custodian_name text,\n", t, count=1)) for n, t in FILES]   # the line may carry an owner comment
 e1f, _, _ = catalog_problems(parse_ddl(broken_ddl3), F1, F2)
 check("S09 a column added later to a table excluded with * (fixed_asset.custodian_name) is caught: a * row covers only the columns it lists",
       any("fixed_asset.custodian_name" in e for e in e1f) and any("CREATE TABLE fixed_asset (" in t for _, t in FILES), [e for e in e1f if "custodian" in e])

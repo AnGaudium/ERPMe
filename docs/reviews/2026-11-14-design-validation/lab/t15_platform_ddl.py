@@ -30,7 +30,7 @@ PLATFORM = os.environ.get("NATIVEFLOWS_PLATFORM_DDL", os.path.join(DESIGN, "DS-0
 DS22 = os.environ.get("NATIVEFLOWS_DS22", os.path.join(DESIGN, "DS-22-09-42-commercial-inventory.sql"))
 DS43 = os.environ.get("NATIVEFLOWS_DS43", os.path.join(DESIGN, "DS-43-54-planning-production.sql"))
 sys.path.insert(0, LAB)
-from lab import RESULTS, conn, new  # noqa: E402
+from lab import RESULTS, conn, new, ins_system_account, ins_account, ins_fiscal_year, ins_posting_period, ins_area_state  # noqa: E402
 
 RLS_ROLE = "nativeflows_lab_rls"
 
@@ -78,11 +78,18 @@ MOVED = [
 for line in [USER_STUB, DOC_STUB] + MOVED:
     assert stubs.count(line) == 1, line
     stubs = stubs.replace(line, "")
-stubs += "CREATE EXTENSION IF NOT EXISTS pg_trgm;\n"     # DS-35 search keys (ADR-0022 rule 8)
-STUB_TABLES = set(re.findall(r"CREATE TABLE (\w+)", stubs)) | {"material_document", "material_document_line"}
 platform = open(PLATFORM, encoding="utf-8").read()
 FILES = ("DS-20-master-data.sql", "DS-06-universal-journal.sql", "DS-15-access.sql", "DS-35-crm.sql", "DS-56-product-configuration.sql")
 base = {f: open(os.path.join(DESIGN, f), encoding="utf-8").read() for f in FILES}
+# The stubs of the DS-05 tables (fiscal_year, posting_period, posting_period_area_state, close_task, tax_code; D6) serve the labs
+# that load DS-06 without DS-05. Here the platform file defines them, so their stubs are dropped (each stub may span lines).
+DEFINED = set(re.findall(r"^CREATE TABLE (\w+)", platform + "".join(base.values()), flags=re.M))
+STUB_DEFS = {m.group(1): m.group(0) for m in re.finditer(r"^CREATE TABLE (\w+) \(.*?\);\n", stubs, flags=re.M | re.S)}
+DS05_STUBS = {t_: d_ for t_, d_ in STUB_DEFS.items() if t_ in DEFINED}
+for d_ in DS05_STUBS.values():
+    stubs = stubs.replace(d_, "")
+stubs += "CREATE EXTENSION IF NOT EXISTS pg_trgm;\n"     # DS-35 search keys (ADR-0022 rule 8)
+STUB_TABLES = set(re.findall(r"CREATE TABLE (\w+)", stubs)) | {"material_document", "material_document_line"}
 
 
 def order(text):
@@ -122,7 +129,7 @@ with tempfile.NamedTemporaryFile("w", suffix=".sql", delete=False, encoding="utf
 p = subprocess.run([sys.executable, os.path.join(LAB, "load_ds06.py"), tf.name], capture_output=True, text=True)
 os.unlink(tf.name)
 external = [l for l in p.stderr.splitlines() if l.startswith("-- external:")]
-ext = set(external[0].split(":", 1)[1].replace(" ", "").split(",")) if external else set()
+ext = set(external[0].split(":", 1)[1].replace(" ", "").split(",")) - {""} if external else set()   # empty once every reference is defined
 check("A01 load_ds06.py orders DS-20, DS-06, DS-15, DS-35, DS-56 and the platform file in one dependency order (no cycle)",
       p.returncode == 0, p.stderr[:200] if p.returncode else "")
 check("A01b the six files refer to no table outside themselves except the remaining lab stubs", ext <= STUB_TABLES, sorted(ext - STUB_TABLES))
@@ -136,9 +143,31 @@ X(p.stdout)
 check("A02 the stubs keep no document or user_account table of their own, and the loaded document is the platform one",
       X("select count(*) from information_schema.columns where table_schema='nativeflows' and table_name='document'").fetchone()[0] > 10)
 
+
+def stub_columns(text):
+    body = text.split("(", 1)[1]
+    out = {}
+    for part in re.split(r",\s*(?![^()]*\))", body):
+        m = re.match(r"\s*([a-z_][a-z0-9_]*)\s+(uuid|text\[\]|text|integer|bigint|boolean|date|timestamptz|jsonb)(?=\s|$)(.*)", part, flags=re.S)
+        if m and m.group(1) not in ("unique", "foreign", "primary", "constraint"):
+            out[m.group(1)] = (m.group(2), "NOT NULL" in m.group(3) or "PRIMARY KEY" in m.group(3))
+    return out
+
+
+TYPES = {"ARRAY": "text[]", "integer": "integer", "bigint": "bigint", "boolean": "boolean", "date": "date", "jsonb": "jsonb", "text": "text", "uuid": "uuid",
+         "timestamp with time zone": "timestamptz"}
+drift = []
+for t_, d_ in sorted(DS05_STUBS.items()):
+    real = {r_[0]: (TYPES.get(r_[1], r_[1]), r_[2] == "NO") for r_ in X(
+        "select column_name, data_type, is_nullable from information_schema.columns where table_schema='nativeflows' and table_name=%s", (t_,))}
+    if stub_columns(d_) != real:
+        drift.append(t_)
+check(f"A02b the {len(DS05_STUBS)} lab stubs of DS-05 tables (D6) have the design columns, types and NOT NULLs", len(DS05_STUBS) == 5 and drift == [],
+      sorted(DS05_STUBS) if drift == [] else drift)
+
 tables = re.findall(r"^CREATE TABLE (\w+)", platform, flags=re.M)
-INSTALLATION = {"event_subject", "event_consumer", "agent_type", "agent_type_version"}
-NULLABLE = {"outbox_event", "event_delivery", "audit_record", "audit_change", "audit_denial", "agent_budget_usage"}
+INSTALLATION = {"event_subject", "event_consumer", "agent_type", "agent_type_version", "regime_setting", "tax_code"}
+NULLABLE = {"outbox_event", "event_delivery", "audit_record", "audit_change", "audit_denial", "agent_budget_usage", "idempotency_record"}
 
 
 def cols(t):
@@ -147,14 +176,15 @@ def cols(t):
 
 missing = [t for t in tables if t not in INSTALLATION and "company_id" not in cols(t)]
 check(f"A03 all {len(tables) - len(INSTALLATION)} company tables of the platform file carry company_id", missing == [], missing)
-check("A04 the four installation tables carry no company_id", [t for t in INSTALLATION if "company_id" in cols(t)] == [])
+check("A04 the six installation tables carry no company_id", [t for t in INSTALLATION if "company_id" in cols(t)] == [])
 bad_null = [t for t in tables if t not in INSTALLATION and (cols(t)["company_id"] == "YES") != (t in NULLABLE)]
-check("A05 company_id is nullable exactly on the six tables with installation-scoped rows", bad_null == [], bad_null)
+check("A05 company_id is nullable exactly on the seven tables with installation-scoped rows", bad_null == [], bad_null)
 check("A06 every platform table has recorded_at", [t for t in tables if "recorded_at" not in cols(t)] == [])
 not_forced = [t for t in tables if t not in INSTALLATION and not X(
     "select relrowsecurity and relforcerowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace where nspname='nativeflows' and relname=%s", (t,)).fetchone()[0]]
 check("A07 every company table of the platform file has forced row-level security and a company policy",
-      not_forced == [] and X("select count(distinct tablename) from pg_policies where schemaname='nativeflows' and policyname='company_policy'").fetchone()[0] == len(tables) - len(INSTALLATION),
+      not_forced == [] and X("select count(distinct tablename) from pg_policies where schemaname='nativeflows' and policyname='company_policy' and tablename = any(%s)",
+                             (tables,)).fetchone()[0] == len(tables) - len(INSTALLATION),
       not_forced)
 names = re.findall(r"(?:CONSTRAINT|INDEX|TRIGGER|FUNCTION) (\w+)", platform)
 check("A08 every constraint, index, trigger and function name of the file is at most 63 bytes (ADR-0004 rule 6)",
@@ -165,7 +195,7 @@ check("A09 the four partitioned tables have a default partition",
 # ---------------------------------------------------------------- fixtures
 I = {k: new() for k in """co co2 uOwner uAcc uChief uSales uOther b1 p1 p2 e1 pba sa acBank acCash acRev acBank2 fy per tc
 rAcc rChief rOwner poolPo poolGen poolSales stStd stSen stGen stSales procStd procSen
-rule ruleV atype runR1 runR2 wiRun""".split()}
+rule ruleV atype runR1 runR2 wiRun tk""".split()}
 t = str(I["co"])[-8:]
 X("insert into currency (code, minor_unit) values ('VND',0),('USD',2) on conflict do nothing")
 for k in ("uOwner", "uAcc", "uChief", "uSales", "uOther"):
@@ -180,13 +210,16 @@ X("insert into partner (id, company_id, code, name, partner_kind, country) value
 X("insert into partner (id, company_id, code, name, partner_kind, country) values (%s,%s,'P2','Other co partner','organization','VN')", (I["p2"], I["co2"]))
 X("insert into partner_bank_account (id, company_id, partner_id, bank_name, account_number, holder_name) values (%s,%s,%s,'Bank (sample)','0001','Supplier')",
   (I["pba"], I["co"], I["p1"]))
-X("insert into system_account (id, code) values (%s,%s)", (I["sa"], "cash_in_bank" + t))
+ins_system_account(X, I["sa"], "cash_in_bank" + t)
 for k, code in (("acBank", "1121"), ("acCash", "1111"), ("acRev", "5111"), ("acBank2", "1122")):
-    X("insert into account (id, company_id, code, system_account_id, currency) values (%s,%s,%s,%s,'VND')", (I[k], I["co"], code, I["sa"]))
-X("insert into fiscal_year (id, company_id) values (%s,%s)", (I["fy"], I["co"]))
-X("insert into posting_period (id, company_id, fiscal_year_id, start_date, end_date) values (%s,%s,%s,'2026-11-01','2026-11-30')", (I["per"], I["co"], I["fy"]))
-X("insert into posting_period_area_state values (%s,'general','open')", (I["per"],))
-X("insert into tax_code (id) values (%s)", (I["tc"],))
+    ins_account(X, I[k], I["co"], code, I["sa"], "VND")
+ins_fiscal_year(X, I["fy"], I["co"], "2026", "2026-01-01", "2026-12-31")
+ins_posting_period(X, I["per"], I["co"], I["fy"], 11, "2026-11-01", "2026-11-30")
+ins_area_state(X, I["co"], I["per"], "general", "open")
+X("""insert into transaction_key (id, code, name, determinants, required_system_accounts, required_control_kind, has_regime_alternatives, added_in, meaning)
+     values (%s,%s,'Input tax','{tax_code}','{tax_receivable_input}',null,false,'0.1.0','lab fixture')""", (I["tk"], "input_tax" + t))
+X("""insert into tax_code (id, localization_package, code, name, tax_kind, direction, calculation, sequence, transaction_key_id, deductibility, basis)
+     values (%s,'l10n_xx',%s,'Input VAT 10%%','vat','purchase','percent',1,%s,'deductible','{"status": "unverified"}')""", (I["tc"], "VAT10_IN_" + t, I["tk"]))
 for k, code in (("rAcc", "accountant"), ("rChief", "chief_accountant"), ("rOwner", "owner")):
     X("""insert into role (id, company_id, code, name, template_code, basis, registry_version, expansion_hash) values (%s,%s,%s,%s,%s,'{"kind":"template"}','lab','x')""",
       (I[k], I["co"], code, code, code))
@@ -717,9 +750,9 @@ with conn() as cx:
     cx.execute("insert into journal_entry (id, company_id, document_id, posting_date, document_date, posting_period_id, fiscal_year_id, line_count) values (%s,%s,%s,%s,%s,%s,%s,2)",
                (JE, I["co"], INV, TODAY, TODAY, I["per"], I["fy"]))
     for n, side, amt, acc in ((1, "debit", 200000, "acRev"), (2, "credit", -200000, "acBank2")):
-        cx.execute("""insert into journal_line (id, journal_entry_id, company_id, line_number, posting_period_id, account_id, system_account_id, side, transaction_currency,
-                      transaction_amount, company_currency, company_amount, tax_code_id) values (%s,%s,%s,%s,%s,%s,%s,%s,'VND',%s,'VND',%s,%s)""",
-                   (new(), JE, I["co"], n, I["per"], I[acc], I["sa"], side, amt, amt, I["tc"] if n == 1 else None))
+        cx.execute("""insert into journal_line (id, journal_entry_id, company_id, line_number, posting_period_id, posting_date, fiscal_year_id, account_id, system_account_id,
+                      side, transaction_currency, transaction_amount, company_currency, company_amount, tax_code_id) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'VND',%s,'VND',%s,%s)""",
+                   (new(), JE, I["co"], n, I["per"], TODAY, I["fy"], I[acc], I["sa"], side, amt, amt, I["tc"] if n == 1 else None))
 TL = new()
 X("""insert into tax_line (id, company_id, document_id, line_number, journal_entry_id, tax_code_id, direction, input_use, rate_percent, transaction_currency,
      base_transaction_amount, tax_transaction_amount, base_company_amount, tax_company_amount, tax_date, declaration_date, initial_deductibility, recorded_at)

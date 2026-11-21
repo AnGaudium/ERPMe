@@ -28,6 +28,8 @@ Employees are partners so that advances to them are open items per person (141 i
 
    Note ([ADR-0068](0068-sites-and-core-logistics-payment-master-data.md), proposed 2026-11-17): customer and supplier profiles gain the defaults `payment_method_id`, `delivery_method_id`, `incoterm_code` and `incoterm_place`. All of them are `master_data` references, so the profiles stay free of `cash` and `inventory`.
 
+   Note (S2 findings closure, 2026-11-21): the account fields of `customer_profile` and `supplier_profile` in the table are required only while module `ledger` is activated for the company, so the CRM-only profile holds customers and suppliers without accounts ([ADR-0015](0015-account-determination.md) rule 11 note; INV-38).
+
 4. Tax IDs are normalized and validated by a rule of the localization package (format, check digit, the forms used by organizations, dependent units, household businesses and individuals), flagged `unverified` until the author verifies it (ADR-0016). A second partner with a tax ID that another partner of the company already has, other than its parent or dependent unit, is accepted with the check result `partner_duplicate_suspected` and a work item (rule 19); whether such duplicates should be refused is an open question.
 
     Note (author's delegation, 2026-11-19): confirmed: a second partner with a tax ID another partner already has is accepted with the `partner_duplicate_suspected` warning and a work item; head offices and their dependent units are exempt.

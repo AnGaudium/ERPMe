@@ -83,6 +83,8 @@ Checks:
 
    Note ([ADR-0070](0070-quality-management-core.md), proposed 2026-11-17): new module `quality` (layer 4: inspection plans, lots, results, usage decisions and nonconformances). It imports the contracts of `inventory`, `production`, `master_data`, `documents`, `work`, `attachments` and `policy`, and no layer-4 peer. `inventory`, `purchasing`, `production`, `sales` and `crm` never import it, and an import-linter contract checks this. It changes stock and production data only through commands its consumers dispatch. It is not part of the CRM-only profile.
 
+   Note (S2 findings closure, 2026-11-21): `registry` owns `module_activation` ([DS-28-settings.sql](../design/DS-28-settings.sql)), one row per company and module, which records the modules a company runs, such as the CRM-only deployment profile. `crm` imports nothing from `ledger`, `tax`, `inventory`, `cash` or `production`, and an import-linter contract checks it ([ADR-0052](0052-minimal-crm.md) rule 1 note).
+
 3. Shape of each module:
    - A module that owns tables or commands has:
      - `contract.py`, the only part other modules import (rule 4);
