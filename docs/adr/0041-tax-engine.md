@@ -49,7 +49,7 @@ Tax codes, dated rates and a dated tax matrix are package rules, read live. The 
    - **Company rows.** A company may add `company_tax_matrix` rows only for keys that contain a group the company added itself (ADR-0018 rule 16). A row that would shadow a package key is rejected with `tax_matrix_row_invalid`, so the legal mapping and its verification gate cannot be bypassed.
    - **Groups.** Item and partner tax groups are package templates copied into the company.
 
-    Note ([ADR-0074](0074-core-data-structure-additions.md), proposed 2026-11-19): the document's partner tax group, and the tax ID copied to `tax_line`, are those of its bill-to party (else the sold-to partner) on sales and of its invoicing party on purchases (ADR-0074 rule 4).
+    Note ([ADR-0074](0074-core-data-structure-additions.md), 2026-11-21): the document's partner tax group, and the tax ID copied to `tax_line`, are those of its bill-to party (else the sold-to partner) on sales and of its invoicing party on purchases (ADR-0074 rule 4).
 4. Production gate. Reading an `unverified` tax code, rate or matrix row in a `production` installation fails with `regime_setting_unverified`, as for settings (ADR-0016 rule 12).
 5. Settings. The core registers these keys with their schemas, all with `date_basis` `document_date` (ADR-0016 rule 10):
    - `tax.rate_date_basis` (per document type: which date is the tax date);
@@ -224,7 +224,7 @@ Tax codes, dated rates and a dated tax matrix are package rules, read live. The 
     Note: this content is `l10n_vn`'s, owned by ADR-0039 ([ADR-0053](0053-core-neutrality.md) rule 13).
 22. Not in Phase 1 unless the author decides otherwise (open question): the direct VAT method, foreign contractor tax withholding, personal income tax withholding, and capitalizing non-deductible VAT into stock or assets (`input_tax_non_deductible` requires an expense).
 
-    Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): also after Phase 1: taxes computed per physical quantity (per litre, per kg) and the statistical unit of customs declarations. They will convert through `master_data.contract.convert_quantity` to the unit the package names, and stay package rules (rule 23).
+    Note ([ADR-0056](0056-multiple-units-of-measure.md), 2026-11-15): also after Phase 1: taxes computed per physical quantity (per litre, per kg) and the statistical unit of customs declarations. They will convert through `master_data.contract.convert_quantity` to the unit the package names, and stay package rules (rule 23).
 
 ## Context
 

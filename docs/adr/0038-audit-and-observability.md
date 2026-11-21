@@ -28,7 +28,7 @@ The retention periods and the strictness of scanning are flagged for the author.
    - **Batches.** One record per batch item. `batch_id` is the idempotency record's ID for the batch. It is not a foreign key, because idempotency records are deleted after their retention (ADR-0008 rule 19).
    - **The result.** The dispatch result carries `audit_record_id` per item, outside the plan and `plan_hash`, so a change proposal's execution can store them (ADR-0029 rule 3). It is null in simulate mode, because the row rolls back (DS-04 response fields; ADR-0008 rule 21).
 
-   Note ([ADR-0079](0079-personal-data-protection.md), proposed 2026-11-21): queries still write no audit record, but a read that returns a `sensitive_personal` column or a blocked subject's unmasked data, and every export with a personal column, writes a `personal_data_read_log` row with no values (ADR-0079 rule 12).
+   Note ([ADR-0079](0079-personal-data-protection.md), 2026-11-21): queries still write no audit record, but a read that returns a `sensitive_personal` column or a blocked subject's unmasked data, and every export with a personal column, writes a `personal_data_read_log` row with no values (ADR-0079 rule 12).
 2. Columns:
    - **Identity:** `id` (UUID version 7), `company_id` (null for installation scope), `recorded_at`, `business_date`. Committed rows are always from execute mode, so the record has no `mode` column.
    - **Command:** `command_type`, `schema_version`, and `effect_class` with `is_human_only` and `is_proposal_bound` as registered at the time, so old rows are judged by the rules then in force (INV-81, INV-86). Also `idempotency_key`, `request_id`, `batch_id`, `batch_item_index`, and `reason` when the command carries one (approvals, period state changes, ADR-0012 rule 9). `reason` is free text that must not hold personal data; the command schemas say so, and erasure masks it under rule 4.
@@ -40,9 +40,9 @@ The retention periods and the strictness of scanning are flagged for the author.
 
    Note: the command columns also hold `is_draft_only` as registered at the time, read by INV-216 ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 55 note).
 
-   Note ([ADR-0058](0058-configurable-workflows.md), proposed 2026-11-15): `audit_record` gains `causation_chain_id`, `causation_depth` (0 to 3, no default, a database check) and `automation_rule_version_id`, with a depth of at least 1 where a rule version is named (rule 12).
+   Note ([ADR-0058](0058-configurable-workflows.md), 2026-11-15): `audit_record` gains `causation_chain_id`, `causation_depth` (0 to 3, no default, a database check) and `automation_rule_version_id`, with a depth of at least 1 where a rule version is named (rule 12).
 
-   Note ([ADR-0067](0067-quickflows-operating-presets.md), 2026-11-17 (proposed)): `is_review_skipped`: true when a person's `Post<Type>` executed without the plan panel under `ui.post_review` `on_exceptions`. The commands of an operating preset's application carry the preset code and version in `reason` ([ADR-0067](0067-quickflows-operating-presets.md) rules 4, 13).
+   Note ([ADR-0067](0067-quickflows-operating-presets.md), 2026-11-21): `is_review_skipped`: true when a person's `Post<Type>` executed without the plan panel under `ui.post_review` `on_exceptions`. The commands of an operating preset's application carry the preset code and version in `reason` ([ADR-0067](0067-quickflows-operating-presets.md) rules 4, 13).
 3. Field changes, in `audit_change` (`id`, `company_id`, `audit_record_id`, `subject_table`, `row_id`, `field`, `before`, `after`, `erased_at`):
    - **Which tables.** A closed set, `is_change_tracked` in each module's table declarations and checked by CI: master data, settings including enabled regime settings (ADR-0016), role assignments, period area state and production structures. Documents rely on `document_version`. Balances, counters, open items and other derived rows are not tracked.
    - **How it is captured.** Only `context`'s write helpers capture it. They read the before row and compute the diff with the canonical forms and diff code of ADR-0029 rule 1. Handlers never build changes by hand.
@@ -56,7 +56,7 @@ The retention periods and the strictness of scanning are flagged for the author.
 
    Note ([ADR-0074](0074-core-data-structure-additions.md), 2026-11-21): erasure of a record also clears the keys of its `custom_values` whose `custom_field_definition.is_personal_data` is true, and masks the `audit_change` images of those keys. Values frozen in posted document versions follow the rule for personal data on posted documents (see the personal-data ADR of the S1 additions).
 
-   Note ([ADR-0079](0079-personal-data-protection.md), proposed 2026-11-21): the erasure exception extends to posted documents, document versions and the journal's text columns (`journal_entry.note`, `journal_line.description`), limited to the catalog columns of each table; every rewrite appends a `data_erasure_entry` and, after commit, an erasure journal line outside the database (ADR-0079 rules 6-7). The erasure commands are two: `EraseDataSubject` and `DestroyRetainedPersonalData`. Each module destroys its own tables in its consumer of their events, in the consumer's own transaction, inside an erasure scope opened through `audit.contract` with the originating command's ID; the trigger accepts the marker when a committed erasure command with that ID exists, not only one in the same transaction, and `audit.contract` binds the scope to that command's subject and due classes, so no consumer rewrites rows of another subject or class under that ID.
+   Note ([ADR-0079](0079-personal-data-protection.md), 2026-11-21): the erasure exception extends to posted documents, document versions and the journal's text columns (`journal_entry.note`, `journal_line.description`), limited to the catalog columns of each table; every rewrite appends a `data_erasure_entry` and, after commit, an erasure journal line outside the database (ADR-0079 rules 6-7). The erasure commands are two: `EraseDataSubject` and `DestroyRetainedPersonalData`. Each module destroys its own tables in its consumer of their events, in the consumer's own transaction, inside an erasure scope opened through `audit.contract` with the originating command's ID; the trigger accepts the marker when a committed erasure command with that ID exists, not only one in the same transaction, and `audit.contract` binds the scope to that command's subject and due classes, so no consumer rewrites rows of another subject or class under that ID.
 5. Denial records, `audit_denial`:
    - **When.** A command or query refused with one of these codes writes a denial record, in simulate and execute mode alike: `permission_denied`, `human_only`, `proposal_required`, `policy_denied`, `outbound_content_out_of_scope` and `segregation_of_duties`. The dispatcher classifies by error code, wherever the error was raised.
    - **Columns.**
@@ -101,7 +101,7 @@ The retention periods and the strictness of scanning are flagged for the author.
    - **Exports and erasures.** Write both an audit record and an entry in the personal data processing log (ADR-0019 rule 11). The breach notification procedure belongs to DS-40 under the existing open question on Law 91/2025; audit and denial records are its evidence. The processing log is owned by `audit` ([ADR-0052](0052-minimal-crm.md) rule 26).
    - **`nativeflows-check` against production** (DS-16) may run, only with the read-only role, on a standby replica or with `statement_timeout`, and never with write rights.
 
-   Note ([ADR-0079](0079-personal-data-protection.md), proposed 2026-11-21): breach handling has its mechanism: the signals raise `personal_data_incident_suspected`, a person opens a work case of kind `personal_data_breach`, and the `personal_data_breach` row holds what an authority asks for; deadlines are package rules (ADR-0079 rules 15-16).
+   Note ([ADR-0079](0079-personal-data-protection.md), 2026-11-21): breach handling has its mechanism: the signals raise `personal_data_incident_suspected`, a person opens a work case of kind `personal_data_breach`, and the `personal_data_breach` row holds what an authority asks for; deadlines are package rules (ADR-0079 rules 15-16).
 
 **Observability**
 
@@ -122,7 +122,7 @@ The retention periods and the strictness of scanning are flagged for the author.
 
     Gateway and tool-call spans and the agent metrics: [ADR-0050](0050-agent-runtime-and-query-layer.md) rule 21.
 
-    Note ([ADR-0059](0059-ai-tuning-and-development-of-deterministic-functions.md), proposed 2026-11-15): spans of agent runs, LLM calls, tool calls and automation executions use the OpenTelemetry GenAI attribute names where they exist, and carry the command request ID, agent run ID, work item ID and automation execution ID, never values (X8). Decision records that name an artifact version, and the artifact tables, follow this ADR's retention: never deleted in Phase 1; a regime may only lengthen it (rules 23, 26).
+    Note ([ADR-0059](0059-ai-tuning-and-development-of-deterministic-functions.md), 2026-11-15): spans of agent runs, LLM calls, tool calls and automation executions use the OpenTelemetry GenAI attribute names where they exist, and carry the command request ID, agent run ID, work item ID and automation execution ID, never values (X8). Decision records that name an artifact version, and the artifact tables, follow this ADR's retention: never deleted in Phase 1; a regime may only lengthen it (rules 23, 26).
 11. No values in telemetry, enforced:
     - **Allow-lists.** Span attributes and log fields come from an allow-list of keys (codes, types, counts, hashes). A structlog processor and a span processor drop everything else.
     - **Exceptions** are recorded as type and error code only.
@@ -135,7 +135,7 @@ The retention periods and the strictness of scanning are flagged for the author.
     - **Tool choices.** The backend and the attachment scanner are new tool categories, chosen by ADR in DS-37, not from ADR-0002's list of tools not used. The byte-level media detection library is chosen by ADR at the first step that builds upload.
     - **Dashboard.** In Phase 1 the operations dashboard is the backend's, with panels generated from the metric names. Held deliveries and their `last_error` (ADR-0013 rule 8) are read through the delivery query, not the dashboard, because they carry values. An NativeFlows screen comes later.
 
-    Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), proposed 2026-11-15): management dashboards are not this operations dashboard: they are saved analyses and KPI tiles of the analysis layer, run through `EvaluateAnalysisPlan` under the viewer's rights. Metrics add analysis answers by outcome and badge, abstentions by code and model cost per answer, with codes as labels (rules 26, 27, 32).
+    Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), 2026-11-15): management dashboards are not this operations dashboard: they are saved analyses and KPI tiles of the analysis layer, run through `EvaluateAnalysisPlan` under the viewer's rights. Metrics add analysis answers by outcome and badge, abstentions by code and model cost per answer, with codes as labels (rules 26, 27, 32).
 
 **Attachments**
 
@@ -145,7 +145,7 @@ The retention periods and the strictness of scanning are flagged for the author.
     - **Errors.** `attachment_too_large` (category `too_large`, HTTP 413) and `attachment_type_not_allowed`.
     - **Allowed types.** The list is installation data: PDF; PNG, JPEG and WebP (not SVG); XML; CSV; XLSX, recognised by its ZIP content types; and e-mail messages. The type is detected from the bytes.
 
-    Note ([ADR-0057](0057-document-intake-and-extraction.md), proposed 2026-11-15): the allowed types are unchanged; a vCard file is not one in Phase 1. Photos, business cards, delivery notes, voice and inquiry attachments, and every attachment from inbound e-mail, are labelled `personal` as a whole at creation, and the label is never lowered; extractions take it or a higher one ([ADR-0057](0057-document-intake-and-extraction.md) rules 3, 19).
+    Note ([ADR-0057](0057-document-intake-and-extraction.md), 2026-11-15): the allowed types are unchanged; a vCard file is not one in Phase 1. Photos, business cards, delivery notes, voice and inquiry attachments, and every attachment from inbound e-mail, are labelled `personal` as a whole at creation, and the label is never lowered; extractions take it or a higher one ([ADR-0057](0057-document-intake-and-extraction.md) rules 3, 19).
 
     Note (Design hardening, 2026-11-16): bytes are stored write-once under the key `attachments/<company_id>/<sha256>`, in a store with object versioning or object lock where the store offers it (DS-37); an object is never overwritten or changed. The upload endpoint copies the temporary bytes to that key only when no object is there yet. The 24-hour sweep of temporary keys stays, because no attachment row ever names a temporary key.
 14. Scan state machine, `attachment.state` (`pending_scan`, `clean`, `rejected`):
@@ -162,7 +162,9 @@ The retention periods and the strictness of scanning are flagged for the author.
 
     Note (Design hardening, 2026-11-16): "their bytes are deleted at once" now reads: a rejected attachment stops being served at once, and the transaction that records the rejection sets its `bytes_released_at`; its bytes are physically removed only by the orphan sweep of rule 15's note, after the grace period. Bytes that are not `clean` are never served in the meantime.
 
-    Note ([ADR-0076](0076-internal-messaging-and-notifications.md), proposed 2026-11-19): an attachment linked to a message (`target_table` `message`) is served only to those who may read the message's conversation now; withdrawing a message, and message retention, end its links (ADR-0076 rules 4, 10).
+    Note ([ADR-0076](0076-internal-messaging-and-notifications.md), 2026-11-21): an attachment linked to a message (`target_table` `message`) is served only to those who may read the message's conversation now; withdrawing a message, and message retention, end its links (ADR-0076 rules 4, 10).
+
+    Note (S2 open questions, 2026-11-21): `production` installations require `attachment_scan_mode` = `required`, checked at startup; the requirement is no longer flagged or open.
 15. Retention:
     - **Accounting attachments.** `Post` sets `attachment.is_accounting_evidence` on every linked attachment; it is never unset. Bytes of such an attachment are kept `attachment_retention_years` after its last link ends. This is a regime setting, seeded `unverified` at 10 years for accounting vouchers. Under ADR-0016 rule 12 an unverified setting fails closed, so such bytes are not purged until the author verifies it. TT99 seed: package `settings.yaml` ([ADR-0039](0039-vietnam-package-tt99.md) rule 9).
     - **Erasure.** Erasure removes a subject's links except links to posted accounting documents, which stay as voucher evidence; ADR-0027 rule 2 gets a note.

@@ -121,7 +121,7 @@ That last check failed until make-to-order supply carried its demand line, a req
     - **Buckets.** The size is the company planning setting `capacity_bucket` (`day` or `week`, default `week`). Only `is_capacity_relevant` work centers count.
     - **Overload.** `capacity_overload` is raised once per work center and contiguous range of overloaded buckets, with the buckets as evidence. It becomes one work item owned by `planning_owner_id` (ADR-0031 rule 17).
 
-    Note ([ADR-0068](0068-sites-and-core-logistics-payment-master-data.md), proposed 2026-11-17): `ListCapacityLoad` also accepts a resource group. `capacity_overload` stays per work center, and its evidence adds the group's spare hours.
+    Note ([ADR-0068](0068-sites-and-core-logistics-payment-master-data.md), 2026-11-21): `ListCapacityLoad` also accepts a resource group. `capacity_overload` stays per work center, and its evidence adds the group's spare hours.
 12. `GetCapacityLevelingProposal` (work center, horizon) is a planning query.
     - **The schedule.** It schedules the remaining operations forward on available hours in a total order: in progress, released, firmed planned, draft, proposed; then need date; then order number or business key (interim, flagged).
     - **Output.** For each order, a new start date, the resulting end date and the lateness.
@@ -132,7 +132,7 @@ That last check failed until make-to-order supply carried its demand line, a req
 
     The planning agent's proposals: [ADR-0051](0051-agent-workflows.md) rule 24.
 
-    Note ([ADR-0068](0068-sites-and-core-logistics-payment-master-data.md), proposed 2026-11-17): the leveling proposal may move operations to a member of the same resource group with spare hours. A proposal is never applied without approval.
+    Note ([ADR-0068](0068-sites-and-core-logistics-payment-master-data.md), 2026-11-21): the leveling proposal may move operations to a member of the same resource group with spare hours. A proposal is never applied without approval.
 
 **Performance, inputs and checks**
 

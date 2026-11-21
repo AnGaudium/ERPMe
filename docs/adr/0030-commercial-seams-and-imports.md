@@ -68,7 +68,7 @@ Accounting and business choices stay with the author, as flagged interims: close
 
    DS-22 composes it. It differs from partner exposure (ADR-0026), which is the ledger part alone.
 
-    Note ([ADR-0074](0074-core-data-structure-additions.md), proposed 2026-11-19): credit exposure is kept per payer (else bill-to party, else sold-to partner) and currency: open items, invoices in `issuing`, delivered-not-invoiced value and undelivered order value are summed under the payer their document resolves to (ADR-0074 rule 4).
+    Note ([ADR-0074](0074-core-data-structure-additions.md), 2026-11-21): credit exposure is kept per payer (else bill-to party, else sold-to partner) and currency: open items, invoices in `issuing`, delivered-not-invoiced value and undelivered order value are summed under the payer their document resolves to (ADR-0074 rule 4).
 7. Credit check points: Credit excess is a condition of the same evaluation, with a seeded rule requiring approval ([ADR-0043](0043-policy-and-approval.md) rules 4, 15).
    - **Where.** At order `Submit` (a policy point, ADR-0029 rule 6) and at `PostDelivery`, when goods leave. Interim, flagged, with EC-21's open question.
    - **How.** The handler locks classes 1–8 of ADR-0027 rule 10, then the partner row (class 9), then reads the exposure. It passes the result to the policy hook through `context.evaluate_policy(input)`, the dispatcher's one hook (ADR-0029 rule 6), called at that point so that inputs read under locks are current. Such commands are registered `is_policy_in_handler` (ADR-0008 rule 1). For them the dispatcher skips its own evaluation and asserts that the hook ran exactly once.
@@ -86,7 +86,7 @@ Accounting and business choices stay with the author, as flagged interims: close
    - **Phase 1** creates no non-owned stock. The columns cost nothing before step 3; adding them after go-live would migrate append-only tables. `owner_partner_id` is also reserved on production order components and outputs and on `demand_supply_line` ([ADR-0037](0037-subcontracting.md) rule 7).
    - **Accounting is the author's** (open question): goods sold but held, and whether delivery and invoice must share a date in Vietnam.
 
-   Note ([ADR-0068](0068-sites-and-core-logistics-payment-master-data.md), proposed 2026-11-17): the owner axis has no ownership-transfer default, so nothing reads a document's Incoterm here. When ownership of goods in transit from the shipping point is designed, the Incoterm is its input.
+   Note ([ADR-0068](0068-sites-and-core-logistics-payment-master-data.md), 2026-11-21): the owner axis has no ownership-transfer default, so nothing reads a document's Incoterm here. When ownership of goods in transit from the shipping point is designed, the Incoterm is its input.
 
 **Imports** (F14)
 
@@ -101,7 +101,7 @@ Accounting and business choices stay with the author, as flagged interims: close
      6. **Abandon.** `AbandonImportBatch` stops a batch. Documents already posted stay, and the close check keeps blocking until they are reversed, by ordinary commands or DS-21's bulk reversal.
    - **Glossary.** "Every data import is one command batch" becomes "every data import is posted through simulated command batches; large ones are staged in an `import_batch`".
 
-   Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): an imported row's unit text resolves through the partner item's text, `uom_alias`, then a unit code; an unresolved text fails the row with `unit_text_unresolved` and is never guessed (rules 19, 21).
+   Note ([ADR-0056](0056-multiple-units-of-measure.md), 2026-11-15): an imported row's unit text resolves through the partner item's text, `uom_alias`, then a unit code; an unresolved text fails the row with `unit_text_unresolved` and is never guessed (rules 19, 21).
 
 **Natural keys and agent drafts** (F18)
 

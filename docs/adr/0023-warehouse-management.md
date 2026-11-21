@@ -78,9 +78,9 @@ A small shop and a managed distribution warehouse run on the same model.
 
    - Bins are created and changed in batches (ADR-0008). A bin with stock cannot be deactivated (`bin_not_empty`). Every warehouse also has a default zone and a default bin (code `DEFAULT`, barcode `<warehouse code>-DEFAULT`), which cannot be deactivated while the warehouse is not bin-managed ([ADR-0031](0031-design-simplifications.md) rule 7).
 
-   Note ([ADR-0061](0061-barcodes.md), proposed 2026-11-15): the bin barcode is an internal code in normalized (upper-case) form, registered in the company's barcode registry: unique across bins, item units, handling units, lots, serials and barcoded documents, so a bin code equal to an item barcode is refused (`barcode_taken`). The default "the code" applies when the code fits the internal code format; an old system's numeric label may be kept as a legacy code (`is_legacy_barcode`). A changed barcode stays reserved: an old label resolves to `barcode_retired`, and the bin may take its old code back (rules 7, 8).
+   Note ([ADR-0061](0061-barcodes.md), 2026-11-15): the bin barcode is an internal code in normalized (upper-case) form, registered in the company's barcode registry: unique across bins, item units, handling units, lots, serials and barcoded documents, so a bin code equal to an item barcode is refused (`barcode_taken`). The default "the code" applies when the code fits the internal code format; an old system's numeric label may be kept as a legacy code (`is_legacy_barcode`). A changed barcode stays reserved: an old label resolves to `barcode_retired`, and the bin may take its old code back (rules 7, 8).
 
-   Note ([ADR-0068](0068-sites-and-core-logistics-payment-master-data.md), proposed 2026-11-17): the recommended model is one physical warehouse per site, with zones and bins for raw materials, the production floor, finished goods and quality. Split into several warehouses only when they need separate keepers, stock reports or accounts. The setup agent proposes this, and nothing enforces it.
+   Note ([ADR-0068](0068-sites-and-core-logistics-payment-master-data.md), 2026-11-21): the recommended model is one physical warehouse per site, with zones and bins for raw materials, the production floor, finished goods and quality. Split into several warehouses only when they need separate keepers, stock reports or accounts. The setup agent proposes this, and nothing enforces it.
 3. Product and partner fields:
    - The product (ADR-0018 rule 3) gets:
      - `is_inspection_required`;
@@ -91,7 +91,7 @@ A small shop and a managed distribution warehouse run on the same model.
 
    Whether shelf life may instead be a share of total shelf life, and whether expired lots may ever be picked, are open questions. The interim rules, flagged: days; expired lots are never picked.
 
-   Note ([ADR-0070](0070-quality-management-core.md), proposed 2026-11-17): `is_inspection_required` becomes `product.inspection_points` (`goods_receipt`, `in_process`, `production_output`, `customer_return`, `stock_recheck`). The upgrade sets `{goods_receipt, production_output}` where the boolean was true (ADR-0070 rule 2).
+   Note ([ADR-0070](0070-quality-management-core.md), 2026-11-21): `is_inspection_required` becomes `product.inspection_points` (`goods_receipt`, `in_process`, `production_output`, `customer_return`, `stock_recheck`). The upgrade sets `{goods_receipt, production_output}` where the boolean was true (ADR-0070 rule 2).
 
 **Stock key, statuses, handling units**
 
@@ -118,9 +118,9 @@ A small shop and a managed distribution warehouse run on the same model.
    - **Returns.** A returned unit is received as a new unit.
    - **Packing.** `PackHandlingUnit` and `UnpackHandlingUnit` are warehouse movements.
 
-   Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): handling unit types stay physical containers, unrelated to product units in Phase 1; a quantity per handling unit type and packaging dimensions come after Phase 1 (rule 15).
+   Note ([ADR-0056](0056-multiple-units-of-measure.md), 2026-11-15): handling unit types stay physical containers, unrelated to product units in Phase 1; a quantity per handling unit type and packaging dimensions come after Phase 1 (rule 15).
 
-   Note ([ADR-0061](0061-barcodes.md), proposed 2026-11-15): a handling unit's barcode is an SSCC (18 digits, valid check digit) or an internal code (default prefix `HU-`), registered in the barcode registry. A receipt scan of a supplier's (00) gives a new handling unit that SSCC in a handling-unit-managed warehouse. A supplier's retired SSCC is deleted by the daily job `RunRetiredSsccCleanup` once `barcode.sscc_reuse_months` have passed (a company setting, default 12, unverified), so the pallet may come back; an SSCC under the company's own prefixes, active or not, needs a person, NativeFlows never reissues one, and SSCC assignment comes after Phase 1 (rules 7, 17, 25).
+   Note ([ADR-0061](0061-barcodes.md), 2026-11-15): a handling unit's barcode is an SSCC (18 digits, valid check digit) or an internal code (default prefix `HU-`), registered in the barcode registry. A receipt scan of a supplier's (00) gives a new handling unit that SSCC in a handling-unit-managed warehouse. A supplier's retired SSCC is deleted by the daily job `RunRetiredSsccCleanup` once `barcode.sscc_reuse_months` have passed (a company setting, default 12, unverified), so the pallet may come back; an SSCC under the company's own prefixes, active or not, needs a person, NativeFlows never reissues one, and SSCC assignment comes after Phase 1 (rules 7, 17, 25).
 
 **Movements**
 
@@ -142,11 +142,11 @@ A small shop and a managed distribution warehouse run on the same model.
 
    Dispatch to a customer may be a `sales_issue`, or a `transfer_out` to a `goods_sent` warehouse (ADR-0020 rule 4).
 
-   Note ([ADR-0070](0070-quality-management-core.md), proposed 2026-11-17): `purchase_receipt` and `other_receipt` lines post to `quality_inspection` when the product's `inspection_points` contains `goods_receipt`. Issuing documents name the status they issue from: `return_to_supplier_line` gains `stock_status`, and scrap and internal-consumption lines carry it too (ADR-0070 rules 2, 15).
+   Note ([ADR-0070](0070-quality-management-core.md), 2026-11-21): `purchase_receipt` and `other_receipt` lines post to `quality_inspection` when the product's `inspection_points` contains `goods_receipt`. Issuing documents name the status they issue from: `return_to_supplier_line` gains `stock_status`, and scrap and internal-consumption lines carry it too (ADR-0070 rules 2, 15).
 
-    Note ([ADR-0075](0075-stock-documents.md), proposed 2026-11-19): a transfer moves `available` stock only, so a transfer line has no status; it is one document (`direct`) or two through a transit warehouse (`dispatch`, `receive`, ADR-0075 rules 1, 2). Scrap and internal-consumption lines carry the status they leave (ADR-0075 rules 4, 5).
+    Note ([ADR-0075](0075-stock-documents.md), 2026-11-21): a transfer moves `available` stock only, so a transfer line has no status; it is one document (`direct`) or two through a transit warehouse (`dispatch`, `receive`, ADR-0075 rules 1, 2). Scrap and internal-consumption lines carry the status they leave (ADR-0075 rules 4, 5).
 
-    Note ([ADR-0075](0075-stock-documents.md), proposed 2026-11-19): `other_receipt_line` takes the line's bin or the default receiving bin and the status of the table above; `other_issue_line` and `opening_balance_line` take the line's bin and any status (ADR-0075 rules 11 to 13).
+    Note ([ADR-0075](0075-stock-documents.md), 2026-11-21): `other_receipt_line` takes the line's bin or the default receiving bin and the status of the table above; `other_issue_line` and `opening_balance_line` take the line's bin and any status (ADR-0075 rules 11 to 13).
 8. Warehouse movements:
    - **Lines.** `warehouse_movement` lines are written by confirmed tasks and by the pack and unpack commands. Each line holds item, lot or serial, quantity in the inventory unit, from and to bin, status and handling unit (inside one warehouse), `business_date` (`clock.today`, for history only), and its source: `warehouse_task_id`, or the pack, unpack or count-correction command that wrote it. They also carry the reserved `owner_partner_id` ([ADR-0030](0030-commercial-seams-and-imports.md) rule 8).
    - **Properties.** They are append-only and post no journal. Per (item, warehouse, lot or serial) their quantities net to zero (DS-16).
@@ -182,7 +182,7 @@ A small shop and a managed distribution warehouse run on the same model.
     - Every task proposal (putaway targets here, pick sources in rule 14) is listed in the plan like events, never in `plan_hash` (ADR-0013 rule 5), so concurrent warehouse work never causes `plan_hash_mismatch`. Check results that follow from proposals are not hashed either ([ADR-0040](0040-ui-architecture.md) rule 10).
     - Releasing from inspection is a `status_change` task to `available` or `blocked`.
 
-    Note ([ADR-0070](0070-quality-management-core.md), proposed 2026-11-17): for stock that an inspection lot claims, the `status_change` tasks that release or block it are created by `quality`'s usage-decision executor (ADR-0070 rule 15). A person's own status change stays possible, and a later decision is checked against the stock left (`inspection_stock_short`).
+    Note ([ADR-0070](0070-quality-management-core.md), 2026-11-21): for stock that an inspection lot claims, the `status_change` tasks that release or block it are created by `quality`'s usage-decision executor (ADR-0070 rule 15). A person's own status change stays possible, and a later decision is checked against the stock left (`inspection_stock_short`).
 12. Putaway rules are rows per warehouse, each with a unique `position`:
     - **Match** on item, product category, storage condition, status and handling unit type.
     - **Target** a zone or bin type, with a method:
@@ -211,9 +211,9 @@ A small shop and a managed distribution warehouse run on the same model.
     - **Lots.** Availability is not lot-aware. A reservation whose lots fail shelf-life rules at pick time gives a short pick. Planning ignores reservations in netting and counts demand in full ([ADR-0024](0024-planning.md) rule 9).
     - **Build step.** Reservations, the check and the posting interfaces are step 3 core; documents call them at step 5. Production orders reserve components at release, passing `destination_bin_id` and `release_sequence` ([ADR-0034](0034-production-orders-and-shop-floor.md) rule 9). Picked and fulfilled quantities stay stored here, checked by INV-58; the open quantity of the demand line is stored in `demand_supply_line` ([ADR-0031](0031-design-simplifications.md) rules 5, 6).
 
-    Note ([ADR-0064](0064-production-agent.md), proposed 2026-11-15): `TransferStockReservation` (module `inventory`, verb Transfer, `is_proposal_bound`, `stock_reservation` at `post`) moves open, unpicked reserved quantity from one production order component line to another of the same item and warehouse, at most the target's unreserved open requirement, only from the execution of an approved change proposal; the new reservation carries `transferred_from_reservation_id` (rule 24). Sales order reservations are not transferred in Phase 1. The production sweep orders production demands by requested date, not first come (rule 7; the reservation question in open-questions.md).
+    Note ([ADR-0064](0064-production-agent.md), 2026-11-15): `TransferStockReservation` (module `inventory`, verb Transfer, `is_proposal_bound`, `stock_reservation` at `post`) moves open, unpicked reserved quantity from one production order component line to another of the same item and warehouse, at most the target's unreserved open requirement, only from the execution of an approved change proposal; the new reservation carries `transferred_from_reservation_id` (rule 24). Sales order reservations are not transferred in Phase 1. The production sweep orders production demands by requested date, not first come (rule 7; the reservation question in open-questions.md).
 
-    Note ([ADR-0071](0071-work-orders-and-shop-floor-execution.md), proposed 2026-11-17): `inventory.contract` gains a change of a reservation's `destination_bin_id`, used when a WO moves to another work center; staged stock gets a move task to the new supply bin (ADR-0071 rule 16).
+    Note ([ADR-0071](0071-work-orders-and-shop-floor-execution.md), 2026-11-21): `inventory.contract` gains a change of a reservation's `destination_bin_id`, used when a WO moves to another work center; staged stock gets a move task to the new supply bin (ADR-0071 rule 16).
 
     Note (author's delegation, 2026-11-19): the reservation interim is confirmed: no over-reservation, first come first served, and the newest reservation is dropped on a stock loss; production keeps the order of [ADR-0064](0064-production-agent.md) rule 7. The Phase 1 feature list of this ADR is accepted: wave picking is in the second slice at step 5; slotting, cross-docking, dock appointments and labor management come later; putaway, picking, short pick and count flows join the step 3 gate (the gate text in spec 11 and the runbook is the author's and is not edited here).
 
@@ -235,7 +235,7 @@ A small shop and a managed distribution warehouse run on the same model.
 
     Note: a demand line without a reservation (with `sales.reserve_on_approval` false, or a backorder that stock now covers) is first reserved by `RunPickRelease`, up to available to promise by rule 13, in the same transaction and under the same `stock_value` locks; its tasks are then created from that reservation, and what cannot be reserved is short (`no_pickable_stock`). Rows not released or on hold are refused with `demand_supply_not_released` or `demand_on_hold` ([ADR-0047](0047-commercial-documents-and-pricing.md) rules 18–19).
 
-    Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): the breakdown uses the product's packaging hierarchy (`contains_uom_id`, `contains_quantity`), largest whole unit first, and `is_default_pick_unit` marks the unit a pick list proposes for a demand line in the inventory unit. When a part's provisional quantity changes at Post, an open task is adjusted, and a task already confirmed gets a follow-up task (an extra pick, or a putaway back), with the check result `part_quantity_recomputed` (rules 10, 15).
+    Note ([ADR-0056](0056-multiple-units-of-measure.md), 2026-11-15): the breakdown uses the product's packaging hierarchy (`contains_uom_id`, `contains_quantity`), largest whole unit first, and `is_default_pick_unit` marks the unit a pick list proposes for a demand line in the inventory unit. When a part's provisional quantity changes at Post, an open task is adjusted, and a task already confirmed gets a follow-up task (an extra pick, or a putaway back), with the check result `part_quantity_recomputed` (rules 10, 15).
 15. Confirming a task:
     - `ConfirmWarehouseTask` records the scanned source and target bins, the handling units, lot or serials, and the actual quantity, which may not exceed the task's (`task_quantity_exceeded`). A smaller quantity requires a `shortage_reason`. The scanned target may differ from the proposal (rule 12).
     - Every confirmed pick moves the goods to a non-pickable bin (rule 7), so no later release allocates them again.
@@ -243,7 +243,7 @@ A small shop and a managed distribution warehouse run on the same model.
     - What happens to the order after a short pick is an open question. Interim, flagged: ship what is picked, and leave the rest as backorder on the demand line.
     - Every scan carries a device idempotency key (ADR-0008); the PWA chains simulate and execute in one call sequence.
 
-    Note ([ADR-0061](0061-barcodes.md), proposed 2026-11-15): every scanned field is confirmed: the handler evaluates the raw scan with `EvaluateBarcode` against what the step expects (the source bin, the handling unit, the task's item, a lot or serial of that item, the proposed or a changed target bin) and refuses anything else with `scan_mismatch`, or `scan_unresolved` when the scan has a typed issue; overrides are command fields with a reason. Serials are scanned per unit with a running count, a serial scanned twice is refused (`serial_already_scanned`), and scanning a closed handling unit that the task takes whole confirms all its serials (rules 15, 19).
+    Note ([ADR-0061](0061-barcodes.md), 2026-11-15): every scanned field is confirmed: the handler evaluates the raw scan with `EvaluateBarcode` against what the step expects (the source bin, the handling unit, the task's item, a lot or serial of that item, the proposed or a changed target bin) and refuses anything else with `scan_mismatch`, or `scan_unresolved` when the scan has a typed issue; overrides are command fields with a reason. Serials are scanned per unit with a running count, a serial scanned twice is refused (`serial_already_scanned`), and scanning a closed handling unit that the task takes whole confirms all its serials (rules 15, 19).
 16. Deliveries are created from confirmed picks:
     - `CreateDelivery` takes the picked stock (lots, serials, bins, handling units) of one or more demand lines. The delivery never needs updating after approval (ADR-0009 rule 9), and a short pick simply yields a partial delivery.
     - In the `staged` flow, picks go to `staging`; packing closes handling units in `packing`; `PostDelivery` posts the goods issue from the `shipping` bin.
@@ -264,17 +264,17 @@ A small shop and a managed distribution warehouse run on the same model.
     - **Bin differences.** A shortage in one bin and a surplus of the same item and lot in another are either netted per (item, warehouse, lot), with the bins corrected by warehouse movements, or posted gross. This is a required regime setting (`stock_count.bin_difference_method`), seeded unverified as `net` (open question).
     - **Plans.** Cycle-count plans (second slice) are company data; an agent proposes them.
 
-    Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): counted quantities may be entered in the product's counting units, several lines per key, each converted and summed in the inventory unit (rule 15).
+    Note ([ADR-0056](0056-multiple-units-of-measure.md), 2026-11-15): counted quantities may be entered in the product's counting units, several lines per key, each converted and summed in the inventory unit (rule 15).
 
-    Note ([ADR-0075](0075-stock-documents.md), proposed 2026-11-19): the draft count that a confirmed task creates is a `stock_count` with one line per counted entry; the book quantity is stored on each line of a key and a key with no line posts nothing (ADR-0075 rule 3).
+    Note ([ADR-0075](0075-stock-documents.md), 2026-11-21): the draft count that a confirmed task creates is a `stock_count` with one line per counted entry; the book quantity is stored on each line of a key and a key with no line posts nothing (ADR-0075 rule 3).
 
-    Note ([ADR-0075](0075-stock-documents.md), proposed 2026-11-19): `stock_count.bin_difference_method` is in `settings.csv` as a required regime setting with no core default (bounds `net`, `gross`; ADR-0075 rule 15).
+    Note ([ADR-0075](0075-stock-documents.md), 2026-11-21): `stock_count.bin_difference_method` is in `settings.csv` as a required regime setting with no core default (bounds `net`, `gross`; ADR-0075 rule 15).
 19. Returns:
     - Returns arrive in a `returns` bin as `blocked` (rule 7).
     - A disposition creates a `status_change` task to restock (then putaway) or to quality, or a draft scrap document.
     - The return's value follows ADR-0020 rule 5.
 
-    Note ([ADR-0070](0070-quality-management-core.md), proposed 2026-11-17): for products with the point `customer_return`, the disposition is the inspection lot's usage decision: `release` restocks, and `scrap` and `rework` create drafts. Other returns keep this rule (ADR-0070 rules 8, 12).
+    Note ([ADR-0070](0070-quality-management-core.md), 2026-11-21): for products with the point `customer_return`, the disposition is the inspection lot's usage decision: `release` restocks, and `scrap` and `rework` create drafts. Other returns keep this rule (ADR-0070 rules 8, 12).
 
 **Commands, events, agents, printing**
 
@@ -291,7 +291,7 @@ A small shop and a managed distribution warehouse run on the same model.
 
     Note: labels and lists are print subjects over registered queries. The print contract, the worker and their templates come at step 5, interim until the author decides the build order ([ADR-0049](0049-statutory-reporting-and-printing.md) rules 25, 30).
 
-    Note ([ADR-0061](0061-barcodes.md), proposed 2026-11-15): label subjects also cover item units, lots and serials (`ListItemLabel`, `ListLotLabel`, `ListSerialLabel`), with Code 128 for bins and documents, GS1-128 with (00) for handling units that carry an SSCC, and GS1 DataMatrix for item units, lots and serials that have a GTIN; barcoded document prints carry `document.barcode`. ZPL and a print agent come after Phase 1 (rules 20, 21, 25).
+    Note ([ADR-0061](0061-barcodes.md), 2026-11-15): label subjects also cover item units, lots and serials (`ListItemLabel`, `ListLotLabel`, `ListSerialLabel`), with Code 128 for bins and documents, GS1-128 with (00) for handling units that carry an SSCC, and GS1 DataMatrix for item units, lots and serials that have a GTIN; barcoded document prints carry `document.barcode`. ZPL and a print agent come after Phase 1 (rules 20, 21, 25).
 23. Queries and reports (DS-33):
     - `GetStockBalance`, extended by bin, status and handling unit;
     - `GetAvailableToPromise`;

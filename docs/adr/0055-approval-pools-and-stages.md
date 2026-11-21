@@ -47,7 +47,7 @@ ADR-0043 decides whether a document needs approval and at which rank, and approv
 
    Note (flow review, 2026-11-15): the core seed stays minimal. Under [ADR-0043](0043-policy-and-approval.md) rule 15's seed, a person's `Submit` of a purchase request, purchase order, quotation or production order matches no rule, gets no rank and goes straight to `approved`, so pools `pr`, `po`, `mo` and, for quotations, `sales` are reached only through company rules. The core seeds no thresholds; DS-17's `vn_*` profiles add sample company rules and stage members through setup events ([DS-17](../design/DS-17-synthetic-dataset.md) rules 5 and 18, notes).
 
-   Note ([ADR-0070](0070-quality-management-core.md), proposed 2026-11-17): the core seeds the pool `quality` for `inspection_lot` (ADR-0070 rule 13).
+   Note ([ADR-0070](0070-quality-management-core.md), 2026-11-21): the core seeds the pool `quality` for `inspection_lot` (ADR-0070 rule 13).
 3. `approval_pool_document_type` (company data) holds the selector:
    - **Columns:** `document_type`, `position`, `condition_input`, `approval_pool_id`.
    - **The default row** has position 0 and no condition. The database allows exactly one per document type and company.
@@ -70,7 +70,7 @@ ADR-0043 decides whether a document needs approval and at which rank, and approv
      - rule 3's monotonic selection.
    - **Too few people.** For each active procedure rank, the required stages are satisfiable when their places can be filled by distinct people: k places per stage, each filled by a different active user who is directly eligible for that stage in some scope (a member who holds an `Approve<Type>` of the pool's types; rule 7, condition 2). Outside ADR-0054's small-company mode, the preparer may not approve, so the places must still be fillable with any one of those people left out. Saving returns the check result `approval_stage_unsatisfiable`, naming each rank that fails. `Submit` returns the same check result for its own plan and document, counting the document's writers out (rule 7, condition 5). This replaces `policy_no_eligible_approver` for stages; ADR-0043 rule 13 gets a note.
 
-    Note ([ADR-0076](0076-internal-messaging-and-notifications.md), proposed 2026-11-19): `approval_stage_member` gains `position`, the stage's order of its members top to bottom (null sorts last): the notifications of ADR-0076 rule 6 go to at most 20 eligible members, the first 20 in that order (the author's decision of 2026-11-19).
+    Note ([ADR-0076](0076-internal-messaging-and-notifications.md), 2026-11-21): `approval_stage_member` gains `position`, the stage's order of its members top to bottom (null sorts last): the notifications of ADR-0076 rule 6 go to at most 20 eligible members, the first 20 in that order (the author's decision of 2026-11-19).
 
 **Link to ADR-0043**
 
@@ -113,11 +113,11 @@ ADR-0043 decides whether a document needs approval and at which rank, and approv
 
    **Small companies.** In ADR-0054's small-company mode, condition 5 is lifted for the document's human writers and recorded as a segregation exception. The agent-run part of condition 5 is a hard floor and is never lifted, and neither is condition 6. Rule 20 walks through companies of one and two people.
 
-   Note ([ADR-0063](0063-configurable-policy-settings.md), proposed 2026-11-15): the approver of a change proposal that loosens a registered setting also meets conditions 5 and 6, and the small-company mode does not lift `approver_is_submitter` for it (rule 3).
+   Note ([ADR-0063](0063-configurable-policy-settings.md), 2026-11-15): the approver of a change proposal that loosens a registered setting also meets conditions 5 and 6, and the small-company mode does not lift `approver_is_submitter` for it (rule 3).
 
    Note (Design hardening, 2026-11-16): an approval given through bulk review ([ADR-0042](0042-work-queue.md) rule 12 note) is one `Approve<Type>` per document, checked against conditions 1 to 8 and recorded as its own `approval` row; one approval never counts for more than one document.
 
-   Note ([ADR-0066](0066-work-cases.md), 2026-11-16 (proposed)): approvals given from a work case are the bulk review above: one `Approve<Type>` per document, checked against conditions 1 to 8. A case adds no approval object. Whether a company may skip a purchase order's approval because the purchase requests it comes from were approved is an open question for the author ([ADR-0066](0066-work-cases.md) rules 16, 20).
+   Note ([ADR-0066](0066-work-cases.md), 2026-11-21): approvals given from a work case are the bulk review above: one `Approve<Type>` per document, checked against conditions 1 to 8. A case adds no approval object. Whether a company may skip a purchase order's approval because the purchase requests it comes from were approved is an open question for the author ([ADR-0066](0066-work-cases.md) rules 16, 20).
 
    Note ([ADR-0066](0066-work-cases.md), 2026-11-21): the question is decided: a company may let a purchase order need no approval of its own when the policy input `is_within_approved_request` is true; approvals otherwise stay per document ([ADR-0066](0066-work-cases.md) rule 20).
 8. Counting and completion:

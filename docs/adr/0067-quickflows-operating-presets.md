@@ -65,7 +65,7 @@ The author's proposal of 2026-11-17: a **QuickFlows mode** lets a lean company w
    | `record_default` | `warehouse.is_bin_managed` | `false` | `false` |
    | `record_default` | `warehouse.outbound_flow` | `direct` | `direct` |
    | `record_default` | `bill_of_materials_component.consumption_method` | `manual` | `backflush_at_receipt` |
-   | `record_default` | `company.valuation_area_level` | `site` | `company` ([ADR-0068](0068-sites-and-core-logistics-payment-master-data.md) rule 7, proposed 2026-11-17) |
+   | `record_default` | `company.valuation_area_level` | `site` | `company` ([ADR-0068](0068-sites-and-core-logistics-payment-master-data.md) rule 7, 2026-11-21) |
 
 **Setup before go-live**
 
@@ -97,7 +97,7 @@ The author's proposal of 2026-11-17: a **QuickFlows mode** lets a lean company w
 
     **The maximum is the implementer's.** The preset `quickflows` sets `ui.post_review` to `on_exceptions` but not the maximum, because a preset cannot know the company currency. The setup flow asks for it next to the preset's `risk_amount`; until it is set it stays 0, so every post is reviewed, and `setup_loosening_review` reminds the owner (rule 10).
 
-    Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): the plan panel is a floorplan of its own (`plan_panel`); for agent-written drafts it adds a field-level diff against the previous version and the taint badge, so `on_exceptions` never skips it for them (ADR-0077 rules 1, 3).
+    Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), 2026-11-21): the plan panel is a floorplan of its own (`plan_panel`); for agent-written drafts it adds a field-level diff against the previous version and the taint badge, so `on_exceptions` never skips it for them (ADR-0077 rules 1, 3).
 12. Review reasons. The simulate response of a `Post<Type>` command carries `review_reasons`, computed by the dispatcher from the run, never by the client (ADR-0040 rule 2). It is empty only when all hold:
     - `ui.post_review` is `on_exceptions` on the business date, and `ui.post_review_max_amount` is above 0;
     - the actor kind is `human` (never `agent`, `integration` or `system`);
@@ -215,7 +215,7 @@ The author's proposal of 2026-11-17: a **QuickFlows mode** lets a lean company w
 
 ## Documents updated
 
-- **ADRs** (notes tagged "ADR-0067, 2026-11-17 (proposed)"):
+- **ADRs** (notes tagged "ADR-0067, 2026-11-21"):
   - [ADR-0008](0008-command-envelope-and-registry.md) rule 13;
   - [ADR-0017](0017-permission-envelope.md) rule 16;
   - [ADR-0029](0029-proposals-and-agent-safety.md) rule 8;

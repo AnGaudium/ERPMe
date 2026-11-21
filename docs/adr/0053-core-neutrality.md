@@ -28,9 +28,9 @@ Every amended ADR gets a note at the end of the amended rule, citing a rule of t
    - **New design items** apply the test. ADR-0016's Decision paragraph already states the rule ("the core holds none of it"); this ADR makes it checkable item by item. [template.md](template.md) has no checklist, so it is not changed; reviewers apply the test as part of the spec check of ADR-0005.
    - **Not overlay:** the UI language (Vietnamese is shipped by the core, D8; rule 16), and decisions the author took for the core even when Vietnam motivated them (rule 14).
 
-   Note ([ADR-0057](0057-document-intake-and-extraction.md), proposed 2026-11-15): the data-processing policy is core and regime-neutral: the core registers the key `data_processing.policy` and the gate, without a default; a regime's values (such as a recorded assessment for cross-border processing of personal data) are package data, and the test package `l10n_xx` declares its own ([ADR-0057](0057-document-intake-and-extraction.md) rules 20, 30).
+   Note ([ADR-0057](0057-document-intake-and-extraction.md), 2026-11-15): the data-processing policy is core and regime-neutral: the core registers the key `data_processing.policy` and the gate, without a default; a regime's values (such as a recorded assessment for cross-border processing of personal data) are package data, and the test package `l10n_xx` declares its own ([ADR-0057](0057-document-intake-and-extraction.md) rules 20, 30).
 
-   Note ([ADR-0063](0063-configurable-policy-settings.md), proposed 2026-11-15): every core setting is registered with a core default or `fail_closed`; a key whose content is a regime's law or accounting rule has no core default, and packages fill such neutral keys and may only tighten core floors (rules 1, 18).
+   Note ([ADR-0063](0063-configurable-policy-settings.md), 2026-11-15): every core setting is registered with a core default or `fail_closed`; a key whose content is a regime's law or accounting rule has no core default, and packages fill such neutral keys and may only tighten core floors (rules 1, 18).
 
 **Tax**
 
@@ -211,7 +211,7 @@ Every amended ADR gets a note at the end of the amended rule, citing a rule of t
     - **`l10n_vn`'s terminology catalog:** Vietnamese accounting names for system accounts and keys (e.g. `income_summary` as "Xác định kết quả kinh doanh").
     - **Notes** on ADR-0016 rule 18 and ADR-0040 rules 15 and 19.
 
-    Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): for units: the core catalog's plain translations of core unit names, and the package's statutory unit names as terminology keys with their bases (rules 2, 18).
+    Note ([ADR-0056](0056-multiple-units-of-measure.md), 2026-11-15): for units: the core catalog's plain translations of core unit names, and the package's statutory unit names as terminology keys with their bases (rules 2, 18).
 
 **Follow-ups**
 

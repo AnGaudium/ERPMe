@@ -220,7 +220,7 @@ The author's decision of 2026-11-18: ADR-0035 keeps actual costing as it is (the
 
 ## Documents updated
 
-- **ADRs** (notes tagged "ADR-0072, proposed 2026-11-18"): ADR-0033 rule 13; ADR-0035 rules 14, 15, 17; ADR-0046 rule 14; ADR-0062 rule 12; ADR-0063 rule 29; ADR-0064 rule 1.
+- **ADRs** (notes tagged "ADR-0072, 2026-11-21"): ADR-0033 rule 13; ADR-0035 rules 14, 15, 17; ADR-0046 rule 14; ADR-0062 rule 12; ADR-0063 rule 29; ADR-0064 rule 1.
 - **Catalogs:** settings.csv (1), authorization-areas.csv (1), role-template-levels.csv (2), invariants.csv (5), edge-cases.csv (8); the catalogs README.
 - **Design:** DS-43-54-planning-production.sql; DS-04 (errors); DS-16 (invariant block and count); DS-17 (event type, edge case block and count); the glossary (new rows only); backlog; the generated overview.
 - **Lab:** `t26_costing_sheet.py` and the lab README (finding L-32); fixtures of `t16_planning_production_ddl.py` and `t21_product_engineering.py` seed the default details that estimate lines now name; `t24_settings.py` C12 reads "adds 1 definition" in the singular too.

@@ -56,9 +56,9 @@ The pipeline:
    - **Pending.** A declaration without a handler is pending. It is not dispatched (`unknown_command_type`) and not generated into a transport. `check` lists pending declarations.
    - **No YAML layer.** A YAML-to-code generator would be a second source of truth, and a framework built before it is needed (B7).
 
-    Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): declarations carry the UI annotations of ADR-0077 on payload and result fields and on the declaration object: per field `importance`, `group`, `order`, `lookup`, `default-from`, `scan`, `ai-fillable`, visibility rules; per entity `title`, `list-defaults`, `header-facets`, `line-columns`, `actions`, `links`, `search`, `floorplan`, `assist` (ADR-0077 rules 8–10).
+    Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), 2026-11-21): declarations carry the UI annotations of ADR-0077 on payload and result fields and on the declaration object: per field `importance`, `group`, `order`, `lookup`, `default-from`, `scan`, `ai-fillable`, visibility rules; per entity `title`, `list-defaults`, `header-facets`, `line-columns`, `actions`, `links`, `search`, `floorplan`, `assist` (ADR-0077 rules 8–10).
 
-    Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-19): agent types are declared the same way: one `AgentTypeDeclaration` named `DECLARATION` in `backend/src/nativeflows/agents/agent_types/<agent_type>.py` (the folder `declarations/` of this rule holds the module's command and query declarations), holding its subjects and triggers, tool list, LLM output schemas, per-run ceilings, seats and evaluation set; `check` validates it (ADR-0078 rules 3, 4).
+    Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), 2026-11-21): agent types are declared the same way: one `AgentTypeDeclaration` named `DECLARATION` in `backend/src/nativeflows/agents/agent_types/<agent_type>.py` (the folder `declarations/` of this rule holds the module's command and query declarations), holding its subjects and triggers, tool list, LLM output schemas, per-run ceilings, seats and evaluation set; `check` validates it (ADR-0078 rules 3, 4).
 2. Generation, scaffolding and validation:
    - **`nativeflows-dev generate`** stays as ADR-0022 rule 17 defines it. It derives from declarations that have a handler. It also writes the `Literal` catalog types that declarations import.
    - **`nativeflows-dev scaffold <module>.<snake_case type>`** runs once per declaration and writes three files:
@@ -79,7 +79,7 @@ The pipeline:
 
      Each failure prints `file:line`, the rule ID and a one-line fix (ADR-0022 rule 13).
 
-    Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): `check` enforces the required annotations and the vocabulary of ADR-0077 rule 19, and the `frontend` job runs the Playwright tests generated per floorplan, with axe-core and visual regression.
+    Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), 2026-11-21): `check` enforces the required annotations and the vocabulary of ADR-0077 rule 19, and the `frontend` job runs the Playwright tests generated per floorplan, with axe-core and visual regression.
 3. Run-time conformance. In test and development, `context` records every posting interface call, lock, event, error code and check code of a run. It raises `declaration_violation` when the handler does something its declaration does not list, the same way the lock helper raises `lock_order_violation` (ADR-0022 rule 13 note). Production does not record.
 
 **Seats**
@@ -97,7 +97,7 @@ The pipeline:
 
    The recomputation writer and the test-scenario model are unchanged (runbook).
 
-    Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): the declaration drafter (Sonnet 5.5) writes the UI annotations with each declaration, and the declaration reviewer checks them; annotations are therefore never added in a second pass (ADR-0077 rule 23).
+    Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), 2026-11-21): the declaration drafter (Sonnet 5.5) writes the UI annotations with each declaration, and the declaration reviewer checks them; annotations are therefore never added in a second pass (ADR-0077 rule 23).
 5. Measurement. The first 3 to 5 packages that the coder seat writes run one at a time, and at least one of them posts money. For each package the step log's Friday line and the step 1 gate report record:
    - **review rounds:** declaration review rounds, and model review runs until both pass;
    - **stops:** stop rule 11 stops;
@@ -324,7 +324,7 @@ The pipeline:
 
 ## Documents updated
 
-- **ADRs** (notes tagged "ADR-0073, proposed 2026-11-18"): ADR-0003 R5; ADR-0005 (constraints); ADR-0008 rule 1; ADR-0022 rules 3, 13, 14, 16, 17; ADR-0059 rule 24; ADR-0063 rule 6.
+- **ADRs** (notes tagged "ADR-0073, 2026-11-21"): ADR-0003 R5; ADR-0005 (constraints); ADR-0008 rule 1; ADR-0022 rules 3, 13, 14, 16, 17; ADR-0059 rule 24; ADR-0063 rule 6.
 - **Runbook:** README.md (unit of work, seats); steps-0-4.md (every step, and steps 0–4); escalation.md (stop rules 6, 11); step-log.md.
 - **Spec glossary:** three new rows in 00-reading-guide.md; no existing row changed.
 - **Index and questions:** docs/adr/README.md; docs/open-questions.md; the generated ADR index.

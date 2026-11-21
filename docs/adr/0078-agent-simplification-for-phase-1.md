@@ -107,6 +107,8 @@ The safety model is unchanged: the hard floors, the permission intersection, tai
 
    Note (author's delegation, 2026-11-21; decided by the chief architect): spec 03 rule 8 and the per-run seat budget of spec 17 were aligned on 2026-11-21, so the bullet above is no longer open. Spec 03 rule 8 now reads "Budgets: per run for each agent type, and per company per day, with a circuit breaker." Spec 17 says the seat's budget is per run and the daily budget is the company's.
 
+   Note (2026-11-16 additions review, 2026-11-21): the customer also sets `agents.internal_reserve_share` (ADR-0050 rule 22 note).
+
 **Gateway, AI drafting, analysis and vision, the light way**
 
 8. Kept in Phase 1, each without new machinery:

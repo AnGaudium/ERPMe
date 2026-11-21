@@ -10,7 +10,7 @@ Applies to every step below:
 
 ---
 
-## Step 5 · Commercial documents (months 5–8)
+## Step 5 · Commercial documents
 
 **Entry criteria:** step 4 gate (Phase 0 gate) passed.
 
@@ -58,6 +58,7 @@ Applies to every step below:
 3. Lead-time offsetting and planned production orders.
 4. The capacity check and conversion of planned orders.
 5. Step 5b simulator adapter: planning events of the manufacturing company to commands.
+6. Subcontracting ([ADR-0037](../adr/0037-subcontracting.md), DS-55), which needs the production core (step 4b) and purchase orders (step 5): built in this step, after both gates.
 
 **How agents are used:** builders implement; the reviewer checks that planning writes only planned orders, pegging and exceptions, and that it changes no document except through conversion. The recomputation writer completes the naive planning recomputation straight from raw demand, supply and bills of materials, without reading planning code, as for costing at step 3.
 
@@ -77,7 +78,7 @@ Applies to every step below:
 
 ---
 
-## Step 6 · Cash and AR/AP (months 5–8)
+## Step 6 · Cash and AR/AP
 
 **Entry criteria:** step 5 gate passed.
 
@@ -108,7 +109,7 @@ Applies to every step below:
 
 ---
 
-## Step 7 · Tax and e-invoicing (months 5–8)
+## Step 7 · Tax and e-invoicing
 
 **Entry criteria:** step 6 gate passed.
 
@@ -142,7 +143,7 @@ Applies to every step below:
 
 ---
 
-## Step 8 · Period close and reports (months 8–10)
+## Step 8 · Period close and reports
 
 **Entry criteria:** step 7 gate passed.
 
@@ -172,7 +173,7 @@ Applies to every step below:
 
 ---
 
-## Step 9 · Hand-built UI and warehouse app (months 8–10)
+## Step 9 · Hand-built UI and warehouse app
 
 **Entry criteria:** step 8 gate passed. The commands behind each screen have passed their gate (B6).
 

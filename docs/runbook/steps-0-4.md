@@ -1,6 +1,6 @@
 # Phase 0: steps 0–4
 
-Steps 0–4 are Phase 0. The Phase 0 gate is the step 4 gate ([10-roadmap.md](../spec/10-roadmap.md)). Month estimates are from the Lean scope table and are estimates only (D15). Section headings follow [README.md](README.md#how-to-use-it).
+Steps 0–4 are Phase 0. The Phase 0 gate is the step 4 gate ([10-roadmap.md](../spec/10-roadmap.md)). The build carries no calendar dates: the build order and the gates are the only schedule (D15 note in [decisions.md](../decisions.md)). Section headings follow [README.md](README.md#how-to-use-it).
 
 Applies to every step below:
 
@@ -8,11 +8,11 @@ Applies to every step below:
 - "Built in full from the start" items in [10-roadmap.md](../spec/10-roadmap.md#lean-scope-for-phases-0-and-1) are built when their layer is built, never deferred: `company_id` on every table, `Decimal`/`NUMERIC` for money and quantities, transaction and company currency on every journal line, `actor` and `on_behalf_of` on every command, idempotency, i18n with English source, data labels and the routing switch.
 - Schema changes are free until the freeze 4 weeks before go-live (B8); concentrate risky changes here.
 
-Note ([ADR-0073](../adr/0073-coding-pipeline-and-mechanical-assurance.md), proposed 2026-11-18): every gate report also carries ADR-0073 rule 21's mechanical summary and the plain-Vietnamese acceptance report with a demo; the gate texts are unchanged. Work packages run one at a time until the step 1 gate has passed with measured numbers. After that they may run in parallel within a step when their allowlists are disjoint, never across steps (ADR-0073 rule 22).
+Note ([ADR-0073](../adr/0073-coding-pipeline-and-mechanical-assurance.md), 2026-11-21): every gate report also carries ADR-0073 rule 21's mechanical summary and the plain-Vietnamese acceptance report with a demo; the gate texts are unchanged. Work packages run one at a time until the step 1 gate has passed with measured numbers. After that they may run in parallel within a step when their allowlists are disjoint, never across steps (ADR-0073 rule 22).
 
 ---
 
-## Step 0 · Preparation (month 1)
+## Step 0 · Preparation
 
 **Entry criteria:** specification committed (D17); ADR-0001 and ADR-0002 accepted. `main` is on the public repository `AnGaudium/NativeFlows`, because CI runs on GitHub Actions (ADR-0002) ([ADR-0003](../adr/0003-build-operating-rules.md) R3).
 
@@ -34,7 +34,7 @@ Note ([ADR-0073](../adr/0073-coding-pipeline-and-mechanical-assurance.md), propo
 
 **Verification:** each DS file meets the "done" rule in [design/README.md](../design/README.md); CI green on the empty skeleton; the simulator, run twice with the same seed and dataset version, produces an identical event log; the small dataset at this step is the event log plus input files and contains every EC v1 edge case at least once as events ([ADR-0003](../adr/0003-build-operating-rules.md) R1).
 
-Note ([ADR-0073](../adr/0073-coding-pipeline-and-mechanical-assurance.md), proposed 2026-11-18): work package 5 also builds ADR-0073's pipeline, written by Claude Opus 5.5:
+Note ([ADR-0073](../adr/0073-coding-pipeline-and-mechanical-assurance.md), 2026-11-21): work package 5 also builds ADR-0073's pipeline, written by Claude Opus 5.5:
 
 - declaration types and the validator;
 - `scaffold`, `work-package` and the hook;
@@ -52,13 +52,13 @@ The author sets branch protection. The gate report shows each part refusing a pl
 
 **Artifacts:** ADRs and DS files for DS-01 to DS-18; catalogs for system accounts, transaction keys, movement types and EC v1; repo skeleton; CI; test server; harness; simulator v1; small dataset event log (seed, version); first golden scenarios.
 
-**Risks:** design work expands beyond month 1; ADRs decided on assumptions that the open legal questions later contradict; the simulator grows into a product of its own.
+**Risks:** design work expands beyond what step 0 needs; ADRs decided on assumptions that the open legal questions later contradict; the simulator grows into a product of its own.
 
 **Fallback:** if an ADR cannot be decided because a legal question is open, decide the structure and keep the rule as flagged configuration ([escalation.md](escalation.md#unverified-legal-rules)). If the simulator is late, ship v1 with only the events step 1 needs and extend it per step (DS-17 allows extension at every step); the gate still requires the small dataset.
 
 ---
 
-## Step 1 · Ledger (months 1–3)
+## Step 1 · Ledger
 
 **Entry criteria:** step 0 gate passed.
 
@@ -77,7 +77,7 @@ The author sets branch protection. The gate report shows each part refusing a pl
 
 **How agents are used:** builders implement each package; the reviewer checks every change touching posting, triggers or idempotency, and the author reviews those line by line. The recomputation writer starts the naive trial-balance recomputation from the spec.
 
-Note ([ADR-0073](../adr/0073-coding-pipeline-and-mechanical-assurance.md), proposed 2026-11-18): "the author reviews those line by line" now reads: those changes pass mutation testing and two model reviews as required check runs, and the author reviews behavior from the acceptance report. Claude Haiku 5.5 codes command packages, one at a time; the first 3–5 are measured, and at least one of them posts money (ADR-0073 rule 5). The registry, dispatcher, `numeric`, triggers, RLS and the first package of each kind are assigned up front to Claude Opus 5.5. Gate evidence: every sensitive package of the step at the interim package mutation threshold, property tests for money arithmetic and posting balance green, SQL tests for every trigger and policy, and no pending declaration (ADR-0073 rule 21).
+Note ([ADR-0073](../adr/0073-coding-pipeline-and-mechanical-assurance.md), 2026-11-21): "the author reviews those line by line" now reads: those changes pass mutation testing and two model reviews as required check runs, and the author reviews behavior from the acceptance report. Claude Haiku 5.5 codes command packages, one at a time; the first 3–5 are measured, and at least one of them posts money (ADR-0073 rule 5). The registry, dispatcher, `numeric`, triggers, RLS and the first package of each kind are assigned up front to Claude Opus 5.5. Gate evidence: every sensitive package of the step at the interim package mutation threshold, property tests for money arithmetic and posting balance green, SQL tests for every trigger and policy, and no pending declaration (ADR-0073 rule 21).
 
 **Verification:** branch coverage of 90% or more on the core packages is enforced from this step ([ADR-0003](../adr/0003-build-operating-rules.md) R4). Hypothesis state machine posts random transaction sequences in VND and foreign currencies; after each step every ledger invariant holds: each entry balances per transaction currency, company currency and group currency; trial balance sums to zero; rounding lands on the defined system account; no number gaps; posted documents never change; reversal nets to zero; retry with the same idempotency key returns the identical result; executed result equals the simulated `plan_hash`. Small dataset (journal-level events) replays in CI. Concurrency test for numbering and idempotency.
 
@@ -93,7 +93,7 @@ Note ([ADR-0073](../adr/0073-coding-pipeline-and-mechanical-assurance.md), propo
 
 ---
 
-## Step 2 · Master data (months 1–3)
+## Step 2 · Master data
 
 **Entry criteria:** step 1 gate passed.
 
@@ -111,7 +111,7 @@ Note ([ADR-0073](../adr/0073-coding-pipeline-and-mechanical-assurance.md), propo
 
 **Verification:** master data of the small and medium datasets imports through command batches; re-importing the same batch with the same idempotency keys changes nothing; account determination cross-check passes for every valuation class in the dataset; all step 1 invariants stay green.
 
-Note ([ADR-0073](../adr/0073-coding-pipeline-and-mechanical-assurance.md), proposed 2026-11-18): gate evidence adds account determination and command batches at the package mutation threshold, and re-import idempotency shown in the acceptance report (ADR-0073 rule 21).
+Note ([ADR-0073](../adr/0073-coding-pipeline-and-mechanical-assurance.md), 2026-11-21): gate evidence adds account determination and command batches at the package mutation threshold, and re-import idempotency shown in the acceptance report (ADR-0073 rule 21).
 
 **Exit gate (verbatim):**
 
@@ -125,7 +125,7 @@ Note ([ADR-0073](../adr/0073-coding-pipeline-and-mechanical-assurance.md), propo
 
 ---
 
-## Step 3 · Inventory, costing, landed cost (months 3–5)
+## Step 3 · Inventory, costing, landed cost
 
 **Entry criteria:** step 2 gate passed.
 
@@ -145,7 +145,7 @@ Note ([ADR-0073](../adr/0073-coding-pipeline-and-mechanical-assurance.md), propo
 
 **How agents are used:** builders implement; the reviewer and the author review every change to stock posting and costing. The recomputation writer completes the naive periodic-average recomputation straight from raw transactions, without reading core code. The test-scenario model starts proposing stock situations on the test server.
 
-Note ([ADR-0073](../adr/0073-coding-pipeline-and-mechanical-assurance.md), proposed 2026-11-18): the author's review of stock posting and costing changes is replaced by mutation testing and two model reviews; he reviews the acceptance report. Gate evidence: `inventory` and costing at the package mutation threshold, property tests for stock quantity and value conservation, and the report's stock and journal per item, warehouse and period against the naive recomputation (ADR-0073 rule 21).
+Note ([ADR-0073](../adr/0073-coding-pipeline-and-mechanical-assurance.md), 2026-11-21): the author's review of stock posting and costing changes is replaced by mutation testing and two model reviews; he reviews the acceptance report. Gate evidence: `inventory` and costing at the package mutation threshold, property tests for stock quantity and value conservation, and the report's stock and journal per item, warehouse and period against the naive recomputation (ADR-0073 rule 21).
 
 **Verification:** golden scenarios for average cost with transfers, returns, backdated documents, landed cost after partial sale and after period close, USD import with duty at a different rate; naive recomputation equals the core result per item, warehouse and period; inventory system account balances (152, 155, 156 in TT99) equal the inventory valuation report; no negative stock; parallel tests for concurrent issues of the same (item, warehouse); edge cases for steps 1–3 appear in the coverage report.
 
@@ -161,7 +161,7 @@ Note ([ADR-0073](../adr/0073-coding-pipeline-and-mechanical-assurance.md), propo
 
 ---
 
-## Step 4 · Sequential replay of the synthetic dataset (months 3–5)
+## Step 4 · Sequential replay of the synthetic dataset
 
 **Entry criteria:** step 3 gate passed. Medium dataset (1 Vietnamese company, TT99, 1 year, about 10,000 documents) generated by the simulator.
 
@@ -179,7 +179,7 @@ Note ([ADR-0073](../adr/0073-coding-pipeline-and-mechanical-assurance.md), propo
 
 **Verification:** the full medium replay nightly, within 4 hours ([ADR-0003](../adr/0003-build-operating-rules.md) R6); every invariant after every simulated day; costing, FX and balances against golden scenarios and naive recomputation; both REST and MCP paths exercised.
 
-Note ([ADR-0073](../adr/0073-coding-pipeline-and-mechanical-assurance.md), proposed 2026-11-18): gate evidence adds mutation scores held since step 3, with no fall of more than 2 points, and the acceptance report showing the replay day by day (ADR-0073 rule 21).
+Note ([ADR-0073](../adr/0073-coding-pipeline-and-mechanical-assurance.md), 2026-11-21): gate evidence adds mutation scores held since step 3, with no fall of more than 2 points, and the acceptance report showing the replay day by day (ADR-0073 rule 21).
 
 **Exit gate (verbatim):**
 

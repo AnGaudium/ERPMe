@@ -42,7 +42,7 @@ A work package is done when it is merged, the documents it affects are updated, 
 
 This six-stage flow is the project's policy for reviewing AI-written code required by [18-license-governance.md](../spec/18-license-governance.md) ([ADR-0003](../adr/0003-build-operating-rules.md) R5).
 
-Note ([ADR-0073](../adr/0073-coding-pipeline-and-mechanical-assurance.md), proposed 2026-11-18; the author's decision of 2026-11-18): for code, the stages run as follows.
+Note ([ADR-0073](../adr/0073-coding-pipeline-and-mechanical-assurance.md), 2026-11-21; the author's decision of 2026-11-18): for code, the stages run as follows.
 
 - **Stage 1** adds the declarations. Claude Sonnet 5.5 drafts them chunk by chunk, with each package's manifest (allowlist and context pack), and Claude Opus 5.5 or Claude Fable 5.2 reviews them.
 - **Stage 2** adds property tests and SQL tests, written by a seat other than the coder. They are read-only to it.

@@ -64,7 +64,7 @@ Each company's fiscal year (ADR-0007) contains regular posting periods and up to
 
     Note: Phase 1 registers only `by: entries` as a value of `closing.method`; closing by computation without documents comes after Phase 1 (interim, open question) (holistic review, 2026-11-15).
 
-    Note ([ADR-0069](0069-business-unit-dimension.md), proposed 2026-11-17): closing entries close each profit-and-loss account per business unit, and each closing line takes the unit of the balance it closes (source `closing`).
+    Note ([ADR-0069](0069-business-unit-dimension.md), 2026-11-21): closing entries close each profit-and-loss account per business unit, and each closing line takes the unit of the balance it closes (source `closing`).
 19. Balance-sheet balances are cumulative at all times: the balance on any date is the sum of all lines up to that date, across fiscal years, so no opening entry is posted at year start. Stored period-closing balances (07) are a cache rebuilt from journal lines (DS-06).
 
 ## Context

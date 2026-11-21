@@ -147,7 +147,7 @@ The author's decision of 2026-11-17 gives Phase 1 a thin but complete quality co
       - When every line is done, it runs `CloseInspectionLot`. A line whose disposition needs no execution (for example `block` on stock already blocked) counts as done, so `CloseInspectionLot` runs at once when no line has an execution row. (review note, 2026-11-21)
     - **Make to order.** Released output still reaches its sales demand through ADR-0034 rule 14's consumer of `WarehouseTaskConfirmed`.
 
-    Note ([ADR-0075](0075-stock-documents.md), proposed 2026-11-19): the tables `scrap`, `scrap_line`, `internal_consumption` and `internal_consumption_line` exist; their lines carry the held `stock_status`, a quality sample is a line with `consumption_kind` `quality_sample`, and `inspection_lot_execution.target_table` names these rows (ADR-0075 rules 4, 5).
+    Note ([ADR-0075](0075-stock-documents.md), 2026-11-21): the tables `scrap`, `scrap_line`, `internal_consumption` and `internal_consumption_line` exist; their lines carry the held `stock_status`, a quality sample is a line with `consumption_kind` `quality_sample`, and `inspection_lot_execution.target_table` names these rows (ADR-0075 rules 4, 5).
 
 **Nonconformance**
 
@@ -231,7 +231,7 @@ The author's decision of 2026-11-17 gives Phase 1 a thin but complete quality co
 
 ## Documents updated
 
-- **ADR notes**, tagged "ADR-0070, proposed 2026-11-17":
+- **ADR notes**, tagged "ADR-0070, 2026-11-21":
   - [ADR-0018](0018-product-and-item-model.md) rule 3;
   - [ADR-0020](0020-inventory-and-costing-model.md) rule 4;
   - [ADR-0022](0022-repository-and-engineering-conventions.md) rule 2;

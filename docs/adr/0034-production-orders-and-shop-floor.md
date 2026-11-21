@@ -65,7 +65,7 @@ It adds only what production needs:
 
    An order of a configured item keeps the configuration's ID and the selected, sized lines as its snapshot ([ADR-0046](0046-product-configuration.md) rule 13).
 
-   Note ([ADR-0071](0071-work-orders-and-shop-floor-execution.md), proposed 2026-11-17): people see the order as an MO and each internal operation as a WO; `operation_execution` and `operation_assignment` hold the WO's run state, execution work center and people, outside version content like output serials (ADR-0071 rules 1, 6, 12).
+   Note ([ADR-0071](0071-work-orders-and-shop-floor-execution.md), 2026-11-21): people see the order as an MO and each internal operation as a WO; `operation_execution` and `operation_assignment` hold the WO's run state, execution work center and people, outside version content like output serials (ADR-0071 rules 1, 6, 12).
 2. Creating and editing:
    - **Explosion.** `CreateProductionOrder` selects the production version (ADR-0033 rule 13), unless the client names one, under a share lock on `production_structure` (ADR-0027 rule 10, class 3), so a revision cannot be withdrawn meanwhile. It copies the components, outputs and operations of the revisions valid on `planned_start_date`. Components are exploded through phantoms, with quantities by ADR-0033 rule 6. Conversion from a planned order uses the shared planning function ([ADR-0036](0036-multi-level-mrp.md) rule 3).
    - **Backward scheduling.** Select the version and the routing revision valid on `planned_end_date`, schedule backward to obtain `planned_start_date`, then explode at that date. If the routing revision valid there differs, schedule once more with it. The response shows both dates.
@@ -82,15 +82,15 @@ It adds only what production needs:
 
    Note: backward scheduling selects the version on `planned_end_date` and requires it to be valid on the resulting start, else the next version in order, else `production_version_missing` ([ADR-0033](0033-production-master-data.md) rule 5's note) (holistic review 2026-11-15, item P3).
 
-   Note ([ADR-0071](0071-work-orders-and-shop-floor-execution.md), proposed 2026-11-17): a component not on the order is issued from the shop floor as one command batch of the change order adding its line (required 0 unless stated) and the issue (ADR-0071 rule 3).
+   Note ([ADR-0071](0071-work-orders-and-shop-floor-execution.md), 2026-11-21): a component not on the order is issued from the shop floor as one command batch of the change order adding its line (required 0 unless stated) and the issue (ADR-0071 rule 3).
 3. Scheduling:
    - **The rule.** Operation dates come from `setup_duration`, `run_duration` × expected quantity / base quantity, `queue_time` and `move_time`, on the work centers' calendars (ADR-0033 rules 10, 11), at infinite capacity. An order without operations uses the version's fixed lead time. External operations use the supplier lead time and route transit of [ADR-0037](0037-subcontracting.md) rule 3.
    - **Load view.** `ListWorkCenterLoad` (work center, day or week buckets) adds up the remaining scheduled hours of draft and approved orders that are not technically complete, against available hours. Real orders only; planned orders are added by planning's `ListCapacityLoad` ([ADR-0036](0036-multi-level-mrp.md) rule 11).
    - **Later.** Finite sequencing and levelling are DS-54's capacity check, proposed by the planning agent, never applied without approval.
 
-   Note ([ADR-0068](0068-sites-and-core-logistics-payment-master-data.md), proposed 2026-11-17): `ListWorkCenterLoad` also accepts a resource group, summing load and available hours over its members.
+   Note ([ADR-0068](0068-sites-and-core-logistics-payment-master-data.md), 2026-11-21): `ListWorkCenterLoad` also accepts a resource group, summing load and available hours over its members.
 
-   Note ([ADR-0071](0071-work-orders-and-shop-floor-execution.md), proposed 2026-11-17): `ListWorkCenterLoad` counts an operation at its execution work center (ADR-0071 rule 16).
+   Note ([ADR-0071](0071-work-orders-and-shop-floor-execution.md), 2026-11-21): `ListWorkCenterLoad` counts an operation at its execution work center (ADR-0071 rule 16).
 4. Rework and disassembly:
    - **`rework`.** No explosion. The client enters the components, usually the item itself, which may be issued from `quality_inspection` (rule 11), and the operations. The main output is the same item or another named item. The cycle this creates is a production order fact, which the costing solver handles (ADR-0025 rule 6), never a bill of materials.
    - **`disassembly`.**
@@ -100,7 +100,7 @@ It adds only what production needs:
 
    Note (catalog review, 2026-11-15): a production order has at most one output of type `main` (a unique index in DS-43-54-planning-production.sql); a disassembly order has none, its outputs being `co_product` lines. A `rework` order may have no production version, since it has no explosion.
 
-   Note ([ADR-0070](0070-quality-management-core.md), proposed 2026-11-17): a rework order may be drafted by `quality`'s usage-decision executor for a lot's `rework` line, issuing from `quality_inspection` (ADR-0070 rules 12, 15).
+   Note ([ADR-0070](0070-quality-management-core.md), 2026-11-21): a rework order may be drafted by `quality`'s usage-decision executor for a lot's `rework` line, issuing from `quality_inspection` (ADR-0070 rules 12, 15).
 
 **Lifecycle and execution state**
 
@@ -151,9 +151,9 @@ It adds only what production needs:
    - **Operations.** Operations with confirmations cannot be removed or change work center.
    - **When it takes force.** Reservations and demand and supply lines are adjusted.
 
-   Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): "unit" includes the line's conversion snapshot (rule 9).
+   Note ([ADR-0056](0056-multiple-units-of-measure.md), 2026-11-15): "unit" includes the line's conversion snapshot (rule 9).
 
-   Note ([ADR-0068](0068-sites-and-core-logistics-payment-master-data.md), proposed 2026-11-17): an unconfirmed internal operation may move to another active member of its work center's resource group in the order's production warehouse. In a draft this is an edit, and after release it is a change order. Standard values carry over; the target's calendar, capacity and efficiency schedule it, and its cost center and rates cost the confirmation.
+   Note ([ADR-0068](0068-sites-and-core-logistics-payment-master-data.md), 2026-11-21): an unconfirmed internal operation may move to another active member of its work center's resource group in the order's production warehouse. In a draft this is an edit, and after release it is a change order. Standard values carry over; the target's calendar, capacity and efficiency schedule it, and its cost center and rates cost the confirmation.
 
 **Components: reservation, staging, issue and return**
 
@@ -165,7 +165,7 @@ It adds only what production needs:
    - **Destination.** `destination_bin_id` is passed only for components issued from the production warehouse.
    - **Interim, flagged:** release with shortages is allowed. Reserving at release can hold stock for an order that starts months later (open question).
 
-   Note ([ADR-0064](0064-production-agent.md), proposed 2026-11-15): `production.reservation.mode` (company: `off`, `on_release`, `scheduled`; default `on_release`, today's behavior) and `production.reservation.window_days` (14) settle reservation timing; the production agent's reservation sweep, a workflow without an LLM step, reserves shortfalls in the reservation priority and never takes stock reserved for another demand; a move between orders is `TransferStockReservation` from an approved change proposal (rules 7, 15, 23, 24).
+   Note ([ADR-0064](0064-production-agent.md), 2026-11-15): `production.reservation.mode` (company: `off`, `on_release`, `scheduled`; default `on_release`, today's behavior) and `production.reservation.window_days` (14) settle reservation timing; the production agent's reservation sweep, a workflow without an LLM step, reserves shortfalls in the reservation priority and never takes stock reserved for another demand; a move between orders is `TransferStockReservation` from an approved change proposal (rules 7, 15, 23, 24).
 10. Staging:
     - **New bin type.** ADR-0023 rule 2 gains bin type `production`, which pick removal never reads. A work center's `supply_bin_id` and `output_bin_id` must be of that type (ADR-0033 rule 11 gets a note). A work center without a supply bin stages to the production warehouse's default bin.
     - **Pick tasks.** `RunPickRelease` (ADR-0023 rule 14) also serves production orders. Its pick tasks move reserved components to the reservation's `destination_bin_id`, released by `release_sequence`.
@@ -185,9 +185,9 @@ It adds only what production needs:
     - **Components not on the order.** They are first added through the order or a change order.
     - **Other reservations.** An issue that would cut into other demands' reservations is rejected with `stock_reserved` (ADR-0023 rule 13).
 
-    Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): issue lines carry the line unit block: `quantity` as entered in any allowed unit of the component, `uom_id`, the snapshot and `inventory_quantity`, which the stock movement and the order line's progress use (rules 9, 17).
+    Note ([ADR-0056](0056-multiple-units-of-measure.md), 2026-11-15): issue lines carry the line unit block: `quantity` as entered in any allowed unit of the component, `uom_id`, the snapshot and `inventory_quantity`, which the stock movement and the order line's progress use (rules 9, 17).
 
-    Note ([ADR-0074](0074-core-data-structure-additions.md), proposed 2026-11-19): the over-issue and component-scrap reason of a `production_issue_line` is `scrap_reason_id`, a reason of kind `scrap`, in place of the text `reason_code` (ADR-0074 rules 13, 14).
+    Note ([ADR-0074](0074-core-data-structure-additions.md), 2026-11-21): the over-issue and component-scrap reason of a `production_issue_line` is `scrap_reason_id`, a reason of kind `scrap`, in place of the text `reason_code` (ADR-0074 rules 13, 14).
 
 **Operations: confirmation and backflush**
 
@@ -211,13 +211,13 @@ It adds only what production needs:
 
     Note: one table holds every generated backflush line: the production-owned `operation_progress_component` (calling document type and ID, order component line, material document line). Confirmations, service receipts and backflush at receipt (rule 13) all write it. `operation_confirmation_component` and `production_receipt_component` are dropped; plans and traceability read the one table, and INV-112 covers every calling document (holistic review 2026-11-15, item P11).
 
-    Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): generated backflush lines carry the line unit block in the inventory unit (source `identity`), rounded up (rules 8, 9).
+    Note ([ADR-0056](0056-multiple-units-of-measure.md), 2026-11-15): generated backflush lines carry the line unit block in the inventory unit (source `identity`), rounded up (rules 8, 9).
 
-    Note ([ADR-0064](0064-production-agent.md), proposed 2026-11-15): the capture agent is the agent type `production_capture`: tainted, scope `subject` on one production order resolved from a trusted order number of an extraction of purpose `shop_floor_report`, quantities copied as stated, drafts only, a person posts. Confirmations carry `entry_source` (`person`, `capture_agent`, `production_import`) and get the yield, activity and duplicate checks of rule 22; a deterministic production import may post them as `integration` only behind `production.mes_import.auto_post` and the evidence of ADR-0043 rule 14 (rules 19, 22, 25).
+    Note ([ADR-0064](0064-production-agent.md), 2026-11-15): the capture agent is the agent type `production_capture`: tainted, scope `subject` on one production order resolved from a trusted order number of an extraction of purpose `shop_floor_report`, quantities copied as stated, drafts only, a person posts. Confirmations carry `entry_source` (`person`, `capture_agent`, `production_import`) and get the yield, activity and duplicate checks of rule 22; a deterministic production import may post them as `integration` only behind `production.mes_import.auto_post` and the evidence of ADR-0043 rule 14 (rules 19, 22, 25).
 
-    Note ([ADR-0071](0071-work-orders-and-shop-floor-execution.md), proposed 2026-11-17): a confirmation with yield and scrap 0 records time only; confirmations carry the execution `work_center_id`, link the time logs they take and store each activity's `proposed_quantity`; a final confirmation is refused while a setup or run log is open (`operation_time_log_open`) (ADR-0071 rules 2, 11, 16).
+    Note ([ADR-0071](0071-work-orders-and-shop-floor-execution.md), 2026-11-21): a confirmation with yield and scrap 0 records time only; confirmations carry the execution `work_center_id`, link the time logs they take and store each activity's `proposed_quantity`; a final confirmation is refused while a setup or run log is open (`operation_time_log_open`) (ADR-0071 rules 2, 11, 16).
 
-    Note ([ADR-0074](0074-core-data-structure-additions.md), proposed 2026-11-19): `scrap_reason_id` (kind `scrap`) replaces the text `scrap_reason_code` of `operation_confirmation` and `production_receipt`; a reason still needs a scrap quantity (ADR-0074 rule 14).
+    Note ([ADR-0074](0074-core-data-structure-additions.md), 2026-11-21): `scrap_reason_id` (kind `scrap`) replaces the text `scrap_reason_code` of `operation_confirmation` and `production_receipt`; a reason still needs a scrap quantity (ADR-0074 rule 14).
 
 **Output: receipt, inspection and make to order**
 
@@ -239,11 +239,11 @@ It adds only what production needs:
 
     Note: backflush at receipt writes its lines to `operation_progress_component`, keyed by the receipt, not to `production_receipt_component` (rule 12's note) (holistic review 2026-11-15, item P11).
 
-    Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): receipt lines carry the line unit block; the tolerance and progress compare inventory quantities (rules 9, 17).
+    Note ([ADR-0056](0056-multiple-units-of-measure.md), 2026-11-15): receipt lines carry the line unit block; the tolerance and progress compare inventory quantities (rules 9, 17).
 
-    Note ([ADR-0070](0070-quality-management-core.md), proposed 2026-11-17): "requires inspection" means that the product's `inspection_points` contains `production_output`. In-process lots come from operation confirmations of operations a released `in_process` plan names (ADR-0070 rules 2, 8).
+    Note ([ADR-0070](0070-quality-management-core.md), 2026-11-21): "requires inspection" means that the product's `inspection_points` contains `production_output`. In-process lots come from operation confirmations of operations a released `in_process` plan names (ADR-0070 rules 2, 8).
 
-    Note ([ADR-0071](0071-work-orders-and-shop-floor-execution.md), proposed 2026-11-17): on an order without internal operations a receipt may record `scrap_quantity` with a reason, alone or with lines (`receipt_scrap_not_allowed` otherwise); backflush at receipt then uses the share max(R / G, (R + S) / Q), today's rule when S = 0; the output bin is that of the last operation's execution work center (ADR-0071 rules 4, 16).
+    Note ([ADR-0071](0071-work-orders-and-shop-floor-execution.md), 2026-11-21): on an order without internal operations a receipt may record `scrap_quantity` with a reason, alone or with lines (`receipt_scrap_not_allowed` otherwise); backflush at receipt then uses the share max(R / G, (R + S) / Q), today's rule when S = 0; the output bin is that of the last operation's execution work center (ADR-0071 rules 4, 16).
 14. Make to order:
     - **The rule.** When `for_demand_supply_line_id` is set and that demand is in the same warehouse, `available` output is reserved for it, up to that demand's unreserved open quantity. Output in inspection is reserved when it is released: a `production` consumer of `WarehouseTaskConfirmed` runs the reservation (effect class `other`). Planning nets the line against this order through the supply link ([ADR-0036](0036-multi-level-mrp.md) rule 9).
     - **Status.** Interim, flagged: this automatic reservation is business behavior (open question).
@@ -274,7 +274,7 @@ It adds only what production needs:
 
     Note: registry flags. `production_order` and `production_issue` have `is_approval_hold_allowed: true`. `operation_confirmation` and `production_receipt` record facts on the floor and have `is_approval_hold_allowed: false`, so they never wait in a pool and a rank becomes `human_post` ([ADR-0043](0043-policy-and-approval.md) rule 10). Pools: `production_order` in `mo`, `production_issue` in `consumption` ([ADR-0055](0055-approval-pools-and-stages.md) rule 2's note) (holistic review 2026-11-15, item P12).
 
-    Note ([ADR-0064](0064-production-agent.md), proposed 2026-11-15): the production and capture agents are designed: agent types `production`, `production_capture` and `production_variance` (rule 1).
+    Note ([ADR-0064](0064-production-agent.md), 2026-11-15): the production and capture agents are designed: agent types `production`, `production_capture` and `production_variance` (rule 1).
 18. Events, permissions and queries:
     - **Events.** Beyond ADR-0009 rule 22's document events: `ProductionOrderCompleted` and `ProductionOrderReopened`. Reservations emit ADR-0023's events.
     - **Permissions.** Record scope for production documents uses `production_warehouse_id` as the warehouse dimension (ADR-0017 rule 9 gets a note). DS-15 adds a shop-floor role template. It is `shop_floor_lead` ([ADR-0054](0054-users-roles-and-authorizations.md) rule 11).
@@ -285,7 +285,7 @@ It adds only what production needs:
       - `ListWorkCenterLoad`.
       - `GetTraceability`.
 
-    Note ([ADR-0064](0064-production-agent.md), proposed 2026-11-15): the agent's queries: `ListComponentShortage`, `EvaluateProductionOrderRelease`, `GetProductionOrderUsageVariance`, `ListProductionOrderVarianceDriver` (`production`), `GetProductionOrderPegging` and `ListShortageResolutionCandidate` (`planning`); the daily job `RunProductionOrderCheck` raises the shortage, completion-candidate, stalled-order and standards items (rules 5–12).
+    Note ([ADR-0064](0064-production-agent.md), 2026-11-15): the agent's queries: `ListComponentShortage`, `EvaluateProductionOrderRelease`, `GetProductionOrderUsageVariance`, `ListProductionOrderVarianceDriver` (`production`), `GetProductionOrderPegging` and `ListShortageResolutionCandidate` (`planning`); the daily job `RunProductionOrderCheck` raises the shortage, completion-candidate, stalled-order and standards items (rules 5–12).
 
 **Locks, checks and later features**
 
@@ -317,7 +317,7 @@ It adds only what production needs:
     - co-product planning items;
     - labor time by clock events.
 
-    Note ([ADR-0071](0071-work-orders-and-shop-floor-execution.md), proposed 2026-11-17): labor time by clock events comes into Phase 1 in a minimal form: time logs that propose confirmation activities; costing still reads only confirmations (ADR-0071 rules 9–11).
+    Note ([ADR-0071](0071-work-orders-and-shop-floor-execution.md), 2026-11-21): labor time by clock events comes into Phase 1 in a minimal form: time logs that propose confirmation activities; costing still reads only confirmations (ADR-0071 rules 9–11).
 
 ## Context
 

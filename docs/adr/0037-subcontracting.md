@@ -119,6 +119,8 @@ Outsourced work runs on the production core:
 
     Note: `service_receipt` records the processor's delivery, a fact: `is_approval_hold_allowed: false`, so it reaches no approval pool and a rank becomes `human_post` ([ADR-0055](0055-approval-pools-and-stages.md) rule 2's note) (holistic review 2026-11-15, item P12).
 
+    Note (S2 open questions, 2026-11-21): build placement: subcontracting runs on the production core (step 4b) and on purchase orders and the service receipt of `purchasing` (step 5), and its planning rules (rules 2, 3) use the planning run of step 5b. It is therefore built in step 5b, after the gates of steps 4b and 5.
+
 ## Context
 
 Research note 01 describes subcontracting in SAP (special stock at the vendor, consumption at receipt, subsequent adjustment), Odoo (subcontracting bills of materials, resupply routes) and Dynamics 365 (service items on route operations). Research note 02 gives the Vietnamese accounting:

@@ -211,7 +211,7 @@ CREATE TABLE agent_type_setting (                          -- company data, chan
     agent_type_code       text NOT NULL REFERENCES agent_type (code),
     mode                  text NOT NULL DEFAULT 'off' CONSTRAINT ck_agent_type_setting_mode CHECK (mode IN ('off', 'shadow', 'assisted', 'active')),   -- active: ADR-0065 rule 11
     workflow_owner_id     uuid REFERENCES user_account (id),
-    -- budget values are setting_value rows of scope agent_type (rule 14 and 22 notes); no lowered_budget column
+    -- no budget columns: per-run ceilings are the declaration's, daily caps are company settings (ADR-0078 rule 7)
     promoted_version      text,
     promoted_seat_models  jsonb,                           -- (seat, model) pairs the evidence covered
     active_document_types text[],                          -- ADR-0065 rule 11: the document types whose drafts may pass the auto-post gateway as tainted drafts

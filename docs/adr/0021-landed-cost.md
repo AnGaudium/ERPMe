@@ -41,7 +41,7 @@ The customs declaration, supplier cost invoices and invoice price differences to
    - Customs or freight assessed before the goods receipt simply wait in clearing.
    - Goods received into a `transit` warehouse take the cost there. The inventory key follows the target's warehouse kind (`inventory_posting`, `inventory_in_transit_posting` or `inventory_goods_sent_posting`, ADR-0020 rule 1), and transfers carry it onward through costing.
 
-   Note ([ADR-0063](0063-configurable-policy-settings.md), proposed 2026-11-15): a purchase return carries its receipt's proportional share of allocated landed cost while `movement_type.purchase_return.include_landed_cost` reads true, the core default (rule 24).
+   Note ([ADR-0063](0063-configurable-policy-settings.md), 2026-11-15): a purchase return carries its receipt's proportional share of allocated landed cost while `movement_type.purchase_return.include_landed_cost` reads true, the core default (rule 24).
 
 **Allocation**
 
@@ -128,7 +128,7 @@ The customs declaration, supplier cost invoices and invoice price differences to
 
     Note: DS-26 defines the report format, and DS-19's report definitions place the lines of 33882, so both statements hold ([ADR-0049](0049-statutory-reporting-and-printing.md) rule 22).
 
-    Note ([ADR-0068](0068-sites-and-core-logistics-payment-master-data.md), proposed 2026-11-17): `ListExpectedLandedCost` lists goods receipts whose purchase Incoterm leaves main carriage or insurance to the buyer and that have no `freight` or `insurance` cost line. The close task shows the list next to the unallocated sources, as information that blocks nothing.
+    Note ([ADR-0068](0068-sites-and-core-logistics-payment-master-data.md), 2026-11-21): `ListExpectedLandedCost` lists goods receipts whose purchase Incoterm leaves main carriage or insurance to the buyer and that have no `freight` or `insurance` cost line. The close task shows the list next to the unallocated sources, as information that blocks nothing.
 15. DS-17 edge cases: landed cost after partial sale and after period close (existing); one declaration covering several receipts; customs assessed before the goods receipt.
 16. Open questions for the author:
     - the earlier-unlocked case (rule 6);
