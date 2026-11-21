@@ -530,6 +530,40 @@ def check_issue_returns():
               "prices, closing (quantity, value) and residuals as cost_period on all 10 examples", bad or len(examples)))
     return R
 
+def check_group_currency():
+    """The group-currency amount of costing lines (ADR-0020 rule 12 note of the chief architect, 2026-11-21; SAP's Material
+    Ledger computes prices in each currency from that currency's own amounts). Two areas linked by a transfer; amounts in
+    minor units. Company currency C; group currency G, translated per line at the rate of its own posting date: the opening
+    at 1/20, W1's receipt at 1/25, W2's receipt at 1/24, the issue from W1 at 1/25; the period-end rate is 1/26. The group
+    solve uses the same flows with group amounts; the independent recomputation is naive_iteration, its own code path.
+    Returns one (ok, name, detail)."""
+    def model(v0, r1, r2):
+        m = Model()
+        m.node("W1", 100, v0); m.node("W2", 0, 0)
+        m.purch["W1"].append((100, r1)); m.purch["W2"].append((50, r2))
+        m.transfers.append(("W1", "W2", 30))
+        m.issues_out.update({"W1": F(50), "W2": F(10)})
+        return m
+    mc = model(100000, 140000, 90000)                                    # company amounts
+    mg = model(F(100000, 20), F(140000, 25), F(90000, 24))               # each line translated at its own date's rate
+    pc, pg = mc.solve(), mg.solve()
+    ig = naive_iteration(mg)
+    vin, vout, _ = mg.check_conservation()
+    issue_c = 50 * 1000                                                   # the issue from W1 at the preliminary price 1,000
+    issue_g = F(issue_c, 25)                                              # its group amount at its posting date's rate
+    reval_g = 50 * pg["W1"] - issue_g                                     # group adjustment from the group solve
+    reval_c_retranslated = (50 * pc["W1"] - issue_c) / 26                 # the company adjustment retranslated (rejected)
+    ok = (pc == {"W1": 1200, "W2": 1575} and pg == {"W1": 53, "W2": F(267, 4)}
+          and all(pg[n] == ig[n] for n in pg) and vin == vout == 14350
+          and all(pg[n] != pc[n] / 26 for n in pg) and pg["W1"] / pc["W1"] != pg["W2"] / pc["W2"]
+          and reval_g == 650 and reval_c_retranslated != reval_g)
+    return (ok, "group currency: two areas linked by a transfer, rates moving in the period; the group solve gives W1 53 and "
+            "W2 66.75 per unit, equal to the naive iteration on group amounts, group value conserved (14,350 in = out); "
+            "retranslating the company averages 1,200 and 1,575 at the period-end rate 1/26 gives other values, and no single "
+            "rate maps both areas (53/1,200 vs 66.75/1,575); the issue's group revaluation is 650, not the retranslated company adjustment 10,000/26 (about 385)",
+            (pc, pg, reval_g, reval_c_retranslated))
+
+
 if __name__ == "__main__":
     m = Model()
     # stock nodes: (item, area)
@@ -560,7 +594,7 @@ if __name__ == "__main__":
     naive = naive_iteration(m)
     diff = max(abs(float(price[n] - naive[n])) for n in price)
     print("max |exact - iterated| =", diff)
-    rs = check_issue_returns()
+    rs = check_issue_returns() + [check_group_currency()]
     for ok, name, detail in rs:
         print(("PASS " if ok else "FAIL ") + name + " -- " + str(detail))
     raise SystemExit(0 if all(ok for ok, *_ in rs) else 1)
