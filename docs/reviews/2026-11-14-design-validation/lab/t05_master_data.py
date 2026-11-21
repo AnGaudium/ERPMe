@@ -59,7 +59,7 @@ X("insert into variant_attribute_value (id, company_id, variant_attribute_id, va
 X("insert into variant_attribute_value (id, company_id, variant_attribute_id, variant_mode, code, name, is_custom) values (%s,%s,%s,'line_option','text','Text',true)", (I["v_engr"], I["co"], I["attr_engr"]))
 X("insert into product_variant_attribute (company_id, product_id, variant_attribute_id, position) values (%s,%s,%s,1),(%s,%s,%s,2)", (I["co"], I["prod"], I["attr_color"], I["co"], I["prod"], I["attr_finish"]))
 X("insert into product_variant_attribute (company_id, product_id, variant_attribute_id, position, is_required) values (%s,%s,%s,3,false)", (I["co"], I["prod"], I["attr_engr"]))
-X("insert into product_attribute_value values (%s,%s,%s,%s),(%s,%s,%s,%s)", (I["co"], I["prod"], I["attr_finish"], I["v_matte"], I["co"], I["prod"], I["attr_finish"], I["v_gloss"]))
+X("insert into product_attribute_value values (uuidv7(), %s,%s,%s,%s),(uuidv7(), %s,%s,%s,%s)", (I["co"], I["prod"], I["attr_finish"], I["v_matte"], I["co"], I["prod"], I["attr_finish"], I["v_gloss"]))
 X("insert into item (id, company_id, product_id, code, variant_key, length, width, height, dimension_uom_id, net_weight, gross_weight, weight_uom_id)"
   " values (%s,%s,%s,'SKU-RED',%s,40,30,20,%s,1.2,1.5,%s)", (I["item1"], I["co"], I["prod"], sorted([I["v_red"]]), I["cm"], I["kg"]))
 X("insert into item_variant_value (company_id, item_id, product_id, variant_attribute_id, variant_attribute_value_id) values (%s,%s,%s,%s,%s)",
@@ -113,8 +113,8 @@ trial("M09 a valid variant value row is accepted", lambda cx: blue_item(cx, "att
 trial("M10 a variant value must belong to its attribute", lambda cx: blue_item(cx, "attr_color", "v_s"), True, "fk_item_variant_value_value")
 trial("M11 a variant value's attribute must be on the item's product", lambda cx: blue_item(cx, "attr_size", "v_s"), True, "fk_item_variant_value_product_attribute")
 trial("M12 a line-option value can never be an item's variant value", lambda cx: blue_item(cx, "attr_finish", "v_gloss"), True, "fk_item_variant_value_value")
-trial("M13 an allowed value needs its attribute on the product", lambda cx: cx.execute("insert into product_attribute_value values (%s,%s,%s,%s)", (I["co"], I["prod"], I["attr_size"], I["v_s"])), True, "fk_product_attribute_value_attribute")
-trial("M14 an allowed value must belong to its attribute", lambda cx: cx.execute("insert into product_attribute_value values (%s,%s,%s,%s)", (I["co"], I["prod"], I["attr_finish"], I["v_red"])), True, "fk_product_attribute_value_value")
+trial("M13 an allowed value needs its attribute on the product", lambda cx: cx.execute("insert into product_attribute_value values (uuidv7(), %s,%s,%s,%s)", (I["co"], I["prod"], I["attr_size"], I["v_s"])), True, "fk_product_attribute_value_attribute")
+trial("M14 an allowed value must belong to its attribute", lambda cx: cx.execute("insert into product_attribute_value values (uuidv7(), %s,%s,%s,%s)", (I["co"], I["prod"], I["attr_finish"], I["v_red"])), True, "fk_product_attribute_value_value")
 trial("M15 only a line-option value may ask for custom text", lambda cx: cx.execute("insert into variant_attribute_value (id, company_id, variant_attribute_id, variant_mode, code, name, is_custom) values (%s,%s,%s,'variant','c','C',true)", (new(), I["co"], I["attr_color"])), True, "ck_variant_attribute_value_custom")
 trial("M16 a value must carry its attribute's mode", lambda cx: cx.execute("insert into variant_attribute_value (id, company_id, variant_attribute_id, variant_mode, code, name) values (%s,%s,%s,'line_option','c','C')", (new(), I["co"], I["attr_color"])), True, "fk_variant_attribute_value_attribute")
 trial("M17 an attribute's mode cannot change once it has values", lambda cx: cx.execute("update variant_attribute set variant_mode='line_option' where id=%s", (I["attr_color"],)), True, "fk_variant_attribute_value_attribute")

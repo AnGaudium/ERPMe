@@ -11,16 +11,16 @@
 -- (DS-22-09-42-commercial-inventory.sql). The labs that load this file without DS-05 keep lab stubs for the five DS-05 tables.
 -- IDs of journal rows come from context.new_id (ADR-0014 rule 14), so there are no ID defaults.
 -- Owner module of each table in brackets on its CREATE TABLE line (ADR-0022 rules 2, 7).
--- recorded_at convention (D13, ADR-0007 rules 9, 16): every table has recorded_at timestamptz NOT NULL DEFAULT now(); a table
--- whose rows are updated in place also gets the trigger trg_<table>_set_recorded_at, BEFORE UPDATE, which runs the shared
--- function set_recorded_at(), so recorded_at is the instant of the last write. Append-only tables need no trigger. The labs
--- load subsets of the design files, so every file that attaches the trigger defines the function itself, with
--- CREATE OR REPLACE, before its first use.
-CREATE OR REPLACE FUNCTION set_recorded_at() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
-BEGIN
-    NEW.recorded_at := now();
-    RETURN NEW;
-END $$;
+-- recorded_at convention (D13, ADR-0007 rules 9, 16): every table of every design file has recorded_at timestamptz NOT NULL
+-- DEFAULT now(); a table whose rows are updated in place also gets the trigger trg_<table>_set_recorded_at, BEFORE UPDATE,
+-- which runs the shared function set_recorded_at(), so recorded_at is the instant of the last write. Append-only tables
+-- (a guard trigger refuses every update outside an erasure, or a pure log) need no trigger. The last section of each design
+-- file defines the function with CREATE OR REPLACE (the labs load subsets of the files) and attaches the trigger in one DO
+-- block to every table of the file except its listed append-only tables (S2 schema phase B; lab schema_phase_b.py writes it,
+-- gen_overview.py --check verifies it).
+-- Key convention (ADR-0006 rule 1 and its note of 2026-11-21): every table's primary key is the single column id uuid; a former
+-- natural or composite key is the named unique constraint uq_<table>_<columns> (uq_<table>_key where that name would exceed
+-- 63 bytes), and foreign keys to it keep working. Only currency and incoterm (E1) keep their natural code key.
 
 -- ADR-0027 rules 3 and 5: company, branch, cost_center and project are owned by master_data and defined in
 -- DS-20-master-data.sql (ADR-0045); the lab loads both files together. derivation_trace is owned by ledger.
@@ -32,7 +32,7 @@ CREATE TABLE derivation_trace (                            -- [ledger] ADR-0027 
     inputs        jsonb NOT NULL,   -- typed references: {kind, table, id or key, effective_from}
     steps         jsonb NOT NULL,   -- ordered intermediate values as exact decimal or rational strings
     result        jsonb NOT NULL,
-    recorded_at   timestamptz NOT NULL,
+    recorded_at   timestamptz NOT NULL DEFAULT now(),
     command_id    uuid NOT NULL,    -- the command request id (ADR-0008)
     UNIQUE (company_id, id)         -- target of company-composite references (journal_entry.business_unit_trace_id)
 );
@@ -66,8 +66,6 @@ CREATE TABLE system_account (                              -- [ledger] ADR-0010 
     CONSTRAINT ck_system_account_bilateral CHECK (NOT is_bilateral OR control_kind IN ('receivable', 'payable')),   -- rule 6
     CONSTRAINT ck_system_account_control_kind_leaf CHECK (control_kind = 'none' OR is_postable)   -- control kinds only on leaves (rule 16)
 );
-CREATE TRIGGER trg_system_account_set_recorded_at BEFORE UPDATE ON system_account
-    FOR EACH ROW EXECUTE FUNCTION set_recorded_at();
 
 -- ===== Transaction keys [ledger] (ADR-0015 rules 1-4; ADR-0027 rule 11; catalog docs/catalogs/transaction-keys.csv) =====
 -- Global catalog loaded like system_account; id = uuid5(..., 'transaction_key:<code>') (ADR-0006 rule 4; ADR-0015 rule 1).
@@ -88,8 +86,6 @@ CREATE TABLE transaction_key (                             -- [ledger] ADR-0015 
     meaning                   text NOT NULL,
     recorded_at               timestamptz NOT NULL DEFAULT now()
 );
-CREATE TRIGGER trg_transaction_key_set_recorded_at BEFORE UPDATE ON transaction_key
-    FOR EACH ROW EXECUTE FUNCTION set_recorded_at();
 
 -- ===== Operational accounts [ledger] (ADR-0010 rules 5, 10-12; ADR-0035 rule 7) =====
 -- Company data; row-level security in the last section (ADR-0017 rule 19; ADR-0022 rule 8).
@@ -135,8 +131,6 @@ END $$;
 CREATE TRIGGER trg_account_posted_immutable
     BEFORE UPDATE ON nativeflows.account
     FOR EACH ROW EXECUTE FUNCTION nativeflows.account_check_posted_immutable();
-CREATE TRIGGER trg_account_set_recorded_at BEFORE UPDATE ON account
-    FOR EACH ROW EXECUTE FUNCTION set_recorded_at();
 
 -- ===== Applied rates [ledger] (ADR-0011 rules 3, 9-10, 12; ADR-0048 rule 12) =====
 -- One conversion that journal lines used; the lines of one document share it (rule 3). Written at posting (rule 1) and
@@ -170,6 +164,7 @@ CREATE TABLE cost_object (                                 -- [production] ADR-0
     production_order_id  uuid,   -- FK to production_order (ADR-0034), added by DS-43-54-planning-production.sql
     cost_center_id       uuid REFERENCES cost_center (id),
     state                text NOT NULL DEFAULT 'open' CONSTRAINT ck_cost_object_state CHECK (state IN ('open', 'closed')),
+    recorded_at          timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, code),
     CONSTRAINT uq_cost_object_company_id_id_production_order_id UNIQUE (company_id, id, production_order_id),   -- an order's cost_object_id names the cost object that names it (DS-43-54)
     CONSTRAINT ck_cost_object_kind_reference CHECK ((kind = 'production_order') = (production_order_id IS NOT NULL)
@@ -182,6 +177,7 @@ CREATE TABLE fixed_asset (                                 -- [ledger] ADR-0025 
     company_id  uuid NOT NULL REFERENCES company (id),
     code        text NOT NULL,
     name        text NOT NULL,
+    recorded_at timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, code)
 );
 -- Both are under row-level security (last section; ADR-0022 rule 8).
@@ -204,8 +200,8 @@ CREATE TABLE journal_entry (                               -- [ledger] ADR-0014 
     document_id                  uuid        NOT NULL REFERENCES document (id),
     posting_date                 date        NOT NULL,
     document_date                date        NOT NULL,
-    posting_period_id            uuid        NOT NULL REFERENCES posting_period (id),
-    fiscal_year_id               uuid        NOT NULL REFERENCES fiscal_year (id),
+    posting_period_id            uuid        NOT NULL,
+    fiscal_year_id               uuid        NOT NULL,
     is_closing_entry             boolean     NOT NULL DEFAULT false,
     close_task_id                uuid        REFERENCES close_task (id),
     database_transaction_number  xid8        NOT NULL,
@@ -214,7 +210,9 @@ CREATE TABLE journal_entry (                               -- [ledger] ADR-0014 
     note                         text CONSTRAINT ck_journal_entry_note CHECK (note IS NULL OR char_length(note) <= 4000),   -- copied from the document's header note at posting (ADR-0074 rule 17)
     recorded_at                  timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT uq_journal_entry_document_id UNIQUE (document_id),
-    FOREIGN KEY (company_id, business_unit_trace_id) REFERENCES derivation_trace (company_id, id)   -- the trace is of the entry's company (ADR-0069 rule 12)
+    FOREIGN KEY (company_id, business_unit_trace_id) REFERENCES derivation_trace (company_id, id),   -- the trace is of the entry's company (ADR-0069 rule 12)
+    FOREIGN KEY (company_id, posting_period_id) REFERENCES posting_period (company_id, id),   -- company key (S2 schema phase B)
+    FOREIGN KEY (company_id, fiscal_year_id) REFERENCES fiscal_year (company_id, id)   -- company key (S2 schema phase B)
 );
 
 CREATE INDEX ix_journal_entry_company_id_posting_date
@@ -230,6 +228,7 @@ CREATE TABLE payment_term (                                -- [ledger] ADR-0026 
     code        text NOT NULL,
     name        text NOT NULL,
     is_active   boolean NOT NULL DEFAULT true,
+    recorded_at timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, code)
 );
 CREATE TABLE payment_term_line (                           -- [ledger] ADR-0026 rule 5
@@ -242,13 +241,14 @@ CREATE TABLE payment_term_line (                           -- [ledger] ADR-0026 
     due_date_base    text NOT NULL CONSTRAINT ck_payment_term_line_due_date_base CHECK (due_date_base IN ('document_date', 'end_of_month')),
     discount_percent types.percent,
     discount_days    integer,
+    recorded_at      timestamptz NOT NULL DEFAULT now(),
     UNIQUE (payment_term_id, line_number)
 );
 CREATE TABLE open_item (                                   -- [ledger] ADR-0026 rule 1
     id                          uuid PRIMARY KEY,
     company_id                  uuid NOT NULL REFERENCES company (id),
     partner_id                  uuid NOT NULL REFERENCES partner (id),
-    account_id                  uuid NOT NULL REFERENCES account (id),
+    account_id                  uuid NOT NULL,
     open_item_kind              text NOT NULL CONSTRAINT ck_open_item_open_item_kind CHECK (open_item_kind IN ('invoice', 'credit', 'advance', 'payment_on_account', 'loan', 'other')),
     natural_side                text NOT NULL CONSTRAINT ck_open_item_natural_side CHECK (natural_side IN ('debit', 'credit')),
     transaction_currency        text NOT NULL REFERENCES currency (code),
@@ -276,12 +276,14 @@ CREATE TABLE open_item (                                   -- [ledger] ADR-0026 
     is_reversed                 boolean NOT NULL DEFAULT false,
     last_settlement_date        date,
     predecessor_open_item_id    uuid REFERENCES open_item (id),
+    recorded_at                 timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT ck_open_item_due_date CHECK ((open_item_kind IN ('invoice', 'credit') AND due_date IS NOT NULL)
                                            OR (open_item_kind IN ('advance', 'payment_on_account', 'loan') AND due_date IS NULL)
                                            OR open_item_kind = 'other'),
     -- Amounts are signed like journal amounts (debit positive); comparisons use magnitudes (ADR-0026 rule 1 note).
     CONSTRAINT ck_open_item_original_transaction_amount CHECK (sign(original_transaction_amount) = CASE natural_side WHEN 'debit' THEN 1 ELSE -1 END),
-    CONSTRAINT ck_open_item_is_settled CHECK (NOT is_settled OR (open_transaction_amount = 0 AND open_company_amount = 0 AND coalesce(open_group_amount, 0) = 0))
+    CONSTRAINT ck_open_item_is_settled CHECK (NOT is_settled OR (open_transaction_amount = 0 AND open_company_amount = 0 AND coalesce(open_group_amount, 0) = 0)),
+    FOREIGN KEY (company_id, account_id) REFERENCES account (company_id, id)   -- company key (S2 schema phase B)
 );
 CREATE INDEX ix_open_item_company_id_partner_id ON open_item (company_id, partner_id) WHERE NOT is_settled AND NOT is_reversed;
 CREATE INDEX ix_open_item_company_id_account_id ON open_item (company_id, account_id) WHERE NOT is_settled AND NOT is_reversed;
@@ -293,10 +295,10 @@ CREATE TABLE journal_line (                                -- [ledger] ADR-0014 
     journal_entry_id           uuid          NOT NULL REFERENCES journal_entry (id),
     company_id                 uuid          NOT NULL REFERENCES company (id),
     line_number                integer       NOT NULL,
-    posting_period_id          uuid          NOT NULL REFERENCES posting_period (id),
+    posting_period_id          uuid          NOT NULL,
     posting_date               date          NOT NULL,     -- copied from the entry at insert (ADR-0014 rule 5 note, 2026-11-21; INV-99)
-    fiscal_year_id             uuid          NOT NULL REFERENCES fiscal_year (id),   -- copied from the entry at insert (as posting_date)
-    account_id                 uuid          NOT NULL REFERENCES account (id),
+    fiscal_year_id             uuid          NOT NULL,   -- copied from the entry at insert (as posting_date)
+    account_id                 uuid          NOT NULL,
     system_account_id          uuid          NOT NULL REFERENCES system_account (id),
     transaction_key_id         uuid          REFERENCES transaction_key (id),
     side                       text          NOT NULL,
@@ -339,7 +341,10 @@ CREATE TABLE journal_line (                                -- [ledger] ADR-0014 
     -- Rule 6: transaction and company amounts never have opposite signs.
     CONSTRAINT ck_journal_line_same_sign
         CHECK (transaction_amount = 0 OR company_amount = 0
-               OR sign(transaction_amount) = sign(company_amount))
+               OR sign(transaction_amount) = sign(company_amount)),
+    FOREIGN KEY (company_id, posting_period_id) REFERENCES posting_period (company_id, id),   -- company key (S2 schema phase B)
+    FOREIGN KEY (company_id, fiscal_year_id) REFERENCES fiscal_year (company_id, id),   -- company key (S2 schema phase B)
+    FOREIGN KEY (company_id, account_id) REFERENCES account (company_id, id)   -- company key (S2 schema phase B)
 );
 
 CREATE INDEX ix_journal_line_company_id_account_id_posting_period_id
@@ -575,8 +580,8 @@ CREATE CONSTRAINT TRIGGER trg_journal_entry_balance
 CREATE TABLE account_period_balance (                      -- [ledger] ADR-0014 rule 18
     id                           uuid          PRIMARY KEY,
     company_id                   uuid          NOT NULL REFERENCES company (id),
-    account_id                   uuid          NOT NULL REFERENCES account (id),
-    posting_period_id            uuid          NOT NULL REFERENCES posting_period (id),
+    account_id                   uuid          NOT NULL,
+    posting_period_id            uuid          NOT NULL,
     transaction_currency         text          NOT NULL REFERENCES currency (code),
     is_closing_entry             boolean       NOT NULL,
     transaction_debit_turnover   types.amount  NOT NULL,
@@ -591,7 +596,9 @@ CREATE TABLE account_period_balance (                      -- [ledger] ADR-0014 
     recorded_at                  timestamptz   NOT NULL DEFAULT now(),
     -- Named by hand: the convention name would exceed 63 bytes (ADR-0004 rule 6).
     CONSTRAINT uq_account_period_balance_key
-        UNIQUE (company_id, account_id, posting_period_id, transaction_currency, is_closing_entry)
+        UNIQUE (company_id, account_id, posting_period_id, transaction_currency, is_closing_entry),
+    FOREIGN KEY (company_id, account_id) REFERENCES account (company_id, id),   -- company key (S2 schema phase B)
+    FOREIGN KEY (company_id, posting_period_id) REFERENCES posting_period (company_id, id)   -- company key (S2 schema phase B)
 );
 
 -- ADR-0044 rule 10; ADR-0049 rule 14: year-to-date turnover before a mid-year cut-over, non-posting, read by statutory
@@ -601,14 +608,15 @@ CREATE TABLE account_period_balance (                      -- [ledger] ADR-0014 
 CREATE TABLE opening_turnover (                            -- [ledger] ADR-0044 rule 10
     id                       uuid          PRIMARY KEY,
     company_id               uuid          NOT NULL REFERENCES company (id),
-    account_id               uuid          NOT NULL REFERENCES account (id),
+    account_id               uuid          NOT NULL,
     start_date               date          NOT NULL,
     end_date                 date          NOT NULL,      -- the migration's opening_date
     company_debit_turnover   types.amount  NOT NULL,
     company_credit_turnover  types.amount  NOT NULL,
     recorded_at              timestamptz   NOT NULL DEFAULT now(),
     CONSTRAINT uq_opening_turnover_company_id_account_id_start_date UNIQUE (company_id, account_id, start_date),
-    CONSTRAINT ck_opening_turnover_dates CHECK (start_date <= end_date)
+    CONSTRAINT ck_opening_turnover_dates CHECK (start_date <= end_date),
+    FOREIGN KEY (company_id, account_id) REFERENCES account (company_id, id)   -- company key (S2 schema phase B)
 );
 
 -- ADR-0026 rule 3: the cycle open_item <-> journal_line is closed by a deferred foreign key.
@@ -663,3 +671,32 @@ BEGIN
     END LOOP;
 END
 $$;
+
+-- ===== recorded_at on update (D13; ADR-0007 rules 9, 16 and the rule 16 note) =====
+-- Every table of this file has recorded_at timestamptz NOT NULL DEFAULT now(). The DO block attaches the trigger
+-- trg_<table>_set_recorded_at (BEFORE UPDATE, function set_recorded_at) to every table of v_tables except v_append_only,
+-- so recorded_at is the instant of the last write (D8). Append-only tables are those whose guard trigger refuses every
+-- update outside an erasure, and pure logs; they need no trigger (here: journal_reject_change, pure log).
+-- Guards on in-place tables sort before set_recorded_at, so they compare rows before it runs. v_tables lists the file's
+-- tables in file order; lab gen_overview.py --check verifies both lists against the table definitions of the file, and
+-- schema_phase_b.py writes the section. The function is defined in every file because the labs load subsets.
+CREATE OR REPLACE FUNCTION set_recorded_at() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
+BEGIN
+    NEW.recorded_at := now();
+    RETURN NEW;
+END $$;
+DO $$
+DECLARE
+    v_tables       text[] := ARRAY['derivation_trace', 'system_account', 'transaction_key', 'account', 'applied_rate', 'cost_object', 'fixed_asset',
+        'subledger_activation', 'journal_entry', 'payment_term', 'payment_term_line', 'open_item', 'journal_line',
+        'account_period_balance', 'opening_turnover'];
+    v_append_only  text[] := ARRAY['derivation_trace', 'journal_entry', 'journal_line', 'subledger_activation']::text[];
+    v_table        text;
+BEGIN
+    FOREACH v_table IN ARRAY v_tables LOOP
+        CONTINUE WHEN v_table = ANY (v_append_only) OR to_regclass(v_table) IS NULL;
+        EXECUTE format('CREATE OR REPLACE TRIGGER %I BEFORE UPDATE ON %I FOR EACH ROW EXECUTE FUNCTION set_recorded_at()',
+                       'trg_' || v_table || '_set_recorded_at', v_table);
+    END LOOP;
+END $$;
+-- ===== end of recorded_at on update =====

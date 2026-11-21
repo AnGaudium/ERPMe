@@ -689,7 +689,7 @@ EV = new()
 X("""insert into outbox_event (id, company_id, event_type, schema_version, subject_table, subject_id, subject_sequence, payload, actor_kind, actor_id,
      business_date, command_type, causation_chain_id, causation_depth, recorded_at) values (%s,%s,'BankStatementImported',1,'bank_statement',%s,1,'{}','human',%s,%s,'ImportBankStatement',%s,0,now())""",
   (EV, I["co"], ST, I["uChief"], TODAY, new()))
-X("insert into event_subject values ('bank_statement',%s,1,now())", (ST,))
+X("insert into event_subject values (uuidv7(), 'bank_statement',%s,1,now())", (ST,))
 X("""insert into event_delivery (id, consumer, event_id, subject_table, subject_id, subject_sequence, company_id, next_attempt_at, recorded_at)
      values (%s,'cash_bank_matching',%s,'bank_statement',%s,1,%s,now(),now())""", (new(), EV, ST, I["co"]))
 check("H01 an event and its delivery are written (ADR-0013 rules 2, 6)", X("select count(*) from event_delivery where event_id=%s", (EV,)).fetchone()[0] == 1)

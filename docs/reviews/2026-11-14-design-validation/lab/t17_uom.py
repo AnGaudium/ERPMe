@@ -1032,10 +1032,10 @@ if "--load" in sys.argv:
         left join lateral (
           select u.numerator, u.denominator, case when u.item_id is null then 'product' else 'item' end as lvl
             from product_uom u
-           where u.product_id = i.product_id and u.uom_id = l.uom_id and u.recorded_at <= l.recorded_at
+           where u.product_id = i.product_id and u.uom_id = l.uom_id and u.created_at <= l.recorded_at
              and (u.retired_at is null or u.retired_at > l.recorded_at)
              and (u.item_id = l.item_id or (u.item_id is null and not exists (
-                   select 1 from product_uom x where x.product_id = i.product_id and x.uom_id = l.uom_id and x.item_id = l.item_id and x.recorded_at <= l.recorded_at)))
+                   select 1 from product_uom x where x.product_id = i.product_id and x.uom_id = l.uom_id and x.item_id = l.item_id and x.created_at <= l.recorded_at)))
            order by (u.item_id is null) limit 1) r on true
        where l.src in ('item', 'product') and l.quantity_placeholder
          and not coalesce(l.s_uom = l.uom_id and l.s_n = l.n and l.s_d = l.d, false)

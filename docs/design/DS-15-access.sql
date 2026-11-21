@@ -35,6 +35,7 @@ CREATE TABLE user_account (                                -- personal data (spe
     created_at            timestamptz NOT NULL,
     disabled_at           timestamptz,
     erased_at             timestamptz,                         -- personal fields replaced by a token (ADR-0019 rule 10)
+    recorded_at           timestamptz NOT NULL DEFAULT now(),
     UNIQUE (oidc_issuer, oidc_subject),
     CONSTRAINT ck_user_account_login CHECK (login = lower(login) AND length(login) BETWEEN 3 AND 254),
     CONSTRAINT ck_user_account_oidc CHECK ((oidc_issuer IS NULL) = (oidc_subject IS NULL)),
@@ -52,6 +53,7 @@ CREATE TABLE user_session (                                -- server-side sessio
     last_seen_at         timestamptz NOT NULL,
     absolute_expires_at  timestamptz NOT NULL,
     revoked_at           timestamptz,
+    recorded_at          timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT ck_user_session_expiry CHECK (absolute_expires_at > created_at)
 );
 CREATE INDEX ix_user_session_user_account_id ON user_session (user_account_id);
@@ -65,6 +67,7 @@ CREATE TABLE credential_reset (                            -- one-time password 
     expires_at          timestamptz NOT NULL,
     used_at             timestamptz,
     voided_at           timestamptz,                         -- a newer reset was consumed, or the user became shared (rule 3)
+    recorded_at         timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT ck_credential_reset_expiry CHECK (expires_at > created_at AND expires_at <= created_at + interval '24 hours'),
     CONSTRAINT ck_credential_reset_once CHECK (used_at IS NULL OR voided_at IS NULL)
 );
@@ -73,7 +76,8 @@ CREATE TABLE integration_client (                          -- ADR-0017 rules 1, 
     code                 text NOT NULL UNIQUE,
     name                 text NOT NULL,
     accountable_user_id  uuid NOT NULL REFERENCES user_account (id),
-    is_active            boolean NOT NULL DEFAULT true
+    is_active            boolean NOT NULL DEFAULT true,
+    recorded_at          timestamptz NOT NULL DEFAULT now()
 );
 CREATE TABLE integration_token (                           -- stored only as a hash, at most one year (ADR-0017 rule 3)
     id                     uuid PRIMARY KEY,
@@ -82,14 +86,17 @@ CREATE TABLE integration_token (                           -- stored only as a h
     created_at             timestamptz NOT NULL,
     expires_at             timestamptz NOT NULL,
     revoked_at             timestamptz,
+    recorded_at            timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT ck_integration_token_expiry CHECK (expires_at > created_at AND expires_at <= created_at + interval '1 year')
 );
 CREATE TABLE installation_role_assignment (                -- ADR-0017 rule 7
+    id                  uuid PRIMARY KEY,
     user_account_id     uuid NOT NULL REFERENCES user_account (id),
     role                text NOT NULL CONSTRAINT ck_installation_role_assignment_role CHECK (role IN ('operator')),
     granted_by_user_id  uuid REFERENCES user_account (id),     -- null only for the bootstrap operator
     granted_at          timestamptz NOT NULL,
-    PRIMARY KEY (user_account_id, role)
+    recorded_at         timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_installation_role_assignment_user_account_id_role UNIQUE (user_account_id, role)
 );
 
 -- ===== Organization for access [master_data] (ADR-0054 rule 6) =====
@@ -101,6 +108,7 @@ CREATE TABLE department (
     parent_id           uuid,                                -- a tree; cycles refused by the command (department_cycle)
     manager_partner_id  uuid,                                -- an active employee (command check)
     is_active           boolean NOT NULL DEFAULT true,
+    recorded_at         timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, code),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, parent_id) REFERENCES department (company_id, id),
@@ -114,15 +122,18 @@ CREATE TABLE team (
     name           text NOT NULL,
     department_id  uuid,
     is_active      boolean NOT NULL DEFAULT true,
+    recorded_at    timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, code),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, department_id) REFERENCES department (company_id, id)
 );
 CREATE TABLE team_member (                                 -- employee partners (command check: active employee role)
+    id          uuid PRIMARY KEY,
     company_id  uuid NOT NULL,
     team_id     uuid NOT NULL,
     partner_id  uuid NOT NULL,
-    PRIMARY KEY (team_id, partner_id),
+    recorded_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_team_member_team_id_partner_id UNIQUE (team_id, partner_id),
     FOREIGN KEY (company_id, team_id) REFERENCES team (company_id, id),
     FOREIGN KEY (company_id, partner_id) REFERENCES partner (company_id, id)
 );
@@ -142,6 +153,7 @@ CREATE TABLE role (
     registry_version            text NOT NULL,                 -- the registry the stored expansion was computed from
     expansion_hash              text NOT NULL,                 -- SHA-256 of the stored sorted permission list (INV-220)
     is_active                   boolean NOT NULL DEFAULT true,
+    recorded_at                 timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, code),
     UNIQUE (company_id, id),
     CONSTRAINT ck_role_suggested_owner_scope CHECK ((suggested_owner_scope_read, suggested_owner_scope_edit) IN (
@@ -150,20 +162,24 @@ CREATE TABLE role (
         ('company', 'own'), ('company', 'team'), ('company', 'department'), ('company', 'branch'), ('company', 'company')))
 );
 CREATE TABLE role_level (                                  -- one level per node of the area tree; inherited downward
+    id                  uuid PRIMARY KEY,
     company_id          uuid NOT NULL,
     role_id             uuid NOT NULL,
     authorization_area  text NOT NULL,                       -- a node code of authorization-areas.csv
     level               text NOT NULL CONSTRAINT ck_role_level_level CHECK (level IN ('none', 'read', 'edit', 'post', 'full')),
     can_approve         boolean NOT NULL DEFAULT false,
-    PRIMARY KEY (role_id, authorization_area),
+    recorded_at         timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_role_level_role_id_authorization_area UNIQUE (role_id, authorization_area),
     FOREIGN KEY (company_id, role_id) REFERENCES role (company_id, id),
     CONSTRAINT ck_role_level_approve CHECK (NOT can_approve OR level <> 'none')
 );
 CREATE TABLE role_permission (                             -- the expansion minus holds in force, read by the dispatcher (ADR-0054 rule 9)
+    id          uuid PRIMARY KEY,
     company_id  uuid NOT NULL,
     role_id     uuid NOT NULL,
     permission  text NOT NULL,                               -- a command type, query or capability name
-    PRIMARY KEY (role_id, permission),
+    recorded_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_role_permission_role_id_permission UNIQUE (role_id, permission),
     FOREIGN KEY (company_id, role_id) REFERENCES role (company_id, id)
 );
 -- A permission an upgrade would have added but that would break segregation mode block or the small-company bound
@@ -180,6 +196,7 @@ CREATE TABLE role_permission_hold (
     created_at          timestamptz NOT NULL,
     decided_by_user_id  uuid REFERENCES user_account (id),   -- null for held, and for ended by the system
     decided_at          timestamptz,
+    recorded_at         timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, role_id) REFERENCES role (company_id, id),
     CONSTRAINT ck_role_permission_hold_decided CHECK ((state = 'held') = (decided_at IS NULL)),
@@ -211,6 +228,7 @@ CREATE TABLE user_invitation (
     expires_at          timestamptz,                         -- pending invitations only: created_at + invitation_expiry_days
     decided_by_user_id  uuid REFERENCES user_account (id),
     decided_at          timestamptz,
+    recorded_at         timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     CONSTRAINT ck_user_invitation_expiry CHECK (is_new_account OR (expires_at IS NOT NULL AND expires_at > created_at)),
     CONSTRAINT ck_user_invitation_new CHECK (NOT is_new_account OR state = 'confirmed'),
@@ -235,6 +253,7 @@ CREATE TABLE role_assignment (
     valid_to               date,                               -- inclusive; null is open (ADR-0027 rule 12)
     granted_by_user_id     uuid REFERENCES user_account (id),  -- null only for the bootstrap owner (ADR-0017 rule 7)
     user_invitation_id     uuid,                               -- in force only when null or confirmed (ADR-0054 rules 3, 12)
+    recorded_at            timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, role_id) REFERENCES role (company_id, id),
     FOREIGN KEY (company_id, user_invitation_id) REFERENCES user_invitation (company_id, id),
@@ -257,10 +276,12 @@ CREATE INDEX ix_role_assignment_role_id ON role_assignment (role_id);
 -- Record scope: a branch or a warehouse per row; none means the whole company (ADR-0017 rule 9). Owner scope branch
 -- needs at least one row and company none: a command rule and INV-221, since it spans rows.
 CREATE TABLE role_assignment_scope (
+    id                  uuid PRIMARY KEY,
     company_id          uuid NOT NULL,
     role_assignment_id  uuid NOT NULL,
     branch_id           uuid,
     warehouse_id        uuid,
+    recorded_at         timestamptz NOT NULL DEFAULT now(),
     FOREIGN KEY (company_id, role_assignment_id) REFERENCES role_assignment (company_id, id),
     FOREIGN KEY (company_id, branch_id) REFERENCES branch (company_id, id),
     FOREIGN KEY (company_id, warehouse_id) REFERENCES warehouse (company_id, id),
@@ -280,6 +301,7 @@ CREATE TABLE delegation (
     reason              text NOT NULL,
     state               text NOT NULL DEFAULT 'active' CONSTRAINT ck_delegation_state CHECK (state IN ('active', 'canceled')),
     created_by_user_id  uuid NOT NULL REFERENCES user_account (id),
+    recorded_at         timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     CONSTRAINT ck_delegation_not_self CHECK (delegator_user_id <> substitute_user_id),
     CONSTRAINT ck_delegation_dates CHECK (end_date >= start_date AND end_date - start_date <= 365)
@@ -288,11 +310,13 @@ CREATE INDEX ix_delegation_substitute_user_id ON delegation (substitute_user_id)
 
 -- ===== Segregation of duties [permissions] (ADR-0054 rules 17-20) =====
 CREATE TABLE company_segregation_rule (                    -- enablement of segregation-rules.csv rows
+    id          uuid PRIMARY KEY,
     company_id  uuid NOT NULL REFERENCES company (id),
     rule_code   text NOT NULL,
     is_enabled  boolean NOT NULL DEFAULT true,
     basis       jsonb NOT NULL,
-    PRIMARY KEY (company_id, rule_code)
+    recorded_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_company_segregation_rule_company_id_rule_code UNIQUE (company_id, rule_code)
 );
 CREATE TABLE segregation_exception (                       -- small-company mode only; immutable (ADR-0054 rule 20)
     id                   uuid PRIMARY KEY,
@@ -304,17 +328,20 @@ CREATE TABLE segregation_exception (                       -- small-company mode
     document_id          uuid NOT NULL,
     related_document_id  uuid,
     audit_record_id      uuid NOT NULL,
-    recorded_at          timestamptz NOT NULL,
+    recorded_at          timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT ck_segregation_exception_rule CHECK ((kind = 'pair') = (rule_code IS NOT NULL))
 );
 CREATE INDEX ix_segregation_exception_company_recorded ON segregation_exception (company_id, recorded_at);
 CREATE TABLE segregation_review (                          -- one per posting period with exceptions, by ConfirmSegregationReview
+    id                    uuid PRIMARY KEY,
     company_id            uuid NOT NULL REFERENCES company (id),
-    posting_period_id     uuid NOT NULL REFERENCES posting_period (id),
+    posting_period_id     uuid NOT NULL,
     exception_count       integer NOT NULL CONSTRAINT ck_segregation_review_count CHECK (exception_count >= 0),
     confirmed_by_user_id  uuid NOT NULL REFERENCES user_account (id),
     confirmed_at          timestamptz NOT NULL,
-    PRIMARY KEY (company_id, posting_period_id)
+    recorded_at           timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_segregation_review_company_id_posting_period_id UNIQUE (company_id, posting_period_id),
+    FOREIGN KEY (company_id, posting_period_id) REFERENCES posting_period (company_id, id)   -- company key (S2 schema phase B)
 );
 
 -- ===== Approval pools and stages [policy] (ADR-0055 rules 1-4) =====
@@ -327,18 +354,21 @@ CREATE TABLE approval_pool (
     name        text NOT NULL,
     basis       jsonb NOT NULL,
     is_active   boolean NOT NULL DEFAULT true,
+    recorded_at timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, code),
     UNIQUE (company_id, id)
 );
 -- Selector: position 0 is the one default row per document type; conditional rows (position >= 1) name a boolean
 -- policy input of that type and are tried in position order (ADR-0055 rule 3).
 CREATE TABLE approval_pool_document_type (
+    id                uuid PRIMARY KEY,   -- uq_approval_pool_document_type_key named by hand: the convention name would exceed 63 bytes (ADR-0004 rule 6)
     company_id        uuid NOT NULL,
     document_type     text NOT NULL,
     position          smallint NOT NULL CONSTRAINT ck_approval_pool_document_type_position CHECK (position >= 0),
     condition_input   text,
     approval_pool_id  uuid NOT NULL,
-    PRIMARY KEY (company_id, document_type, position),
+    recorded_at       timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_approval_pool_document_type_key UNIQUE (company_id, document_type, position),
     FOREIGN KEY (company_id, approval_pool_id) REFERENCES approval_pool (company_id, id),
     CONSTRAINT ck_approval_pool_document_type_default CHECK ((position = 0) = (condition_input IS NULL))
 );
@@ -355,6 +385,7 @@ CREATE TABLE approval_stage (
     escalation_role_id   uuid,
     due_days             smallint NOT NULL DEFAULT 2 CONSTRAINT ck_approval_stage_due_days CHECK (due_days BETWEEN 1 AND 90),
     is_active            boolean NOT NULL DEFAULT true,
+    recorded_at          timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     UNIQUE (approval_pool_id, sequence),
     UNIQUE (approval_pool_id, code),
@@ -362,12 +393,14 @@ CREATE TABLE approval_stage (
     FOREIGN KEY (company_id, escalation_role_id) REFERENCES role (company_id, id)
 );
 CREATE TABLE approval_stage_member (
+    id                 uuid PRIMARY KEY,
     company_id         uuid NOT NULL,
     approval_stage_id  uuid NOT NULL,
     member_kind        text NOT NULL CONSTRAINT ck_approval_stage_member_kind CHECK (member_kind IN ('user', 'role')),
     user_account_id    uuid REFERENCES user_account (id),
     role_id            uuid,
     position           smallint CONSTRAINT ck_approval_stage_member_position CHECK (position IS NULL OR position >= 1),   -- the stage's order top to bottom; null sorts last (ADR-0076 rule 6)
+    recorded_at        timestamptz NOT NULL DEFAULT now(),
     FOREIGN KEY (company_id, approval_stage_id) REFERENCES approval_stage (company_id, id),
     FOREIGN KEY (company_id, role_id) REFERENCES role (company_id, id),
     CONSTRAINT ck_approval_stage_member_target CHECK ((member_kind = 'user') = (user_account_id IS NOT NULL) AND (member_kind = 'role') = (role_id IS NOT NULL))
@@ -387,3 +420,34 @@ ALTER TABLE employee_profile ADD CONSTRAINT fk_employee_profile_department FOREI
 --   work_item (DS-29, ADR-0042 rule 2): owner_kind gains 'approval_stage'; owner_approval_stage_id uuid, a composite key
 --     to approval_stage, set exactly when owner_kind is approval_stage (ADR-0055 rule 12).
 --   audit_record (DS-36, ADR-0038 rule 2): delegated_from_user_id (ADR-0054 rule 21).
+
+-- ===== recorded_at on update (D13; ADR-0007 rules 9, 16 and the rule 16 note) =====
+-- Every table of this file has recorded_at timestamptz NOT NULL DEFAULT now(). The DO block attaches the trigger
+-- trg_<table>_set_recorded_at (BEFORE UPDATE, function set_recorded_at) to every table of v_tables except v_append_only,
+-- so recorded_at is the instant of the last write (D8). Append-only tables are those whose guard trigger refuses every
+-- update outside an erasure, and pure logs; they need no trigger.
+-- Guards on in-place tables sort before set_recorded_at, so they compare rows before it runs. v_tables lists the file's
+-- tables in file order; lab gen_overview.py --check verifies both lists against the table definitions of the file, and
+-- schema_phase_b.py writes the section. The function is defined in every file because the labs load subsets.
+CREATE OR REPLACE FUNCTION set_recorded_at() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
+BEGIN
+    NEW.recorded_at := now();
+    RETURN NEW;
+END $$;
+DO $$
+DECLARE
+    v_tables       text[] := ARRAY['user_account', 'user_session', 'credential_reset', 'integration_client', 'integration_token',
+        'installation_role_assignment', 'department', 'team', 'team_member', 'role', 'role_level', 'role_permission',
+        'role_permission_hold', 'user_invitation', 'role_assignment', 'role_assignment_scope', 'delegation',
+        'company_segregation_rule', 'segregation_exception', 'segregation_review', 'approval_pool',
+        'approval_pool_document_type', 'approval_stage', 'approval_stage_member'];
+    v_append_only  text[] := ARRAY[]::text[];
+    v_table        text;
+BEGIN
+    FOREACH v_table IN ARRAY v_tables LOOP
+        CONTINUE WHEN v_table = ANY (v_append_only) OR to_regclass(v_table) IS NULL;
+        EXECUTE format('CREATE OR REPLACE TRIGGER %I BEFORE UPDATE ON %I FOR EACH ROW EXECUTE FUNCTION set_recorded_at()',
+                       'trg_' || v_table || '_set_recorded_at', v_table);
+    END LOOP;
+END $$;
+-- ===== end of recorded_at on update =====

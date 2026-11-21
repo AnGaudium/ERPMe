@@ -50,7 +50,7 @@ CREATE TABLE analysis_question (                           -- the subject of an 
     asked_at                   timestamptz NOT NULL,
     answered_at                timestamptz,                -- when the run closed the question, whatever its state
     erased_at                  timestamptz,                -- question text and note blanked by retention or erasure (rule 21)
-    recorded_at                timestamptz NOT NULL,
+    recorded_at                timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, agent_run_id) REFERENCES agent_run (company_id, id),
     -- states: open has nothing; answered has the answered outcome; abstained has an abstention, not_applicable or
@@ -101,7 +101,7 @@ CREATE TABLE saved_analysis (                              -- company data, chan
     latest_version    integer NOT NULL CONSTRAINT ck_saved_analysis_latest_version CHECK (latest_version >= 1),
     verified_version  integer,                             -- the released version in force (ReleaseSavedAnalysis); key below
     owner_user_id     uuid NOT NULL REFERENCES user_account (id),
-    recorded_at       timestamptz NOT NULL,
+    recorded_at       timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     UNIQUE (company_id, id, kind),
     CONSTRAINT uq_saved_analysis_code UNIQUE (company_id, code),
@@ -135,7 +135,7 @@ CREATE TABLE saved_analysis_version (                      -- immutable once rel
     released_by_user_id    uuid REFERENCES user_account (id),
     released_at            timestamptz,
     is_self_released       boolean NOT NULL DEFAULT false, -- released by its author, allowed only in small-company mode (rule 26)
-    recorded_at            timestamptz NOT NULL,
+    recorded_at            timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     CONSTRAINT uq_saved_analysis_version_version UNIQUE (company_id, saved_analysis_id, version),
     FOREIGN KEY (company_id, saved_analysis_id, kind) REFERENCES saved_analysis (company_id, id, kind),
@@ -191,7 +191,7 @@ CREATE TABLE analysis_example (                            -- company data, chan
     released_by_user_id         uuid REFERENCES user_account (id),
     released_at                 timestamptz,
     is_self_released            boolean NOT NULL DEFAULT false,
-    recorded_at                 timestamptz NOT NULL,
+    recorded_at                 timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     CONSTRAINT uq_analysis_example_version UNIQUE (company_id, normalized_question, language, version),
     FOREIGN KEY (company_id, origin_analysis_question_id) REFERENCES analysis_question (company_id, id),
@@ -294,3 +294,30 @@ BEGIN
     END LOOP;
 END
 $$;
+
+-- ===== recorded_at on update (D13; ADR-0007 rules 9, 16 and the rule 16 note) =====
+-- Every table of this file has recorded_at timestamptz NOT NULL DEFAULT now(). The DO block attaches the trigger
+-- trg_<table>_set_recorded_at (BEFORE UPDATE, function set_recorded_at) to every table of v_tables except v_append_only,
+-- so recorded_at is the instant of the last write (D8). Append-only tables are those whose guard trigger refuses every
+-- update outside an erasure, and pure logs; they need no trigger.
+-- Guards on in-place tables sort before set_recorded_at, so they compare rows before it runs. v_tables lists the file's
+-- tables in file order; lab gen_overview.py --check verifies both lists against the table definitions of the file, and
+-- schema_phase_b.py writes the section. The function is defined in every file because the labs load subsets.
+CREATE OR REPLACE FUNCTION set_recorded_at() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
+BEGIN
+    NEW.recorded_at := now();
+    RETURN NEW;
+END $$;
+DO $$
+DECLARE
+    v_tables       text[] := ARRAY['analysis_question', 'saved_analysis', 'saved_analysis_version', 'analysis_example'];
+    v_append_only  text[] := ARRAY[]::text[];
+    v_table        text;
+BEGIN
+    FOREACH v_table IN ARRAY v_tables LOOP
+        CONTINUE WHEN v_table = ANY (v_append_only) OR to_regclass(v_table) IS NULL;
+        EXECUTE format('CREATE OR REPLACE TRIGGER %I BEFORE UPDATE ON %I FOR EACH ROW EXECUTE FUNCTION set_recorded_at()',
+                       'trg_' || v_table || '_set_recorded_at', v_table);
+    END LOOP;
+END $$;
+-- ===== end of recorded_at on update =====

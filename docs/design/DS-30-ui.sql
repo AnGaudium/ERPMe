@@ -31,7 +31,7 @@ CREATE TABLE assist_request (                              -- the subject of an 
     requested_at         timestamptz NOT NULL,
     answered_at          timestamptz,
     erased_at            timestamptz,                          -- request text blanked by retention or erasure
-    recorded_at          timestamptz NOT NULL,
+    recorded_at          timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     UNIQUE (company_id, requested_by_user_id, id),
     FOREIGN KEY (company_id, agent_run_id) REFERENCES agent_run (company_id, id),
@@ -60,7 +60,7 @@ CREATE TABLE list_variant (                                -- a saved view of on
     grouping             jsonb NOT NULL DEFAULT '[]',          -- result field names
     is_default           boolean NOT NULL DEFAULT false,       -- the owner's (personal) or the role's (shared) default for the query
     state                text NOT NULL DEFAULT 'active' CONSTRAINT ck_list_variant_state CHECK (state IN ('active', 'deleted')),
-    recorded_at          timestamptz NOT NULL,
+    recorded_at          timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, shared_role_id) REFERENCES role (company_id, id),
     CONSTRAINT ck_list_variant_shapes CHECK (jsonb_typeof(filters) = 'object' AND jsonb_typeof(columns) = 'array'
@@ -84,3 +84,30 @@ BEGIN
     END LOOP;
 END
 $$;
+
+-- ===== recorded_at on update (D13; ADR-0007 rules 9, 16 and the rule 16 note) =====
+-- Every table of this file has recorded_at timestamptz NOT NULL DEFAULT now(). The DO block attaches the trigger
+-- trg_<table>_set_recorded_at (BEFORE UPDATE, function set_recorded_at) to every table of v_tables except v_append_only,
+-- so recorded_at is the instant of the last write (D8). Append-only tables are those whose guard trigger refuses every
+-- update outside an erasure, and pure logs; they need no trigger.
+-- Guards on in-place tables sort before set_recorded_at, so they compare rows before it runs. v_tables lists the file's
+-- tables in file order; lab gen_overview.py --check verifies both lists against the table definitions of the file, and
+-- schema_phase_b.py writes the section. The function is defined in every file because the labs load subsets.
+CREATE OR REPLACE FUNCTION set_recorded_at() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
+BEGIN
+    NEW.recorded_at := now();
+    RETURN NEW;
+END $$;
+DO $$
+DECLARE
+    v_tables       text[] := ARRAY['assist_request', 'list_variant'];
+    v_append_only  text[] := ARRAY[]::text[];
+    v_table        text;
+BEGIN
+    FOREACH v_table IN ARRAY v_tables LOOP
+        CONTINUE WHEN v_table = ANY (v_append_only) OR to_regclass(v_table) IS NULL;
+        EXECUTE format('CREATE OR REPLACE TRIGGER %I BEFORE UPDATE ON %I FOR EACH ROW EXECUTE FUNCTION set_recorded_at()',
+                       'trg_' || v_table || '_set_recorded_at', v_table);
+    END LOOP;
+END $$;
+-- ===== end of recorded_at on update =====

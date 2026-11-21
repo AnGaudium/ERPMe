@@ -23,6 +23,9 @@ Module: from load_all import load_all; load_all(dsn, docs_dir) -> int
 Reloading: the tables already in schema nativeflows are dropped in batches of DROP_BATCH, each in its own transaction, before
 the stubs drop the schema, so no transaction needs more locks than max_locks_per_transaction allows.
 
+After the DDL, the lab-only stand-in for the command layer of S2 schema phase B runs: lab.id_default_shim_sql() gives
+id the default uuidv7() on the tables that gained it in phase B, whose fixtures insert without an id (lab README).
+
 Tables of DS-05-platform.sql get FORCE ROW LEVEL SECURITY; a role without BYPASSRLS (or not the superuser) must set
 nativeflows.company_id before it reads or writes them (ADR-0017 rule 19).
 """
@@ -204,6 +207,9 @@ def load_all(dsn, docs_dir):
                         cx.execute(stmt)
                     except psycopg.Error as e:
                         raise SystemExit(f"{where}: {str(e).splitlines()[0]}") from None
+        with cx.transaction():                             # lab-only id default of S2 schema phase B (lab.py, README)
+            from lab import id_default_shim_sql
+            cx.execute(id_default_shim_sql())
         return cx.execute("select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace"
                           " where n.nspname = 'nativeflows' and c.relkind in ('r', 'p')").fetchone()[0]
 

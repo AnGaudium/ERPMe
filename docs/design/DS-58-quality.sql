@@ -31,7 +31,7 @@ CREATE TABLE sampling_procedure (                          -- [quality] ADR-0070
     sample_quantity types.quantity CONSTRAINT ck_sampling_procedure_sample_quantity CHECK (sample_quantity > 0),   -- inventory units, fixed_quantity only
     sample_percent  types.percent CONSTRAINT ck_sampling_procedure_sample_percent CHECK (sample_percent > 0 AND sample_percent <= 100),
     is_active       boolean NOT NULL DEFAULT true,
-    recorded_at     timestamptz NOT NULL,
+    recorded_at     timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, code),
     UNIQUE (company_id, id),
     CONSTRAINT ck_sampling_procedure_parameters CHECK ((kind = 'fixed_quantity') = (sample_quantity IS NOT NULL)
@@ -48,7 +48,7 @@ CREATE TABLE inspection_plan (                             -- [quality] ADR-0070
     site_id           uuid,                                    -- optional; selection prefers a plan of the lot's site (rule 4)
     operation_number  integer CONSTRAINT ck_inspection_plan_operation_number CHECK (operation_number > 0),   -- in_process plans of an item only
     is_active         boolean NOT NULL DEFAULT true,
-    recorded_at       timestamptz NOT NULL,
+    recorded_at       timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, code),
     UNIQUE (company_id, id),
     UNIQUE NULLS NOT DISTINCT (company_id, item_id, item_group_id, inspection_point, site_id, operation_number),
@@ -71,7 +71,7 @@ CREATE TABLE inspection_plan_revision (                    -- [quality] ADR-0070
     content_hash            text CONSTRAINT ck_inspection_plan_revision_content_hash CHECK (content_hash ~ '^[0-9a-f]{64}$'),
     released_at             timestamptz,
     copy_from_revision_id   uuid,
-    recorded_at             timestamptz NOT NULL,
+    recorded_at             timestamptz NOT NULL DEFAULT now(),
     UNIQUE (inspection_plan_id, revision),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, inspection_plan_id) REFERENCES inspection_plan (company_id, id),
@@ -97,7 +97,7 @@ CREATE TABLE inspection_characteristic (                   -- [quality] ADR-0070
     passing_result_codes          text[],
     is_required                   boolean NOT NULL DEFAULT true,
     is_recorded_per_unit          boolean NOT NULL DEFAULT false,   -- one result per sample unit, else one summary result
-    recorded_at                   timestamptz NOT NULL,
+    recorded_at                   timestamptz NOT NULL DEFAULT now(),
     UNIQUE (inspection_plan_revision_id, position),
     UNIQUE (inspection_plan_revision_id, code),
     UNIQUE (company_id, id),
@@ -118,7 +118,7 @@ CREATE TABLE defect_code (                                 -- [quality] ADR-0070
     name         text NOT NULL,
     severity     text NOT NULL CONSTRAINT ck_defect_code_severity CHECK (severity IN ('critical', 'major', 'minor')),
     is_active    boolean NOT NULL DEFAULT true,
-    recorded_at  timestamptz NOT NULL,
+    recorded_at  timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, code),
     UNIQUE (company_id, id)
 );
@@ -144,7 +144,7 @@ CREATE TABLE inspection_lot (                              -- [quality] ADR-0070
     operation_number              integer CONSTRAINT ck_inspection_lot_operation_number CHECK (operation_number > 0),
     outcome                       text CONSTRAINT ck_inspection_lot_outcome CHECK (outcome IN ('accepted', 'accepted_with_deviation', 'rejected')),
     deviation_reason              text,
-    recorded_at                   timestamptz NOT NULL,
+    recorded_at                   timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     UNIQUE (company_id, id, inspection_plan_revision_id),   -- results carry the lot's revision through it
     FOREIGN KEY (company_id, id) REFERENCES document (company_id, id),
@@ -179,7 +179,7 @@ CREATE TABLE inspection_lot_line (                         -- [quality] ADR-0070
     serial_number_id    uuid REFERENCES serial_number (id),
     reason_id           uuid,                                -- only for scrap (kind scrap) and return_to_supplier (kind return); required while documents.reason_required.scrap or .return is true (ADR-0074 rule 22); the executor copies it to the draft it creates (rule 15)
     reason_kind         text CONSTRAINT ck_inspection_lot_line_reason_kind CHECK (reason_kind IN ('scrap', 'return')),
-    recorded_at         timestamptz NOT NULL,
+    recorded_at         timestamptz NOT NULL DEFAULT now(),
     UNIQUE (inspection_lot_id, line_number),
     UNIQUE (company_id, id),
     UNIQUE (company_id, id, disposition),
@@ -200,7 +200,7 @@ CREATE TABLE inspection_lot_execution (                    -- [quality] ADR-0070
     target_id                uuid NOT NULL,              -- polymorphic; created with this client ID in the same batch
     state                    text NOT NULL DEFAULT 'created' CONSTRAINT ck_inspection_lot_execution_state CHECK (state IN ('created', 'done', 'canceled')),
     done_quantity            types.quantity CONSTRAINT ck_inspection_lot_execution_done_quantity CHECK (done_quantity >= 0),
-    recorded_at              timestamptz NOT NULL,       -- the last write
+    recorded_at              timestamptz NOT NULL DEFAULT now(),       -- the last write
     UNIQUE (company_id, id),
     UNIQUE (target_table, target_id),
     CONSTRAINT fk_inspection_lot_execution_line FOREIGN KEY (company_id, inspection_lot_line_id, disposition) REFERENCES inspection_lot_line (company_id, id, disposition),
@@ -241,7 +241,7 @@ CREATE TABLE inspection_result (                           -- [quality] ADR-0070
     supersedes_result_id          uuid,
     confirmed_by_user_id          uuid REFERENCES user_account (id),
     confirmed_at                  timestamptz,
-    recorded_at                   timestamptz NOT NULL,
+    recorded_at                   timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     UNIQUE (company_id, id, inspection_lot_id, inspection_characteristic_id),
     CONSTRAINT fk_inspection_result_lot FOREIGN KEY (company_id, inspection_lot_id, inspection_plan_revision_id) REFERENCES inspection_lot (company_id, id, inspection_plan_revision_id),
@@ -298,7 +298,7 @@ CREATE TABLE nonconformance (                              -- [quality] ADR-0070
     close_note                  text,
     cancel_reason               text,
     version                     integer NOT NULL DEFAULT 1,
-    recorded_at                 timestamptz NOT NULL,
+    recorded_at                 timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, defect_code_id) REFERENCES defect_code (company_id, id),
     FOREIGN KEY (company_id, item_id) REFERENCES item (company_id, id),
@@ -337,3 +337,31 @@ BEGIN
     END LOOP;
 END
 $$;
+
+-- ===== recorded_at on update (D13; ADR-0007 rules 9, 16 and the rule 16 note) =====
+-- Every table of this file has recorded_at timestamptz NOT NULL DEFAULT now(). The DO block attaches the trigger
+-- trg_<table>_set_recorded_at (BEFORE UPDATE, function set_recorded_at) to every table of v_tables except v_append_only,
+-- so recorded_at is the instant of the last write (D8). Append-only tables are those whose guard trigger refuses every
+-- update outside an erasure, and pure logs; they need no trigger.
+-- Guards on in-place tables sort before set_recorded_at, so they compare rows before it runs. v_tables lists the file's
+-- tables in file order; lab gen_overview.py --check verifies both lists against the table definitions of the file, and
+-- schema_phase_b.py writes the section. The function is defined in every file because the labs load subsets.
+CREATE OR REPLACE FUNCTION set_recorded_at() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
+BEGIN
+    NEW.recorded_at := now();
+    RETURN NEW;
+END $$;
+DO $$
+DECLARE
+    v_tables       text[] := ARRAY['sampling_procedure', 'inspection_plan', 'inspection_plan_revision', 'inspection_characteristic', 'defect_code',
+        'inspection_lot', 'inspection_lot_line', 'inspection_lot_execution', 'inspection_result', 'nonconformance'];
+    v_append_only  text[] := ARRAY[]::text[];
+    v_table        text;
+BEGIN
+    FOREACH v_table IN ARRAY v_tables LOOP
+        CONTINUE WHEN v_table = ANY (v_append_only) OR to_regclass(v_table) IS NULL;
+        EXECUTE format('CREATE OR REPLACE TRIGGER %I BEFORE UPDATE ON %I FOR EACH ROW EXECUTE FUNCTION set_recorded_at()',
+                       'trg_' || v_table || '_set_recorded_at', v_table);
+    END LOOP;
+END $$;
+-- ===== end of recorded_at on update =====

@@ -28,7 +28,7 @@ Event types named in backticks in the ADRs, recognised by the event forms of the
 | `DocumentExtractionVerified` | `document_extraction` | attachments | `certificate_result_drafter`, a consumer in `purchasing` | ADR-0057:242, ADR-0057:270, ADR-0057:311 (+1) |
 | `ExtractionFieldCorrected` | `extraction_field` | attachments | — | ADR-0057:241, ADR-0057:248, ADR-0057:311 |
 | `ForecastCompleted` | — | — | — | ADR-0024:286 |
-| `GoodsReceiptPosted` | `goods_receipt` | inventory | `inspection_lot_creator` | ADR-0004:7, ADR-0004:61, ADR-0009:106 (+4) |
+| `GoodsReceiptPosted` | `goods_receipt` | inventory | `inspection_lot_creator` | ADR-0004:7, ADR-0004:63, ADR-0009:106 (+4) |
 | `InboundMessageRecorded` | `inbound_message` | crm | a consumer in `crm` | ADR-0052:373, ADR-0057:255 |
 | `InspectionLotApproved` | `inspection_lot` | quality | `usage_decision_executor` | ADR-0070:140 |
 | `InspectionLotExecutionRecorded` | `inspection_lot_execution` | quality | — | ADR-0070:178 |
@@ -109,7 +109,7 @@ Event types named in backticks in the ADRs, recognised by the event forms of the
 | `WorkItemAssigned` | `work_item` | work | `messaging_fanout` | ADR-0042:150, ADR-0042:156, ADR-0076:51 (+1) |
 | `WorkItemCanceled` | `work_item` | work | — | ADR-0042:150 |
 | `WorkItemClaimed` | `work_item` | work | — | ADR-0042:150 |
-| `WorkItemRaised` | `work_item` | work | `agent_wake_up`, `messaging_fanout`, `work_case_opener` | ADR-0004:60, ADR-0013:56, ADR-0042:61 (+10) |
+| `WorkItemRaised` | `work_item` | work | `agent_wake_up`, `messaging_fanout`, `work_case_opener` | ADR-0004:62, ADR-0013:56, ADR-0042:61 (+10) |
 | `WorkItemResolved` | `work_item` | work | — | ADR-0042:150 |
 | `WorkItemUnclaimed` | `work_item` | work | — | ADR-0042:109, ADR-0042:150 |
 

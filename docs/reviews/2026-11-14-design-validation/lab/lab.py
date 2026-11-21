@@ -53,3 +53,41 @@ def ins_area_state(X, company_id, posting_period_id, area, state):
 def entry_dates(cx, journal_entry_id):
     """posting_date and fiscal_year_id a journal line copies from its entry (ADR-0014 rule 5 note; INV-99)."""
     return cx.execute("select posting_date, fiscal_year_id from journal_entry where id = %s", (journal_entry_id,)).fetchone()
+
+
+# Lab-only stand-in for the command layer (S2 schema phase B). The 87 tables below gained the primary key id in phase B,
+# with no default, because the command layer supplies UUIDv7 IDs (ADR-0006 rule 2). Their lab fixtures predate the key and
+# insert without an id, so after loading, load_all.py and load_ds06.py give id the default uuidv7() on these tables (the
+# ones the load defines). The design DDL never has this default (barcode's, for rows database code writes, is in the DDL).
+PHASE_B_ID_TABLES = (
+    "change_proposal_execution_item", "event_subject", "event_consumer", "open_item_collection",
+    "installation_role_assignment", "team_member", "role_level", "role_permission", "role_assignment_scope",
+    "company_segregation_rule", "segregation_review", "approval_pool_document_type", "approval_stage_member",
+    "company_currency_activation", "working_calendar_holiday", "data_translation", "partner_role", "customer_profile",
+    "supplier_profile", "employee_profile", "product_variant_attribute", "product_attribute_value", "item_variant_value",
+    "product_classification", "external_id_map", "document_line_price_step", "document_line_custom_text",
+    "document_installment", "automation_scope_skip", "configuration_state", "decision_table_row", "parameter_set_value",
+    "setting_definition", "setting_preset", "setting_preset_item", "extension_point", "public_mail_domain",
+    "interaction_content", "interaction_match_candidate", "complaint_document", "data_subject_request_content",
+    "outbound_message_content", "outbound_message_recipient", "outbound_message_delivery_recipient", "partner_search_key",
+    "extraction_word", "extraction_rule_run", "extraction_confirmation", "extraction_result_link", "planning_setting",
+    "planning_state", "production_structure", "supplier_purchasing_term", "supplier_item_lead_time", "sales_history",
+    "demand_event_window", "forecast_line", "work_center_activity", "routing_operation_activity", "item_production_setting",
+    "item_low_level_code", "planned_order_operation", "replenishment_request_line", "production_order_operation_activity",
+    "operation_execution", "production_order_output_serial", "operation_confirmation_activity",
+    "operation_confirmation_time_log", "costing_sheet_row", "costing_sheet_base_member", "site_costing_sheet",
+    "cost_estimate_line", "cost_estimate_sheet_row", "cost_estimate_gap", "activity_rate", "pool_allocation_rule",
+    "normal_capacity", "production_cost_settlement_line", "production_order_period_cost",
+    "production_order_period_cost_detail", "configuration_table_column", "configuration_table_row", "configuration_default",
+    "product_configuration_value", "conversation_member", "message_mention", "notification_preference",
+)
+
+
+def id_default_shim_sql():
+    """SQL that sets DEFAULT uuidv7() on the id of each loaded table of PHASE_B_ID_TABLES; runs with search_path nativeflows."""
+    names = ", ".join(f"'{t}'" for t in PHASE_B_ID_TABLES)
+    return ("DO $$\nDECLARE v_table text;\nBEGIN\n"
+            f"    FOREACH v_table IN ARRAY ARRAY[{names}] LOOP\n"
+            "        CONTINUE WHEN to_regclass('nativeflows.' || v_table) IS NULL;\n"
+            "        EXECUTE format('ALTER TABLE nativeflows.%I ALTER COLUMN id SET DEFAULT uuidv7()', v_table);\n"
+            "    END LOOP;\nEND $$;\n")

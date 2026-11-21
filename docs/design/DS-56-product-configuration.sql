@@ -16,6 +16,7 @@ CREATE TABLE configuration_model (
     code        text NOT NULL,
     name        text NOT NULL,
     is_active   boolean NOT NULL DEFAULT true,
+    recorded_at timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, code),
     UNIQUE (company_id, id, product_id),
     FOREIGN KEY (company_id, product_id) REFERENCES product (company_id, id)
@@ -33,6 +34,7 @@ CREATE TABLE configuration_model_revision (
     content_hash             text,                                  -- set at release
     released_at              timestamptz,
     copy_from_revision_id    uuid,
+    recorded_at              timestamptz NOT NULL DEFAULT now(),
     UNIQUE (configuration_model_id, revision),
     UNIQUE (company_id, id),
     UNIQUE (company_id, id, product_id),
@@ -53,6 +55,7 @@ CREATE TABLE configuration_rule (                           -- ADR-0046 rule 6
     target_attribute_id               uuid,
     effect                            jsonb NOT NULL DEFAULT '{}',   -- restrict: {"values": [...]} or {"min": n, "max": n}; set: {"value": v}
     message_code                      text NOT NULL,
+    recorded_at                       timestamptz NOT NULL DEFAULT now(),
     UNIQUE (configuration_model_revision_id, position) DEFERRABLE INITIALLY DEFERRED,
     FOREIGN KEY (company_id, configuration_model_revision_id, product_id) REFERENCES configuration_model_revision (company_id, id, product_id),
     FOREIGN KEY (product_id, target_attribute_id) REFERENCES product_variant_attribute (product_id, variant_attribute_id),
@@ -64,31 +67,37 @@ CREATE TABLE configuration_table (                          -- ADR-0046 rule 7
     configuration_model_revision_id   uuid NOT NULL,
     product_id                        uuid NOT NULL,
     code                              text NOT NULL,
+    recorded_at                       timestamptz NOT NULL DEFAULT now(),
     UNIQUE (configuration_model_revision_id, code),
     UNIQUE (company_id, id, product_id),
     FOREIGN KEY (company_id, configuration_model_revision_id, product_id) REFERENCES configuration_model_revision (company_id, id, product_id)
 );
 CREATE TABLE configuration_table_column (
+    id                      uuid PRIMARY KEY,   -- uq_configuration_table_column_key named by hand: the convention name would exceed 63 bytes (ADR-0004 rule 6)
     company_id              uuid NOT NULL,
     configuration_table_id  uuid NOT NULL,
     product_id              uuid NOT NULL,
     column_number           integer NOT NULL CONSTRAINT ck_configuration_table_column_number CHECK (column_number > 0),
     variant_attribute_id    uuid NOT NULL,
-    PRIMARY KEY (configuration_table_id, column_number),
+    recorded_at             timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_configuration_table_column_key UNIQUE (configuration_table_id, column_number),
     UNIQUE (configuration_table_id, variant_attribute_id),
     FOREIGN KEY (company_id, configuration_table_id, product_id) REFERENCES configuration_table (company_id, id, product_id),
     FOREIGN KEY (product_id, variant_attribute_id) REFERENCES product_variant_attribute (product_id, variant_attribute_id)
 );
 CREATE TABLE configuration_table_row (
+    id                      uuid PRIMARY KEY,
     company_id              uuid NOT NULL,
     configuration_table_id  uuid NOT NULL,
     product_id              uuid NOT NULL,
     row_number              integer NOT NULL,
     cells                   jsonb NOT NULL CONSTRAINT ck_configuration_table_row_cells CHECK (jsonb_typeof(cells) = 'array'),   -- by column_number: a code, a number, "*" or {"min": n, "max": n}
-    PRIMARY KEY (configuration_table_id, row_number),
+    recorded_at             timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_configuration_table_row_configuration_table_id_row_number UNIQUE (configuration_table_id, row_number),
     FOREIGN KEY (company_id, configuration_table_id, product_id) REFERENCES configuration_table (company_id, id, product_id)
 );
 CREATE TABLE configuration_default (                        -- ADR-0046 rule 8
+    id                                uuid PRIMARY KEY,   -- uq_configuration_default_key named by hand: the convention name would exceed 63 bytes (ADR-0004 rule 6)
     company_id                        uuid NOT NULL,
     configuration_model_revision_id   uuid NOT NULL,
     product_id                        uuid NOT NULL,
@@ -96,7 +105,8 @@ CREATE TABLE configuration_default (                        -- ADR-0046 rule 8
     target_attribute_id               uuid NOT NULL,
     value                             jsonb NOT NULL,             -- a value code or a number
     condition                         jsonb NOT NULL DEFAULT '{}',
-    PRIMARY KEY (configuration_model_revision_id, position) DEFERRABLE INITIALLY DEFERRED,
+    recorded_at                       timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_configuration_default_key UNIQUE (configuration_model_revision_id, position) DEFERRABLE INITIALLY DEFERRED,
     FOREIGN KEY (company_id, configuration_model_revision_id, product_id) REFERENCES configuration_model_revision (company_id, id, product_id),
     FOREIGN KEY (product_id, target_attribute_id) REFERENCES product_variant_attribute (product_id, variant_attribute_id)
 );
@@ -109,12 +119,14 @@ CREATE TABLE product_configuration (                        -- immutable, conten
     content_hash  text NOT NULL CONSTRAINT ck_product_configuration_hash CHECK (content_hash ~ '^[0-9a-f]{64}$'),
     created_at    timestamptz NOT NULL,
     created_xact_id  xid8 NOT NULL DEFAULT pg_current_xact_id(),   -- the top-level transaction, also inside savepoints
+    recorded_at   timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, product_id, content_hash),
     UNIQUE (company_id, id),
     UNIQUE (company_id, id, product_id),
     FOREIGN KEY (company_id, product_id) REFERENCES product (company_id, id)
 );
 CREATE TABLE product_configuration_value (
+    id                          uuid PRIMARY KEY,   -- uq_product_configuration_value_key named by hand: the convention name would exceed 63 bytes (ADR-0004 rule 6)
     company_id                  uuid NOT NULL,
     product_configuration_id    uuid NOT NULL,
     product_id                  uuid NOT NULL,
@@ -122,7 +134,8 @@ CREATE TABLE product_configuration_value (
     value_type                  text NOT NULL,
     variant_attribute_value_id  uuid,                             -- list values
     numeric_value               types.quantity,                   -- numbers, in both modes; value rows appear only with items (ADR-0046 rule 11)
-    PRIMARY KEY (product_configuration_id, variant_attribute_id),
+    recorded_at                 timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_product_configuration_value_key UNIQUE (product_configuration_id, variant_attribute_id),
     FOREIGN KEY (company_id, product_configuration_id, product_id) REFERENCES product_configuration (company_id, id, product_id),
     FOREIGN KEY (product_id, variant_attribute_id) REFERENCES product_variant_attribute (product_id, variant_attribute_id),
     CONSTRAINT fk_product_configuration_value_type FOREIGN KEY (company_id, variant_attribute_id, value_type) REFERENCES variant_attribute (company_id, id, value_type),
@@ -142,6 +155,7 @@ CREATE TABLE price_list_characteristic_rate (
     start_date            date NOT NULL,
     end_date              date,
     rate_per_value        types.unit_price NOT NULL,              -- per inventory unit, per unit of the characteristic
+    recorded_at           timestamptz NOT NULL DEFAULT now(),
     FOREIGN KEY (company_id, price_list_id) REFERENCES price_list (company_id, id),
     FOREIGN KEY (company_id, product_id) REFERENCES product (company_id, id),
     FOREIGN KEY (product_id, variant_attribute_id) REFERENCES product_variant_attribute (product_id, variant_attribute_id),
@@ -201,3 +215,32 @@ CREATE TRIGGER trg_product_configuration_immutable BEFORE UPDATE OR DELETE ON pr
     FOR EACH ROW EXECUTE FUNCTION product_configuration_immutable();
 CREATE TRIGGER trg_product_configuration_value_immutable BEFORE INSERT OR UPDATE OR DELETE ON product_configuration_value
     FOR EACH ROW EXECUTE FUNCTION product_configuration_immutable();
+
+-- ===== recorded_at on update (D13; ADR-0007 rules 9, 16 and the rule 16 note) =====
+-- Every table of this file has recorded_at timestamptz NOT NULL DEFAULT now(). The DO block attaches the trigger
+-- trg_<table>_set_recorded_at (BEFORE UPDATE, function set_recorded_at) to every table of v_tables except v_append_only,
+-- so recorded_at is the instant of the last write (D8). Append-only tables are those whose guard trigger refuses every
+-- update outside an erasure, and pure logs; they need no trigger (here: product_configuration_immutable).
+-- Guards on in-place tables sort before set_recorded_at, so they compare rows before it runs. v_tables lists the file's
+-- tables in file order; lab gen_overview.py --check verifies both lists against the table definitions of the file, and
+-- schema_phase_b.py writes the section. The function is defined in every file because the labs load subsets.
+CREATE OR REPLACE FUNCTION set_recorded_at() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
+BEGIN
+    NEW.recorded_at := now();
+    RETURN NEW;
+END $$;
+DO $$
+DECLARE
+    v_tables       text[] := ARRAY['configuration_model', 'configuration_model_revision', 'configuration_rule', 'configuration_table',
+        'configuration_table_column', 'configuration_table_row', 'configuration_default', 'product_configuration',
+        'product_configuration_value', 'price_list_characteristic_rate'];
+    v_append_only  text[] := ARRAY['product_configuration', 'product_configuration_value']::text[];
+    v_table        text;
+BEGIN
+    FOREACH v_table IN ARRAY v_tables LOOP
+        CONTINUE WHEN v_table = ANY (v_append_only) OR to_regclass(v_table) IS NULL;
+        EXECUTE format('CREATE OR REPLACE TRIGGER %I BEFORE UPDATE ON %I FOR EACH ROW EXECUTE FUNCTION set_recorded_at()',
+                       'trg_' || v_table || '_set_recorded_at', v_table);
+    END LOOP;
+END $$;
+-- ===== end of recorded_at on update =====

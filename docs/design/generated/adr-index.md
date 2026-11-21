@@ -11,9 +11,9 @@ Title, status and design item come from each ADR's first lines. **Declared** ADR
 | [ADR-0001](../../adr/0001-programming-language.md) | Programming language | accepted 2026-11-12 | — | — | — | — |
 | [ADR-0002](../../adr/0002-core-technology-tools.md) | Core technology tools | accepted 2026-11-14 | — | — | — | — |
 | [ADR-0003](../../adr/0003-build-operating-rules.md) | Build operating rules | accepted 2026-11-14 | DS-17, DS-18, DS-30, DS-34, DS-37, DS-40 | — | — | — |
-| [ADR-0004](../../adr/0004-naming-conventions.md) | Naming conventions | accepted 2026-11-14 | DS-01 | `tax`, `documents` | 3, 2 | `ledger` |
+| [ADR-0004](../../adr/0004-naming-conventions.md) | Naming conventions | accepted 2026-11-14 | DS-01 | `tax`, `documents` | 3, 2 | `ledger`, `master_data` |
 | [ADR-0005](../../adr/0005-technical-decisions-delegated.md) | Technical decisions are delegated to agents | accepted 2026-11-14 | all DS items | — | — | — |
-| [ADR-0006](../../adr/0006-id-and-numeric-model.md) | ID and numeric model | accepted 2026-11-14 | DS-02 | `ledger`, `master_data`, `numeric` | 3, 1 | `audit`, `master_data` |
+| [ADR-0006](../../adr/0006-id-and-numeric-model.md) | ID and numeric model | accepted 2026-11-14 | DS-02 | `ledger`, `master_data`, `numeric` | 3, 1 | `master_data`, `registry`, `audit` |
 | [ADR-0007](../../adr/0007-time-model.md) | Time model | accepted 2026-11-14 | DS-03 | `periods`, `clock` | 2, 1 | `periods` |
 | [ADR-0008](../../adr/0008-command-envelope-and-registry.md) | Command envelope and registry | accepted 2026-11-14 | DS-04 | `documents`, `registry` | 2 | `registry` |
 | [ADR-0009](../../adr/0009-document-lifecycle.md) | Document lifecycle | accepted 2026-11-14 | DS-05 | `crm`, `quality`, `documents`, `policy` | 4, 2 | `documents`, `sales`, `crm`, `inventory` |
@@ -109,7 +109,7 @@ Title, status and design item come from each ADR's first lines. **Declared** ADR
 | 3 | `assets` | — | ADR-0025 |
 | 3 | `inventory` | ADR-0020, ADR-0022, ADR-0023, ADR-0024, ADR-0027, ADR-0028, ADR-0030, ADR-0031, ADR-0035, ADR-0037, ADR-0044, ADR-0047, ADR-0056, ADR-0075 | ADR-0009, ADR-0012, ADR-0020, ADR-0021, ADR-0022, ADR-0023, ADR-0024, ADR-0025, ADR-0027, ADR-0028, ADR-0030, ADR-0031, ADR-0034, ADR-0035, ADR-0037, ADR-0044, ADR-0047, ADR-0056, ADR-0061, ADR-0064, ADR-0068, ADR-0069, ADR-0070, ADR-0071, ADR-0074, ADR-0075 |
 | 3 | `ledger` | ADR-0006, ADR-0010, ADR-0011, ADR-0014, ADR-0015, ADR-0025, ADR-0026, ADR-0027, ADR-0035, ADR-0044, ADR-0048, ADR-0049 | ADR-0004, ADR-0010, ADR-0014, ADR-0015, ADR-0025, ADR-0026, ADR-0041, ADR-0044, ADR-0048, ADR-0049, ADR-0060, ADR-0069 |
-| 3 | `master_data` | ADR-0006, ADR-0011, ADR-0018, ADR-0019, ADR-0020, ADR-0023, ADR-0024, ADR-0027, ADR-0029, ADR-0031, ADR-0033, ADR-0037, ADR-0041, ADR-0044, ADR-0045, ADR-0046, ADR-0049, ADR-0054, ADR-0056, ADR-0057, ADR-0061, ADR-0062, ADR-0068, ADR-0069, ADR-0074 | ADR-0006, ADR-0010, ADR-0015, ADR-0017, ADR-0018, ADR-0019, ADR-0020, ADR-0023, ADR-0024, ADR-0027, ADR-0033, ADR-0038, ADR-0041, ADR-0045, ADR-0046, ADR-0049, ADR-0051, ADR-0053, ADR-0054, ADR-0056, ADR-0057, ADR-0058, ADR-0060, ADR-0061, ADR-0062, ADR-0063, ADR-0064, ADR-0067, ADR-0068, ADR-0069, ADR-0070, ADR-0072, ADR-0074, ADR-0076, ADR-0079 |
+| 3 | `master_data` | ADR-0006, ADR-0011, ADR-0018, ADR-0019, ADR-0020, ADR-0023, ADR-0024, ADR-0027, ADR-0029, ADR-0031, ADR-0033, ADR-0037, ADR-0041, ADR-0044, ADR-0045, ADR-0046, ADR-0049, ADR-0054, ADR-0056, ADR-0057, ADR-0061, ADR-0062, ADR-0068, ADR-0069, ADR-0074 | ADR-0004, ADR-0006, ADR-0010, ADR-0015, ADR-0017, ADR-0018, ADR-0019, ADR-0020, ADR-0023, ADR-0024, ADR-0027, ADR-0033, ADR-0038, ADR-0041, ADR-0045, ADR-0046, ADR-0049, ADR-0051, ADR-0053, ADR-0054, ADR-0056, ADR-0057, ADR-0058, ADR-0060, ADR-0061, ADR-0062, ADR-0063, ADR-0064, ADR-0067, ADR-0068, ADR-0069, ADR-0070, ADR-0072, ADR-0074, ADR-0076, ADR-0079 |
 | 3 | `production` | ADR-0014, ADR-0025, ADR-0026, ADR-0027, ADR-0032, ADR-0033, ADR-0034, ADR-0035, ADR-0037, ADR-0046, ADR-0055, ADR-0062, ADR-0068, ADR-0071, ADR-0072 | ADR-0024, ADR-0025, ADR-0032, ADR-0033, ADR-0034, ADR-0035, ADR-0036, ADR-0037, ADR-0043, ADR-0046, ADR-0049, ADR-0062, ADR-0064, ADR-0068, ADR-0070, ADR-0071, ADR-0072 |
 | 3 | `tax` | ADR-0004, ADR-0016, ADR-0028, ADR-0041, ADR-0053 | ADR-0041 |
 | 2 | `agent_runs` | ADR-0027, ADR-0050, ADR-0057 | ADR-0027, ADR-0042, ADR-0050, ADR-0057, ADR-0063, ADR-0065, ADR-0078 |
@@ -123,7 +123,7 @@ Title, status and design item come from each ADR's first lines. **Declared** ADR
 | 2 | `periods` | ADR-0007, ADR-0012, ADR-0028, ADR-0029, ADR-0038, ADR-0043, ADR-0044, ADR-0055 | ADR-0007, ADR-0012, ADR-0060 |
 | 2 | `permissions` | ADR-0017, ADR-0040, ADR-0054 | ADR-0017, ADR-0042, ADR-0054, ADR-0055, ADR-0067 |
 | 2 | `policy` | ADR-0009, ADR-0028, ADR-0029, ADR-0043, ADR-0055 | ADR-0029, ADR-0042, ADR-0043, ADR-0055, ADR-0059, ADR-0065, ADR-0067 |
-| 2 | `registry` | ADR-0008, ADR-0015, ADR-0017, ADR-0022, ADR-0038, ADR-0052, ADR-0063, ADR-0067, ADR-0077 | ADR-0008, ADR-0017, ADR-0063, ADR-0067, ADR-0073, ADR-0076, ADR-0077 |
+| 2 | `registry` | ADR-0008, ADR-0015, ADR-0017, ADR-0022, ADR-0038, ADR-0052, ADR-0063, ADR-0067, ADR-0077 | ADR-0006, ADR-0008, ADR-0017, ADR-0063, ADR-0067, ADR-0073, ADR-0076, ADR-0077 |
 | 2 | `work` | ADR-0013, ADR-0042, ADR-0054, ADR-0055, ADR-0066, ADR-0076 | ADR-0022, ADR-0027, ADR-0040, ADR-0042, ADR-0066, ADR-0076 |
 | 1 | `clock` | ADR-0007 | — |
 | 1 | `errors` | — | — |

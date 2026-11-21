@@ -517,7 +517,7 @@ if "--load" in sys.argv:
         cx.execute("insert into costing_sheet (id, company_id, code, name, recorded_at) values (%s,%s,'HEAVY','Heavy line',now())", (I["CS2"], I["co"])),
         cx.execute("insert into site_costing_sheet (company_id, site_id, costing_sheet_id, recorded_at) values (%s,%s,%s,now())", (I["co"], I["S1"], I["CS"]))))
     trial("X28 one sheet per site", lambda cx: cx.execute("insert into site_costing_sheet (company_id, site_id, costing_sheet_id, recorded_at) values (%s,%s,%s,now())",
-                                                       (I["co"], I["S1"], I["CS2"])), True, "site_costing_sheet_pkey")
+                                                       (I["co"], I["S1"], I["CS2"])), True, "uq_site_costing_sheet_site_id")
     trial("X29 a site of one company cannot take another company's sheet", lambda cx: cx.execute(
         "insert into site_costing_sheet (company_id, site_id, costing_sheet_id, recorded_at) values (%s,%s,%s,now())", (I["co2"], I["S2"], I["CS"])), True, "foreign key")
 

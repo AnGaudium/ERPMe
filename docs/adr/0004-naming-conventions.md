@@ -30,6 +30,8 @@ Every code identifier is an English word or phrase from the glossary in [00-read
 10. A line table is `<header>_line` unless the glossary names it otherwise (`journal_line`).
 11. A link table for a many-to-many relation is named after the relation when the glossary has a word for it; otherwise `<table_a>_<table_b>` in alphabetical order.
 12. A surrogate key column is named `id`; whether a table's primary key also contains other columns (e.g. for partitioning) is decided by DS-02 and DS-06. A foreign key column is `<relation>_id`, where the relation name is the referenced table's name (`partner_id`, `company_id`) or, when a table refers to the same table more than once or the glossary names the relation, that relation name (`reversal_of_id` for the relation `reversal_of`). There are no exceptions to the `_id` suffix, so an agent can tell every foreign key by its name.
+
+    Note (S2 schema phase B, 2026-11-21): a foreign key column that references the natural unique `code` or `key` column of a reference catalog (`currency`, `incoterm`: class E1 of the [ADR-0006](0006-id-and-numeric-model.md) rule 1 note) or of an installation registry (class E2) keeps its name, e.g. `transaction_currency`, `incoterm_code`, `setting_key`, `consumer`. Every foreign key to an `id` is `<relation>_id`. Every table's surrogate key is the single column `id` (ADR-0006 rule 1 note); a former composite key is a named `UNIQUE` constraint.
 13. Column suffixes and prefixes by meaning. The examples show the form only; the actual columns of each table are decided by DS-02, DS-03, DS-06 and DS-10.
 
 | Kind | Form | Example |

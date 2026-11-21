@@ -11,7 +11,7 @@
 -- company itself, whose policy compares its own id. The lab checks this list (ADR-0045 rule 14).
 -- Owner module per table in brackets (ADR-0022 rule 2). Referenced tables defined elsewhere: user_account and department (DS-15-access.sql, which adds employee_profile's department key),
 -- account and payment_term (DS-06, ledger), tax groups' matrix (ADR-0041, tax).
--- IDs are UUIDv7 from context.new_id or the client (ADR-0006 rule 3); no ID defaults.
+-- IDs are UUIDv7 from context.new_id or the client (ADR-0006 rule 3); no ID defaults, except barcode.id, whose rows a trigger writes (ADR-0006 rule 2).
 -- Template-copied company data keeps its package basis in `basis`, always set by the command: the template entry's
 -- basis, or company_decision for a row the company adds (ADR-0016 rules 6-7, 12).
 -- Uniqueness, checks and foreign keys that the database can hold are here, including composite keys that keep a
@@ -24,12 +24,15 @@ CREATE TABLE currency (
     code           text PRIMARY KEY CONSTRAINT ck_currency_code CHECK (code ~ '^[A-Z]{3}$'),     -- ISO 4217 (ADR-0011 rule 7)
     minor_unit     smallint NOT NULL CONSTRAINT ck_currency_minor_unit CHECK (minor_unit BETWEEN 0 AND 4),
     rounding_mode  text NOT NULL DEFAULT 'half_up' CONSTRAINT ck_currency_rounding_mode CHECK (rounding_mode IN ('half_up', 'half_even', 'down', 'up')),
-    is_active      boolean NOT NULL DEFAULT true
+    is_active      boolean NOT NULL DEFAULT true,
+    recorded_at    timestamptz NOT NULL DEFAULT now()
 );
 CREATE TABLE company_currency_activation (                 -- a company activates the currencies it uses (ADR-0011 rule 7)
+    id          uuid PRIMARY KEY,
     company_id  uuid NOT NULL REFERENCES company (id),
     currency    text NOT NULL REFERENCES currency (code),
-    PRIMARY KEY (company_id, currency)
+    recorded_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_company_currency_activation_company_id_currency UNIQUE (company_id, currency)
 );
 CREATE TABLE uom (                                         -- ADR-0018 rule 8; core rows have company_id null
     id              uuid PRIMARY KEY,
@@ -39,6 +42,7 @@ CREATE TABLE uom (                                         -- ADR-0018 rule 8; c
     quantity_kind   text NOT NULL CONSTRAINT ck_uom_quantity_kind CHECK (quantity_kind IN ('count', 'mass', 'length', 'area', 'volume', 'time')),
     decimal_places  smallint NOT NULL CONSTRAINT ck_uom_decimal_places CHECK (decimal_places BETWEEN 0 AND 6),
     is_active       boolean NOT NULL DEFAULT true,          -- false: retired, no new uses; history keeps it (ADR-0056 rule 2)
+    recorded_at     timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT ck_uom_company_code CHECK ((company_id IS NULL) = (code NOT LIKE 'x-%'))
 );
 CREATE UNIQUE INDEX ux_uom_core_code ON uom (code) WHERE company_id IS NULL;
@@ -50,6 +54,7 @@ CREATE TABLE uom_conversion (                              -- core catalog unit-
     numerator    bigint NOT NULL CONSTRAINT ck_uom_conversion_numerator CHECK (numerator > 0),       -- 1 from = numerator/denominator to
     denominator  bigint NOT NULL CONSTRAINT ck_uom_conversion_denominator CHECK (denominator > 0),
     is_active    boolean NOT NULL DEFAULT true,            -- false: retired by a catalog version; immutable once used
+    recorded_at  timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT ck_uom_conversion_distinct CHECK (from_uom_id <> to_uom_id),
     -- direct pairs only, stored once from the larger unit (factor >= 1); the inverse is derived, never stored or chained
     CONSTRAINT ck_uom_conversion_direction CHECK (numerator >= denominator)
@@ -63,6 +68,7 @@ CREATE TABLE uom_alias (                                   -- unit text as partn
     normalized_alias  text NOT NULL,                       -- master_data.contract.normalize_unit_text(alias), e.g. thung
     uom_id            uuid NOT NULL REFERENCES uom (id),   -- a core unit or a unit of the same company (command check)
     is_active         boolean NOT NULL DEFAULT true,
+    recorded_at       timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT uq_uom_alias_normalized UNIQUE (company_id, normalized_alias),
     CONSTRAINT ck_uom_alias_normalized CHECK (length(normalized_alias) > 0 AND normalized_alias = lower(normalized_alias) AND normalized_alias !~ '\s')
 );
@@ -83,7 +89,8 @@ CREATE TABLE company (
     fiscal_year_lead_days     integer NOT NULL DEFAULT 30,
     default_language          text NOT NULL,                       -- BCP 47, set at company creation from the package; documents and partners may override (ADR-0016 rule 19)
     is_active                 boolean NOT NULL DEFAULT true,
-    first_operating_posting_at timestamptz                         -- set once, by the first journal entry outside the migration fiscal year, which locks this row; null: the setup phase (ADR-0067 rule 7)
+    first_operating_posting_at timestamptz,                         -- set once, by the first journal entry outside the migration fiscal year, which locks this row; null: the setup phase (ADR-0067 rule 7)
+    recorded_at               timestamptz NOT NULL DEFAULT now()
 );
 CREATE TABLE branch (
     id                 uuid PRIMARY KEY,
@@ -94,6 +101,7 @@ CREATE TABLE branch (
     is_declaring_unit  boolean NOT NULL DEFAULT false,             -- files tax returns separately (ADR-0041 rule 11; ADR-0045 rule 8; ADR-0053 rule 14)
     address            jsonb,                                       -- the columns of partner_address as keys (ADR-0045 rule 8)
     is_active          boolean NOT NULL DEFAULT true,
+    recorded_at        timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, code),
     UNIQUE (company_id, id),
     CONSTRAINT ck_branch_declaring_unit_tax_id CHECK (NOT is_declaring_unit OR tax_id IS NOT NULL)
@@ -113,6 +121,7 @@ CREATE TABLE print_profile (                              -- print header of the
     logo_attachment_id          uuid,                                -- attachment (DS-36), PNG or JPEG
     seal_attachment_id          uuid,                                -- label internal; never printed on a document with a marker
     signature_attachment_id     uuid,                                -- label internal; never printed on a document with a marker
+    recorded_at                 timestamptz NOT NULL DEFAULT now(),
     UNIQUE NULLS NOT DISTINCT (company_id, branch_id),
     FOREIGN KEY (company_id, branch_id) REFERENCES branch (company_id, id)
 );
@@ -140,6 +149,7 @@ CREATE TABLE cost_center (
     branch_id   uuid,
     is_active   boolean NOT NULL DEFAULT true,
     business_unit_id uuid,                                    -- default unit of its profit-and-loss lines (ADR-0069 rule 7)
+    recorded_at timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, code),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, parent_id) REFERENCES cost_center (company_id, id),
@@ -152,16 +162,19 @@ CREATE TABLE working_calendar (                            -- ADR-0024 rule 4
     code              text NOT NULL,
     name              text NOT NULL,
     working_weekdays  smallint[] NOT NULL CONSTRAINT ck_working_calendar_weekdays CHECK (working_weekdays <@ ARRAY[1,2,3,4,5,6,7]::smallint[]),  -- ISO weekdays
+    recorded_at       timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, code),
     UNIQUE (company_id, id)
 );
 CREATE TABLE working_calendar_holiday (                    -- copied from a package template entry, or added by the company (ADR-0045 rule 10)
+    id                   uuid PRIMARY KEY,
     company_id           uuid NOT NULL,
     working_calendar_id  uuid NOT NULL,
     holiday_date         date NOT NULL,
     name                 text,
     basis                jsonb NOT NULL,
-    PRIMARY KEY (working_calendar_id, holiday_date),
+    recorded_at          timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_working_calendar_holiday_working_calendar_id_holiday_date UNIQUE (working_calendar_id, holiday_date),
     FOREIGN KEY (company_id, working_calendar_id) REFERENCES working_calendar (company_id, id)
 );
 CREATE TABLE site (                                        -- [master_data] ADR-0068 rule 1; SAP plant, Dynamics 365 site
@@ -183,36 +196,43 @@ CREATE TABLE site (                                        -- [master_data] ADR-
     FOREIGN KEY (company_id, business_unit_id) REFERENCES business_unit (company_id, id)
 );
 CREATE TABLE data_translation (                            -- ADR-0018 rule 17
+    id          uuid PRIMARY KEY,
     company_id  uuid NOT NULL REFERENCES company (id),
     table_name  text NOT NULL,
     row_id      uuid NOT NULL,
     field       text NOT NULL,
     language    text NOT NULL,
     text        text NOT NULL,
-    PRIMARY KEY (company_id, table_name, row_id, field, language)
+    recorded_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_data_translation_company_id_table_name_row_id_field_language UNIQUE (company_id, table_name, row_id, field, language)
 );
 
 -- ===== Groups copied from package templates [master_data] =====
 CREATE TABLE partner_group (
     id uuid PRIMARY KEY, company_id uuid NOT NULL REFERENCES company (id), code text NOT NULL, name text NOT NULL,
-    basis jsonb NOT NULL, is_active boolean NOT NULL DEFAULT true, UNIQUE (company_id, code)
+    basis jsonb NOT NULL, is_active boolean NOT NULL DEFAULT true, UNIQUE (company_id, code),
+    recorded_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE TABLE partner_tax_group (                           -- read by the tax matrix (ADR-0041 rule 3)
     id uuid PRIMARY KEY, company_id uuid NOT NULL REFERENCES company (id), code text NOT NULL, name text NOT NULL,
     directions text[] NOT NULL CONSTRAINT ck_partner_tax_group_directions CHECK (directions <@ ARRAY['sale','purchase']::text[] AND cardinality(directions) > 0),
-    basis jsonb NOT NULL, is_active boolean NOT NULL DEFAULT true, UNIQUE (company_id, code)
+    basis jsonb NOT NULL, is_active boolean NOT NULL DEFAULT true, UNIQUE (company_id, code),
+    recorded_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE TABLE item_group (
     id uuid PRIMARY KEY, company_id uuid NOT NULL REFERENCES company (id), code text NOT NULL, name text NOT NULL,
-    basis jsonb NOT NULL, is_active boolean NOT NULL DEFAULT true, UNIQUE (company_id, code), UNIQUE (company_id, id)
+    basis jsonb NOT NULL, is_active boolean NOT NULL DEFAULT true, UNIQUE (company_id, code), UNIQUE (company_id, id),
+    recorded_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE TABLE valuation_class (
     id uuid PRIMARY KEY, company_id uuid NOT NULL REFERENCES company (id), code text NOT NULL, name text NOT NULL,
-    basis jsonb NOT NULL, is_active boolean NOT NULL DEFAULT true, UNIQUE (company_id, code)
+    basis jsonb NOT NULL, is_active boolean NOT NULL DEFAULT true, UNIQUE (company_id, code),
+    recorded_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE TABLE item_tax_group (                              -- read by the tax matrix (ADR-0041 rule 3)
     id uuid PRIMARY KEY, company_id uuid NOT NULL REFERENCES company (id), code text NOT NULL, name text NOT NULL,
-    basis jsonb NOT NULL, is_active boolean NOT NULL DEFAULT true, UNIQUE (company_id, code)
+    basis jsonb NOT NULL, is_active boolean NOT NULL DEFAULT true, UNIQUE (company_id, code),
+    recorded_at timestamptz NOT NULL DEFAULT now()
 );
 
 -- ===== Partners [master_data] (ADR-0019) =====
@@ -233,6 +253,7 @@ CREATE TABLE partner (
     superseded_by_partner_id  uuid,                               -- ADR-0019 rule 19 (interim)
     is_active                 boolean NOT NULL DEFAULT true,
     custom_values    jsonb NOT NULL DEFAULT '{}'::jsonb CONSTRAINT ck_partner_custom_values CHECK (jsonb_typeof(custom_values) = 'object'),   -- ADR-0074 rules 8, 9
+    recorded_at               timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, code),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, parent_partner_id) REFERENCES partner (company_id, id),
@@ -251,6 +272,7 @@ CREATE TABLE project (
     end_date             date,
     state                text NOT NULL DEFAULT 'open' CONSTRAINT ck_project_state CHECK (state IN ('open', 'closed')),
     business_unit_id     uuid,                           -- default unit of its profit-and-loss lines (ADR-0069 rule 7)
+    recorded_at          timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, code),
     UNIQUE (company_id, id),                         -- stock document lines name a project by company key (ADR-0075 rules 4, 5)
     FOREIGN KEY (company_id, customer_partner_id) REFERENCES partner (company_id, id),
@@ -258,11 +280,13 @@ CREATE TABLE project (
     FOREIGN KEY (company_id, business_unit_id) REFERENCES business_unit (company_id, id)
 );
 CREATE TABLE partner_role (
+    id          uuid PRIMARY KEY,
     company_id  uuid NOT NULL,
     partner_id  uuid NOT NULL,
     role        text NOT NULL CONSTRAINT ck_partner_role_role CHECK (role IN ('customer', 'supplier', 'employee')),
     is_active   boolean NOT NULL DEFAULT true,
-    PRIMARY KEY (partner_id, role),
+    recorded_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_partner_role_partner_id_role UNIQUE (partner_id, role),
     FOREIGN KEY (company_id, partner_id) REFERENCES partner (company_id, id)
 );
 
@@ -321,6 +345,7 @@ CREATE TABLE price_list (
     is_tax_included  boolean NOT NULL DEFAULT false,               -- passed as prices_include_tax to ADR-0041 rule 9
     is_default       boolean NOT NULL DEFAULT false,
     is_active        boolean NOT NULL DEFAULT true,
+    recorded_at      timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, code),
     UNIQUE (company_id, id),
     UNIQUE (company_id, id, kind),
@@ -332,9 +357,10 @@ CREATE UNIQUE INDEX ux_price_list_default ON price_list (company_id, kind) WHERE
 CREATE UNIQUE INDEX ux_price_list_by_product ON price_list (company_id) WHERE kind = 'by_product' AND is_active;
 
 CREATE TABLE customer_profile (
+    id                                 uuid PRIMARY KEY,
     company_id                         uuid NOT NULL,
-    partner_id                         uuid PRIMARY KEY,
-    receivable_account_id              uuid REFERENCES account (id),   -- required while ledger is activated (partner commands; INV-38; ADR-0015 rule 11 note); empty in the CRM-only profile
+    partner_id                         uuid NOT NULL CONSTRAINT uq_customer_profile_partner_id UNIQUE,
+    receivable_account_id              uuid,   -- required while ledger is activated (partner commands; INV-38; ADR-0015 rule 11 note); empty in the CRM-only profile
     payment_term_id                    uuid REFERENCES payment_term (id),
     credit_limit                       types.amount,
     credit_limit_currency              text REFERENCES currency (code),
@@ -347,19 +373,22 @@ CREATE TABLE customer_profile (
     delivery_method_id                 uuid,
     incoterm_code                      text REFERENCES incoterm (code),
     incoterm_place                     text,                          -- the named place; requires a code
+    recorded_at                        timestamptz NOT NULL DEFAULT now(),
     FOREIGN KEY (company_id, partner_id) REFERENCES partner (company_id, id),
     CONSTRAINT fk_customer_profile_price_list FOREIGN KEY (company_id, price_list_id, price_list_kind) REFERENCES price_list (company_id, id, kind),
     FOREIGN KEY (company_id, salesperson_id) REFERENCES partner (company_id, id),
     CONSTRAINT ck_customer_profile_credit_limit CHECK (credit_limit IS NULL OR (credit_limit >= 0 AND credit_limit_currency IS NOT NULL)),
     FOREIGN KEY (company_id, payment_method_id) REFERENCES payment_method (company_id, id),
     FOREIGN KEY (company_id, delivery_method_id) REFERENCES delivery_method (company_id, id),
-    CONSTRAINT ck_customer_profile_incoterm_place CHECK (incoterm_place IS NULL OR incoterm_code IS NOT NULL)
+    CONSTRAINT ck_customer_profile_incoterm_place CHECK (incoterm_place IS NULL OR incoterm_code IS NOT NULL),
+    FOREIGN KEY (company_id, receivable_account_id) REFERENCES account (company_id, id)   -- company key (S2 schema phase B)
 );
 CREATE INDEX ix_customer_profile_price_list_id ON customer_profile (price_list_id);
 CREATE TABLE supplier_profile (
+    id                   uuid PRIMARY KEY,
     company_id           uuid NOT NULL,
-    partner_id           uuid PRIMARY KEY,
-    payable_account_id   uuid REFERENCES account (id),          -- required while ledger is activated (partner commands; INV-38; ADR-0015 rule 11 note); empty in the CRM-only profile
+    partner_id           uuid NOT NULL CONSTRAINT uq_supplier_profile_partner_id UNIQUE,
+    payable_account_id   uuid,          -- required while ledger is activated (partner commands; INV-38; ADR-0015 rule 11 note); empty in the CRM-only profile
     payment_term_id      uuid REFERENCES payment_term (id),
     buyer_id             uuid,
     price_list_id        uuid,                                    -- the supplier's purchase prices (ADR-0045 rule 2)
@@ -370,31 +399,36 @@ CREATE TABLE supplier_profile (
     delivery_method_id   uuid,
     incoterm_code        text REFERENCES incoterm (code),
     incoterm_place       text,                          -- the named place; requires a code
+    recorded_at          timestamptz NOT NULL DEFAULT now(),
     FOREIGN KEY (company_id, partner_id) REFERENCES partner (company_id, id),
     FOREIGN KEY (company_id, price_list_id, price_list_kind) REFERENCES price_list (company_id, id, kind),
     FOREIGN KEY (company_id, buyer_id) REFERENCES partner (company_id, id),
     FOREIGN KEY (company_id, working_calendar_id) REFERENCES working_calendar (company_id, id),
     FOREIGN KEY (company_id, payment_method_id) REFERENCES payment_method (company_id, id),
     FOREIGN KEY (company_id, delivery_method_id) REFERENCES delivery_method (company_id, id),
-    CONSTRAINT ck_supplier_profile_incoterm_place CHECK (incoterm_place IS NULL OR incoterm_code IS NOT NULL)
+    CONSTRAINT ck_supplier_profile_incoterm_place CHECK (incoterm_place IS NULL OR incoterm_code IS NOT NULL),
+    FOREIGN KEY (company_id, payable_account_id) REFERENCES account (company_id, id)   -- company key (S2 schema phase B)
 );
 CREATE INDEX ix_supplier_profile_price_list_id ON supplier_profile (price_list_id);
 CREATE TABLE employee_profile (                            -- personal data (ADR-0019 rule 7)
+    id                     uuid PRIMARY KEY,
     company_id             uuid NOT NULL,
-    partner_id             uuid PRIMARY KEY,
+    partner_id             uuid NOT NULL CONSTRAINT uq_employee_profile_partner_id UNIQUE,
     user_account_id        uuid REFERENCES user_account (id),           -- unique per company; set only by UpdateEmployeeOrganization (ADR-0054 rule 6)
-    receivable_account_id  uuid REFERENCES account (id),           -- advances (receivable_employee_advance)
+    receivable_account_id  uuid,           -- advances (receivable_employee_advance)
     branch_id              uuid,
     cost_center_id         uuid,
     job_title              text,
     department_id          uuid,                                    -- key to department in DS-15-access.sql; set only by UpdateEmployeeOrganization (ADR-0054 rule 6)
     manager_partner_id     uuid,                                    -- the employee's manager; no loops (command, employee_manager_cycle); set only by UpdateEmployeeOrganization
+    recorded_at            timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, user_account_id),
     FOREIGN KEY (company_id, partner_id) REFERENCES partner (company_id, id),
     FOREIGN KEY (company_id, branch_id) REFERENCES branch (company_id, id),
     FOREIGN KEY (company_id, cost_center_id) REFERENCES cost_center (company_id, id),
     FOREIGN KEY (company_id, manager_partner_id) REFERENCES partner (company_id, id),
-    CONSTRAINT ck_employee_profile_manager CHECK (manager_partner_id IS DISTINCT FROM partner_id)
+    CONSTRAINT ck_employee_profile_manager CHECK (manager_partner_id IS DISTINCT FROM partner_id),
+    FOREIGN KEY (company_id, receivable_account_id) REFERENCES account (company_id, id)   -- company key (S2 schema phase B)
 );
 CREATE TABLE partner_address (
     id                uuid PRIMARY KEY,
@@ -406,6 +440,7 @@ CREATE TABLE partner_address (
     postal_code       text,
     country           text NOT NULL CONSTRAINT ck_partner_address_country CHECK (country ~ '^[A-Z]{2}$'),
     is_active         boolean NOT NULL DEFAULT true,
+    recorded_at       timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, partner_id, id),                             -- a document names its ship-to or bill-to address with its partner (ADR-0074 rules 1-3)
     FOREIGN KEY (company_id, partner_id) REFERENCES partner (company_id, id)
 );
@@ -420,6 +455,7 @@ CREATE TABLE partner_bank_account (                        -- changed only throu
     holder_name     text NOT NULL,
     currency        text REFERENCES currency (code),
     is_active       boolean NOT NULL DEFAULT true,
+    recorded_at     timestamptz NOT NULL DEFAULT now(),
     FOREIGN KEY (company_id, partner_id) REFERENCES partner (company_id, id),
     UNIQUE NULLS NOT DISTINCT (partner_id, bank_code, account_number)
 );
@@ -434,6 +470,7 @@ CREATE TABLE contact (
     preferred_language  text,
     is_active           boolean NOT NULL DEFAULT true,
     is_accounts_contact boolean NOT NULL DEFAULT false,      -- receives payment reminders (ADR-0052 rule 28)
+    recorded_at         timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     UNIQUE (company_id, partner_id, id),                     -- keeps a crm row's contact inside its partner (ADR-0052 rule 3)
     FOREIGN KEY (company_id, partner_id) REFERENCES partner (company_id, id),
@@ -457,12 +494,14 @@ CREATE TABLE product_category (
     default_inventory_uom_id   uuid REFERENCES uom (id),
     basis                      jsonb NOT NULL,
     is_active                  boolean NOT NULL DEFAULT true,
+    recorded_at                timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, code),
     UNIQUE (company_id, id)
 );
 CREATE TABLE storage_condition (                           -- ADR-0023 rule 3
     id uuid PRIMARY KEY, company_id uuid NOT NULL REFERENCES company (id), code text NOT NULL, name text NOT NULL,
-    is_active boolean NOT NULL DEFAULT true, UNIQUE (company_id, code)
+    is_active boolean NOT NULL DEFAULT true, UNIQUE (company_id, code),
+    recorded_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE TABLE handling_unit_type (                          -- ADR-0023 rule 6
     id                uuid PRIMARY KEY,
@@ -476,6 +515,7 @@ CREATE TABLE handling_unit_type (                          -- ADR-0023 rule 6
     height            types.quantity,
     dimension_uom_id  uuid REFERENCES uom (id),
     is_active         boolean NOT NULL DEFAULT true,
+    recorded_at       timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, code),
     CONSTRAINT ck_handling_unit_type_weight_uom CHECK (tare_weight IS NULL OR weight_uom_id IS NOT NULL),
     CONSTRAINT ck_handling_unit_type_dimension_uom CHECK ((length IS NULL AND width IS NULL AND height IS NULL) OR dimension_uom_id IS NOT NULL)
@@ -512,6 +552,7 @@ CREATE TABLE product (
     business_unit_id               uuid,                            -- default unit of its items' profit-and-loss lines, read through the item (ADR-0069 rule 7)
     is_active                      boolean NOT NULL DEFAULT true,
     custom_values jsonb NOT NULL DEFAULT '{}'::jsonb CONSTRAINT ck_product_custom_values CHECK (jsonb_typeof(custom_values) = 'object'),   -- ADR-0074 rules 8, 9
+    recorded_at                    timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, code),
     UNIQUE (company_id, id),
     UNIQUE (company_id, id, inventory_uom_id),             -- product_uom holds the inventory unit through it (ADR-0056 rule 4)
@@ -538,7 +579,8 @@ CREATE TABLE product_uom (                                 -- other units of one
     is_default_pick_unit  boolean NOT NULL DEFAULT false,  -- proposed on pick lists for a demand line in the inventory unit
     is_active             boolean NOT NULL DEFAULT true,   -- false: retired, no new uses; a new row for the same unit may replace it (ADR-0056 rule 5)
     retired_at            timestamptz,
-    recorded_at           timestamptz NOT NULL DEFAULT now(),   -- in force from recorded_at until retired_at (INV-603)
+    created_at            timestamptz NOT NULL DEFAULT now(),   -- set once at insert: in force from created_at until retired_at (INV-603; ADR-0056 rule 4 note)
+    recorded_at           timestamptz NOT NULL DEFAULT now(),   -- the last write, retirement included (ADR-0007 rule 9)
     CONSTRAINT fk_product_uom_inventory_unit FOREIGN KEY (company_id, product_id, inventory_uom_id) REFERENCES product (company_id, id, inventory_uom_id) ON UPDATE CASCADE,
     FOREIGN KEY (company_id, item_id) REFERENCES item (company_id, id),
     CONSTRAINT fk_product_uom_item_product FOREIGN KEY (item_id, product_id) REFERENCES item (id, product_id),
@@ -566,6 +608,7 @@ CREATE TABLE variant_attribute (                          -- ADR-0018 rule 6; va
     maximum_value   types.quantity,
     step_value      types.quantity CONSTRAINT ck_variant_attribute_step CHECK (step_value > 0),
     decimal_places  smallint CONSTRAINT ck_variant_attribute_decimal_places CHECK (decimal_places BETWEEN 0 AND 6),
+    recorded_at   timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, code),
     UNIQUE (company_id, id),
     UNIQUE (company_id, id, variant_mode),
@@ -586,6 +629,7 @@ CREATE TABLE variant_attribute_value (                    -- carries its attribu
     numeric_value         types.quantity,                       -- a number of an item-defining characteristic, created with the item (ADR-0046 rules 3, 11)
     position              integer NOT NULL DEFAULT 0,
     is_custom             boolean NOT NULL DEFAULT false,      -- a line choosing it also gives free text (line options only)
+    recorded_at           timestamptz NOT NULL DEFAULT now(),
     UNIQUE (variant_attribute_id, code),
     UNIQUE (variant_attribute_id, id),
     UNIQUE (variant_attribute_id, numeric_value),
@@ -596,22 +640,26 @@ CREATE TABLE variant_attribute_value (                    -- carries its attribu
     CONSTRAINT ck_variant_attribute_value_number CHECK ((value_type = 'number') = (numeric_value IS NOT NULL) AND (value_type = 'list' OR variant_mode = 'variant'))
 );
 CREATE TABLE product_variant_attribute (                  -- the attributes of a product, of either mode
+    id                    uuid PRIMARY KEY,
     company_id            uuid NOT NULL,
     product_id            uuid NOT NULL,
     variant_attribute_id  uuid NOT NULL,
     position              integer NOT NULL,
     is_required           boolean NOT NULL DEFAULT false,      -- line options: a line must choose a value
-    PRIMARY KEY (product_id, variant_attribute_id),
+    recorded_at           timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_product_variant_attribute_product_id_variant_attribute_id UNIQUE (product_id, variant_attribute_id),
     UNIQUE (product_id, position) DEFERRABLE INITIALLY DEFERRED,
     FOREIGN KEY (company_id, product_id) REFERENCES product (company_id, id),
     FOREIGN KEY (company_id, variant_attribute_id) REFERENCES variant_attribute (company_id, id)
 );
 CREATE TABLE product_attribute_value (                    -- values a product allows for an attribute, of either mode; none listed = every value (ADR-0045 rule 15)
+    id                          uuid PRIMARY KEY,   -- uq_product_attribute_value_key named by hand: the convention name would exceed 63 bytes (ADR-0004 rule 6)
     company_id                  uuid NOT NULL,
     product_id                  uuid NOT NULL,
     variant_attribute_id        uuid NOT NULL,
     variant_attribute_value_id  uuid NOT NULL,
-    PRIMARY KEY (product_id, variant_attribute_id, variant_attribute_value_id),
+    recorded_at                 timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_product_attribute_value_key UNIQUE (product_id, variant_attribute_id, variant_attribute_value_id),
     FOREIGN KEY (company_id, product_id) REFERENCES product (company_id, id),
     CONSTRAINT fk_product_attribute_value_attribute FOREIGN KEY (product_id, variant_attribute_id) REFERENCES product_variant_attribute (product_id, variant_attribute_id),
     CONSTRAINT fk_product_attribute_value_value FOREIGN KEY (variant_attribute_id, variant_attribute_value_id) REFERENCES variant_attribute_value (variant_attribute_id, id)
@@ -631,6 +679,7 @@ CREATE TABLE item (
     weight_uom_id     uuid REFERENCES uom (id),
     is_active         boolean NOT NULL DEFAULT true,
     custom_values jsonb NOT NULL DEFAULT '{}'::jsonb CONSTRAINT ck_item_custom_values CHECK (jsonb_typeof(custom_values) = 'object'),   -- ADR-0074 rules 8, 9
+    recorded_at       timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT fk_item_product FOREIGN KEY (company_id, product_id) REFERENCES product (company_id, id),
     UNIQUE (company_id, code),
     UNIQUE (company_id, id),
@@ -643,13 +692,15 @@ CREATE TABLE item (
     CONSTRAINT ck_item_gross_weight CHECK (net_weight IS NULL OR gross_weight IS NULL OR gross_weight >= net_weight)
 );
 CREATE TABLE item_variant_value (                         -- one per variant-mode attribute of the item's product
+    id                          uuid PRIMARY KEY,
     company_id                  uuid NOT NULL,
     item_id                     uuid NOT NULL,
     product_id                  uuid NOT NULL,
     variant_attribute_id        uuid NOT NULL,
     variant_attribute_value_id  uuid NOT NULL,
     variant_mode                text NOT NULL DEFAULT 'variant' CONSTRAINT ck_item_variant_value_mode CHECK (variant_mode = 'variant'),
-    PRIMARY KEY (item_id, variant_attribute_id),
+    recorded_at                 timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_item_variant_value_item_id_variant_attribute_id UNIQUE (item_id, variant_attribute_id),
     FOREIGN KEY (company_id, item_id) REFERENCES item (company_id, id),
     FOREIGN KEY (item_id, product_id) REFERENCES item (id, product_id),
     CONSTRAINT fk_item_variant_value_product_attribute FOREIGN KEY (product_id, variant_attribute_id) REFERENCES product_variant_attribute (product_id, variant_attribute_id),
@@ -664,6 +715,7 @@ CREATE TABLE item_barcode (                              -- one barcode per pack
     uom_id      uuid NOT NULL REFERENCES uom (id),
     barcode     text NOT NULL,
     is_legacy_barcode  boolean NOT NULL DEFAULT false,   -- an old system's code kept on migration; set at creation (ADR-0061 rule 8)
+    recorded_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT uq_item_barcode_barcode UNIQUE (company_id, barcode),
     FOREIGN KEY (company_id, item_id) REFERENCES item (company_id, id)
 );
@@ -678,6 +730,7 @@ CREATE TABLE partner_item (                                -- a partner's own co
     partner_uom_text    text,                                    -- the unit as the partner writes it
     uom_id              uuid REFERENCES uom (id),                -- the matching unit of the item's product
     is_active           boolean NOT NULL DEFAULT true,
+    recorded_at         timestamptz NOT NULL DEFAULT now(),
     UNIQUE (partner_id, partner_item_code),
     FOREIGN KEY (company_id, partner_id) REFERENCES partner (company_id, id),
     FOREIGN KEY (company_id, item_id) REFERENCES item (company_id, id)
@@ -692,6 +745,7 @@ CREATE TABLE item_manufacturer_part (                      -- a manufacturer's p
     part_number                   text NOT NULL,
     normalized_part_number        text NOT NULL,                -- upper-cased, separators removed; letters and digits of any script
     is_active                     boolean NOT NULL DEFAULT true,
+    recorded_at                   timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     CONSTRAINT uq_item_manufacturer_part UNIQUE (company_id, normalized_manufacturer_name, normalized_part_number),
     FOREIGN KEY (company_id, item_id) REFERENCES item (company_id, id),
@@ -706,6 +760,7 @@ CREATE TABLE code_series (                                 -- master-data code s
     prefix               text NOT NULL DEFAULT '',
     next_value           bigint NOT NULL CONSTRAINT ck_code_series_next_value CHECK (next_value >= 1),   -- moved only by the numbering lock helper at execution
     format               text NOT NULL CONSTRAINT ck_code_series_format CHECK (format LIKE '%{counter:%}%'),
+    recorded_at          timestamptz NOT NULL DEFAULT now(),
     UNIQUE NULLS NOT DISTINCT (company_id, record_kind, product_category_id),
     FOREIGN KEY (company_id, product_category_id) REFERENCES product_category (company_id, id)
 );
@@ -718,6 +773,7 @@ CREATE TABLE product_category_requirement (                -- readiness rules pe
     variant_attribute_id      uuid,
     classification_scheme_id  uuid,
     is_active                 boolean NOT NULL DEFAULT true,
+    recorded_at               timestamptz NOT NULL DEFAULT now(),
     UNIQUE NULLS NOT DISTINCT (company_id, product_category_id, requirement, variant_attribute_id, classification_scheme_id),
     FOREIGN KEY (company_id, product_category_id) REFERENCES product_category (company_id, id),
     FOREIGN KEY (company_id, variant_attribute_id) REFERENCES variant_attribute (company_id, id),
@@ -728,7 +784,8 @@ CREATE TABLE product_category_requirement (                -- readiness rules pe
 CREATE TABLE classification_scheme (
     id uuid PRIMARY KEY, company_id uuid NOT NULL REFERENCES company (id), code text NOT NULL, name text NOT NULL,
     is_hierarchical boolean NOT NULL DEFAULT false, is_protected boolean NOT NULL DEFAULT false, UNIQUE (company_id, code),
-    UNIQUE (company_id, id)
+    UNIQUE (company_id, id),
+    recorded_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE TABLE classification_value (
     id                        uuid PRIMARY KEY,
@@ -737,16 +794,19 @@ CREATE TABLE classification_value (
     code                      text NOT NULL,
     name                      text NOT NULL,
     parent_id                 uuid REFERENCES classification_value (id),
+    recorded_at               timestamptz NOT NULL DEFAULT now(),
     UNIQUE (classification_scheme_id, code),
     UNIQUE (classification_scheme_id, id),
     FOREIGN KEY (company_id, classification_scheme_id) REFERENCES classification_scheme (company_id, id)
 );
 CREATE TABLE product_classification (                      -- one value per scheme per product (ADR-0018 rule 15)
+    id                        uuid PRIMARY KEY,
     company_id                uuid NOT NULL,
     product_id                uuid NOT NULL,
     classification_scheme_id  uuid NOT NULL,
     classification_value_id   uuid NOT NULL,
-    PRIMARY KEY (product_id, classification_scheme_id),
+    recorded_at               timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_product_classification_product_id_classification_scheme_id UNIQUE (product_id, classification_scheme_id),
     FOREIGN KEY (company_id, product_id) REFERENCES product (company_id, id),
     FOREIGN KEY (company_id, classification_scheme_id) REFERENCES classification_scheme (company_id, id),
     FOREIGN KEY (classification_scheme_id, classification_value_id) REFERENCES classification_value (classification_scheme_id, id)
@@ -773,6 +833,7 @@ CREATE TABLE warehouse (
     default_receiving_bin_id   uuid,
     default_shipping_bin_id    uuid,
     is_active                  boolean NOT NULL DEFAULT true,
+    recorded_at                timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, code),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, branch_id) REFERENCES branch (company_id, id),
@@ -792,7 +853,8 @@ CREATE INDEX ix_warehouse_company_id_site_id ON warehouse (company_id, site_id) 
 CREATE TABLE zone (
     id uuid PRIMARY KEY, company_id uuid NOT NULL, warehouse_id uuid NOT NULL,
     code text NOT NULL, name text NOT NULL, UNIQUE (warehouse_id, code), UNIQUE (id, warehouse_id),
-    FOREIGN KEY (company_id, warehouse_id) REFERENCES warehouse (company_id, id)
+    FOREIGN KEY (company_id, warehouse_id) REFERENCES warehouse (company_id, id),
+    recorded_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE TABLE bin (
     id                       uuid PRIMARY KEY,
@@ -812,6 +874,7 @@ CREATE TABLE bin (
     is_blocked_for_putaway   boolean NOT NULL DEFAULT false,
     is_blocked_for_picking   boolean NOT NULL DEFAULT false,
     is_active                boolean NOT NULL DEFAULT true,
+    recorded_at              timestamptz NOT NULL DEFAULT now(),
     UNIQUE (warehouse_id, code),
     UNIQUE (company_id, barcode),
     UNIQUE (id, warehouse_id),
@@ -829,14 +892,16 @@ CREATE TABLE lot (                                         -- ADR-0020 rule 17 [
     CONSTRAINT ck_lot_code_not_empty CHECK (code <> ''),   -- any code is kept as it comes, but never an empty one (ADR-0061 rule 8)
     FOREIGN KEY (company_id, item_id) REFERENCES item (company_id, id),
     CONSTRAINT ck_lot_dates CHECK (expiry_date IS NULL OR manufacture_date IS NULL OR expiry_date >= manufacture_date),
-    CONSTRAINT ck_lot_best_before CHECK (best_before_date IS NULL OR manufacture_date IS NULL OR best_before_date >= manufacture_date)
+    CONSTRAINT ck_lot_best_before CHECK (best_before_date IS NULL OR manufacture_date IS NULL OR best_before_date >= manufacture_date),
+    recorded_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE TABLE serial_number (                               -- ADR-0020 rule 17 [inventory]
     id uuid PRIMARY KEY, company_id uuid NOT NULL, item_id uuid NOT NULL,
     code text NOT NULL, UNIQUE (item_id, code),
     barcode text, UNIQUE (company_id, barcode),            -- the serial's own internal label code (ADR-0061 rules 7-8)
     CONSTRAINT ck_serial_number_code_not_empty CHECK (code <> ''),   -- any code is kept as it comes, but never an empty one (ADR-0061 rule 8)
-    FOREIGN KEY (company_id, item_id) REFERENCES item (company_id, id)
+    FOREIGN KEY (company_id, item_id) REFERENCES item (company_id, id),
+    recorded_at timestamptz NOT NULL DEFAULT now()
 );
 
 -- ===== Price list entries [master_data] (ADR-0045) =====
@@ -851,6 +916,7 @@ CREATE TABLE price_list_entry (
     start_date        date NOT NULL,
     end_date          date,                                          -- inclusive (ADR-0027 rule 12); null = open
     unit_price        types.unit_price NOT NULL CONSTRAINT ck_price_list_entry_unit_price CHECK (unit_price >= 0),
+    recorded_at       timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT fk_price_list_entry_list FOREIGN KEY (company_id, price_list_id) REFERENCES price_list (company_id, id),
     CONSTRAINT fk_price_list_entry_item FOREIGN KEY (company_id, item_id) REFERENCES item (company_id, id),
     CONSTRAINT fk_price_list_entry_product FOREIGN KEY (company_id, product_id) REFERENCES product (company_id, id),
@@ -874,6 +940,7 @@ CREATE TABLE price_list_option_extra (                     -- extra per inventor
     start_date                  date NOT NULL,
     end_date                    date,
     unit_price_extra            types.unit_price NOT NULL,          -- may be negative (a cheaper option)
+    recorded_at                 timestamptz NOT NULL DEFAULT now(),
     FOREIGN KEY (company_id, price_list_id) REFERENCES price_list (company_id, id),
     FOREIGN KEY (company_id, product_id) REFERENCES product (company_id, id),
     CONSTRAINT fk_price_list_option_extra_value FOREIGN KEY (company_id, variant_attribute_id, variant_mode, variant_attribute_value_id)
@@ -893,6 +960,7 @@ CREATE TABLE price_list_option_extra (                     -- extra per inventor
 -- owner row is deleted or changes its barcode stays as type internal with retired_type and retired_owner_id, so a stale
 -- label never resolves to another object, and the same owner may take it back.
 CREATE TABLE barcode (
+    id                uuid PRIMARY KEY DEFAULT uuidv7(),   -- barcode_register inserts the rows (ADR-0006 rule 2)
     company_id        uuid NOT NULL REFERENCES company (id),
     barcode           text NOT NULL,                       -- normalized: a GTIN as 14 digits, an SSCC as 18, an internal code in upper case
     barcode_type      text NOT NULL CONSTRAINT ck_barcode_type CHECK (barcode_type IN ('item_unit', 'bin', 'handling_unit', 'lot', 'serial', 'document', 'internal')),
@@ -902,7 +970,7 @@ CREATE TABLE barcode (
     retired_owner_id  uuid,                                -- the item of an item barcode, else the owner row itself; it may take the code back
     retired_at        timestamptz,
     recorded_at       timestamptz NOT NULL DEFAULT now(),
-    PRIMARY KEY (company_id, barcode),
+    CONSTRAINT uq_barcode_company_id_barcode UNIQUE (company_id, barcode),
     -- GS1 keys are digits (check digits: the trigger); internal codes start with an upper-case letter; legacy codes with
     -- a letter or a digit (rule 8)
     CONSTRAINT ck_barcode_format CHECK ((encoding = 'gtin' AND NOT is_legacy AND barcode ~ '^[0-9]{14}$')
@@ -1045,13 +1113,14 @@ CREATE UNIQUE INDEX ux_partner_relationship_default ON partner_relationship (com
 CREATE INDEX ix_partner_relationship_related_partner_id ON partner_relationship (company_id, related_partner_id);
 
 CREATE TABLE external_id_map (                             -- [master_data] ADR-0074 rule 7; replaces the undefined import_key_map of ADR-0044 rule 5
+    id            uuid PRIMARY KEY,   -- uq_external_id_map_key named by hand: the convention name would exceed 63 bytes (ADR-0004 rule 6)
     company_id    uuid NOT NULL REFERENCES company (id),
     source_system text NOT NULL CONSTRAINT ck_external_id_map_source_system CHECK (source_system ~ '^[a-z][a-z0-9_.-]{0,39}$'),
     table_name    text NOT NULL CONSTRAINT ck_external_id_map_table_name CHECK (table_name ~ '^[a-z][a-z0-9_]*$'),
     external_key  text NOT NULL CONSTRAINT ck_external_id_map_external_key CHECK (length(btrim(external_key)) > 0 AND length(external_key) <= 200),
     entity_id     uuid NOT NULL,                           -- polymorphic: the row of table_name; checked by INV-860
     recorded_at   timestamptz NOT NULL DEFAULT now(),
-    PRIMARY KEY (company_id, source_system, table_name, external_key),
+    CONSTRAINT uq_external_id_map_key UNIQUE (company_id, source_system, table_name, external_key),
     CONSTRAINT uq_external_id_map_entity UNIQUE (company_id, source_system, table_name, entity_id),
     CONSTRAINT ck_external_id_map_source_system_reserved CHECK (source_system <> 'group')   -- reserved for the group key until the distribution command exists (rule 7 note; external_id_source_reserved)
 );
@@ -1095,3 +1164,40 @@ CREATE TABLE reason (                                      -- [master_data] ADR-
     UNIQUE (company_id, id),
     UNIQUE (company_id, id, kind)                          -- a column that takes one kind names it, so the key holds the kind
 );
+
+-- ===== recorded_at on update (D13; ADR-0007 rules 9, 16 and the rule 16 note) =====
+-- Every table of this file has recorded_at timestamptz NOT NULL DEFAULT now(). The DO block attaches the trigger
+-- trg_<table>_set_recorded_at (BEFORE UPDATE, function set_recorded_at) to every table of v_tables except v_append_only,
+-- so recorded_at is the instant of the last write (D8). Append-only tables are those whose guard trigger refuses every
+-- update outside an erasure, and pure logs; they need no trigger.
+-- Guards on in-place tables sort before set_recorded_at, so they compare rows before it runs. v_tables lists the file's
+-- tables in file order; lab gen_overview.py --check verifies both lists against the table definitions of the file, and
+-- schema_phase_b.py writes the section. The function is defined in every file because the labs load subsets.
+CREATE OR REPLACE FUNCTION set_recorded_at() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
+BEGIN
+    NEW.recorded_at := now();
+    RETURN NEW;
+END $$;
+DO $$
+DECLARE
+    v_tables       text[] := ARRAY['currency', 'company_currency_activation', 'uom', 'uom_conversion', 'uom_alias', 'company', 'branch',
+        'print_profile', 'business_unit', 'cost_center', 'working_calendar', 'working_calendar_holiday', 'site',
+        'data_translation', 'partner_group', 'partner_tax_group', 'item_group', 'valuation_class', 'item_tax_group',
+        'partner', 'project', 'partner_role', 'payment_method', 'incoterm', 'delivery_method', 'price_list',
+        'customer_profile', 'supplier_profile', 'employee_profile', 'partner_address', 'partner_bank_account', 'contact',
+        'product_category', 'storage_condition', 'handling_unit_type', 'product', 'product_uom', 'variant_attribute',
+        'variant_attribute_value', 'product_variant_attribute', 'product_attribute_value', 'item', 'item_variant_value',
+        'item_barcode', 'partner_item', 'item_manufacturer_part', 'code_series', 'product_category_requirement',
+        'classification_scheme', 'classification_value', 'product_classification', 'warehouse', 'zone', 'bin', 'lot',
+        'serial_number', 'price_list_entry', 'price_list_option_extra', 'barcode', 'gs1_company_prefix',
+        'partner_relationship', 'external_id_map', 'custom_field_definition', 'reason'];
+    v_append_only  text[] := ARRAY[]::text[];
+    v_table        text;
+BEGIN
+    FOREACH v_table IN ARRAY v_tables LOOP
+        CONTINUE WHEN v_table = ANY (v_append_only) OR to_regclass(v_table) IS NULL;
+        EXECUTE format('CREATE OR REPLACE TRIGGER %I BEFORE UPDATE ON %I FOR EACH ROW EXECUTE FUNCTION set_recorded_at()',
+                       'trg_' || v_table || '_set_recorded_at', v_table);
+    END LOOP;
+END $$;
+-- ===== end of recorded_at on update =====

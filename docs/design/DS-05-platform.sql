@@ -14,9 +14,9 @@
 -- Conventions of DS-20 and DS-15: tables in schema `nativeflows`, domains in `types`; keys inline, named by the MetaData naming
 -- convention in migrations (ADR-0004 rule 15); IDs are UUIDv7 from context.new_id (ADR-0006 rule 3), no ID defaults;
 -- references between company tables are composite on (company_id, id); recorded_at on every row (ADR-0007 rule 9).
--- New tables follow the one convention of D13 (ADR-0007 rule 16 note): recorded_at timestamptz NOT NULL DEFAULT now(), and the
--- trigger trg_<table>_set_recorded_at (function set_recorded_at, defined below) on tables updated in place. Older tables of
--- this file still write recorded_at without a default; they move to the convention in one later change.
+-- Every table follows the one convention of D13 (ADR-0007 rule 16 note; DS-06-universal-journal.sql header): recorded_at
+-- timestamptz NOT NULL DEFAULT now(), and the trigger trg_<table>_set_recorded_at on tables updated in place, attached in the
+-- last section of this file.
 -- Every table with company_id gets FORCE ROW LEVEL SECURITY and the company policy of ADR-0017 rule 19; the last
 -- section writes them as the rls_v1 helper would (ADR-0022 rule 8). Tables whose company_id is nullable
 -- (outbox_event, event_delivery, audit_record, audit_change, audit_denial, agent_budget_usage, idempotency_record) show their
@@ -38,12 +38,6 @@
 -- Rules that need other rows or the registry (allowed targets of a proposal, stage eligibility, the matching cascade,
 -- the supplier-invoice key across tables) are enforced by commands and named in their ADRs; the rules a row can hold are
 -- checks here, and a few cross-row rules that the database can hold cheaply are triggers at the end.
--- The labs load subsets of the design files, so this file defines the shared recorded_at function itself (as DS-06 does).
-CREATE OR REPLACE FUNCTION set_recorded_at() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
-BEGIN
-    NEW.recorded_at := now();
-    RETURN NEW;
-END $$;
 
 -- ===== Agent types [agent_runs] (ADR-0050 rules 12, 14; ADR-0027 rule 1) =====
 -- Written by the registry at startup from the workflow declarations; nobody edits them (rule 12).
@@ -52,7 +46,7 @@ CREATE TABLE agent_type (                                  -- installation data
     code         text NOT NULL UNIQUE CONSTRAINT ck_agent_type_code CHECK (code ~ '^[a-z][a-z0-9_]*$'),
     name         text NOT NULL,
     is_active    boolean NOT NULL DEFAULT true,
-    recorded_at  timestamptz NOT NULL
+    recorded_at  timestamptz NOT NULL DEFAULT now()
 );
 CREATE TABLE agent_type_version (                          -- installation data; immutable (trigger below)
     id                 uuid PRIMARY KEY,
@@ -62,7 +56,7 @@ CREATE TABLE agent_type_version (                          -- installation data;
     behavior_hash      text NOT NULL CONSTRAINT ck_agent_type_version_behavior_hash CHECK (behavior_hash ~ '^[0-9a-f]{64}$'),   -- content hash without budget maximums (rule 14)
     declaration        jsonb NOT NULL,                     -- steps, tool list (= declared permissions), claimable kinds, scope_kind, subject tables, may_read_untrusted, seats, templates, schemas, budget maximums, evaluation suite (rule 12)
     field_classes      text[] NOT NULL DEFAULT '{}' CONSTRAINT ck_agent_type_version_field_classes CHECK (field_classes <@ ARRAY['cost', 'margin']::text[]),   -- default none; no record scope (rule 12 note, platform review 11); never sensitive_personal (ADR-0079 rule 11)
-    recorded_at        timestamptz NOT NULL,
+    recorded_at        timestamptz NOT NULL DEFAULT now(),
     UNIQUE (agent_type_code, version)
 );
 
@@ -95,7 +89,7 @@ CREATE TABLE work_item (
     resolution               text,
     resolved_at              timestamptz,
     version                  integer NOT NULL CONSTRAINT ck_work_item_version CHECK (version >= 1),
-    recorded_at              timestamptz NOT NULL,
+    recorded_at              timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, branch_id) REFERENCES branch (company_id, id),
     FOREIGN KEY (company_id, warehouse_id) REFERENCES warehouse (company_id, id),
@@ -126,7 +120,7 @@ CREATE TABLE work_item_link (                              -- evidence and what 
     target_table  text NOT NULL,
     target_id     uuid NOT NULL,
     link_kind     text NOT NULL CONSTRAINT ck_work_item_link_kind CHECK (link_kind IN ('evidence', 'draft', 'result')),
-    recorded_at   timestamptz NOT NULL,
+    recorded_at   timestamptz NOT NULL DEFAULT now(),
     UNIQUE (work_item_id, target_table, target_id, link_kind),
     FOREIGN KEY (company_id, work_item_id) REFERENCES work_item (company_id, id)
 );
@@ -138,7 +132,7 @@ CREATE TABLE work_item_note (                              -- append-only (rule 
     author_id     uuid,                                    -- interim: not stated in ADR-0042; a user or an agent run, null for system
     body_text     text NOT NULL,
     is_untrusted  boolean NOT NULL DEFAULT false,          -- an agent's note from outside content (rule 3; ADR-0029 rule 10)
-    recorded_at   timestamptz NOT NULL,
+    recorded_at   timestamptz NOT NULL DEFAULT now(),
     FOREIGN KEY (company_id, work_item_id) REFERENCES work_item (company_id, id),
     CONSTRAINT ck_work_item_note_author CHECK ((author_kind = 'system') = (author_id IS NULL))
 );
@@ -165,7 +159,7 @@ CREATE TABLE work_case (                                   -- one business inten
     resolved_at       timestamptz,
     cancel_reason     text,
     version           integer NOT NULL CONSTRAINT ck_work_case_version CHECK (version >= 1),
-    recorded_at       timestamptz NOT NULL,
+    recorded_at       timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, branch_id) REFERENCES branch (company_id, id),
     FOREIGN KEY (company_id, warehouse_id) REFERENCES warehouse (company_id, id),
@@ -194,7 +188,7 @@ CREATE TABLE work_case_link (                              -- append-only; unlin
     linked_by_kind   text NOT NULL CONSTRAINT ck_work_case_link_linked_by_kind CHECK (linked_by_kind IN ('user', 'system')),
     linked_by_id     uuid,                                 -- the user; null for system (the opener consumer, an automation rule)
     unlinked_at      timestamptz,
-    recorded_at      timestamptz NOT NULL,
+    recorded_at      timestamptz NOT NULL DEFAULT now(),
     FOREIGN KEY (company_id, work_case_id) REFERENCES work_case (company_id, id),
     CONSTRAINT ck_work_case_link_linked_by CHECK ((linked_by_kind = 'system') = (linked_by_id IS NULL))
 );
@@ -215,7 +209,7 @@ CREATE TABLE agent_type_setting (                          -- company data, chan
     promoted_version      text,
     promoted_seat_models  jsonb,                           -- (seat, model) pairs the evidence covered
     active_document_types text[],                          -- ADR-0065 rule 11: the document types whose drafts may pass the auto-post gateway as tainted drafts
-    recorded_at           timestamptz NOT NULL,
+    recorded_at           timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, agent_type_code),
     FOREIGN KEY (agent_type_code, promoted_version) REFERENCES agent_type_version (agent_type_code, version),
     CONSTRAINT ck_agent_type_setting_owner CHECK (mode = 'off' OR workflow_owner_id IS NOT NULL),
@@ -266,7 +260,7 @@ CREATE TABLE agent_run (                                   -- company data, not 
     input_refs             jsonb NOT NULL DEFAULT '[]',    -- typed references: table, ID, role
     output_refs            jsonb NOT NULL DEFAULT '[]',
     trace_id               text,
-    recorded_at            timestamptz NOT NULL,
+    recorded_at            timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (agent_type_code, agent_type_version) REFERENCES agent_type_version (agent_type_code, version),
     FOREIGN KEY (company_id, replay_of_run_id) REFERENCES agent_run (company_id, id),
@@ -340,7 +334,7 @@ CREATE TABLE agent_run_step (
     plan_hash               text,
     audit_record_id         uuid,                          -- no key: audit_record is created later in the file and partitioned; checked by INV-211's query
     erased_at               timestamptz,                   -- interim: not stated in ADR-0050 (rule 20 blanks the bodies; this records when)
-    recorded_at             timestamptz NOT NULL,
+    recorded_at             timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (id),
     FOREIGN KEY (company_id, agent_run_id) REFERENCES agent_run (company_id, id),
     CONSTRAINT ck_agent_run_step_pairing CHECK ((kind IN ('llm_request', 'tool_request')) = (request_step_id IS NULL)),
@@ -365,7 +359,7 @@ CREATE TABLE agent_budget_usage (
     run_count        integer NOT NULL DEFAULT 0 CONSTRAINT ck_agent_budget_usage_run_count CHECK (run_count >= 0),
     run_limit_count  integer,                              -- a run count limit; Phase 1 sets none (ADR-0078 rule 7)
     currency         text NOT NULL DEFAULT 'USD' CONSTRAINT ck_agent_budget_usage_currency CHECK (currency = 'USD'),
-    recorded_at      timestamptz NOT NULL,
+    recorded_at      timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT uq_agent_budget_usage_key UNIQUE NULLS NOT DISTINCT (scope_kind, company_id, agent_type_code, business_date),
     CONSTRAINT ck_agent_budget_usage_scope CHECK (
         (scope_kind = 'installation') = (company_id IS NULL)
@@ -384,7 +378,7 @@ CREATE TABLE approval_procedure (                          -- named ranks; appro
     rank         integer NOT NULL CONSTRAINT ck_approval_procedure_rank CHECK (rank > 0),
     basis        jsonb NOT NULL,                           -- interim: not stated in ADR-0043; seeded rows keep their template basis as DS-20 does
     is_active    boolean NOT NULL DEFAULT true,
-    recorded_at  timestamptz NOT NULL,
+    recorded_at  timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, code),
     UNIQUE (company_id, rank),
     UNIQUE (company_id, id)
@@ -393,7 +387,7 @@ CREATE TABLE policy_rule (                                 -- the identity of a 
     id           uuid PRIMARY KEY,
     company_id   uuid NOT NULL REFERENCES company (id),
     code         text NOT NULL,                            -- interim: not stated in ADR-0043
-    recorded_at  timestamptz NOT NULL,
+    recorded_at  timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, code),
     UNIQUE (company_id, id)
 );
@@ -440,7 +434,7 @@ CREATE TABLE policy_rule_version (
     --      AND is_enabled AND shadow_evidence_outdated_by IS NULL AND k = ANY (evidence_setting_keys)
     evidence_setting_keys   text[] CONSTRAINT ck_policy_rule_version_evidence_settings CHECK ((evidence_setting_keys IS NULL) = (shadow_evidence IS NULL)
         AND (evidence_setting_keys IS NULL OR cardinality(evidence_setting_keys) >= 1)),
-    recorded_at             timestamptz NOT NULL,
+    recorded_at             timestamptz NOT NULL DEFAULT now(),
     UNIQUE (policy_rule_id, version),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, policy_rule_id) REFERENCES policy_rule (company_id, id),
@@ -467,21 +461,22 @@ CREATE TABLE numbering_configuration (                     -- per document type:
     prefix         text NOT NULL,
     is_per_branch  boolean NOT NULL DEFAULT false,
     format         text NOT NULL CONSTRAINT ck_numbering_configuration_format CHECK (format LIKE '%{counter:%}%'),   -- placeholders of rule 15
-    recorded_at    timestamptz NOT NULL,
+    recorded_at    timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, document_type)
 );
 CREATE TABLE numbering_series (                            -- created on first use; the counter moves only through the numbering lock helper (rule 15)
     id              uuid PRIMARY KEY,
     company_id      uuid NOT NULL REFERENCES company (id),
     document_type   text NOT NULL,
-    fiscal_year_id  uuid NOT NULL REFERENCES fiscal_year (id),
+    fiscal_year_id  uuid NOT NULL,
     branch_id       uuid,
     prefix          text NOT NULL,
     next_value      bigint NOT NULL CONSTRAINT ck_numbering_series_next_value CHECK (next_value >= 1),
     format          text NOT NULL,
-    recorded_at     timestamptz NOT NULL,
+    recorded_at     timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT uq_numbering_series_key UNIQUE NULLS NOT DISTINCT (company_id, document_type, fiscal_year_id, branch_id),
-    FOREIGN KEY (company_id, branch_id) REFERENCES branch (company_id, id)
+    FOREIGN KEY (company_id, branch_id) REFERENCES branch (company_id, id),
+    FOREIGN KEY (company_id, fiscal_year_id) REFERENCES fiscal_year (company_id, id)   -- company key (S2 schema phase B)
 );
 CREATE TABLE document (
     id                    uuid PRIMARY KEY,
@@ -511,7 +506,7 @@ CREATE TABLE document (
     canceled_note         text,
     FOREIGN KEY (company_id, canceled_reason_id, canceled_reason_kind) REFERENCES reason (company_id, id, kind),
     CONSTRAINT ck_document_canceled CHECK ((canceled_reason_id IS NULL AND canceled_note IS NULL) OR state = 'canceled'),
-    recorded_at           timestamptz NOT NULL,
+    recorded_at           timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     UNIQUE (company_id, id, document_type),
     CONSTRAINT uq_document_company_id_document_type_number UNIQUE (company_id, document_type, number),
@@ -555,7 +550,7 @@ CREATE TABLE document_version (
     is_tainted               boolean NOT NULL,             -- set at insert, never changed (ADR-0029 rule 8; trigger below holds INV-88)
     derived_from_version_id  uuid,                         -- the version in force for a change, or the source version of version 1
     erased_at                timestamptz,                  -- set by the destruction path of ADR-0079 rule 6; version_hash is then no longer compared with content (INV-10)
-    recorded_at              timestamptz NOT NULL,
+    recorded_at              timestamptz NOT NULL DEFAULT now(),
     UNIQUE (document_id, version),
     UNIQUE (company_id, id),
     UNIQUE (company_id, document_id, id),
@@ -573,7 +568,7 @@ CREATE TABLE taint_clearance (                             -- immutable; one per
     cleared_by_user_id  uuid NOT NULL REFERENCES user_account (id),   -- a human (ClearTaint is human_only)
     reason              text NOT NULL CONSTRAINT ck_taint_clearance_reason CHECK (length(reason) > 0),
     cleared_at          timestamptz NOT NULL,
-    recorded_at         timestamptz NOT NULL,
+    recorded_at         timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT uq_taint_clearance_document_version_id UNIQUE (document_version_id),   -- interim: not stated in ADR-0029 (one clearance per version)
     FOREIGN KEY (company_id, document_version_id) REFERENCES document_version (company_id, id)
 );
@@ -613,7 +608,7 @@ CREATE TABLE policy_decision (                             -- [policy] ADR-0043 
     auto_post_evidence            jsonb,                   -- settings read (key, value, source), decision table and parameter set versions with hashes, every rule's code,
                                                            -- outcome and values, value bases, taint, drafting run, agent type, behavior hash, effective mode, rule version
     decided_at                    timestamptz NOT NULL,
-    recorded_at                   timestamptz NOT NULL,
+    recorded_at                   timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     UNIQUE (company_id, id, document_version_id),
     UNIQUE (company_id, id, approval_pool_id),
@@ -672,7 +667,7 @@ CREATE TABLE approval (                                    -- owned by documents
     reject_reason_kind      text NOT NULL DEFAULT 'reject' CONSTRAINT ck_approval_reject_reason_kind CHECK (reject_reason_kind = 'reject'),
     FOREIGN KEY (company_id, reject_reason_id, reject_reason_kind) REFERENCES reason (company_id, id, kind),
     CONSTRAINT ck_approval_reject_reason CHECK (reject_reason_id IS NULL OR decision = 'rejected'),
-    recorded_at             timestamptz NOT NULL,
+    recorded_at             timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, document_id, document_version_id) REFERENCES document_version (company_id, document_id, id),
     FOREIGN KEY (company_id, policy_decision_id, document_version_id) REFERENCES policy_decision (company_id, id, document_version_id),
@@ -691,18 +686,19 @@ CREATE TABLE auto_post_confirmation (                      -- [policy] ADR-0043 
     policy_decision_id  uuid NOT NULL,
     confirmed_by_id     uuid NOT NULL REFERENCES user_account (id),   -- the owner of the rule's latest version (command check)
     confirmed_at        timestamptz NOT NULL,
-    recorded_at         timestamptz NOT NULL,
+    recorded_at         timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT uq_auto_post_confirmation_policy_decision_id UNIQUE (policy_decision_id),
     FOREIGN KEY (company_id, policy_decision_id) REFERENCES policy_decision (company_id, id)
 );
 CREATE TABLE period_unlock_request (                       -- [periods] ADR-0012 rule 7; ADR-0043 rules 1, 16; typed header of a non-posting document type
     id                 uuid PRIMARY KEY,
     company_id         uuid NOT NULL,
-    posting_period_id  uuid NOT NULL REFERENCES posting_period (id),
+    posting_period_id  uuid NOT NULL,
     area               text NOT NULL CONSTRAINT ck_period_unlock_request_area CHECK (area IN ('general', 'inventory', 'receivable', 'payable')),
     reason             text NOT NULL,
-    recorded_at        timestamptz NOT NULL,
-    FOREIGN KEY (company_id, id) REFERENCES document (company_id, id)
+    recorded_at        timestamptz NOT NULL DEFAULT now(),
+    FOREIGN KEY (company_id, id) REFERENCES document (company_id, id),
+    FOREIGN KEY (company_id, posting_period_id) REFERENCES posting_period (company_id, id)   -- company key (S2 schema phase B)
 );
 
 -- ===== Posting intents [documents] (ADR-0028 rules 6-7, 10-11) =====
@@ -722,7 +718,7 @@ CREATE TABLE posting_intent (
     e_invoice_record_id    uuid,                           -- tax's record (DS-24 add-on); no key until its DDL exists
     issued_at              timestamptz NOT NULL,           -- interim: not stated in ADR-0028
     ended_at               timestamptz,                    -- interim: not stated in ADR-0028
-    recorded_at            timestamptz NOT NULL,
+    recorded_at            timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, document_id, document_version_id) REFERENCES document_version (company_id, document_id, id),
     FOREIGN KEY (company_id, policy_decision_id) REFERENCES policy_decision (company_id, id),
@@ -740,7 +736,7 @@ CREATE TABLE change_proposal (                             -- typed header of a 
     reason           text NOT NULL,
     document_date    date NOT NULL,
     execution_error  jsonb,                                -- the non-retryable error of the last execution attempt (rule 3, Failure)
-    recorded_at      timestamptz NOT NULL,
+    recorded_at      timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, id) REFERENCES document (company_id, id)
 );
@@ -758,7 +754,7 @@ CREATE TABLE change_proposal_item (
     target_id           uuid,
     expected_version    text CONSTRAINT ck_change_proposal_item_expected_version CHECK (expected_version ~ '^[0-9a-f]{64}$'),   -- absent when the command creates the record
     field_changes       jsonb NOT NULL CONSTRAINT ck_change_proposal_item_field_changes CHECK (jsonb_typeof(field_changes) = 'array'),   -- before and after per field
-    recorded_at         timestamptz NOT NULL,
+    recorded_at         timestamptz NOT NULL DEFAULT now(),
     UNIQUE (change_proposal_id, item_index),
     FOREIGN KEY (company_id, change_proposal_id) REFERENCES change_proposal (company_id, id),
     CONSTRAINT ck_change_proposal_item_target CHECK (expected_version IS NULL OR target_id IS NOT NULL)
@@ -769,7 +765,7 @@ CREATE TABLE change_proposal_execution (                   -- immutable; written
     change_proposal_id   uuid NOT NULL,
     document_version_id  uuid NOT NULL,                    -- the proposal version executed
     executed_at          timestamptz NOT NULL,
-    recorded_at          timestamptz NOT NULL,
+    recorded_at          timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     CONSTRAINT uq_change_proposal_execution_change_proposal_id UNIQUE (change_proposal_id),   -- executed once, then closed
     FOREIGN KEY (company_id, change_proposal_id) REFERENCES change_proposal (company_id, id),
@@ -777,33 +773,36 @@ CREATE TABLE change_proposal_execution (                   -- immutable; written
 );
 -- The audit row of each executed item (rule 3, Success). interim: not stated in ADR-0029 as a table.
 CREATE TABLE change_proposal_execution_item (
+    id                            uuid PRIMARY KEY,   -- uq_change_proposal_execution_item_key named by hand: the convention name would exceed 63 bytes (ADR-0004 rule 6)
     company_id                    uuid NOT NULL,
     change_proposal_execution_id  uuid NOT NULL,
     item_index                    integer NOT NULL,
     audit_record_id               uuid NOT NULL,           -- key added after audit_record
-    recorded_at                   timestamptz NOT NULL,
-    PRIMARY KEY (change_proposal_execution_id, item_index),
+    recorded_at                   timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_change_proposal_execution_item_key UNIQUE (change_proposal_execution_id, item_index),
     FOREIGN KEY (company_id, change_proposal_execution_id) REFERENCES change_proposal_execution (company_id, id)
 );
 
 -- ===== Outbox and delivery [outbox] (ADR-0013 rules 2-3, 6-8, 14-16) =====
 CREATE TABLE event_subject (                               -- installation data, unpartitioned; the only ordering of events (rule 3)
+    id             uuid PRIMARY KEY,
     subject_table  text NOT NULL,
     subject_id     uuid NOT NULL,
     last_sequence  bigint NOT NULL CONSTRAINT ck_event_subject_last_sequence CHECK (last_sequence >= 1),
-    recorded_at    timestamptz NOT NULL,
-    PRIMARY KEY (subject_table, subject_id)
+    recorded_at    timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_event_subject_subject_table_subject_id UNIQUE (subject_table, subject_id)
 );
 -- The pause state of a registered consumer (rules 6, 16): a new consumer is registered paused and ReplayEvents unpauses it.
 -- interim: not stated in ADR-0013 as a table (the registration is code; only the runtime state is stored here).
 CREATE TABLE event_consumer (                              -- installation data
-    consumer       text PRIMARY KEY CONSTRAINT ck_event_consumer_consumer CHECK (consumer ~ '^[a-z][a-z0-9_]*$' AND length(consumer) <= 48),
+    id             uuid PRIMARY KEY,   -- uuid5(f244ce09-3c6c-4c82-af14-918bdeca6be3, 'event_consumer:<consumer>'), computed by the loader (registry E2, ADR-0006 rule 1 note)
+    consumer       text NOT NULL CONSTRAINT uq_event_consumer_consumer UNIQUE CONSTRAINT ck_event_consumer_consumer CHECK (consumer ~ '^[a-z][a-z0-9_]*$' AND length(consumer) <= 48),
     kind           text NOT NULL CONSTRAINT ck_event_consumer_kind CHECK (kind IN ('transactional', 'external')),
     queue          text NOT NULL CONSTRAINT ck_event_consumer_queue CHECK (queue IN ('events', 'integrations', 'jobs', 'pdf', 'agents')),
     is_paused      boolean NOT NULL DEFAULT true,
     max_attempts   smallint NOT NULL DEFAULT 10 CONSTRAINT ck_event_consumer_max_attempts CHECK (max_attempts >= 1),
     lease_seconds  integer NOT NULL DEFAULT 300 CONSTRAINT ck_event_consumer_lease CHECK (lease_seconds > 0),
-    recorded_at    timestamptz NOT NULL
+    recorded_at    timestamptz NOT NULL DEFAULT now()
 );
 CREATE TABLE outbox_event (                                -- partitioned by month on id (rule 2); no unique index but its key
     id                   uuid NOT NULL,
@@ -826,7 +825,7 @@ CREATE TABLE outbox_event (                                -- partitioned by mon
     business_date        date NOT NULL,
     command_type         text NOT NULL,
     trace_id             text,
-    recorded_at          timestamptz NOT NULL,
+    recorded_at          timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (id)
 ) PARTITION BY RANGE (id);
 CREATE TABLE event_delivery (                              -- one per subscribed consumer, unpartitioned (rule 6)
@@ -842,7 +841,7 @@ CREATE TABLE event_delivery (                              -- one per subscribed
     next_attempt_at   timestamptz NOT NULL,
     locked_until      timestamptz,
     last_error        text,
-    recorded_at       timestamptz NOT NULL,
+    recorded_at       timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT uq_event_delivery_consumer_event_id UNIQUE (consumer, event_id),
     CONSTRAINT ck_event_delivery_running CHECK (state <> 'running' OR locked_until IS NOT NULL)
 );
@@ -889,7 +888,7 @@ CREATE TABLE audit_record (                                -- one per executed c
     trace_id                text,
     check_codes             text[] NOT NULL DEFAULT '{}',
     erased_at               timestamptz,                   -- rule 4
-    recorded_at             timestamptz NOT NULL,
+    recorded_at             timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (id),
     CONSTRAINT ck_audit_record_batch CHECK ((batch_id IS NULL) = (batch_item_index IS NULL)),
     CONSTRAINT ck_audit_record_document CHECK ((document_id IS NULL) = (document_version IS NULL)),
@@ -909,7 +908,7 @@ CREATE TABLE audit_change (                                -- field changes of c
     before           jsonb,                                -- null for a personal field at creation or erasure (rule 3)
     after            jsonb,
     erased_at        timestamptz,
-    recorded_at      timestamptz NOT NULL,
+    recorded_at      timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (id),
     FOREIGN KEY (audit_record_id) REFERENCES audit_record (id)
 ) PARTITION BY RANGE (id);
@@ -941,7 +940,7 @@ CREATE TABLE audit_denial (
     first_at             timestamptz NOT NULL,
     last_at              timestamptz NOT NULL,
     trace_id             text,
-    recorded_at          timestamptz NOT NULL,
+    recorded_at          timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT ck_audit_denial_window CHECK (extract(epoch FROM window_start)::bigint % 600 = 0),   -- 10-minute windows
     CONSTRAINT ck_audit_denial_times CHECK (first_at <= last_at),
     CONSTRAINT ck_audit_denial_policy CHECK (error_code = 'policy_denied' OR (policy_rule_id IS NULL AND policy_input_hash IS NULL))
@@ -967,7 +966,7 @@ CREATE TABLE attachment (
     last_link_ended_at             timestamptz,            -- interim: not stated in ADR-0038 (retention counts from the last link's end, rule 15)
     bytes_released_at              timestamptz,            -- the bytes are no longer needed or served; physical deletion waits attachments.delete_grace_days (ADR-0038 rule 15 note)
     bytes_deleted_at               timestamptz,            -- set by RunAttachmentOrphanSweep after the grace period (ADR-0038 rule 15 note)
-    recorded_at                    timestamptz NOT NULL,
+    recorded_at                    timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT uq_attachment_company_id_sha256 UNIQUE (company_id, sha256),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, generated_subject_document_id) REFERENCES document (company_id, id),
@@ -984,7 +983,7 @@ CREATE TABLE attachment_link (                             -- polymorphic target
     target_table   text NOT NULL,
     target_id      uuid NOT NULL,
     ended_at       timestamptz,                            -- interim: not stated in ADR-0027 (links end rather than disappear, for retention)
-    recorded_at    timestamptz NOT NULL,
+    recorded_at    timestamptz NOT NULL DEFAULT now(),
     FOREIGN KEY (company_id, attachment_id) REFERENCES attachment (company_id, id)
 );
 CREATE UNIQUE INDEX ux_attachment_link_current ON attachment_link (attachment_id, target_table, target_id) WHERE ended_at IS NULL;
@@ -1026,8 +1025,6 @@ CREATE TABLE tax_code (                                    -- installation data 
     -- Import codes carry their treatment, and no other code does (ADR-0021 rule 11; check_package.py).
     CONSTRAINT ck_tax_code_import_treatment_scope CHECK ((direction = 'import') = (import_treatment IS NOT NULL))
 );
-CREATE TRIGGER trg_tax_code_set_recorded_at BEFORE UPDATE ON tax_code
-    FOR EACH ROW EXECUTE FUNCTION set_recorded_at();
 
 -- ===== Taxes [tax] (ADR-0041 rules 6, 11-13; ADR-0053 rule 3) =====
 -- Part of the document's content: replaced by Create and Update while the document can change, frozen with it.
@@ -1046,7 +1043,7 @@ CREATE TABLE document_line_tax (
     tax_transaction_amount           types.amount NOT NULL,   -- the amount used: the stated tax when there is one
     computed_tax_transaction_amount  types.amount NOT NULL,
     input_use                        text CONSTRAINT ck_document_line_tax_input_use CHECK (input_use IN ('taxable', 'non_taxable', 'shared')),   -- purchase lines (rule 6)
-    recorded_at                      timestamptz NOT NULL,
+    recorded_at                      timestamptz NOT NULL DEFAULT now(),
     UNIQUE (document_id, line_number, tax_code_id),
     FOREIGN KEY (company_id, document_id) REFERENCES document (company_id, id)
 );
@@ -1072,7 +1069,7 @@ CREATE TABLE tax_line (                                    -- the immutable tax 
     declaration_date         date NOT NULL,
     initial_deductibility    text CONSTRAINT ck_tax_line_initial_deductibility CHECK (initial_deductibility IN ('deductible', 'conditional', 'not_deductible')),
     deductibility_rule_id    uuid,                         -- the package rule row in force on the tax date (ADR-0053 rule 3)
-    recorded_at              timestamptz NOT NULL,
+    recorded_at              timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, document_id) REFERENCES document (company_id, id),
     FOREIGN KEY (company_id, declaring_branch_id) REFERENCES branch (company_id, id),
@@ -1092,7 +1089,7 @@ CREATE TABLE tax_line_adjustment (                         -- append-only (rule 
     reason                              text,              -- the condition type's reason for condition_failed (failing_method, lapsed)
     journal_entry_id                    uuid REFERENCES journal_entry (id),
     reversal_of_id                      uuid,              -- interim: not stated in ADR-0041 (the adjustment a reversal_of_adjustment undoes)
-    recorded_at                         timestamptz NOT NULL,
+    recorded_at                         timestamptz NOT NULL DEFAULT now(),
     FOREIGN KEY (company_id, adjusts_tax_line_id) REFERENCES tax_line (company_id, id),
     FOREIGN KEY (reversal_of_id) REFERENCES tax_line_adjustment (id),
     CONSTRAINT ck_tax_line_adjustment_reason CHECK (kind <> 'condition_failed' OR reason IS NOT NULL),
@@ -1115,7 +1112,7 @@ CREATE TABLE agent_promotion_evidence (                    -- immutable; compute
     document_type       text,                              -- ADR-0065 rule 11: the document type an active promotion covers (GetAgentDraftAcceptance)
     attachment_id       uuid,                              -- the data migration rehearsal report (ADR-0051 rule 28)
     created_by_user_id  uuid NOT NULL REFERENCES user_account (id),   -- interim: not stated in ADR-0050 (a person's command)
-    recorded_at         timestamptz NOT NULL,
+    recorded_at         timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, attachment_id) REFERENCES attachment (company_id, id),
     CONSTRAINT ck_agent_promotion_evidence_dates CHECK (start_date <= end_date),
@@ -1130,14 +1127,14 @@ CREATE TABLE money_account (                               -- company data, mast
     name                  text NOT NULL,
     kind                  text NOT NULL CONSTRAINT ck_money_account_kind CHECK (kind IN ('cash', 'bank')),
     currency              text NOT NULL REFERENCES currency (code),
-    account_id            uuid NOT NULL REFERENCES account (id),   -- cash_on_hand or cash_in_bank in its hierarchy, same currency (command check)
+    account_id            uuid NOT NULL,   -- cash_on_hand or cash_in_bank in its hierarchy, same currency (command check)
     bank_name             text,
     bank_code             text,
     bank_account_number   text,
     bank_branch           text,
     is_overdraft_allowed  boolean NOT NULL DEFAULT false,  -- Phase 1: bank accounts in company currency only (command check, overdraft_not_allowed)
     is_active             boolean NOT NULL DEFAULT true,
-    recorded_at           timestamptz NOT NULL,
+    recorded_at           timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, code),
     UNIQUE (company_id, id),
     UNIQUE (company_id, id, kind, currency),
@@ -1145,7 +1142,8 @@ CREATE TABLE money_account (                               -- company data, mast
     CONSTRAINT uq_money_account_account_id UNIQUE (account_id),   -- each operational account serves at most one money account
     CONSTRAINT ck_money_account_bank CHECK (CASE kind
         WHEN 'bank' THEN bank_name IS NOT NULL AND bank_account_number IS NOT NULL
-        ELSE bank_name IS NULL AND bank_code IS NULL AND bank_account_number IS NULL AND bank_branch IS NULL AND NOT is_overdraft_allowed END)
+        ELSE bank_name IS NULL AND bank_code IS NULL AND bank_account_number IS NULL AND bank_branch IS NULL AND NOT is_overdraft_allowed END),
+    FOREIGN KEY (company_id, account_id) REFERENCES account (company_id, id)   -- company key (S2 schema phase B)
 );
 CREATE TABLE payment_method_money_account (                -- [cash] ADR-0068 rule 16; company data, master_data_change, change-tracked
     id                 uuid PRIMARY KEY,
@@ -1177,7 +1175,7 @@ CREATE TABLE bank_statement (
     reader_code                  text NOT NULL,            -- the package's BankStatementReader (DS-14)
     has_gap                      boolean NOT NULL DEFAULT false,
     imported_by_user_id          uuid NOT NULL REFERENCES user_account (id),   -- interim: not stated in ADR-0048 (drafts act on behalf of the importer, rule 9)
-    recorded_at                  timestamptz NOT NULL,
+    recorded_at                  timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     UNIQUE (company_id, id, money_account_id),
     CONSTRAINT uq_bank_statement_money_account_id_statement_number UNIQUE (money_account_id, statement_number),   -- interim: not stated in ADR-0048
@@ -1225,7 +1223,7 @@ CREATE TABLE bank_statement_line (
     suggested_purpose             text CONSTRAINT ck_bank_statement_line_suggested_purpose CHECK (suggested_purpose IN (
                                       'invoice_payment', 'advance', 'refund', 'salary', 'tax', 'bank_charge', 'internal_transfer', 'loan', 'unknown')),
     suggestion_agent_run_id       uuid,
-    recorded_at                   timestamptz NOT NULL,
+    recorded_at                   timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     UNIQUE (bank_statement_id, line_number),
     FOREIGN KEY (company_id, bank_statement_id, money_account_id) REFERENCES bank_statement (company_id, id, money_account_id),
@@ -1275,7 +1273,7 @@ CREATE TABLE payment (
     partner_bank_account_id      uuid,                     -- bank_payment to a partner (ADR-0028 rule 15)
     bank_statement_line_id       uuid,                     -- interim: not stated in ADR-0048 (the line it was drafted from, for UnmatchBankLine, rule 9)
     print_language               text,                     -- ADR-0049 rule 27
-    recorded_at                  timestamptz NOT NULL,
+    recorded_at                  timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, id, document_type) REFERENCES document (company_id, id, document_type),
     -- money_account_kind_mismatch and the currency rule, held by the key (rule 3).
@@ -1302,7 +1300,7 @@ CREATE TABLE payment_line (
     discount_transaction_amount  types.amount CONSTRAINT ck_payment_line_discount CHECK (discount_transaction_amount >= 0),   -- rule 7, in the item's currency
     is_paid_by_third_party       boolean NOT NULL DEFAULT false,   -- paid_by_third_party of rule 3
     evidence_method              text CONSTRAINT ck_payment_line_evidence_method CHECK (evidence_method IN ('cash', 'bank_transfer', 'card', 'third_party')),   -- rule 18
-    account_id                   uuid REFERENCES account (id),   -- account lines
+    account_id                   uuid,   -- account lines
     cost_center_id               uuid,
     project_id                   uuid REFERENCES project (id),
     supplier_partner_id          uuid,                     -- taxed account lines: a partner, or a tax ID and name snapshot
@@ -1312,7 +1310,7 @@ CREATE TABLE payment_line (
     supplier_invoice_date        date,
     business_unit_id             uuid,                     -- account lines: the explicit unit (ADR-0069 rule 8; command check)
     description                  text,
-    recorded_at                  timestamptz NOT NULL,
+    recorded_at                  timestamptz NOT NULL DEFAULT now(),
     UNIQUE (payment_id, line_number),
     FOREIGN KEY (company_id, payment_id) REFERENCES payment (company_id, id),
     FOREIGN KEY (company_id, cost_center_id) REFERENCES cost_center (company_id, id),
@@ -1329,7 +1327,8 @@ CREATE TABLE payment_line (
         AND (NOT is_paid_by_third_party OR line_kind = 'settle')),
     CONSTRAINT ck_payment_line_supplier CHECK ((supplier_partner_id IS NULL AND supplier_tax_id IS NULL AND supplier_invoice_key IS NULL)
         OR line_kind = 'account'),
-    FOREIGN KEY (company_id, business_unit_id) REFERENCES business_unit (company_id, id)
+    FOREIGN KEY (company_id, business_unit_id) REFERENCES business_unit (company_id, id),
+    FOREIGN KEY (company_id, account_id) REFERENCES account (company_id, id)   -- company key (S2 schema phase B)
 );
 CREATE INDEX ix_payment_line_open_item_id ON payment_line (open_item_id) WHERE open_item_id IS NOT NULL;
 -- ADR-0048 rule 17 (and its note of the final simulation review): the collection side table of an open item (ADR-0026
@@ -1338,7 +1337,8 @@ CREATE INDEX ix_payment_line_open_item_id ON payment_line (open_item_id) WHERE o
 -- purchase invoice in the transaction that posts it, and clears it when a person records not a duplicate. The key to
 -- open_item is closed below (open_item gains a key with its company).
 CREATE TABLE open_item_collection (                        -- change-tracked (ADR-0038), so INV-98 reads the block at a posting
-    open_item_id          uuid PRIMARY KEY,
+    id                    uuid PRIMARY KEY,
+    open_item_id          uuid NOT NULL CONSTRAINT uq_open_item_collection_open_item_id UNIQUE,
     company_id            uuid NOT NULL,
     dunning_level         integer NOT NULL DEFAULT 0 CONSTRAINT ck_open_item_collection_dunning_level CHECK (dunning_level >= 0),   -- the level of cash.dunning.levels last reminded
     last_reminder_date    date,
@@ -1346,7 +1346,7 @@ CREATE TABLE open_item_collection (                        -- change-tracked (AD
     payment_block_reason  text CONSTRAINT ck_open_item_collection_payment_block_reason CHECK (payment_block_reason IN ('duplicate_review', 'manual')),   -- interim: not stated in ADR-0048 (why the item is held)
     is_disputed           boolean NOT NULL DEFAULT false,
     dispute_reason        text,
-    recorded_at           timestamptz NOT NULL,
+    recorded_at           timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT ck_open_item_collection_payment_block CHECK (is_payment_blocked = (payment_block_reason IS NOT NULL)),
     CONSTRAINT ck_open_item_collection_dispute CHECK (is_disputed = (dispute_reason IS NOT NULL)),
     CONSTRAINT ck_open_item_collection_reminder CHECK ((dunning_level = 0) = (last_reminder_date IS NULL))
@@ -1378,8 +1378,6 @@ CREATE TABLE business_date_override (                      -- one row per compan
     recorded_at    timestamptz NOT NULL DEFAULT now(),     -- the last write (ADR-0007 rule 9; trigger below)
     UNIQUE (company_id)
 );
-CREATE TRIGGER trg_business_date_override_set_recorded_at BEFORE UPDATE ON business_date_override
-    FOR EACH ROW EXECUTE FUNCTION set_recorded_at();
 
 -- ===== Command idempotency [registry] (ADR-0008 rules 14-19, 21; ADR-0017 rule 19; ADR-0038 rules 1, 4, 8; INV-89) =====
 -- An execution's first write after the checks: INSERT ... ON CONFLICT DO NOTHING of (actor, scope, key, request hash); the
@@ -1406,8 +1404,6 @@ CREATE TABLE idempotency_record (
 );
 -- The retention job of rule 19 deletes by age.
 CREATE INDEX ix_idempotency_record_recorded_at ON idempotency_record (recorded_at);
-CREATE TRIGGER trg_idempotency_record_set_recorded_at BEFORE UPDATE ON idempotency_record
-    FOR EACH ROW EXECUTE FUNCTION set_recorded_at();
 
 -- ===== Regime settings [localization] (ADR-0016 rules 3, 6, 9-13; ADR-0063 rule 1) =====
 -- Package rules, loaded with the package version at deployment and compared with the installed rows by identity (rules 3,
@@ -1430,8 +1426,6 @@ CREATE TABLE regime_setting (                              -- installation data
     -- Named by hand: the convention name would exceed 63 bytes (ADR-0004 rule 6).
     CONSTRAINT uq_regime_setting_identity UNIQUE NULLS NOT DISTINCT (localization_package, accounting_regime, key, effective_from)   -- identity (rule 9)
 );
-CREATE TRIGGER trg_regime_setting_set_recorded_at BEFORE UPDATE ON regime_setting
-    FOR EACH ROW EXECUTE FUNCTION set_recorded_at();
 
 -- ===== Fiscal calendar, posting periods and close tasks [periods] (ADR-0007 rules 18-22; ADR-0012 rules 1-16; ADR-0044 rule 2) =====
 -- Company data written by CreateFiscalYear, the next-year job and CreateMigration (ADR-0012 rules 1, 3; ADR-0044 rule 2).
@@ -1456,8 +1450,6 @@ CREATE TABLE fiscal_year (
     CONSTRAINT ck_fiscal_year_migration CHECK (NOT is_migration OR start_date = end_date),   -- one day (ADR-0044 rule 2)
     CONSTRAINT ex_fiscal_year_overlap EXCLUDE USING gist (company_id WITH =, daterange(start_date, end_date, '[]') WITH &&)   -- ADR-0007 rule 18
 );
-CREATE TRIGGER trg_fiscal_year_set_recorded_at BEFORE UPDATE ON fiscal_year
-    FOR EACH ROW EXECUTE FUNCTION set_recorded_at();
 CREATE TABLE posting_period (                              -- found by range lookup, never by formula (ADR-0007 rule 19)
     id              uuid PRIMARY KEY,
     company_id      uuid NOT NULL REFERENCES company (id),
@@ -1475,8 +1467,6 @@ CREATE TABLE posting_period (                              -- found by range loo
     -- Non-overlap applies to regular periods only (ADR-0012 rule 1).
     CONSTRAINT ex_posting_period_overlap EXCLUDE USING gist (company_id WITH =, daterange(start_date, end_date, '[]') WITH &&) WHERE (kind = 'regular')
 );
-CREATE TRIGGER trg_posting_period_set_recorded_at BEFORE UPDATE ON posting_period
-    FOR EACH ROW EXECUTE FUNCTION set_recorded_at();
 -- Updated in place by the period commands under an exclusive lock; postings read it FOR SHARE (ADR-0012 rule 9;
 -- journal_line_check_insert, DS-06). Change-tracked (ADR-0038 rule 3). New regular periods start open, special ones soft_locked
 -- (ADR-0012 rule 6).
@@ -1490,8 +1480,6 @@ CREATE TABLE posting_period_area_state (
     UNIQUE (posting_period_id, area),
     FOREIGN KEY (company_id, posting_period_id) REFERENCES posting_period (company_id, id)
 );
-CREATE TRIGGER trg_posting_period_area_state_set_recorded_at BEFORE UPDATE ON posting_period_area_state
-    FOR EACH ROW EXECUTE FUNCTION set_recorded_at();
 -- Copied from the company's checklist template when the period is first restricted; a special period's tasks are copied when the
 -- year's last regular period is first restricted in general (ADR-0012 rule 11; ADR-0016 rule 7; ADR-0049 rule 23).
 -- A task goes back to pending when it is no longer current or after UnlockPostingPeriod (rule 12), and a sequential task's
@@ -1526,8 +1514,6 @@ CREATE TABLE close_task (
     CONSTRAINT ck_close_task_done CHECK (state <> 'done' OR (completed_at IS NOT NULL AND actor_kind IS NOT NULL AND (kind = 'manual' OR entry_count_at_done IS NOT NULL))),
     CONSTRAINT ck_close_task_skipped CHECK (state <> 'skipped' OR NOT is_required)   -- SkipCloseTask skips optional tasks only (rules 13-14)
 );
-CREATE TRIGGER trg_close_task_set_recorded_at BEFORE UPDATE ON close_task
-    FOR EACH ROW EXECUTE FUNCTION set_recorded_at();
 
 -- ===== Keys closed after their tables (cycles and tables of other design items) =====
 -- work_item -> agent_run -> work_item and document -> work_item would be cycles in a top-down load.
@@ -1934,3 +1920,43 @@ $$;
 -- when it is set, so it is unique across every barcode type of the company.
 CREATE TRIGGER trg_document_register AFTER INSERT OR UPDATE OF number, is_barcoded OR DELETE ON document
     FOR EACH ROW EXECUTE FUNCTION barcode_register('document', 'number', 'id');
+
+-- ===== recorded_at on update (D13; ADR-0007 rules 9, 16 and the rule 16 note) =====
+-- Every table of this file has recorded_at timestamptz NOT NULL DEFAULT now(). The DO block attaches the trigger
+-- trg_<table>_set_recorded_at (BEFORE UPDATE, function set_recorded_at) to every table of v_tables except v_append_only,
+-- so recorded_at is the instant of the last write (D8). Append-only tables are those whose guard trigger refuses every
+-- update outside an erasure, and pure logs; they need no trigger (here: document_version_check_change, platform_check_append_only, platform_reject_change, pure log).
+-- Guards on in-place tables sort before set_recorded_at, so they compare rows before it runs. v_tables lists the file's
+-- tables in file order; lab gen_overview.py --check verifies both lists against the table definitions of the file, and
+-- schema_phase_b.py writes the section. The function is defined in every file because the labs load subsets.
+CREATE OR REPLACE FUNCTION set_recorded_at() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
+BEGIN
+    NEW.recorded_at := now();
+    RETURN NEW;
+END $$;
+DO $$
+DECLARE
+    v_tables       text[] := ARRAY['agent_type', 'agent_type_version', 'work_item', 'work_item_link', 'work_item_note', 'work_case', 'work_case_link',
+        'agent_type_setting', 'agent_run', 'agent_run_step', 'agent_budget_usage', 'approval_procedure', 'policy_rule',
+        'policy_rule_version', 'numbering_configuration', 'numbering_series', 'document', 'document_version',
+        'taint_clearance', 'policy_decision', 'approval', 'auto_post_confirmation', 'period_unlock_request',
+        'posting_intent', 'change_proposal', 'change_proposal_item', 'change_proposal_execution',
+        'change_proposal_execution_item', 'event_subject', 'event_consumer', 'outbox_event', 'event_delivery',
+        'audit_record', 'audit_change', 'audit_denial', 'attachment', 'attachment_link', 'tax_code', 'document_line_tax',
+        'tax_line', 'tax_line_adjustment', 'agent_promotion_evidence', 'money_account', 'payment_method_money_account',
+        'bank_statement', 'bank_statement_line', 'payment', 'payment_line', 'open_item_collection',
+        'business_date_override', 'idempotency_record', 'regime_setting', 'fiscal_year', 'posting_period',
+        'posting_period_area_state', 'close_task'];
+    v_append_only  text[] := ARRAY['agent_promotion_evidence', 'agent_run_step', 'agent_type_version', 'approval', 'audit_change', 'audit_record',
+        'auto_post_confirmation', 'bank_statement', 'change_proposal_execution', 'change_proposal_execution_item',
+        'document_version', 'outbox_event', 'policy_decision', 'taint_clearance', 'tax_line', 'tax_line_adjustment',
+        'work_item_note']::text[];
+    v_table        text;
+BEGIN
+    FOREACH v_table IN ARRAY v_tables LOOP
+        CONTINUE WHEN v_table = ANY (v_append_only) OR to_regclass(v_table) IS NULL;
+        EXECUTE format('CREATE OR REPLACE TRIGGER %I BEFORE UPDATE ON %I FOR EACH ROW EXECUTE FUNCTION set_recorded_at()',
+                       'trg_' || v_table || '_set_recorded_at', v_table);
+    END LOOP;
+END $$;
+-- ===== end of recorded_at on update =====

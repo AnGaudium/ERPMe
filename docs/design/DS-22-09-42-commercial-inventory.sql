@@ -1180,7 +1180,7 @@ CREATE TABLE purchase_invoice_line (
     purchase_order_line_id   uuid,
     service_receipt_line_id  uuid,
     item_id                  uuid,
-    account_id               uuid REFERENCES account (id), -- expense lines: key purchase_expense by item group, or entered
+    account_id               uuid, -- expense lines: key purchase_expense by item group, or entered
     cost_center_id           uuid,
     project_id               uuid,
     quantity                 types.quantity CONSTRAINT ck_purchase_invoice_line_quantity CHECK (quantity > 0),
@@ -1218,7 +1218,8 @@ CREATE TABLE purchase_invoice_line (
     CONSTRAINT ck_purchase_invoice_line_uom_quantity CHECK (abs(inventory_quantity * uom_denominator - quantity * uom_numerator) <= 2 * uom_denominator
         AND (uom_factor_source <> 'identity' OR inventory_quantity = quantity)),
     CONSTRAINT ck_purchase_invoice_line_uom_snapshot CHECK (num_nulls(quantity, uom_id, uom_numerator, uom_denominator, uom_factor_source, inventory_quantity) IN (0, 6)),
-    FOREIGN KEY (company_id, business_unit_id) REFERENCES business_unit (company_id, id)
+    FOREIGN KEY (company_id, business_unit_id) REFERENCES business_unit (company_id, id),
+    FOREIGN KEY (company_id, account_id) REFERENCES account (company_id, id)   -- company key (S2 schema phase B)
 );
 CREATE INDEX ix_purchase_invoice_line_purchase_order_line_id ON purchase_invoice_line (purchase_order_line_id) WHERE purchase_order_line_id IS NOT NULL;
 CREATE TABLE purchase_return (
@@ -1431,6 +1432,7 @@ CREATE TABLE gr_ir_write_off_line (
 -- is_price_copied exempts it from re-pricing when its item, unit, quantity or date changes; repricing (quotation_expired
 -- with reprice) clears the flag and writes new steps with source_kind procedure.
 CREATE TABLE document_line_price_step (                    -- [documents] ADR-0047 rule 16; written by sales and purchasing pricing
+    id                        uuid PRIMARY KEY,
     company_id                uuid NOT NULL,
     document_id               uuid NOT NULL,
     line_number               integer NOT NULL,
@@ -1443,7 +1445,7 @@ CREATE TABLE document_line_price_step (                    -- [documents] ADR-00
     copied_from_document_id   uuid,
     copied_from_line_number   integer,
     recorded_at               timestamptz NOT NULL DEFAULT now(),
-    PRIMARY KEY (document_id, line_number, step_number),
+    CONSTRAINT uq_document_line_price_step_document_id_line_number_step_number UNIQUE (document_id, line_number, step_number),
     FOREIGN KEY (company_id, document_id) REFERENCES document (company_id, id),
     FOREIGN KEY (company_id, copied_from_document_id) REFERENCES document (company_id, id),
     CONSTRAINT ck_document_line_price_step_copied CHECK ((source_kind = 'copied') = (copied_from_document_id IS NOT NULL AND copied_from_line_number IS NOT NULL)),
@@ -1451,19 +1453,21 @@ CREATE TABLE document_line_price_step (                    -- [documents] ADR-00
 );
 -- Free text for is_custom values (ADR-0046 rule 9; ADR-0045 rule 15): personal and untrusted.
 CREATE TABLE document_line_custom_text (                   -- [documents] ADR-0046 rule 9; ADR-0045 rule 15
+    id                    uuid PRIMARY KEY,   -- uq_document_line_custom_text_key named by hand: the convention name would exceed 63 bytes (ADR-0004 rule 6)
     company_id            uuid NOT NULL,
     document_id           uuid NOT NULL,
     line_number           integer NOT NULL,
     variant_attribute_id  uuid NOT NULL,
     text                  text NOT NULL,
     recorded_at           timestamptz NOT NULL DEFAULT now(),
-    PRIMARY KEY (document_id, line_number, variant_attribute_id),
+    CONSTRAINT uq_document_line_custom_text_key UNIQUE (document_id, line_number, variant_attribute_id),
     FOREIGN KEY (company_id, document_id) REFERENCES document (company_id, id),
     FOREIGN KEY (company_id, variant_attribute_id) REFERENCES variant_attribute (company_id, id)
 );
 -- The installment schedule of an invoice, part of its content (ADR-0047 rule 6; ADR-0026 rule 5); open items are
 -- derived from it at posting. interim: table not named in ADR-0047.
 CREATE TABLE document_installment (                        -- [documents] ADR-0047 rule 6; ADR-0026 rule 5
+    id                    uuid PRIMARY KEY,
     company_id            uuid NOT NULL,
     document_id           uuid NOT NULL,
     installment_number    integer NOT NULL CONSTRAINT ck_document_installment_installment_number CHECK (installment_number > 0),
@@ -1472,7 +1476,7 @@ CREATE TABLE document_installment (                        -- [documents] ADR-00
     discount_due_date     date,
     discount_percent      types.percent,
     recorded_at           timestamptz NOT NULL DEFAULT now(),
-    PRIMARY KEY (document_id, installment_number),
+    CONSTRAINT uq_document_installment_document_id_installment_number UNIQUE (document_id, installment_number),
     FOREIGN KEY (company_id, document_id) REFERENCES document (company_id, id),
     CONSTRAINT ck_document_installment_discount CHECK ((discount_due_date IS NULL) = (discount_percent IS NULL))
 );
@@ -1584,7 +1588,7 @@ CREATE TABLE preliminary_price (
     item_id                 uuid NOT NULL,
     valuation_warehouse_id  uuid,                            -- the area at level warehouse; null at levels company and site (ADR-0068 rule 8)
     valuation_site_id       uuid,                            -- the area at level site; null at levels company and warehouse
-    posting_period_id       uuid NOT NULL REFERENCES posting_period (id),
+    posting_period_id       uuid NOT NULL,
     unit_price              types.unit_price NOT NULL CONSTRAINT ck_preliminary_price_unit_price CHECK (unit_price >= 0),   -- company currency per inventory unit
     price_source            text NOT NULL CONSTRAINT ck_preliminary_price_price_source CHECK (price_source IN ('prior_actual', 'area_receipt', 'company_receipt', 'cost_estimate', 'purchase_list', 'last_purchase_invoice', 'opening', 'manual')),   -- interim: not stated in ADR-0020 (which branch of rule 11 gave the price; purchase_list and last_purchase_invoice: its rule 11 note of the UoM simulation review)
     derivation_trace_id     uuid REFERENCES derivation_trace (id),
@@ -1595,7 +1599,8 @@ CREATE TABLE preliminary_price (
     FOREIGN KEY (company_id, valuation_warehouse_id) REFERENCES warehouse (company_id, id),
     CONSTRAINT ck_preliminary_price_manual CHECK ((price_source = 'manual') = (set_by_user_id IS NOT NULL)),
     FOREIGN KEY (company_id, valuation_site_id) REFERENCES site (company_id, id),
-    CONSTRAINT ck_preliminary_price_valuation_area CHECK (valuation_site_id IS NULL OR valuation_warehouse_id IS NULL)
+    CONSTRAINT ck_preliminary_price_valuation_area CHECK (valuation_site_id IS NULL OR valuation_warehouse_id IS NULL),
+    FOREIGN KEY (company_id, posting_period_id) REFERENCES posting_period (company_id, id)   -- company key (S2 schema phase B)
 );
 
 -- ===== Reservations and warehouse tasks [inventory] (ADR-0023 rules 13-15, 20; ADR-0028 rule 2; ADR-0031 rule 6) =====
@@ -2280,3 +2285,44 @@ CREATE INDEX ix_transfer_order_line_company_id_item_id ON transfer_order_line (c
 -- demand_supply_line gets the key its step 3 column was waiting for (ADR-0028 rule 2).
 ALTER TABLE demand_supply_line ADD CONSTRAINT fk_demand_supply_line_transfer_order_line
     FOREIGN KEY (company_id, transfer_order_line_id) REFERENCES transfer_order_line (company_id, id);
+
+-- ===== recorded_at on update (D13; ADR-0007 rules 9, 16 and the rule 16 note) =====
+-- Every table of this file has recorded_at timestamptz NOT NULL DEFAULT now(). The DO block attaches the trigger
+-- trg_<table>_set_recorded_at (BEFORE UPDATE, function set_recorded_at) to every table of v_tables except v_append_only,
+-- so recorded_at is the instant of the last write (D8). Append-only tables are those whose guard trigger refuses every
+-- update outside an erasure, and pure logs; they need no trigger (here: inventory_reject_change).
+-- Guards on in-place tables sort before set_recorded_at, so they compare rows before it runs. v_tables lists the file's
+-- tables in file order; lab gen_overview.py --check verifies both lists against the table definitions of the file, and
+-- schema_phase_b.py writes the section. The function is defined in every file because the labs load subsets.
+CREATE OR REPLACE FUNCTION set_recorded_at() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
+BEGIN
+    NEW.recorded_at := now();
+    RETURN NEW;
+END $$;
+DO $$
+DECLARE
+    v_tables       text[] := ARRAY['movement_type', 'promotion', 'quotation', 'quotation_line', 'sales_order', 'sales_order_line', 'credit_hold',
+        'purchase_request', 'purchase_request_line', 'purchase_order', 'purchase_order_line', 'handling_unit',
+        'goods_receipt', 'goods_receipt_line', 'return_to_supplier', 'return_to_supplier_line', 'delivery',
+        'delivery_line', 'return_from_customer', 'return_from_customer_line', 'service_receipt', 'service_receipt_line',
+        'sales_invoice', 'sales_invoice_line', 'sales_return', 'sales_return_line', 'credit_note', 'credit_note_line',
+        'debit_note', 'debit_note_line', 'purchase_invoice', 'purchase_invoice_line', 'purchase_return',
+        'purchase_return_line', 'purchase_credit_note', 'purchase_credit_note_line', 'purchase_debit_note',
+        'purchase_debit_note_line', 'gr_ir_write_off', 'gr_ir_write_off_line', 'document_line_price_step',
+        'document_line_custom_text', 'document_installment', 'material_document', 'material_document_line', 'stock_value',
+        'stock_quantity', 'preliminary_price', 'stock_reservation', 'warehouse_task', 'warehouse_movement',
+        'purchase_order_line_gr_ir_layer', 'purchase_order_line_gr_ir_posting', 'pending_receipt_adjustment',
+        'stock_transfer', 'stock_transfer_line', 'stock_count', 'stock_count_line', 'scrap', 'scrap_line',
+        'internal_consumption', 'internal_consumption_line', 'other_receipt', 'other_receipt_line', 'other_issue',
+        'other_issue_line', 'opening_balance', 'opening_balance_line', 'transfer_order', 'transfer_order_line'];
+    v_append_only  text[] := ARRAY['material_document', 'material_document_line', 'purchase_order_line_gr_ir_layer',
+        'purchase_order_line_gr_ir_posting', 'warehouse_movement']::text[];
+    v_table        text;
+BEGIN
+    FOREACH v_table IN ARRAY v_tables LOOP
+        CONTINUE WHEN v_table = ANY (v_append_only) OR to_regclass(v_table) IS NULL;
+        EXECUTE format('CREATE OR REPLACE TRIGGER %I BEFORE UPDATE ON %I FOR EACH ROW EXECUTE FUNCTION set_recorded_at()',
+                       'trg_' || v_table || '_set_recorded_at', v_table);
+    END LOOP;
+END $$;
+-- ===== end of recorded_at on update =====

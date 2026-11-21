@@ -267,7 +267,7 @@ if "--load" in sys.argv:
     def ext(cx, source="shop", table="partner", key="C-1", entity=None):
         ins(cx, "external_id_map", company_id=I["co"], source_system=source, table_name=table, external_key=key, entity_id=entity or I["sold"])
     ext(c)
-    trial("X31 a key names one entity in a source system", lambda cx: ext(cx, entity=I["ship"]), "external_id_map_pkey")
+    trial("X31 a key names one entity in a source system", lambda cx: ext(cx, entity=I["ship"]), "uq_external_id_map_key")
     trial("X32 an entity has one key in a source system", lambda cx: ext(cx, key="C-2"), "uq_external_id_map_entity")
     ext(c, source="edi", key="C-1", entity=I["ship"])
     check("X33 the same key may name another entity in another source system", True)

@@ -40,7 +40,7 @@ CREATE TABLE automation_rule (                             -- company data; the 
     shadow_version_id   uuid,                              -- at most one version in shadow
     disabled_at         timestamptz,                       -- rules 9, 16, 25
     disabled_reason     text CONSTRAINT ck_automation_rule_disabled_reason CHECK (disabled_reason IN ('circuit_breaker', 'owner_inactive', 'upgrade_invalid', 'person')),
-    recorded_at         timestamptz NOT NULL,
+    recorded_at         timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, code),
     UNIQUE (company_id, id),
     CONSTRAINT ck_automation_rule_disabled CHECK ((disabled_at IS NULL) = (disabled_reason IS NULL)),
@@ -76,7 +76,7 @@ CREATE TABLE automation_rule_version (
     drafting_window_from   date,                           -- ADR-0059 rule 15; null: from the beginning
     drafting_window_to     date NOT NULL,                  -- every draft has one; a person's defaults to the draft's date
     change_proposal_id     uuid,                           -- the approved proposal that last raised its state
-    recorded_at            timestamptz NOT NULL,
+    recorded_at            timestamptz NOT NULL DEFAULT now(),
     UNIQUE (automation_rule_id, version),
     UNIQUE (company_id, id),
     UNIQUE (company_id, automation_rule_id, id),
@@ -120,7 +120,7 @@ CREATE TABLE automation_execution (
     is_tainted                  boolean NOT NULL,
     origin_agent_run_id         uuid,
     on_behalf_of_id             uuid NOT NULL REFERENCES user_account (id),   -- the rule's owner at execution (rule 9)
-    recorded_at                 timestamptz NOT NULL,
+    recorded_at                 timestamptz NOT NULL DEFAULT now(),
     UNIQUE (automation_rule_version_id, event_id, mode),  -- rule 17
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, automation_rule_id, automation_rule_version_id) REFERENCES automation_rule_version (company_id, automation_rule_id, id),
@@ -143,20 +143,22 @@ CREATE UNIQUE INDEX ux_automation_execution_chain_target ON automation_execution
 CREATE INDEX ix_automation_execution_rule_recorded ON automation_execution (company_id, automation_rule_id, business_date, recorded_at);
 -- ADR-0058 rule 9: subjects outside the owner's scope are not evaluated; a value-free count per rule and business date.
 CREATE TABLE automation_scope_skip (
+    id                  uuid PRIMARY KEY,
     company_id          uuid NOT NULL,
     automation_rule_id  uuid NOT NULL,
     business_date       date NOT NULL,
     skipped_count       integer NOT NULL CONSTRAINT ck_automation_scope_skip_count CHECK (skipped_count >= 1),
-    recorded_at         timestamptz NOT NULL,
-    PRIMARY KEY (automation_rule_id, business_date),
+    recorded_at         timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_automation_scope_skip_automation_rule_id_business_date UNIQUE (automation_rule_id, business_date),
     FOREIGN KEY (company_id, automation_rule_id) REFERENCES automation_rule (company_id, id)
 );
 -- ADR-0058 rule 15: one row per company, locked by every activation, enable, rollback and demotion (ADR-0027 rule 10, class 3).
 CREATE TABLE configuration_state (
-    company_id        uuid PRIMARY KEY REFERENCES company (id),
+    id                uuid PRIMARY KEY,   -- one row per company (E3, ADR-0006 rule 1 note)
+    company_id        uuid NOT NULL CONSTRAINT uq_configuration_state_company_id UNIQUE REFERENCES company (id),
     registry_version  text NOT NULL,                       -- the registry the active set was last checked against
     last_checked_at   timestamptz,
-    recorded_at       timestamptz NOT NULL
+    recorded_at       timestamptz NOT NULL DEFAULT now()
 );
 
 -- ===== Decision tables [configuration] (ADR-0058 rules 18-20) =====
@@ -168,7 +170,7 @@ CREATE TABLE decision_table (                              -- company data; the 
     owner_user_id       uuid NOT NULL REFERENCES user_account (id),
     current_version_id  uuid,
     shadow_version_id   uuid,
-    recorded_at         timestamptz NOT NULL,
+    recorded_at         timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, code),
     UNIQUE (company_id, id),
     CONSTRAINT ck_decision_table_pointers CHECK (current_version_id IS NULL OR current_version_id IS DISTINCT FROM shadow_version_id)
@@ -194,7 +196,7 @@ CREATE TABLE decision_table_version (                      -- immutable once out
     drafting_window_from   date,
     drafting_window_to     date NOT NULL,
     change_proposal_id     uuid,
-    recorded_at            timestamptz NOT NULL,
+    recorded_at            timestamptz NOT NULL DEFAULT now(),
     UNIQUE (decision_table_id, version),
     UNIQUE (company_id, id),
     UNIQUE (company_id, decision_table_id, id),
@@ -210,13 +212,14 @@ CREATE TABLE decision_table_version (                      -- immutable once out
     CONSTRAINT ck_decision_table_version_window CHECK (drafting_window_from IS NULL OR drafting_window_from <= drafting_window_to)
 );
 CREATE TABLE decision_table_row (                          -- frozen with its version (trigger below)
+    id                         uuid PRIMARY KEY,
     company_id                 uuid NOT NULL,
     decision_table_version_id  uuid NOT NULL,
     row_number                 integer NOT NULL CONSTRAINT ck_decision_table_row_row_number CHECK (row_number BETWEEN 1 AND 200),   -- rule 18
     cells                      jsonb NOT NULL,             -- per input code: {"in": [...]}, {"min": x, "max": y} (half-open) or {"is": true|false}; absent means any
     outputs                    jsonb NOT NULL,             -- per output code: a typed value
-    recorded_at                timestamptz NOT NULL,
-    PRIMARY KEY (decision_table_version_id, row_number),
+    recorded_at                timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_decision_table_row_decision_table_version_id_row_number UNIQUE (decision_table_version_id, row_number),
     FOREIGN KEY (company_id, decision_table_version_id) REFERENCES decision_table_version (company_id, id),
     CONSTRAINT ck_decision_table_row_cells CHECK (jsonb_typeof(cells) = 'object'),
     CONSTRAINT ck_decision_table_row_outputs CHECK (jsonb_typeof(outputs) = 'object')
@@ -230,7 +233,7 @@ CREATE TABLE parameter_set (                               -- company data; one 
     owner_user_id       uuid NOT NULL REFERENCES user_account (id),
     current_version_id  uuid,                              -- null: the core defaults of the registry are in force
     shadow_version_id   uuid,
-    recorded_at         timestamptz NOT NULL,
+    recorded_at         timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, function_code),
     UNIQUE (company_id, id),
     CONSTRAINT ck_parameter_set_pointers CHECK (current_version_id IS NULL OR current_version_id IS DISTINCT FROM shadow_version_id)
@@ -254,7 +257,7 @@ CREATE TABLE parameter_set_version (                       -- immutable once out
     drafting_window_from   date,
     drafting_window_to     date NOT NULL,
     change_proposal_id     uuid,
-    recorded_at            timestamptz NOT NULL,
+    recorded_at            timestamptz NOT NULL DEFAULT now(),
     UNIQUE (parameter_set_id, version),
     UNIQUE (company_id, id),
     UNIQUE (company_id, parameter_set_id, id),
@@ -268,6 +271,7 @@ CREATE TABLE parameter_set_version (                       -- immutable once out
 -- One per declared parameter, with the declaration's type, default and bounds copied at the version's function version;
 -- frozen with its version (trigger below).
 CREATE TABLE parameter_set_value (
+    id                        uuid PRIMARY KEY,
     company_id                uuid NOT NULL,
     parameter_set_version_id  uuid NOT NULL,
     parameter_code            text NOT NULL CONSTRAINT ck_parameter_set_value_code CHECK (parameter_code ~ '^[a-z][a-z0-9_]*$'),
@@ -278,8 +282,8 @@ CREATE TABLE parameter_set_value (
     min_value                 numeric NOT NULL,
     max_value                 numeric NOT NULL,
     is_safety_cap             boolean NOT NULL DEFAULT false,   -- lowered only and never off: the maximum is the core default (rule 3)
-    recorded_at               timestamptz NOT NULL,
-    PRIMARY KEY (parameter_set_version_id, parameter_code),
+    recorded_at               timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_parameter_set_value_parameter_set_version_id_parameter_code UNIQUE (parameter_set_version_id, parameter_code),
     FOREIGN KEY (company_id, parameter_set_version_id) REFERENCES parameter_set_version (company_id, id),
     CONSTRAINT ck_parameter_set_value_bounds CHECK (min_value <= max_value),
     CONSTRAINT ck_parameter_set_value_in_bounds CHECK (value IS NULL OR value BETWEEN min_value AND max_value),   -- parameter_out_of_bounds
@@ -325,7 +329,7 @@ CREATE TABLE artifact_promotion_evidence (                 -- immutable; compute
     drafted_by_filtered_run  boolean NOT NULL DEFAULT false,   -- the version came from a held-out-filtered drafting run, not a person (rule 16)
     created_by_kind          text NOT NULL DEFAULT 'human' CONSTRAINT ck_artifact_promotion_evidence_created_by_kind CHECK (created_by_kind IN ('human', 'system')),
     created_by_user_id       uuid REFERENCES user_account (id),   -- null when the monitor job wrote a re-evaluation
-    recorded_at              timestamptz NOT NULL,
+    recorded_at              timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     CONSTRAINT ck_artifact_promotion_evidence_windows CHECK (evaluation_window_from <= evaluation_window_to
         AND (drafting_window_from IS NULL OR drafting_window_from <= drafting_window_to)),
@@ -363,7 +367,7 @@ CREATE TABLE artifact_transition (                         -- immutable; one per
     actor_kind                   text NOT NULL CONSTRAINT ck_artifact_transition_actor_kind CHECK (actor_kind IN ('human', 'agent', 'integration', 'system')),
     actor_id                     uuid NOT NULL,
     on_behalf_of_id              uuid REFERENCES user_account (id),
-    recorded_at                  timestamptz NOT NULL,
+    recorded_at                  timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, evidence_id) REFERENCES artifact_promotion_evidence (company_id, id),
     FOREIGN KEY (company_id, change_proposal_id) REFERENCES change_proposal (company_id, id),
@@ -389,7 +393,7 @@ CREATE TABLE artifact_shadow_outcome (
     shadow_outcome       jsonb NOT NULL,
     current_outcome      jsonb NOT NULL,                   -- what the version in force (or the core defaults) decided
     current_hash         text NOT NULL CONSTRAINT ck_artifact_shadow_outcome_current_hash CHECK (current_hash ~ '^[0-9a-f]{64}$'),
-    recorded_at          timestamptz NOT NULL,
+    recorded_at          timestamptz NOT NULL DEFAULT now(),
     UNIQUE (artifact_version_id, case_table, case_id)
 );
 
@@ -405,7 +409,7 @@ CREATE TABLE golden_case_label (                           -- company data; appe
     labelled_by_user_id  uuid NOT NULL REFERENCES user_account (id),
     labelled_on          date NOT NULL,
     retired_at           timestamptz,                      -- set once when a later label replaces it
-    recorded_at          timestamptz NOT NULL,
+    recorded_at          timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     -- Rule 16: held out when the first byte of SHA-256 of the UTF-8 text '<company_id>:<case_id>' (canonical UUIDs) is below 51.
     CONSTRAINT ck_golden_case_label_held_out CHECK (is_held_out = (get_byte(sha256(convert_to(company_id::text || ':' || case_id::text, 'UTF8')), 0) < 51))
@@ -428,7 +432,7 @@ CREATE TABLE artifact_monitor_snapshot (                   -- immutable; one per
     thresholds              jsonb NOT NULL,
     result                  text NOT NULL CONSTRAINT ck_artifact_monitor_snapshot_result CHECK (result IN ('within', 'breached', 'too_few_decisions')),
     transition_id           uuid,                          -- the demotion a breach caused
-    recorded_at             timestamptz NOT NULL,
+    recorded_at             timestamptz NOT NULL DEFAULT now(),
     UNIQUE (artifact_version_id, window_to),
     FOREIGN KEY (company_id, transition_id) REFERENCES artifact_transition (company_id, id),
     CONSTRAINT ck_artifact_monitor_snapshot_window CHECK (window_from <= window_to),
@@ -668,3 +672,34 @@ BEGIN
     END LOOP;
 END
 $$;
+
+-- ===== recorded_at on update (D13; ADR-0007 rules 9, 16 and the rule 16 note) =====
+-- Every table of this file has recorded_at timestamptz NOT NULL DEFAULT now(). The DO block attaches the trigger
+-- trg_<table>_set_recorded_at (BEFORE UPDATE, function set_recorded_at) to every table of v_tables except v_append_only,
+-- so recorded_at is the instant of the last write (D8). Append-only tables are those whose guard trigger refuses every
+-- update outside an erasure, and pure logs; they need no trigger (here: platform_reject_change).
+-- Guards on in-place tables sort before set_recorded_at, so they compare rows before it runs. v_tables lists the file's
+-- tables in file order; lab gen_overview.py --check verifies both lists against the table definitions of the file, and
+-- schema_phase_b.py writes the section. The function is defined in every file because the labs load subsets.
+CREATE OR REPLACE FUNCTION set_recorded_at() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
+BEGIN
+    NEW.recorded_at := now();
+    RETURN NEW;
+END $$;
+DO $$
+DECLARE
+    v_tables       text[] := ARRAY['automation_rule', 'automation_rule_version', 'automation_execution', 'automation_scope_skip',
+        'configuration_state', 'decision_table', 'decision_table_version', 'decision_table_row', 'parameter_set',
+        'parameter_set_version', 'parameter_set_value', 'artifact_promotion_evidence', 'artifact_transition',
+        'artifact_shadow_outcome', 'golden_case_label', 'artifact_monitor_snapshot'];
+    v_append_only  text[] := ARRAY['artifact_monitor_snapshot', 'artifact_promotion_evidence', 'artifact_shadow_outcome', 'artifact_transition',
+        'automation_execution']::text[];
+    v_table        text;
+BEGIN
+    FOREACH v_table IN ARRAY v_tables LOOP
+        CONTINUE WHEN v_table = ANY (v_append_only) OR to_regclass(v_table) IS NULL;
+        EXECUTE format('CREATE OR REPLACE TRIGGER %I BEFORE UPDATE ON %I FOR EACH ROW EXECUTE FUNCTION set_recorded_at()',
+                       'trg_' || v_table || '_set_recorded_at', v_table);
+    END LOOP;
+END $$;
+-- ===== end of recorded_at on update =====

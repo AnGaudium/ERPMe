@@ -31,3 +31,5 @@ print("-- external:", ", ".join(external), file=sys.stderr)
 print("-- order:", ", ".join(order), file=sys.stderr)
 out = [tables[t] for t in order] + others
 sys.stdout.write("".join(out))
+from lab import id_default_shim_sql  # noqa: E402  the lab-only id default of S2 schema phase B (lab.py, README)
+sys.stdout.write("\n" + id_default_shim_sql())

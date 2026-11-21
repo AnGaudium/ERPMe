@@ -110,7 +110,7 @@ for e, u, d, mgr in (("eM", "uM", "dSales", None), ("eA", "uA", "dSales", "eM"),
     X("insert into employee_profile (company_id, partner_id, user_account_id, department_id, manager_partner_id) values (%s,%s,%s,%s,%s)",
       (I["co"], I[e], I[u], I[d], I[mgr] if mgr else None))
 X("insert into team (id, company_id, code, name) values (%s,%s,'T','T')", (I["team"], I["co"]))
-X("insert into team_member values (%s,%s,%s),(%s,%s,%s)", (I["co"], I["team"], I["eA"], I["co"], I["team"], I["eC"]))
+X("insert into team_member values (uuidv7(), %s,%s,%s),(uuidv7(), %s,%s,%s)", (I["co"], I["team"], I["eA"], I["co"], I["team"], I["eC"]))
 X("""insert into role (id, company_id, code, name, basis, registry_version, expansion_hash) values (%s,%s,'r','R','{"kind":"company_decision"}','lab','x'),
      (%s,%s,'r2','R2','{"kind":"company_decision"}','lab','x')""", (I["role"], I["co"], I["role2"], I["co2"]))
 
@@ -131,9 +131,9 @@ expect("B6 assignment granted to oneself", lambda cx: ra(cx, granted="uA"), True
 expect("B7 assignment ending before it starts", lambda cx: ra(cx, vfrom="2026-02-01", vto="2026-01-31"), True, "ck_role_assignment_dates")
 expect("B8 assignment of another company's role", lambda cx: ra(cx, role="role2"), True, "foreign key")
 expect("B9 role level that approves at level none",
-       lambda cx: cx.execute("insert into role_level values (%s,%s,'sales','none',true)", (I["co"], I["role"])), True, "ck_role_level_approve")
+       lambda cx: cx.execute("insert into role_level values (uuidv7(), %s,%s,'sales','none',true)", (I["co"], I["role"])), True, "ck_role_level_approve")
 expect("B10 record scope row naming both a branch and a warehouse",
-       lambda cx: (ra(cx), cx.execute("""insert into role_assignment_scope select company_id, id, %s, %s from role_assignment where user_account_id=%s limit 1""",
+       lambda cx: (ra(cx), cx.execute("""insert into role_assignment_scope select uuidv7(), company_id, id, %s, %s from role_assignment where user_account_id=%s limit 1""",
                                       (I["b1"], new(), I["uA"]))), True, "ck_role_assignment_scope_one")
 expect("B11 record scope on another company's branch",
        lambda cx: (ra(cx), cx.execute("""insert into role_assignment_scope (company_id, role_assignment_id, branch_id) select company_id, id, %s from role_assignment where user_account_id=%s limit 1""",
@@ -159,9 +159,9 @@ expect("B20 integration token valid for more than a year",
        True, "ck_integration_token_expiry")
 X("insert into approval_pool (id, company_id, code, name, basis) values (%s,%s,'po','PO','{}')", (I["pool"], I["co"]))
 expect("B21 a second default selector row for one document type",
-       lambda cx: cx.execute("insert into approval_pool_document_type values (%s,'purchase_order',0,null,%s),(%s,'purchase_order',0,null,%s)", (I["co"], I["pool"], I["co"], I["pool"])), True, "duplicate key")
+       lambda cx: cx.execute("insert into approval_pool_document_type values (uuidv7(), %s,'purchase_order',0,null,%s),(uuidv7(), %s,'purchase_order',0,null,%s)", (I["co"], I["pool"], I["co"], I["pool"])), True, "duplicate key")
 expect("B22 a default selector row with a condition",
-       lambda cx: cx.execute("insert into approval_pool_document_type values (%s,'purchase_order',0,'is_direct_expense',%s)", (I["co"], I["pool"])), True, "ck_approval_pool_document_type_default")
+       lambda cx: cx.execute("insert into approval_pool_document_type values (uuidv7(), %s,'purchase_order',0,'is_direct_expense',%s)", (I["co"], I["pool"])), True, "ck_approval_pool_document_type_default")
 expect("B23 a stage needing zero approvals",
        lambda cx: cx.execute("insert into approval_stage (id, company_id, approval_pool_id, sequence, code, name, min_rank, required_approvals) values (%s,%s,%s,1,'s','S',10,0)", (new(), I["co"], I["pool"])), True, "ck_approval_stage_required_approvals")
 expect("B24 two stages with one sequence",
@@ -169,7 +169,7 @@ expect("B24 two stages with one sequence",
                              (new(), I["co"], I["pool"], new(), I["co"], I["pool"])), True, "duplicate key")
 expect("B25 a stage member that names both a user and a role",
        lambda cx: (cx.execute("insert into approval_stage (id, company_id, approval_pool_id, sequence, code, name, min_rank, required_approvals) values (%s,%s,%s,1,'a','A',10,1)", (I["stage"], I["co"], I["pool"])),
-                   cx.execute("insert into approval_stage_member values (%s,%s,'user',%s,%s)", (I["co"], I["stage"], I["uA"], I["role"]))), True, "ck_approval_stage_member_target")
+                   cx.execute("insert into approval_stage_member values (uuidv7(), %s,%s,'user',%s,%s)", (I["co"], I["stage"], I["uA"], I["role"]))), True, "ck_approval_stage_member_target")
 
 # ---------------------------------------------------------------- C: levels and their expansion
 AREAS = read_csv("authorization-areas.csv")
@@ -559,9 +559,9 @@ check("C29b agent-assisted analysis (ADR-0060 rule 36): every template runs plan
 perms = expand(TPL["sales_manager"])
 X("update role set expansion_hash=%s, registry_version='lab' where id=%s", (ehash(perms), I["role"]))
 for node, (lvl, appr) in TPL["sales_manager"].items():
-    X("insert into role_level values (%s,%s,%s,%s,%s)", (I["co"], I["role"], node, lvl, appr))
+    X("insert into role_level values (uuidv7(), %s,%s,%s,%s,%s)", (I["co"], I["role"], node, lvl, appr))
 with c.cursor() as cur:
-    cur.executemany("insert into role_permission values (%s,%s,%s)", [(I["co"], I["role"], p) for p in perms])
+    cur.executemany("insert into role_permission values (uuidv7(), %s,%s,%s)", [(I["co"], I["role"], p) for p in perms])
 stored_rows = {r[0]: (r[1], r[2]) for r in X("select authorization_area, level, can_approve from role_level where role_id=%s", (I["role"],))}
 stored = [r[0] for r in X("select permission from role_permission where role_id=%s order by permission collate \"C\"", (I["role"],))]
 h = X("select expansion_hash from role where id=%s", (I["role"],)).fetchone()[0]
@@ -1007,9 +1007,9 @@ for code in ("w1", "w2"):
     X("""insert into role (id, company_id, code, name, template_code, basis, registry_version, expansion_hash) values (%s,%s,%s,%s,'warehouse_keeper','{}','old','x')""",
       (rid, I["co"], code, code))
     for node, (lvl, appr) in TPL["warehouse_keeper"].items():
-        X("insert into role_level values (%s,%s,%s,%s,%s)", (I["co"], rid, node, lvl, appr))
+        X("insert into role_level values (uuidv7(), %s,%s,%s,%s,%s)", (I["co"], rid, node, lvl, appr))
     with c.cursor() as cur:
-        cur.executemany("insert into role_permission values (%s,%s,%s)", [(I["co"], rid, p) for p in expand(TPL["warehouse_keeper"], REG_OLD)])
+        cur.executemany("insert into role_permission values (uuidv7(), %s,%s,%s)", [(I["co"], rid, p) for p in expand(TPL["warehouse_keeper"], REG_OLD)])
     holder["uC"] |= set(expand(TPL["warehouse_keeper"], REG_OLD))
 items = []
 def upgrade(rid, mode="block"):
@@ -1021,7 +1021,7 @@ def upgrade(rid, mode="block"):
             X("insert into role_permission_hold (id, company_id, role_id, permission, reason, registry_version, created_at) values (%s,%s,%s,%s,%s,'new',now())",
               (new(), I["co"], rid, p, res_[0][1]))
         else:
-            X("insert into role_permission values (%s,%s,%s)", (I["co"], rid, p))
+            X("insert into role_permission values (uuidv7(), %s,%s,%s)", (I["co"], rid, p))
     if X("select count(*) from role_permission_hold where company_id=%s and state='held'", (I["co"],)).fetchone()[0] and not items:
         items.append(("role_permission_held", I["co"]))
 def inv220(rid):
@@ -1042,7 +1042,7 @@ def confirm_hold(rid, p, user="uB"):
     if r_ == "segregation_conflict":
         return r_
     X("update role_permission_hold set state='granted', decided_at=now(), decided_by_user_id=%s where role_id=%s and permission=%s and state='held'", (I[user], rid, p))
-    X("insert into role_permission values (%s,%s,%s)", (I["co"], rid, p))
+    X("insert into role_permission values (uuidv7(), %s,%s,%s)", (I["co"], rid, p))
     return None
 first = confirm_hold(roles_w["w1"], "PostGoodsReceipt")
 holder["uC"] -= BUYER                                    # the buyer role ends
@@ -1057,7 +1057,7 @@ rows_w2 = {r_[0]: (r_[1], r_[2]) for r_ in X("select authorization_area, level, 
 gain = set(expand(rows_w2)) - {r_[0] for r_ in X("select permission from role_permission where role_id=%s", (roles_w["w2"],))}
 if outcome(change_rights, holder, "UpdateRole", "uC", gain, "block", enabled) != "segregation_conflict":
     with c.cursor() as cur:
-        cur.executemany("insert into role_permission values (%s,%s,%s)", [(I["co"], roles_w["w2"], p) for p in gain])
+        cur.executemany("insert into role_permission values (uuidv7(), %s,%s,%s)", [(I["co"], roles_w["w2"], p) for p in gain])
 check("H15 an ignored hold stays withheld; an UpdateRole that changes levels ends it and stores the full expansion under the checks",
       ignored_withheld and "PostGoodsReceipt" in gain and inv220(roles_w["w2"]))
 
