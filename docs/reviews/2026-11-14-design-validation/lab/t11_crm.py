@@ -42,11 +42,19 @@ ALTER TABLE document ADD COLUMN partner_id uuid, ADD COLUMN document_date date, 
 CREATE TABLE document_version (id uuid PRIMARY KEY, company_id uuid NOT NULL, document_id uuid NOT NULL REFERENCES document (id),
   version integer NOT NULL, content jsonb NOT NULL, recorded_at timestamptz NOT NULL, UNIQUE (document_id, version));
 """
-# The erasure marker check of DS-05 (S2 schema review B1): this lab loads DS-35 without DS-05, so it creates the columns of
-# idempotency_record that erasure_marker_valid() reads (mirroring DS-05) and runs that function's text taken from DS-05.
+# The erasure functions of DS-05 that DS-35's guards call (S2 schema review B1; round 2 R2-N3; round 3): this lab loads
+# DS-35 without DS-05, so it creates the columns of idempotency_record that erasure_marker_valid() reads (mirroring DS-05)
+# and runs each function's text taken from DS-05 by name; a missing function stops the lab.
+ERASURE_FUNCTIONS = ("erasure_marker_valid", "erasure_value_is_erased", "erasure_json_reduced", "erasure_column_change_allowed")
 def erasure_marker_sql():
     ds05 = open(os.path.join(DESIGN, "DS-05-platform.sql"), encoding="utf-8").read()
-    fn = re.search(r"^CREATE FUNCTION erasure_marker_valid\(\).*?^\$\$;$", ds05, re.S | re.M).group(0)
+    fns = []
+    for name in ERASURE_FUNCTIONS:
+        m = re.search(r"^CREATE FUNCTION " + name + r"\(.*?^\$\$;$", ds05, re.S | re.M)
+        if not m:
+            raise SystemExit(f"t11: DS-05-platform.sql has no function {name}, which DS-35's guards call")
+        fns.append(m.group(0))
+    fn = "\n".join(fns)
     return ("CREATE TABLE idempotency_record (id uuid PRIMARY KEY, company_id uuid, actor_kind text NOT NULL, actor_id uuid NOT NULL, scope text NOT NULL,"
             " idempotency_key text NOT NULL, request_hash text NOT NULL, response jsonb, transaction_id xid8 NOT NULL DEFAULT pg_current_xact_id(),"
             " recorded_at timestamptz NOT NULL DEFAULT now());\n" + fn + "\n")
@@ -588,7 +596,9 @@ def participant_twice(cx, second):
 trial("T09 a participant's contact is set once", lambda cx: participant_twice(cx, False), False)
 trial("T10 a participant's contact is not changed after", lambda cx: participant_twice(cx, True), True, "interaction_participant.contact_id is append-only")
 trial("T11 erasure blanks an inbound message's raw fields, generated columns untouched", lambda cx: (erasing(cx), cx.execute(
-    "update inbound_message set message_id=null, sender_address=null, sender_display_name=null, sender_domain=null, sender_authentication='{\"erased\": true}', parse_notes='[]', erased_at=now() where id=%s", (I["m1"],))), False)
+    "update inbound_message set message_id=null, sender_address=null, sender_display_name=null, sender_domain=null, sender_authentication='{}', parse_notes='[]', erased_at=now() where id=%s", (I["m1"],))), False)
+# sender_authentication takes the blank marker {} (catalog row; ADR-0079 rule 1), the only JSON erasure result the guard
+# accepts since S2 schema review round 2 (R2-N3); the older {"erased": true} is not one
 
 # ---- C: complaints
 def complaint(cx, **o):
@@ -854,3 +864,4 @@ check("S04 DS-20's contact phone index exists for the duplicate search", X("sele
 c.close()
 
 print(sum(1 for r in RESULTS if r[0]), "/", len(RESULTS), "passed")
+raise SystemExit(0 if all(r[0] for r in RESULTS) else 1)   # a failing check fails the lab

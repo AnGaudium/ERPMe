@@ -44,3 +44,4 @@ def activation_update(cx):
     cx.execute("update subledger_activation set effective_from='2027-06-01' where id=%s", (a,))
 expect("A04 subledger activation rows are append-only", activation_update, True, "append-only")
 print(sum(1 for r in RESULTS if r[0]), "/", len(RESULTS), "passed")
+raise SystemExit(0 if all(r[0] for r in RESULTS) else 1)   # a failing check fails the lab

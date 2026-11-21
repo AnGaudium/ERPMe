@@ -244,3 +244,4 @@ for name, (it, u, qty, on, vals), want in opt:
     check(name, find_price(c, I["pl"], I[it], I[u], qty, on, tuple(I[v] for v in vals)), want)
 c.close()
 print(sum(1 for r in RESULTS if r[0]), "/", len(RESULTS), "passed")
+raise SystemExit(0 if all(r[0] for r in RESULTS) else 1)   # a failing check fails the lab

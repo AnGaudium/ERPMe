@@ -107,3 +107,4 @@ c.execute("update posting_period_area_state set state='locked' where posting_per
 c.close()
 trial("O05 once CompleteMigration has locked the migration period, opening entries are rejected", lambda cx: opening(cx, "VND", [("a_cash", "debit", 1, 1)]), True, "locked")
 print(sum(1 for r in RESULTS if r[0]), "/", len(RESULTS), "passed")
+raise SystemExit(0 if all(r[0] for r in RESULTS) else 1)   # a failing check fails the lab

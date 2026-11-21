@@ -153,3 +153,4 @@ expect("T24 N1: an entry whose period belongs to another fiscal year is refused"
 expect("T25 N1: an entry whose posting date lies outside its period is refused", lambda cx: entry(cx, doc(cx), 2, date="2027-02-15"), True, "outside the entry's posting period")
 expect("T26 N6: a derivation trace is never updated (ADR-0027 rule 3)", lambda cx: cx.execute("update derivation_trace set result='{\"x\": 1}' where id=%s", (tr,)), True, "append-only")
 print(sum(1 for r in RESULTS if r[0]), "/", len(RESULTS), "passed")
+raise SystemExit(0 if all(r[0] for r in RESULTS) else 1)   # a failing check fails the lab

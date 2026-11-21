@@ -635,3 +635,4 @@ check("H03 the same version reversed, or in another e-invoice state, gets a new 
       (3, "REVERSED", "CANCELED", "DRAFT", None))
 
 print(sum(1 for r in RESULTS if r[0]), "/", len(RESULTS), "passed")
+raise SystemExit(0 if all(r[0] for r in RESULTS) else 1)   # a failing check fails the lab

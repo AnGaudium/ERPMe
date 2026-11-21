@@ -48,3 +48,4 @@ def wrong_kind(cx):
     cx.execute("insert into cost_object (id,company_id,code,name,kind) values (%s,%s,'BAD','bad','cost_pool')", (new(), I["co"]))
 expect("S06 a cost pool without its cost center is rejected", wrong_kind, True, "ck_cost_object_kind_reference")
 print(sum(1 for r in RESULTS if r[0]), "/", len(RESULTS), "passed")
+raise SystemExit(0 if all(r[0] for r in RESULTS) else 1)   # a failing check fails the lab

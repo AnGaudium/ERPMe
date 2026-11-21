@@ -570,3 +570,4 @@ check("K02 estimate of 1600 x 900 steel", kB, D("4394000.0"))
 check("K03 the two configurations' estimates differ, so their configured items start from different costs", kA != kB, True)
 cx.close()
 print(sum(1 for r in RESULTS if r[0]), "/", len(RESULTS), "passed")
+raise SystemExit(0 if all(r[0] for r in RESULTS) else 1)   # a failing check fails the lab

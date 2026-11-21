@@ -250,3 +250,4 @@ check("C02 over the limit: an unreleased order is held; one released, or approve
 check("C03 under the limit: nothing is held", holds([{"id": 1}], D(300000000), D(400000000)), [])
 
 print(sum(1 for r in RESULTS if r[0]), "/", len(RESULTS), "passed")
+raise SystemExit(0 if all(r[0] for r in RESULTS) else 1)   # a failing check fails the lab
