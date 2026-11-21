@@ -61,8 +61,11 @@ class Overrides(unittest.TestCase):
         cls.by = {r["id"]: r for r in cls.rows}
 
     def test_override_replaces_the_default_primary(self):
-        for n in range(9, 16):
+        for n in (9, 10, 12, 14):
             self.assertEqual(self.by[f"ADR-0047.R{n}"]["primary_module"], "purchasing")
+        # S4 routing audit: rule 11 says "(`goods_receipt`, inventory)"; rules 13 and 15 bind both modules
+        self.assertEqual(self.by["ADR-0047.R11"]["primary_module"], "inventory")
+        self.assertEqual(self.by["ADR-0047.R13"]["primary_module"], "inventory;purchasing")
         self.assertEqual(self.by["ADR-0047.R4"]["primary_module"], "sales")
         self.assertEqual(self.by["ADR-0077.R1"]["primary_module"], "app")
         self.assertEqual(self.by["ADR-0077.R13"]["primary_module"], "agents")
