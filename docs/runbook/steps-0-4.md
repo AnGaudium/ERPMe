@@ -129,7 +129,7 @@ Note ([ADR-0073](../adr/0073-coding-pipeline-and-mechanical-assurance.md), 2026-
 
 **Entry criteria:** step 2 gate passed.
 
-**Design items first:** DS-09 algorithm spec (warehouses only; BOM levels left for Phase 2); DS-11 landed cost logic; movement type catalog. The negative-stock time point (a design question for DS-09) is answered; the legal items for step 3 in the [ADR-0003](../adr/0003-build-operating-rules.md) R10 schedule are verified before the gate.
+**Design items first:** DS-09 algorithm spec (warehouses only; BOM levels at step 4b, the production core, [ADR-0032](../adr/0032-phase-1-scope-with-production.md)); DS-11 landed cost logic; movement type catalog. The negative-stock time point (a design question for DS-09) is answered; the legal items for step 3 in the [ADR-0003](../adr/0003-build-operating-rules.md) R10 schedule are verified before the gate.
 
 **Work packages, in order:**
 
@@ -151,7 +151,7 @@ Note ([ADR-0073](../adr/0073-coding-pipeline-and-mechanical-assurance.md), 2026-
 
 **Exit gate (verbatim):**
 
-> Matches golden scenarios, including imports with later costs, and the independent recomputation. No negative stock
+> Matches golden scenarios, including imports with later costs, and the independent recomputation. No negative stock. Putaway, picking, short pick and count flows pass their edge cases
 
 **Artifacts:** inventory and costing modules; DS-09 algorithm spec; movement type catalog; step 3 adapter; naive costing recomputation; golden results.
 
