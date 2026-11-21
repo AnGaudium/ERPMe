@@ -42,6 +42,8 @@ Leads, opportunities, marketing automation, appointments, chat connectors and se
    - interaction summaries, partner insights, tax ID lookups and partner search keys (ADR-0019 rules 18–20).
 
    `audit` owns `personal_data_processing_log` (rule 26). Partners, contacts and their commands stay in `master_data` (DS-20). The ADRs win if the DDL disagrees.
+   Note (S2 findings closure, 2026-11-21; author's decision of 2026-11-17): CRM-only is a deployment profile, not an edition (spec 18's one edition holds). `crm` never depends on `ledger`, `tax`, `inventory`, `cash` or `production`: the import-linter contract `crm_independent_of_accounting` ([ADR-0022](0022-repository-and-engineering-conventions.md) rule 2 note) enforces it, and `crm` imports `master_data` for partners and contacts. The activated module set of the profile is kernel, `master_data` partners and contacts, `crm`, `agents` and `query`, intake, analysis and automation. The timeline of rule 18 and the commercial screens degrade when accounting modules are not activated: entries and actions that belong to a module that is not activated are left out. The DDL side (account links on partner profiles that may be empty, and a record of which modules are activated) is done in DS-20 by another work item.
+
 2. Not in Phase 1, so there is no table or command for them now:
    - **Leads, prospects, opportunities, pipeline** ([09](../spec/09-mvp-scope.md); [13](../spec/13-crm.md) says "draft leads after Phase 1"; ADR-0019 rule 21). A party known only from an e-mail becomes a partner only through rule 16's proposal, with the role it proposes; the approving person decides. Whether a quotation needs the `customer` role is DS-22's.
    - **Marketing automation:** campaigns, lists, bulk sends, unsubscribe links.
@@ -119,7 +121,7 @@ Leads, opportunities, marketing automation, appointments, chat connectors and se
       Only `passed` sets `is_authentication_verified`, and only a completed probe with a negative result (`probe_no_field`, `forged_field_kept`, `field_not_topmost`) clears it; a `transport_error` keeps the last state. The probe proves stripping on the submission path only; that the server treats mail from outside the same way is the administrator's configuration, which the probe cannot see (flagged). A person can repeat the probe with `VerifyMailboxAuthentication`; the consumer also repeats it daily. While `is_authentication_verified` is false, intake marks every message of the mailbox not authenticated, with reason `mailbox_not_verified`, and nothing is matched automatically. Intake skips the probe message by its token.
     - **Ownership.** ADR-0019 listed mailbox connectors under DS-24, which is now the e-invoice add-on (backlog). They belong here.
 
-    Note ([ADR-0057](0057-document-intake-and-extraction.md), proposed 2026-11-15): `mailbox` gains `document_intake_purpose` (`supplier_invoice`, `inquiry_lines` or empty), and `document_intake_quarantine_limit`. `UpdateMailbox` refuses a purpose whose leaf the owner cannot `edit` (`mailbox_owner_not_permitted`). The `crm` consumer `mailbox_document_intake` requests extractions of a message's XML parts first, and of its other parts only after them (or after `crm.document_intake_xml_timeout_minutes`) and only for a message matched to exactly one active partner (rule 15), never for authentication alone. Past the quarantine cap, which counts quarantined records of messages not matched to a partner per receipt date, an XML is extracted but not imported, and `e_invoice_quarantine_overflow` lets the owner import it ([ADR-0057](0057-document-intake-and-extraction.md) rule 25).
+    Note ([ADR-0057](0057-document-intake-and-extraction.md), 2026-11-15): `mailbox` gains `document_intake_purpose` (`supplier_invoice`, `inquiry_lines` or empty), and `document_intake_quarantine_limit`. `UpdateMailbox` refuses a purpose whose leaf the owner cannot `edit` (`mailbox_owner_not_permitted`). The `crm` consumer `mailbox_document_intake` requests extractions of a message's XML parts first, and of its other parts only after them (or after `crm.document_intake_xml_timeout_minutes`) and only for a message matched to exactly one active partner (rule 15), never for authentication alone. Past the quarantine cap, which counts quarantined records of messages not matched to a partner per receipt date, an XML is extracted but not imported, and `e_invoice_quarantine_overflow` lets the owner import it ([ADR-0057](0057-document-intake-and-extraction.md) rule 25).
 12. The intake run:
     - **Not an agent run.** Intake is deterministic code that runs as actor `system` on behalf of the mailbox owner (ADR-0027 rule 14; ADR-0017 rule 12). It calls no LLM and never classifies content. Spec 03 rule 1 restricts agent runs that read untrusted content; intake is not one, so it may record inbound messages and their interactions directly. Labeling every inbound e-mail untrusted (rule 6) is how intake meets that rule.
     - **Schedule.** The job `mailbox_intake` runs per enabled mailbox every `crm.intake_interval_minutes` (company setting, default 5), on the `integrations` queue. `RunMailboxIntake` starts one now; it emits `MailboxIntakeCompleted`.
@@ -161,7 +163,7 @@ Leads, opportunities, marketing automation, appointments, chat connectors and se
 
     Note: the owner rule `role:sales` resolves as `role:sales_clerk`, through `role.template_code` ([ADR-0054](0054-users-roles-and-authorizations.md) rule 11).
 
-    Note ([ADR-0066](0066-work-cases.md), 2026-11-16 (proposed)): where the company sets `work_case.quote_request.mode` to `auto`, the raise of `inbound_message_matched` opens a `quote_request` work case through the consumer `work_case_opener` (and `interaction_unmatched` a `customer_onboarding` case, `complaint_open` a `customer_issue` case, each under its own mode). `crm` itself is unchanged, and the case copies `partner_id` only from the matched interaction ([ADR-0066](0066-work-cases.md) rules 3, 6).
+    Note ([ADR-0066](0066-work-cases.md), 2026-11-21): where the company sets `work_case.quote_request.mode` to `auto`, the raise of `inbound_message_matched` opens a `quote_request` work case through the consumer `work_case_opener` (and `interaction_unmatched` a `customer_onboarding` case, `complaint_open` a `customer_issue` case, each under its own mode). `crm` itself is unchanged, and the case copies `partner_id` only from the matched interaction ([ADR-0066](0066-work-cases.md) rules 3, 6).
 
 **Customer onboarding from e-mail**
 
@@ -185,7 +187,7 @@ Leads, opportunities, marketing automation, appointments, chat connectors and se
 
     Note (simulation review, 2026-11-15): the threshold of [ADR-0019](0019-partners-and-crm-foundation.md) rule 19 is this setting, `crm.duplicate_name_threshold`: a `pg_trgm` similarity of the normalized names, between 0 and 1, default 0.6. The simulation used a token-set ratio of 50 on a 0–100 scale as a stand-in measure; it changes no default.
 
-    Note ([ADR-0059](0059-ai-tuning-and-development-of-deterministic-functions.md), proposed 2026-11-15): the threshold stays the setting `crm.duplicate_name_threshold`. Once `crm` registers `backtest`, `compare` and `monitor` for `crm.find_partner_duplicates`, a company may opt in to tuning by creating its parameter set, seeded from the setting (rule 8).
+    Note ([ADR-0059](0059-ai-tuning-and-development-of-deterministic-functions.md), 2026-11-15): the threshold stays the setting `crm.duplicate_name_threshold`. Once `crm` registers `backtest`, `compare` and `monitor` for `crm.find_partner_duplicates`, a company may opt in to tuning by creating its parameter set, seeded from the setting (rule 8).
 
 **Partner timeline**
 
@@ -202,7 +204,7 @@ Leads, opportunities, marketing automation, appointments, chat connectors and se
 
     Note: a document entry also needs the document inside the actor's read owner scope; otherwise it is left out and `is_scope_filtered` is true ([ADR-0054](0054-users-roles-and-authorizations.md) rule 15).
 
-    Note ([ADR-0074](0074-core-data-structure-additions.md), proposed 2026-11-19): `document.partner_id` and INV-49 stay the sold-to partner (the ordered-from partner on purchases); the other parties of ADR-0074 rule 1 are not CRM links.
+    Note ([ADR-0074](0074-core-data-structure-additions.md), 2026-11-21): `document.partner_id` and INV-49 stay the sold-to partner (the ordered-from partner on purchases); the other parties of ADR-0074 rule 1 are not CRM links.
 
 **Follow-up tasks**
 
@@ -258,17 +260,17 @@ Leads, opportunities, marketing automation, appointments, chat connectors and se
     - **Other modules** react to `DataSubjectErased`, which carries only IDs. `sales`, `purchasing` and `cash` consumers erase their own personal data outside accounting documents (DS-22, DS-25); `imports`' consumer `imports_data_subject_erasure` blanks the subject's values in staging rows of import batches (DS-21). Data on accounting documents is kept for the legal retention period.
     - **Records.** It writes an audit record and a processing log entry (ADR-0038 rule 9).
 
-    Note ([ADR-0057](0057-document-intake-and-extraction.md), proposed 2026-11-15): the subject's document extractions (by partner, by result links to the subject's contact or partner, by the subject's inbound messages) are erased through `attachments.contract`, except the accounting fields of an extraction linked to an incoming e-invoice record or a posted accounting document ([ADR-0057](0057-document-intake-and-extraction.md) rule 19).
+    Note ([ADR-0057](0057-document-intake-and-extraction.md), 2026-11-15): the subject's document extractions (by partner, by result links to the subject's contact or partner, by the subject's inbound messages) are erased through `attachments.contract`, except the accounting fields of an extraction linked to an incoming e-invoice record or a posted accounting document ([ADR-0057](0057-document-intake-and-extraction.md) rule 19).
 
-    Note ([ADR-0076](0076-internal-messaging-and-notifications.md), proposed 2026-11-19): `EraseDataSubject` of a partner also clears the bodies of that partner's record thread and ends their attachment links (ADR-0076 rule 10); threads on the partner's documents are an open question.
+    Note ([ADR-0076](0076-internal-messaging-and-notifications.md), 2026-11-21): `EraseDataSubject` of a partner also clears the bodies of that partner's record thread and ends their attachment links (ADR-0076 rule 10); threads on the partner's documents are an open question.
 
-    Note ([ADR-0079](0079-personal-data-protection.md), proposed 2026-11-21): the snapshots that `sales`, `purchasing` and `cash` keep on posted documents and versions are destroyed after their retention period by `DestroyRetainedPersonalData` (`system`, `is_internal_only`, module `audit`), run by the retention job; `EraseDataSubject` itself stays as this rule defines it. Both commands use the same catalog-driven hooks under the erasure exception of ADR-0079 rule 7: each module destroys its own tables in its consumer of `DataSubjectErased` or `PersonalDataDestructionDue`. Before then the subject is blocked (ADR-0079 rules 6-7, 9).
+    Note ([ADR-0079](0079-personal-data-protection.md), 2026-11-21): the snapshots that `sales`, `purchasing` and `cash` keep on posted documents and versions are destroyed after their retention period by `DestroyRetainedPersonalData` (`system`, `is_internal_only`, module `audit`), run by the retention job; `EraseDataSubject` itself stays as this rule defines it. Both commands use the same catalog-driven hooks under the erasure exception of ADR-0079 rule 7: each module destroys its own tables in its consumer of `DataSubjectErased` or `PersonalDataDestructionDue`. Before then the subject is blocked (ADR-0079 rules 6-7, 9).
 26. `personal_data_processing_log` is owned by `audit` (layer 2), because its writers sit in layers 2 to 5: the LLM gateway (DS-32), tax ID lookups, exports (ADR-0044) and erasure.
     - **Writing.** Through `audit.contract.log_personal_data_processing`, in the caller's transaction.
     - **Columns:** `processing_kind` (`llm_send`, `tax_id_lookup`, `export`, `erasure`), `subject_table` and `subject_id` (none for a whole-company export), `field_names`, `recipient` (provider and model, or lookup provider), `agent_run_id`, `audit_record_id`.
     - **Append-only.** It holds IDs and field names, never values, so erasure keeps it. A trigger refuses every update and delete.
 
-    Note ([ADR-0079](0079-personal-data-protection.md), proposed 2026-11-21): `processing_kind` gains `retention`, one entry per subject and run of `RunPersonalDataRetention` (ADR-0079 rule 9; DS-35).
+    Note ([ADR-0079](0079-personal-data-protection.md), 2026-11-21): `processing_kind` gains `retention`, one entry per subject and run of `RunPersonalDataRetention` (ADR-0079 rule 9; DS-35).
 
 **Outgoing messages**
 
@@ -321,7 +323,7 @@ Leads, opportunities, marketing automation, appointments, chat connectors and se
 
     Event payloads carry IDs, states and codes only, never these fields (ADR-0013 rule 4).
 
-    Note ([ADR-0079](0079-personal-data-protection.md), proposed 2026-11-21): this table is an extract of [personal-data-fields.csv](../catalogs/personal-data-fields.csv); where they disagree the catalog wins and the difference is a defect (ADR-0079 rule 2).
+    Note ([ADR-0079](0079-personal-data-protection.md), 2026-11-21): this table is an extract of [personal-data-fields.csv](../catalogs/personal-data-fields.csv); where they disagree the catalog wins and the difference is a defect (ADR-0079 rule 2).
 30. Retention:
     - **Interactions and messages** are kept until erased. Whether they must be deleted after a time when no request comes is a package rule for the author (open question). The setting `crm.interaction_retention_days` is reserved and empty.
     - **Attachments** follow ADR-0038 rule 15. A file from an e-mail that is later linked to a posted document becomes accounting evidence.
@@ -468,6 +470,8 @@ Immutability decided the outbound message's shape. ADR-0009 rule 14 freezes a do
 - The author lets tainted runs write interactions directly, or activities enter scope.
 - Chat channels or call recording are added.
 - Copies of employees' own sent mail should become outbound interactions.
+
+Note (S2 findings closure, 2026-11-21; author's decision of 2026-11-17): these CRM features are Phase 2 or later, not Phase 1: leads, opportunities and a pipeline; marketing (campaigns, segments, lists); appointments and calendar sync; chat and telephony channels; service cases with service levels (SLA). The CRM-only profile does not bring them forward.
 
 ## Documents updated
 

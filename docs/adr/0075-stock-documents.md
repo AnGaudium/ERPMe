@@ -102,7 +102,7 @@ ADR-0027 rule 7 settled who owns the stock documents and that their fields and f
 
 ## Documents updated
 
-- **ADRs** (notes tagged "ADR-0075, proposed 2026-11-19"): ADR-0020 rules 7 and 18; ADR-0023 rules 7 and 18; ADR-0024 rule 8; ADR-0027 rule 7; ADR-0028 rule 2; ADR-0044 rule 9; ADR-0063 rule 29 (the five settings); ADR-0069 rule 8; ADR-0070 rule 15.
+- **ADRs** (notes tagged "ADR-0075, 2026-11-21"): ADR-0020 rules 7 and 18; ADR-0023 rules 7 and 18; ADR-0024 rule 8; ADR-0027 rule 7; ADR-0028 rule 2; ADR-0044 rule 9; ADR-0063 rule 29 (the five settings); ADR-0069 rule 8; ADR-0070 rule 15.
 - **Catalogs:** settings.csv (5, rule 15), invariants.csv (8), edge-cases.csv (18).
 - **Design:** DS-22-09-42-commercial-inventory.sql; DS-04 (`dispatch_has_receive`, `transfer_order_line_invalid`); DS-43-54 (the foreign key of `demand_supply_line.transfer_order_line_id`, added in DS-22); DS-16 and DS-17 (blocks and counts); the glossary (new rows only); the generated overview.
 - **Lab:** `t28_stock_count.py`, `t29_other_stock_documents.py` and the lab README (findings); `t17_uom.py` D03 and `t14_commercial_inventory_ddl.py` M5 (shared with ADR-0074).

@@ -93,7 +93,7 @@ The CRM-only deployment profile holds: the four `master_data` tables reference n
     - **Moves outside the group** stay the ordinary edits of ADR-0034.
     - **Not Phase 1.** Named individual resources, such as a specific machine, operator or tool with its own calendar or skills, are not Phase 1. They are an open question with a seam: `capacity_units` already covers counting.
 
-    Note ([ADR-0071](0071-work-orders-and-shop-floor-execution.md), proposed 2026-11-17): besides the change order that moves the planned work center (which, before start, also resets the execution work center), a WO not yet started moves inside its group by `TransferOperation` without a new version; "the work center on the operation when it is confirmed" is `operation_confirmation.work_center_id`, the execution work center (ADR-0071 rule 16).
+    Note ([ADR-0071](0071-work-orders-and-shop-floor-execution.md), 2026-11-21): besides the change order that moves the planned work center (which, before start, also resets the execution work center), a WO not yet started moves inside its group by `TransferOperation` without a new version; "the work center on the operation when it is confirmed" is `operation_confirmation.work_center_id`, the execution work center (ADR-0071 rule 16).
 
 **Payment methods**
 
@@ -143,7 +143,7 @@ The CRM-only deployment profile holds: the four `master_data` tables reference n
     - **The tracking link** is computed by putting the URL-encoded number into the template, and is never stored.
     - **Freight.** Freight charged to the customer stays a service-item line. There is no rate shopping and no carrier API in Phase 1. Carrier integration is a later item on the `integrations` queue (backlog).
 
-    Note ([ADR-0074](0074-core-data-structure-additions.md), proposed 2026-11-19): the delivery's address is its ship-to party (`ship_to_partner_id`, `ship_to_name`, `ship_to_address_id`, `ship_to_address`), which replaces the interim `delivery_address` and defaults from the customer's `partner_relationship` rows (ADR-0074 rules 1 to 3).
+    Note ([ADR-0074](0074-core-data-structure-additions.md), 2026-11-21): the delivery's address is its ship-to party (`ship_to_partner_id`, `ship_to_name`, `ship_to_address_id`, `ship_to_address`), which replaces the interim `delivery_address` and defaults from the customer's `partner_relationship` rows (ADR-0074 rules 1 to 3).
 
 **Commands, catalogs and checks**
 
@@ -217,7 +217,7 @@ The CRM-only deployment profile holds: the four `master_data` tables reference n
 
 ## Documents updated
 
-- **ADRs** (notes tagged "ADR-0068, proposed 2026-11-17"):
+- **ADRs** (notes tagged "ADR-0068, 2026-11-21"):
   - [ADR-0015](0015-account-determination.md) rule 8;
   - [ADR-0019](0019-partners-and-crm-foundation.md) rule 3;
   - [ADR-0020](0020-inventory-and-costing-model.md) rules 1, 2, 3, 11;

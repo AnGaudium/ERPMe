@@ -131,7 +131,7 @@ The lesson: an ERP's own chat should cover talk about its records and tell peopl
 
 ## Documents updated
 
-- **ADRs** (notes tagged "ADR-0076, proposed 2026-11-19"): ADR-0013 rule 10; ADR-0027 rule 1; ADR-0038 rule 14; ADR-0040 rules 13 and 14; ADR-0042 rule 14; ADR-0052 rule 25; ADR-0055 rule 4 (`approval_stage_member.position`); ADR-0063 rule 29; [ADR-0050](0050-agent-runtime-and-query-layer.md) rule 30 (note of 2026-11-21: the four messaging queries are on no tool list).
+- **ADRs** (notes tagged "ADR-0076, 2026-11-21"): ADR-0013 rule 10; ADR-0027 rule 1; ADR-0038 rule 14; ADR-0040 rules 13 and 14; ADR-0042 rule 14; ADR-0052 rule 25; ADR-0055 rule 4 (`approval_stage_member.position`); ADR-0063 rule 29; [ADR-0050](0050-agent-runtime-and-query-layer.md) rule 30 (note of 2026-11-21: the four messaging queries are on no tool list).
 - **Catalogs:** authorization-areas.csv (2), role-template-levels.csv (16), settings.csv (3), invariants.csv (5), edge-cases.csv (10).
 - **Design:** DS-63-messaging.sql (new); DS-15-access.sql (`approval_stage_member.position`); spec 07's approval-channels line (the author's decision of 2026-11-19); DS-04 (eight errors); DS-16 and DS-17 (blocks and counts); backlog (DS-63); the glossary (new rows only); the generated overview.
 - **Lab:** `t30_messaging.py` and the lab README.

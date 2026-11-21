@@ -61,14 +61,14 @@ Planning answers, per item and warehouse: what to buy or move, how much, and by 
    - `supplier_purchasing_term` (one row per supplier partner) holds `minimum_order_amount` with its currency, an optional `container_volume` and `container_weight`, and an optional `order_cycle_days`.
    - `supplier_item_lead_time` stores measured lead times per (supplier, item), refreshed by the forecast job: mean and standard deviation (square root through `nativeflows.numeric`) of the days from the supply line's `ordered_date` to receipt, read from `demand_supply_line` (rule 8). They are visible data (spec 03 rule 9) and are never applied without approval.
 
-   Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): `supplier_item` gains `order_uom_id` (NOT NULL; the inventory unit or an active product unit; proposed from the product's purchase unit), and its minimum and multiple are in that unit. A supplier with another pack size gets its own product unit, never a supplier factor. `supplier_purchasing_term.volume_uom_id` and `weight_uom_id` stay interim; item dimensions and weights convert to them through `uom_conversion` only (rules 14, 23).
+   Note ([ADR-0056](0056-multiple-units-of-measure.md), 2026-11-15): `supplier_item` gains `order_uom_id` (NOT NULL; the inventory unit or an active product unit; proposed from the product's purchase unit), and its minimum and multiple are in that unit. A supplier with another pack size gets its own product unit, never a supplier factor. `supplier_purchasing_term.volume_uom_id` and `weight_uom_id` stay interim; item dimensions and weights convert to them through `uom_conversion` only (rules 14, 23).
 3. `transfer_route` holds:
    - source warehouse, destination warehouse;
    - `lead_time_days` (calendar days); the destination warehouse's `receiving_days` and calendar then apply, as for purchases.
 
    A `transfer` replenishment source names a route. Writing parameters that would form a cycle of transfer sources is rejected with `planning_network_cycle`.
 
-   Note ([ADR-0068](0068-sites-and-core-logistics-payment-master-data.md), proposed 2026-11-17): between two warehouses of one site, `lead_time_days` may be omitted and is then 0. Planning stays per (item, warehouse). Site-level pooled planning is an open question for after Phase 1.
+   Note ([ADR-0068](0068-sites-and-core-logistics-payment-master-data.md), 2026-11-21): between two warehouses of one site, `lead_time_days` may be omitted and is then 0. Planning stays per (item, warehouse). Site-level pooled planning is an open question for after Phase 1.
 4. Working calendars:
    - `working_calendar` is company data: working weekdays and holiday dates, assigned to warehouses and suppliers. It moves to `master_data` so that production work centers can use it ([ADR-0033](0033-production-master-data.md) rule 11).
    - The localization package may seed public holidays as a template entry with a basis (ADR-0016). Tết dates are calendar data, not code.
@@ -77,7 +77,7 @@ Planning answers, per item and warehouse: what to buy or move, how much, and by 
    - **Release date:** the latest working day of the supplier's calendar from which the order still arrives by its `need_date`.
 6. Units: every planning quantity is in the item's inventory unit (ADR-0018 rule 9). The supplier's minimum and multiple are applied in the purchase unit, then converted exactly. Rounding excess is shown on the proposal.
 
-   Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): "the purchase unit" is the supplier item's `order_uom_id`. The run converts the shortfall exactly into it, applies the minimum and the multiple rounding up, and converts the order quantity back half up, as the purchase order line will; the planned order stores `order_quantity`, `order_uom_id` and the snapshot beside `quantity` in the inventory unit (rule 14).
+   Note ([ADR-0056](0056-multiple-units-of-measure.md), 2026-11-15): "the purchase unit" is the supplier item's `order_uom_id`. The run converts the shortfall exactly into it, applies the minimum and the multiple rounding up, and converts the order quantity back half up, as the purchase order line will; the planned order stores `order_quantity`, `order_uom_id` and the snapshot beside `quantity` in the inventory unit (rule 14).
 7. `planning_setting` per company holds:
    - `planning_owner_id`: the human accountable for scheduled runs (spec 03 rule 3);
    - `planning_horizon_days`;
@@ -102,7 +102,7 @@ Planning answers, per item and warehouse: what to buy or move, how much, and by 
 
    Note (catalog review, 2026-11-15): the rows of a production order's components and outputs carry the hold reason `not_approved` until the order is approved (released), like sales and purchase rows ([ADR-0047](0047-commercial-documents-and-pricing.md) rule 18 note). Make-to-order netting and planning count only released rows as demand; supply rows count once planned, held or not.
 
-    Note ([ADR-0075](0075-stock-documents.md), proposed 2026-11-19): transfer order lines exist (`transfer_order_line`), so `demand_supply_line.transfer_order_line_id` has its foreign key; a line is demand at the source and supply at the destination, and stock transfers fulfil it (ADR-0075 rule 14).
+    Note ([ADR-0075](0075-stock-documents.md), 2026-11-21): transfer order lines exist (`transfer_order_line`), so `demand_supply_line.transfer_order_line_id` has its foreign key; a line is demand at the source and supply at the destination, and stock transfers fulfil it (ADR-0075 rule 14).
 9. Stock on hand:
    - **Counted:** stock in status `available` in the warehouse, in any bin. `quality_inspection` and `blocked` stock do not count (interim, flagged).
    - **Never counted:** stock in `goods_sent` warehouses.
@@ -172,7 +172,7 @@ Planning answers, per item and warehouse: what to buy or move, how much, and by 
 
     When the minimum or the multiple forces a quantity above the cap, the forced quantity wins. The excess is shown, and the exception `supplier_minimum_excess` is raised.
 
-    Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): steps 2 and 3 work in the supplier item's order unit; every proposal quantity, purchase, transfer or production, rounds up (rules 8, 14).
+    Note ([ADR-0056](0056-multiple-units-of-measure.md), 2026-11-15): steps 2 and 3 work in the supplier item's order unit; every proposal quantity, purchase, transfer or production, rounds up (rules 8, 14).
 
 **The planning graph and the run**
 
@@ -200,7 +200,7 @@ Planning answers, per item and warehouse: what to buy or move, how much, and by 
 
     A run matches proposals to existing ones by business key and updates them in place. It creates new ones, and cancels proposals no longer needed. A canceled row never blocks a new proposal: the new one takes the next `sequence`. Firmed and converted orders are never changed by a run; a firmed order whose release date has passed raises `firmed_order_overdue`.
 
-    Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): a planned order also holds its order unit block, `order_quantity`, `order_uom_id`, `uom_numerator`, `uom_denominator` and `uom_factor_source` (identity for transfer and production proposals); `quantity` stays in the inventory unit (rules 9, 14).
+    Note ([ADR-0056](0056-multiple-units-of-measure.md), 2026-11-15): a planned order also holds its order unit block, `order_quantity`, `order_uom_id`, `uom_numerator`, `uom_denominator` and `uom_factor_source` (identity for transfer and production proposals); `quantity` stays in the inventory unit (rules 9, 14).
 19. The firm fence covers release dates strictly before planning date + `firm_horizon_days` (default 0, so no fence). Inside it a run changes no existing proposal. A new shortage there is proposed with its release date moved to the first date outside the fence, and raises `shortage_inside_lead_time`; the projection continues with it. Commands: Production planned orders start no earlier than `earliest_start` = max(planning date, fence end) + `conversion_lead_days` ([ADR-0036](0036-multi-level-mrp.md) rule 4).
     - `FirmPlannedOrder`;
     - `UpdatePlannedOrder`, which sets quantity or dates and implies firming;
@@ -256,7 +256,7 @@ Planning answers, per item and warehouse: what to buy or move, how much, and by 
     - **`capacity_overload`** is stored in `planning_exception` like the others, with the work center as subject, but its work item kind is `capacity_overload`, owned by `planning_owner`; it is never a `planning_exception` work item (holistic review 2026-11-15, item P24).
     - **Owners.** Work items of kind `planning_exception` are owned by the kind rule `planning_node_owner`: the company's `planning_owner_id` when the node's replenishment source is `production`, otherwise the item's buyer ([ADR-0042](0042-work-queue.md) rule 7's note) (holistic review 2026-11-15, item P7).
 
-    Note ([ADR-0064](0064-production-agent.md), proposed 2026-11-15): production orders get exceptions and messages: the exceptions `production_order_start_overdue` and `production_order_overdue` (with `production_order_id`), and `expedite`, `postpone`, `cancel` and `reduce` on a production order's main-output supply line, under the settings `planning.production_reschedule_in_tolerance_days` (0), `planning.production_reschedule_out_tolerance_days` (3), `planning.production_rescheduling_horizon_days` (60), `production.order.start_grace_days` (1) and `production.order.overdue_grace_days` (0). `postpone` and `reduce` are in Phase 1 for production-order supply. One work item `production_order_exception` per order (owner `planning_owner`) lists them; these kinds get no `planning_exception` item, as `capacity_overload` has its own kind (rule 17).
+    Note ([ADR-0064](0064-production-agent.md), 2026-11-15): production orders get exceptions and messages: the exceptions `production_order_start_overdue` and `production_order_overdue` (with `production_order_id`), and `expedite`, `postpone`, `cancel` and `reduce` on a production order's main-output supply line, under the settings `planning.production_reschedule_in_tolerance_days` (0), `planning.production_reschedule_out_tolerance_days` (3), `planning.production_rescheduling_horizon_days` (60), `production.order.start_grace_days` (1) and `production.order.overdue_grace_days` (0). `postpone` and `reduce` are in Phase 1 for production-order supply. One work item `production_order_exception` per order (owner `planning_owner`) lists them; these kinds get no `planning_exception` item, as `capacity_overload` has its own kind (rule 17).
 22. Conversion:
     - **Grouping.** `ConvertPlannedOrder` takes firmed or proposed planned orders. Purchase orders are grouped by supplier, warehouse, and release date within `conversion_window_days`; transfer orders by route. Production planned orders convert through `production.contract` ([ADR-0036](0036-multi-level-mrp.md) rule 8).
     - **Hand-over.** The command sets `converted` and calls the posting interface `inventory.contract.request_replenishment`, which writes one `replenishment_request` with a line per planned order (carrying `origin_planned_order_id`) and emits `ReplenishmentRequested` from `inventory`, so every importer imports downward (ADR-0022 rule 2).
@@ -265,7 +265,7 @@ Planning answers, per item and warehouse: what to buy or move, how much, and by 
     - **Canceled drafts.** When the document lines of a converted order close with `closed_reason` `canceled` (rule 8), the next run sets it `canceled` and may propose again.
     - **Auto-conversion.** Converting under a value threshold by policy is an open question (DS-28). Sending to a supplier always stays a separate approved step. For agents, `UpdatePlannedOrder`, `FirmPlannedOrder` and `ConvertPlannedOrder` are proposal-bound for every order type ([ADR-0036](0036-multi-level-mrp.md) rule 12).
 
-    Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): the replenishment request line and the drafted purchase request line carry the planned order's order unit and snapshot; a purchase order copied from a request keeps the request's unit unless the person changes it (rule 14).
+    Note ([ADR-0056](0056-multiple-units-of-measure.md), 2026-11-15): the replenishment request line and the drafted purchase request line carry the planned order's order unit and snapshot; a purchase order copied from a request keeps the request's unit unless the person changes it (rule 14).
 
 **Agents, events, queries, performance**
 
@@ -295,7 +295,7 @@ Planning answers, per item and warehouse: what to buy or move, how much, and by 
     | Later in Phase 1 | The later slice: forecast methods by backtest, service-level safety stock, more action messages, the planning agent |
     | Phase 2 | `bill_of_materials` edges |
 
-    Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-21): the planning agent of the later slice is a Phase 1 agent type. It starts after the manual path of planning with multi-level MRP is built and has passed its gate (after step 5; this rule, ADR-0032 rule 7). The runbook does not place that work yet (open question) (ADR-0078 rule 1; ADR-0036).
+    Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), 2026-11-21): the planning agent of the later slice is a Phase 1 agent type. It starts after the manual path of planning with multi-level MRP is built and has passed its gate (after step 5; this rule, ADR-0032 rule 7). The runbook does not place that work yet (open question) (ADR-0078 rule 1; ADR-0036).
 
     Note (author's delegation, 2026-11-21; decided by the chief architect): the later slice of this rule and multi-level MRP of [ADR-0036](0036-multi-level-mrp.md) are the build step 5b, Planning and multi-level MRP ([runbook](../runbook/steps-5-9.md), [spec 11](../spec/11-build-order.md)): it starts after the gates of steps 5 and 4b and may run beside steps 6 and 7. The planning agent starts after the step 5b gate ([ADR-0078](0078-agent-simplification-for-phase-1.md) rule 1); this replaces "the runbook does not place that work yet" in the note above.
 

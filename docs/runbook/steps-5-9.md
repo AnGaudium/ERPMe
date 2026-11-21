@@ -10,7 +10,7 @@ Applies to every step below:
 
 ---
 
-## Step 5 · Commercial documents (months 5–8)
+## Step 5 · Commercial documents
 
 **Entry criteria:** step 4 gate (Phase 0 gate) passed.
 
@@ -77,7 +77,7 @@ Applies to every step below:
 
 ---
 
-## Step 6 · Cash and AR/AP (months 5–8)
+## Step 6 · Cash and AR/AP
 
 **Entry criteria:** step 5 gate passed.
 
@@ -108,7 +108,7 @@ Applies to every step below:
 
 ---
 
-## Step 7 · Tax and e-invoicing (months 5–8)
+## Step 7 · Tax and e-invoicing
 
 **Entry criteria:** step 6 gate passed.
 
@@ -142,7 +142,7 @@ Applies to every step below:
 
 ---
 
-## Step 8 · Period close and reports (months 8–10)
+## Step 8 · Period close and reports
 
 **Entry criteria:** step 7 gate passed.
 
@@ -172,7 +172,7 @@ Applies to every step below:
 
 ---
 
-## Step 9 · Hand-built UI and warehouse app (months 8–10)
+## Step 9 · Hand-built UI and warehouse app
 
 **Entry criteria:** step 8 gate passed. The commands behind each screen have passed their gate (B6).
 

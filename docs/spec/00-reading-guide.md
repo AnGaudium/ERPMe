@@ -594,7 +594,6 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Role level | role\_level | A role's level and approval flag on one node of the authorization area tree, inherited downward ([ADR-0054](../adr/0054-users-roles-and-authorizations.md) rule 8) |
 | Role permission | role\_permission | The stored expansion of a role's levels minus its holds in force, which the dispatcher reads ([ADR-0054](../adr/0054-users-roles-and-authorizations.md) rule 9) |
 | Role assignment scope | role\_assignment\_scope | The record scope of a role assignment, one branch or warehouse per row; none means the whole company ([ADR-0017](../adr/0017-permission-envelope.md) rule 9) |
-| Delegation role assignment | delegation\_role\_assignment | A role assignment of the delegator lent by a delegation of kind `role_assignments` ([ADR-0054](../adr/0054-users-roles-and-authorizations.md) rule 21) |
 | Segregation review | segregation\_review | The owner's confirmed review of one posting period's segregation exceptions in the small-company mode (`ConfirmSegregationReview`, [ADR-0054](../adr/0054-users-roles-and-authorizations.md) rule 20) |
 | Company currency activation | company\_currency\_activation | A currency a company has activated for use ([ADR-0011](../adr/0011-multi-currency.md) rule 7) |
 | Working calendar holiday | working\_calendar\_holiday | A non-working date of a working calendar, copied from a package template entry or added by the company ([ADR-0045](../adr/0045-master-data-and-price-lists.md) rule 10) |

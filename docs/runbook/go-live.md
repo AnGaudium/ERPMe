@@ -4,7 +4,7 @@ No parallel run with the old software; the pilot goes live fully on NativeFlows,
 
 ---
 
-## Step 10 · Platform completion (months 10–12)
+## Step 10 · Platform completion
 
 **Entry criteria:** step 9 gate and the step 4b and 5b gates passed; the six Phase 1 agents built ([steps-5-9.md](steps-5-9.md#agents)).
 

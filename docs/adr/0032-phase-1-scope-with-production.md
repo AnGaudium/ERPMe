@@ -53,7 +53,7 @@ On 2026-11-14 the author decided that every capability a customer cannot operate
 
    The production agent is design item DS-57, designed before the production core step ([ADR-0051](0051-agent-workflows.md) rule 29).
 
-   Note ([ADR-0070](0070-quality-management-core.md), proposed 2026-11-17): the author's decision of 2026-11-17 widens DS-52's "quality inspection on output" into a quality core in Phase 1. Design item DS-58 covers inspection plans, inspection lots at five points, results, usage decisions and nonconformances (ADR-0070).
+   Note ([ADR-0070](0070-quality-management-core.md), 2026-11-21): the author's decision of 2026-11-17 widens DS-52's "quality inspection on output" into a quality core in Phase 1. Design item DS-58 covers inspection plans, inspection lots at five points, results, usage decisions and nonconformances (ADR-0070).
 6. **Synthetic data.** DS-17 adds a fictional Vietnamese manufacturing company with multi-level bills of materials, production, subcontracting and production cost closing. It is due at the gate of the production core step. The production design items add their edge cases.
 7. **Author-owned documents.** The roadmap, build order, MVP scope, vision, specs and runbook are the author's documents. This ADR proposes their changes as an open question, with draft wording:
    - **Spec 09 (MVP scope):** production rows move to Phase 1, including MRP, routings, operations, shop floor and quality. "MVP is Phases 1 and 2" becomes "MVP is Phase 1".
@@ -81,7 +81,7 @@ On 2026-11-14 the author decided that every capability a customer cannot operate
 
    Note (author's delegation, 2026-11-19): the author's answer: there is no deadline and no customer commitment. The build carries no calendar dates; the build order and the gates are the only schedule, and no dated plan is set. The production core is a Phase 1 step numbered 4b: it starts after step 4's gate and may run beside step 5, and its gate check is the independent naive recomputation, not a manual spreadsheet. Spec 10 and spec 11 record step 4b without dates. Where subcontracting is built and the rest of the wording above stay open.
 
-   Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-21): the list of agents done before platform completion keeps the planning agent, which ADR-0078 puts in Phase 1 after the manual path of planning with multi-level MRP is built and has passed its gate (after step 5; ADR-0024 rule 26, this rule). The runbook does not place that work yet (open question) (ADR-0078 rule 1). The three production agent types move to Phase 2 (ADR-0078 rule 2).
+   Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), 2026-11-21): the list of agents done before platform completion keeps the planning agent, which ADR-0078 puts in Phase 1 after the manual path of planning with multi-level MRP is built and has passed its gate (after step 5; ADR-0024 rule 26, this rule). The runbook does not place that work yet (open question) (ADR-0078 rule 1). The three production agent types move to Phase 2 (ADR-0078 rule 2).
 
    Note (author's delegation, 2026-11-21; decided by the chief architect): the planning slice with multi-level MRP is the build step 5b ([runbook](../runbook/steps-5-9.md), [spec 11](../spec/11-build-order.md)), after the gates of steps 5 and 4b. The planning agent starts after the step 5b gate ([ADR-0078](0078-agent-simplification-for-phase-1.md) rule 1); this replaces "the runbook does not place that work yet" in the note above.
 
@@ -96,7 +96,7 @@ On 2026-11-14 the author decided that every capability a customer cannot operate
    - payroll;
    - multi-level approval.
 
-   Note: the author asked (2026-11-15) for approval pools with several stages; they are designed in [ADR-0055](0055-approval-pools-and-stages.md) (proposed).
+   Note: the author asked (2026-11-15) for approval pools with several stages; they are designed in [ADR-0055](0055-approval-pools-and-stages.md) (accepted 2026-11-15).
 
    Note: [ADR-0055](0055-approval-pools-and-stages.md) was accepted on 2026-11-15 (holistic review 2026-11-15, item P27).
 

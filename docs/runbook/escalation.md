@@ -11,14 +11,14 @@ Every agent session reads this file. When a stop rule below applies, the agent s
 5. A fix would change an invariant, a golden-scenario expected value or the naive recomputation, rather than the code under test.
 6. The work touches permission intersection, segregation of duties or the routing switch beyond what its DS file specifies. For posted-row protection, DB triggers and RLS beyond the DS file, the agent updates the DS file first and the author reviews the change line by line (stage 5).
 
-   Note ([ADR-0073](../adr/0073-coding-pipeline-and-mechanical-assurance.md), proposed 2026-11-18): "the author reviews the change line by line (stage 5)" now reads: the change passes ADR-0073's mechanical layers and two model reviews (the author's decision of 2026-11-18). Updating the DS file first still holds.
+   Note ([ADR-0073](../adr/0073-coding-pipeline-and-mechanical-assurance.md), 2026-11-21): "the author reviews the change line by line (stage 5)" now reads: the change passes ADR-0073's mechanical layers and two model reviews (the author's decision of 2026-11-18). Updating the DS file first still holds.
 7. The work would replace a tool chosen in ADR-0002 (D14), add one on its "deliberately not used" list, or build a framework before a concrete need (B7). Any other library is added by the agent with a recorded reason; one that opens a category ADR-0002 does not cover needs an ADR.
 8. The work would build an "After Phase 1" feature or a hand-built screen or agent before its manual path passed its gate (B6).
 9. The schema is frozen (4 weeks before go-live, B8) and the work changes it.
 10. The work needs real company or personal data, or pilot data would enter the repository, CI or the test server.
 11. A budget is reached, or CI or the nightly run stays red after two attempts at the same fix.
 
-    Note ([ADR-0073](../adr/0073-coding-pipeline-and-mechanical-assurance.md), proposed 2026-11-18): this applies to the coder seat too. After two red attempts at the same fix (a failing check, test or review finding), it stops and reports. A stopped work package is never handed to a stronger model: it is re-specified for the same seat, or asked of the author. A stronger model is assigned only up front, in the package's manifest (ADR-0073 rule 10).
+    Note ([ADR-0073](../adr/0073-coding-pipeline-and-mechanical-assurance.md), 2026-11-21): this applies to the coder seat too. After two red attempts at the same fix (a failing check, test or review finding), it stops and reports. A stopped work package is never handed to a stronger model: it is re-specified for the same seat, or asked of the author. A stronger model is assigned only up front, in the package's manifest (ADR-0073 rule 10).
 12. The work would weaken a hard floor: untrusted content, segregation of duties, "Human only" actions ([03-agent-safety.md](../spec/03-agent-safety.md)).
 
 **How to stop:** commit the work in progress on its branch with a message starting `WIP (blocked):` and the reference IDs; add the question to [open-questions.md](../open-questions.md) with those IDs; tell the author in one paragraph what is blocked, what options exist, and which one the agent would pick and why. Do not merge, and do not start dependent work packages.

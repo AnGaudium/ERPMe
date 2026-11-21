@@ -65,23 +65,32 @@ Checks:
 
    Note: layer 2 lists `work` twice; it is one module.
 
-   Note ([ADR-0057](0057-document-intake-and-extraction.md), proposed 2026-11-15): `attachments` declares the hook `document_reader`; modules and packages register pure readers on it and `app` wires them, so `attachments` imports no module and no package. No new module: the extraction tables belong to `attachments`, mapping rules to `master_data`, the data-processing permission's table to `agent_runs` and its commands to `agents` ([ADR-0057](0057-document-intake-and-extraction.md) rule 1).
+   Note ([ADR-0057](0057-document-intake-and-extraction.md), 2026-11-15): `attachments` declares the hook `document_reader`; modules and packages register pure readers on it and `app` wires them, so `attachments` imports no module and no package. No new module: the extraction tables belong to `attachments`, mapping rules to `master_data`, the data-processing permission's table to `agent_runs` and its commands to `agents` ([ADR-0057](0057-document-intake-and-extraction.md) rule 1).
 
-   Note ([ADR-0058](0058-configurable-workflows.md), proposed 2026-11-15): new modules `configuration` (layer 2: the configuration and artifact tables, the pure evaluators, validators and graph check, `get_parameters`; it imports the `registry` contract and `work`) and `automation` (layer 5: the automation consumer, replay, evidence, the monitor and the upgrade check; it imports `registry`, the `configuration`, `work` and `permissions` contracts and the contracts of the layer 3–4 modules whose tunable functions it evaluates, and none of its layer-5 peers). `configuration` declares the hook `artifact_checks`, which `automation` registers and `app` wires, for the checks that read layer 3–5 data (rule 1; [ADR-0059](0059-ai-tuning-and-development-of-deterministic-functions.md) rule 2).
+   Note ([ADR-0058](0058-configurable-workflows.md), 2026-11-15): new modules `configuration` (layer 2: the configuration and artifact tables, the pure evaluators, validators and graph check, `get_parameters`; it imports the `registry` contract and `work`) and `automation` (layer 5: the automation consumer, replay, evidence, the monitor and the upgrade check; it imports `registry`, the `configuration`, `work` and `permissions` contracts and the contracts of the layer 3–4 modules whose tunable functions it evaluates, and none of its layer-5 peers). `configuration` declares the hook `artifact_checks`, which `automation` registers and `app` wires, for the checks that read layer 3–5 data (rule 1; [ADR-0059](0059-ai-tuning-and-development-of-deterministic-functions.md) rule 2).
 
-   Note ([ADR-0059](0059-ai-tuning-and-development-of-deterministic-functions.md), proposed 2026-11-15): a module that owns a tunable function or an artifact kind registers, with its declaration, the pure functions `backtest`, `compare` and `monitor` in its contract; `automation` calls them. `policy`'s auto-post evidence hook gains `auto_post_eligibility`, which `cash` registers, so the policy floor for cascade drafts needs no import of `cash`. `configuration` declares the hook `artifact_in_force_changed`, which `policy` registers (calling its contract function `mark_auto_post_evidence_outdated`) and `app` wires (rule 2).
+   Note ([ADR-0059](0059-ai-tuning-and-development-of-deterministic-functions.md), 2026-11-15): a module that owns a tunable function or an artifact kind registers, with its declaration, the pure functions `backtest`, `compare` and `monitor` in its contract; `automation` calls them. `policy`'s auto-post evidence hook gains `auto_post_eligibility`, which `cash` registers, so the policy floor for cascade drafts needs no import of `cash`. `configuration` declares the hook `artifact_in_force_changed`, which `policy` registers (calling its contract function `mark_auto_post_evidence_outdated`) and `app` wires (rule 2).
 
-   Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), proposed 2026-11-15): `query` also owns the analysis layer: the catalog of facts, measures and dimensions, the plan validator, compiler and executor, and the tables `analysis_question`, `saved_analysis`, `saved_analysis_version` and `analysis_example`. Besides `db`, `registry` and `agent_runs` it now imports the `work` contract, downward, to raise `analysis_answer_disputed` and `analysis_catalog_request`. `agents` adds the `analysis` workflow, which reaches `query` only through the dispatcher. No external semantic engine runs in the core (rule 1).
+   Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), 2026-11-15): `query` also owns the analysis layer: the catalog of facts, measures and dimensions, the plan validator, compiler and executor, and the tables `analysis_question`, `saved_analysis`, `saved_analysis_version` and `analysis_example`. Besides `db`, `registry` and `agent_runs` it now imports the `work` contract, downward, to raise `analysis_answer_disputed` and `analysis_catalog_request`. `agents` adds the `analysis` workflow, which reaches `query` only through the dispatcher. No external semantic engine runs in the core (rule 1).
 
-   Note ([ADR-0066](0066-work-cases.md), 2026-11-16 (proposed)): `work` also owns `work_case` and `work_case_link` and imports nothing new. `ListWorkCaseTimeline` is a query of `query` over views in schema `query`, and the consumer `work_case_opener` belongs to `automation`, which already imports the `configuration` and `work` contracts ([ADR-0066](0066-work-cases.md) rules 2, 6, 17).
+   Note ([ADR-0066](0066-work-cases.md), 2026-11-21): `work` also owns `work_case` and `work_case_link` and imports nothing new. `ListWorkCaseTimeline` is a query of `query` over views in schema `query`, and the consumer `work_case_opener` belongs to `automation`, which already imports the `configuration` and `work` contracts ([ADR-0066](0066-work-cases.md) rules 2, 6, 17).
 
    Note ([ADR-0066](0066-work-cases.md), 2026-11-21): the system resolver of rule 15 lives in `automation` (layer 5), beside `work_case_opener`, not in `work`: `work` is layer 2 and may not read document states. The resolver reads the linked targets' states through their modules' contracts and runs the command `ResolveWorkCase` as `system`. Beyond `configuration` and `work`, the resolver imports the contract of `documents` (layer 2), which owns both `document.state` and the `change_proposal` document type (ADR-0009 rule 4; ADR-0029) ([ADR-0066](0066-work-cases.md) rules 13, 15).
 
-   Note ([ADR-0069](0069-business-unit-dimension.md), proposed 2026-11-17): `ledger` declares the hook `business_unit_defaults`; `master_data` registers it, so `ledger` reads the business unit defaults of master records without an import inside layer 3.
+   Note ([ADR-0069](0069-business-unit-dimension.md), 2026-11-21): `ledger` declares the hook `business_unit_defaults`; `master_data` registers it, so `ledger` reads the business unit defaults of master records without an import inside layer 3.
 
    Note (S1 review, 2026-11-21): same-layer modules may not import each other (rule 2), so the derivation of the business unit runs through the hook `business_unit_defaults`; the hook is required, not optional.
 
-   Note ([ADR-0070](0070-quality-management-core.md), proposed 2026-11-17): new module `quality` (layer 4: inspection plans, lots, results, usage decisions and nonconformances). It imports the contracts of `inventory`, `production`, `master_data`, `documents`, `work`, `attachments` and `policy`, and no layer-4 peer. `inventory`, `purchasing`, `production`, `sales` and `crm` never import it, and an import-linter contract checks this. It changes stock and production data only through commands its consumers dispatch. It is not part of the CRM-only profile.
+   Note ([ADR-0070](0070-quality-management-core.md), 2026-11-21): new module `quality` (layer 4: inspection plans, lots, results, usage decisions and nonconformances). It imports the contracts of `inventory`, `production`, `master_data`, `documents`, `work`, `attachments` and `policy`, and no layer-4 peer. `inventory`, `purchasing`, `production`, `sales` and `crm` never import it, and an import-linter contract checks this. It changes stock and production data only through commands its consumers dispatch. It is not part of the CRM-only profile.
+
+   Note (S2 findings closure, 2026-11-21; finding 12, D14): within layer 3 a module may import another layer-3 module's `contract` and call its interfaces, such as posting interfaces and pure functions, in one direction only: the caller imports the module that owns the interface, and the owner never imports the caller back. The `tax` to `ledger` sentence above is one case of this rule, and rule 6's "except their `contract`" already allows it. Examples: `inventory` and `production` call `ledger.contract.write_journal_entry` (rule 4); `production` calls `master_data.contract.evaluate_condition` ([ADR-0046](0046-product-configuration.md) rule 1). Import-linter's layer contract lists each allowed pair and fails on a cycle. `ledger` imports no other layer-3 contract: it reads master data defaults through the hook of the ADR-0069 note above. Layer 4 importing a layer-3 contract is downward and needs no exception.
+
+   Note (S2 findings closure, 2026-11-21; author's decision of 2026-11-17, [ADR-0052](0052-minimal-crm.md)): CRM-only is a deployment profile, not an edition: one product and one codebase, with the activated module set kernel, `master_data` partners and contacts, `crm`, `agents` and `query`, intake, analysis and automation. `crm` never depends on `ledger`, `tax`, `inventory`, `cash` or `production`. An import-linter contract enforces it:
+   - **Name:** `crm_independent_of_accounting`.
+   - **Type and source:** `forbidden`, source module `nativeflows.crm`; indirect imports count.
+   - **Forbidden modules:** `nativeflows.ledger`, `nativeflows.tax`, `nativeflows.inventory`, `nativeflows.cash`, `nativeflows.production`.
+
+   Commercial screens and the partner timeline degrade when the accounting modules are not activated: they show no accounting entries and offer no accounting actions. The database side (partner account links that may be empty, and a record of which modules are activated) is done in the DDL by another work item.
 
 3. Shape of each module:
    - A module that owns tables or commands has:
@@ -93,7 +102,14 @@ Checks:
      - tests in `backend/tests/<module>/`.
    - Foundation modules and `db` publish through their `__init__`.
 
-   Note ([ADR-0073](0073-coding-pipeline-and-mechanical-assurance.md), proposed 2026-11-18): a module that owns commands or queries also has `declarations/`, one file per command or query (ADR-0008 rule 1 note). `contract.py` re-exports the payload and result models that other modules use. `handlers/<name>.py` is the thin handler that `nativeflows-dev scaffold` writes once. The logic is in `services/<name>.py`, which together with new tests is all that a coder work package writes (ADR-0073 rules 2, 6).
+   Note ([ADR-0073](0073-coding-pipeline-and-mechanical-assurance.md), 2026-11-21): a module that owns commands or queries also has `declarations/`, one file per command or query (ADR-0008 rule 1 note). `contract.py` re-exports the payload and result models that other modules use. `handlers/<name>.py` is the thin handler that `nativeflows-dev scaffold` writes once. The logic is in `services/<name>.py`, which together with new tests is all that a coder work package writes (ADR-0073 rules 2, 6).
+
+   Note (S2 findings closure, 2026-11-21; finding 13, D15): a module that owns consumers, queries or auto-post checkers also has:
+   - `consumers/`: registered outbox consumers ([ADR-0013](0013-outbox-and-events.md) rule 6);
+   - `queries/`: registered read-only query handlers ([ADR-0008](0008-command-envelope-and-registry.md) rule 1);
+   - `checkers/`: registered auto-post checkers, one per document type the module owns ([ADR-0065](0065-deterministic-auto-post-gateway.md) rule 2, accepted 2026-11-21).
+
+   `app` imports them as it imports `handlers/` (rule 5).
 4. A module's `contract.py` holds three things:
    - its command, query and event schemas;
    - its **posting interfaces**: plain functions that take the caller's `context`, such as `ledger.contract.write_journal_entry`, `inventory.contract.move_stock`, `documents.contract.assign_number` and `periods.contract.check_posting`;
@@ -134,6 +150,8 @@ Checks:
      | `nativeflows_reference` | standard library only |
 
    A `forbidden` contract lets only `nativeflows.agents.gateway.adapters` import a provider library ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 4).
+
+   Note (S2 findings closure, 2026-11-21): the CRM-only profile adds the contract `crm_independent_of_accounting` (rule 2 note); layer-3 imports of a layer-3 `contract` follow the rule 2 note on same-layer imports.
 
 **Database**
 
@@ -203,6 +221,10 @@ Checks:
     - A daily job creates `outbox_event` partitions 3 months ahead and drops expired ones under ADR-0013 rule 15. The same job creates audit partitions 3 months ahead and drops none ([ADR-0038](0038-audit-and-observability.md) rule 6).
     - Procrastinate's stalled-job retry runs from the `jobs` worker, with a heartbeat of 30 s and stalled after 5 min.
     - Step 1 work package 6 implements this rule.
+
+    Note (S2 findings closure, 2026-11-21; finding 3): the queues are `events|integrations|jobs|pdf|agents`. `agents` runs the `agent_runner` consumer ([ADR-0013](0013-outbox-and-events.md) rule 13 and its rule 6 note; [ADR-0050](0050-agent-runtime-and-query-layer.md) rule 16).
+
+    Note (S2 findings closure, 2026-11-21): the bullet on Procrastinate's stalled-job retry is superseded by the author's decision of 2026-11-19 to drop Procrastinate (OPT-08; [ADR-0031](0031-design-simplifications.md) rule 15 note; [ADR-0002](0002-core-technology-tools.md) note). The `jobs` queue runs on the outbox workers, and a stalled run is retried through the consumer lease and heartbeat of [ADR-0013](0013-outbox-and-events.md) rule 7, once the step 0 spike confirms it. The other mentions of Procrastinate and schema `procrastinate` (the paragraph before rule 1, rules 5, 7 and 8) and [ADR-0013](0013-outbox-and-events.md) rule 13 and [ADR-0006](0006-id-and-numeric-model.md) rule 22 stay as written until that spike.
 13. `nativeflows_dev.checks` holds the checks no tool provides, each named after the rule it enforces. Each failure reports `file:line`, the rule ID and a one-line fix:
     - **Floats.** No floating-point types in migrations, and none for amounts, quantities, prices, rates or percentages in `nativeflows` (ADR-0006 rule 12). Other floats, such as timeouts, need a `# float-ok: <reason>` comment.
     - **Rounding and conversion.** Neither happens outside `nativeflows.numeric` (ADR-0006 rules 10, 15).
@@ -221,7 +243,7 @@ Checks:
     - **Documents.** Relative Markdown links resolve, and per-directory `AGENTS.md` files are within 40 lines.
     - **Licences and workflows.** Dependency licences are on the allowlist ([18](../spec/18-license-governance.md)). No workflow uses a self-hosted runner, and actions are pinned by commit SHA.
 
-    Note ([ADR-0063](0063-configurable-policy-settings.md), proposed 2026-11-15): transaction-level advisory locks (`pg_advisory_xact_lock`) are allowed on handler and trigger paths, because they end with the transaction; session-level advisory locks stay banned. The first user is the settings trigger, which serializes changes per company and key ([ADR-0063](0063-configurable-policy-settings.md) rule 2).
+    Note ([ADR-0063](0063-configurable-policy-settings.md), 2026-11-15): transaction-level advisory locks (`pg_advisory_xact_lock`) are allowed on handler and trigger paths, because they end with the transaction; session-level advisory locks stay banned. The first user is the settings trigger, which serializes changes per company and key ([ADR-0063](0063-configurable-policy-settings.md) rule 2).
 
     Note (coding-rules gate, 2026-11-16; chief architect under ADR-0005, the author asked that the way code is written and checked be fixed before the first line of product code):
     - **Gate 0.** No product code (anything under `nativeflows` beyond the empty module skeleton) is merged until `nativeflows-dev check` exists and passes on that skeleton with every contract of rule 6 and every check of rule 13 implemented, or reporting `skipped` with its reason where its inputs do not exist yet (rule 14). CI runs the same command, and `main` is protected: the CI checks are required and no direct push. Pre-commit hooks are a convenience, not the gate.
@@ -234,7 +256,7 @@ Checks:
     - **Two speeds.** `nativeflows-dev check --fast` (ruff, format, import-linter and the rule 13 checks on changed files) for pre-commit and agents' inner loop; the full `check` (adds pyright and generated-file drift through `generate --check`) on pre-push and CI.
     - **Agents read the rules in one place:** the root `AGENTS.md` points to this note and to `docs/design/architecture-core.md` section A5; every failure prints `file:line`, the rule ID and a one-line fix (rule 13).
 
-    Note ([ADR-0073](0073-coding-pipeline-and-mechanical-assurance.md), proposed 2026-11-18): new checks.
+    Note ([ADR-0073](0073-coding-pipeline-and-mechanical-assurance.md), 2026-11-21): new checks.
     - **Declaration validator:** ADR-0073 rule 2.
     - **Floats:** extended to `float(` calls and to float literals in arithmetic in sensitive paths.
     - **Raw SQL:** only in migrations, `db` and a module's private `tables.py`, its data-access file.
@@ -245,7 +267,17 @@ Checks:
 
     Thresholds and lists move into the ratchet file `.github/assurance.toml`, which may be tightened freely and loosened only with an ADR (ADR-0073 rules 12, 14, 16).
 
-    Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): the UI annotation checks join `nativeflows_dev.checks`: required annotations, known keys with renderers, label keys, `scale-from` pairing, at most 8 default list columns and 6 header facets, actions and value help naming registered commands and queries, assist actions only `is_draft_only`, custom component names registered, and a conflict-free shortcut map (ADR-0077 rule 19).
+    Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), 2026-11-21): the UI annotation checks join `nativeflows_dev.checks`: required annotations, known keys with renderers, label keys, `scale-from` pairing, at most 8 default list columns and 6 header facets, actions and value help naming registered commands and queries, assist actions only `is_draft_only`, custom component names registered, and a conflict-free shortcut map (ADR-0077 rule 19).
+
+    Note (S2 findings closure, 2026-11-21; finding 14): eight checks have a rule but no check yet. They are built in the coding kit's lint and check deliverable and join this list, each named after its rule:
+    - **Client-side money arithmetic:** [ADR-0040](0040-ui-architecture.md) rule 2.
+    - **Permission, visibility or policy checks inside handlers:** [ADR-0008](0008-command-envelope-and-registry.md) rule 5.
+    - **References by `code` in command payloads:** [ADR-0006](0006-id-and-numeric-model.md) rule 5.
+    - **A column named `status`:** [ADR-0004](0004-naming-conventions.md) rule 13.
+    - **PostgreSQL `ENUM` types:** [ADR-0004](0004-naming-conventions.md) rule 14.
+    - **Country rules in the core:** [ADR-0053](0053-core-neutrality.md) rule 1. Only reviewers apply this test today, so the check is a heuristic: it flags candidates (country words, legal citations, account numbers in core code) for review and does not fail the build on its own.
+    - **Imports of lab code:** the lab README says the lab is "never imported by the product".
+    - **Writes to change-tracked tables outside the `context` helpers:** the DS-18 guard of [ADR-0038](0038-audit-and-observability.md) rule 3. It is not in the list above, and it is part of the gate's backlog (coding-rules gate note above).
 
 **One command for agents and CI**
 
@@ -266,7 +298,7 @@ Checks:
     | `nightly` | The nightly run (rule 18) | — |
     | `ci` | Every CI job's subcommands, in order | — |
 
-    Note ([ADR-0073](0073-coding-pipeline-and-mechanical-assurance.md), proposed 2026-11-18): new subcommands.
+    Note ([ADR-0073](0073-coding-pipeline-and-mechanical-assurance.md), 2026-11-21): new subcommands.
     - **`scaffold <declaration> [--check]`:** one-time handler, service stub and test skeleton; `--check` verifies the handler is unchanged.
     - **`work-package <id> --start|--context|--allows <path>|--check`:** start a package, print its context pack, answer the hook, guard a pull request.
     - **`mutation [--diff <base>|--package <name>]`:** job `mutation`.
@@ -291,7 +323,7 @@ Checks:
     - **Labels.** A separate `pull_request_target` workflow, whose only permission is `pull-requests: write`, reads only the changed-file list, never checks out the head, and applies the labels `reserved-review` and `author-review`. `author-review` marks paths of money, stock posting, idempotency, outbox, triggers and RLS (runbook stage 5).
     - **Branch protection.** The author sets branch protection and the required jobs, and the setting "require approval for all external contributors".
 
-    Note ([ADR-0073](0073-coding-pipeline-and-mechanical-assurance.md), proposed 2026-11-18): by the author's decision of 2026-11-18, `author-review` no longer means that the author reviews code. It marks a sensitive path, on which `mutation` and `model-review-b` apply and the reviewers use the area's checklist.
+    Note ([ADR-0073](0073-coding-pipeline-and-mechanical-assurance.md), 2026-11-21): by the author's decision of 2026-11-18, `author-review` no longer means that the author reviews code. It marks a sensitive path, on which `mutation` and `model-review-b` apply and the reviewers use the area's checklist.
     - **New jobs.** `mutation` in `ci.yml`. `scope-guard`, `model-review-a` and `model-review-b` in a base-side `pull_request_target` workflow that never checks out or runs head code.
     - **Required checks.** `dco`, `check`, `test`, `dataset`, `scenarios`, `guards`, `frontend`, `mutation`, `scope-guard`, `model-review-a` and `model-review-b`. Each always runs and reports `skipped: <reason>` when it does not apply.
     - **Branch protection.** A pull request is required and must be up to date. Protection is enforced for administrators, with no bypass actors and no override.
@@ -306,11 +338,11 @@ Checks:
     - Output is sorted and stable. A merge conflict in it is resolved by rerunning the command.
     - The files are committed, and CI fails on any difference, so every public API change shows in review (ADR-0008).
 
-    Note ([ADR-0073](0073-coding-pipeline-and-mechanical-assurance.md), proposed 2026-11-18): `generate` derives the registry outputs from the declarations of ADR-0008 rule 1's note, for declarations that have a handler. It also writes, from the catalogs, the `Literal` types that declarations use: authorization leaves, error and check codes, event types, lock names, and tables with their states. `nativeflows-dev scaffold <declaration>` is separate and runs once. It writes the handler, the service stub and the test skeleton, refuses to overwrite, and is never rerun (ADR-0073 rule 2).
+    Note ([ADR-0073](0073-coding-pipeline-and-mechanical-assurance.md), 2026-11-21): `generate` derives the registry outputs from the declarations of ADR-0008 rule 1's note, for declarations that have a handler. It also writes, from the catalogs, the `Literal` types that declarations use: authorization leaves, error and check codes, event types, lock names, and tables with their states. `nativeflows-dev scaffold <declaration>` is separate and runs once. It writes the handler, the service stub and the test skeleton, refuses to overwrite, and is never rerun (ADR-0073 rule 2).
 
-    Note ([ADR-0074](0074-core-data-structure-additions.md), proposed 2026-11-19): the schema of a command or query that names a table with `custom_values` carries it as an object annotated `x-nativeflows-custom-values`; the company's own keys are read at run time, so no generated file depends on a company (ADR-0074 rule 11).
+    Note ([ADR-0074](0074-core-data-structure-additions.md), 2026-11-21): the schema of a command or query that names a table with `custom_values` carries it as an object annotated `x-nativeflows-custom-values`; the company's own keys are read at run time, so no generated file depends on a company (ADR-0074 rule 11).
 
-    Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): `generate` emits the closed vocabulary of ADR-0077 (24 `x-nativeflows-*` keys) from the declarations, and the renderer's key map is compared with it by `check` (ADR-0077 rules 8, 19).
+    Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), 2026-11-21): `generate` emits the closed vocabulary of ADR-0077 (24 `x-nativeflows-*` keys) from the declarations, and the renderer's key map is compared with it by `check` (ADR-0077 rules 8, 19).
 
 **Test server and nightly**
 

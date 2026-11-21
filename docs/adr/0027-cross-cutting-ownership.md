@@ -35,7 +35,7 @@ Before step 1 code freezes the platform modules, every entity that several modul
 
    The columns of `agent_type`, `agent_type_version`, `agent_type_setting`, `agent_run`, `agent_run_step`, `agent_budget_usage` and `agent_promotion_evidence` are in [ADR-0050](0050-agent-runtime-and-query-layer.md) rules 12, 14, 18, 19 and 23.
 
-    Note ([ADR-0076](0076-internal-messaging-and-notifications.md), proposed 2026-11-19): `work` also owns the messaging tables of ADR-0076 (`conversation`, `conversation_member`, `message`, `message_mention`, `notification`, `notification_email`, `notification_preference`); it still imports no higher module, and reads permissions, approval stages and settings through registered functions that `app` wires (ADR-0076 rule 12).
+    Note ([ADR-0076](0076-internal-messaging-and-notifications.md), 2026-11-21): `work` also owns the messaging tables of ADR-0076 (`conversation`, `conversation_member`, `message`, `message_mention`, `notification`, `notification_email`, `notification_preference`); it still imports no higher module, and reads permissions, approval stages and settings through registered functions that `app` wires (ADR-0076 rule 12).
 2. Attachments:
    - **Identity and storage.** An `attachment` is unique per (`company_id`, SHA-256). It records media type, size, storage key, data label and source kind. The bytes live in an object store, never in the database (DS-37).
    - **Data labels.** A second upload of the same bytes in the same company reuses the row and keeps the stricter data label.
@@ -58,7 +58,7 @@ Before step 1 code freezes the platform modules, every entity that several modul
 
    Interim, with the open question on trace scope: prices are explained by the `document_line_price_step` rows on each line, part of its content, and pricing writes no `derivation_trace` rows ([ADR-0047](0047-commercial-documents-and-pricing.md) rule 16).
 
-   Note ([ADR-0069](0069-business-unit-dimension.md), proposed 2026-11-17): by the author's decision of 2026-11-17, the business unit derivation writes traces, one per journal entry (`rule_code` `business_unit_derivation`), named by `journal_entry.business_unit_trace_id`.
+   Note ([ADR-0069](0069-business-unit-dimension.md), 2026-11-21): by the author's decision of 2026-11-17, the business unit derivation writes traces, one per journal entry (`rule_code` `business_unit_derivation`), named by `journal_entry.business_unit_trace_id`.
 
 **Master records**
 
@@ -82,9 +82,9 @@ Before step 1 code freezes the platform modules, every entity that several modul
    - **Order references.** Lines of `goods_receipt`, `delivery` and the return types have nullable order-line reference columns (`purchase_order_line_id`, `sales_order_line_id`), reserved in the step 3 design (typed line references, [ADR-0028](0028-document-lifecycle-hardening.md) rule 2). Commercial documents at step 5 fill them, and the core table does not change (B3). Before step 5, `needs_reference` is satisfied by a free-text reference.
    - **Correction types.** The return stock documents may carry `correction_of_id` to the receipt or delivery they correct (ADR-0009 rule 23); the DS-09 deliverable decides. The commercial correction types `purchase_return` and `sales_return` refer to them.
 
-   Note ([ADR-0070](0070-quality-management-core.md), proposed 2026-11-17): the non-posting document type `inspection_lot` is owned by `quality` (ADR-0070 rule 7).
+   Note ([ADR-0070](0070-quality-management-core.md), 2026-11-21): the non-posting document type `inspection_lot` is owned by `quality` (ADR-0070 rule 7).
 
-    Note ([ADR-0075](0075-stock-documents.md), proposed 2026-11-19): the fields and reversibility flags of every type of this rule are written (ADR-0075 rules 1 to 6 and 11 to 14), with the link from `transfer_order` to `stock_transfer` as `stock_transfer_line.transfer_order_line_id` (one step, or two through transit; rule 14).
+    Note ([ADR-0075](0075-stock-documents.md), 2026-11-21): the fields and reversibility flags of every type of this rule are written (ADR-0075 rules 1 to 6 and 11 to 14), with the link from `transfer_order` to `stock_transfer` as `stock_transfer_line.transfer_order_line_id` (one step, or two through transit; rule 14).
 8. Owners of entities that had none:
 
    | Entity | Owner |
@@ -99,7 +99,7 @@ Before step 1 code freezes the platform modules, every entity that several modul
 
    ADR-0012 rule 17's "DS-26" for these computations is corrected.
 
-   Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), proposed 2026-11-15): management reporting is the analysis layer of `query`: declared measures over the semantic views, plans compiled to one `SELECT`, saved analyses and KPIs as company data, still never documents. Measures over accounts use system accounts and ADR-0049's turnover rules for closing and migration entries, and equal ADR-0049's turnover for the same scope and range (INV-411) (rules 3, 4, 26, 35).
+   Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), 2026-11-15): management reporting is the analysis layer of `query`: declared measures over the semantic views, plans compiled to one `SELECT`, saved analyses and KPIs as company data, still never documents. Measures over accounts use system accounts and ADR-0049's turnover rules for closing and migration entries, and equal ADR-0049's turnover for the same scope and range (INV-411) (rules 3, 4, 26, 35).
 
 **Read models**
 
@@ -137,7 +137,7 @@ Before step 1 code freezes the platform modules, every entity that several modul
 
     Note: `money_account_balance` rows ([ADR-0048](0048-cash-bank-receivables-payables.md) rule 12's note) are a class of their own between partner rows (9) and open item rows (10), in ascending ID (holistic review, 2026-11-15).
 
-    Note ([ADR-0058](0058-configurable-workflows.md), proposed 2026-11-15): class 3 also holds the company's `configuration_state` row, locked by every activation, enable, rollback and demotion of a configuration artifact, so parallel activations cannot together form a cycle in the rule graph (rule 15).
+    Note ([ADR-0058](0058-configurable-workflows.md), 2026-11-15): class 3 also holds the company's `configuration_state` row, locked by every activation, enable, rollback and demotion of a configuration artifact, so parallel activations cannot together form a cycle in the rule graph (rule 15).
 
 **Catalog and glossary consistency**
 
