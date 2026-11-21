@@ -11,7 +11,7 @@ same bytes. Every tool exits non-zero on failure.
 tools/docs/run_all.sh [OUT_DIR]        # index, units, dossiers, tests; OUT_DIR defaults to ~/Projects/NativeFlows-lab/fable/s3-out
 python tools/docs/extract_rules.py --out OUT/units.jsonl [--markers-out OUT/conflict-markers.jsonl] [--strict]
 python tools/docs/build_index.py [--check]                 # writes docs/design/generated/rule-index.csv
-python tools/docs/build_dossiers.py --out OUT/dossiers     # <module>.md, cross.md, unassigned.md, MODULES.csv
+python tools/docs/build_dossiers.py --out OUT/dossiers     # <module>.md, cross.md, MODULES.csv
 python tools/docs/doc_lint.py SPEC.md [SPEC-2.md ...] --module M [--json]
 python -m unittest discover tools/docs/tests
 ```
@@ -25,7 +25,7 @@ repository.
 | --- | --- | --- |
 | `extract_rules.py` | `docs/adr/[0-9]*.md`; for markers also `docs/spec`, `docs/design` | units JSON Lines; marker JSON Lines; summary on stdout |
 | `build_index.py` | ADRs, `docs/design/**/*.sql`, `docs/catalogs/*.csv`, ADR-0022 rule 2 through `gen_overview.py` | `docs/design/generated/rule-index.csv` |
-| `build_dossiers.py` | same as the index | `<module>.md` per module of ADR-0022 rule 2, `cross.md`, `unassigned.md`, `MODULES.csv` |
+| `build_dossiers.py` | same as the index | `<module>.md` per module of ADR-0022 rule 2 and `process`, `cross.md`, `MODULES.csv` |
 | `doc_lint.py` | the compiled spec, the index, the DDL and catalogs | findings on stdout |
 
 `nfdocs.py` holds the shared parsing. The table -> owner mapping and the ADR -> declared modules mapping are
@@ -80,22 +80,43 @@ one blank line in `text`, and `line_end` is the rule's last own line.
 - **catalog rows**: first-column keys of catalogs whose first column is unique (5 catalogs with repeating keys are
   skipped and reported), min 4 characters, in code; keys with `<placeholder>` parts match either form; `INV-n` and
   `EC-n` anywhere, matched to the catalog key by number. A key spelled like a table is credited to the table only.
-- **modules** of a unit: the owners of its tables; else the modules gen_overview declares for its ADR; else
-  `unassigned`. A note takes its owner's modules plus the owners of its own tables. More than 3 modules ->
-  `modules = cross`, the full list in `modules_all`.
+- **modules** of a unit: the primary module of its ADR (`primary_module`, from the committed
+  [adr-primary-module.csv](adr-primary-module.csv)) plus the owners of its tables; a note also takes its owner's
+  modules. When more than 3 modules besides the primary one are named, `modules` is `<primary>;cross` and the full
+  list is in `modules_all`. No unit is unassigned. In a dossier a unit is `primary` (its ADR's primary module) or
+  `shared` (it names a table the module owns).
+- **adr-primary-module.csv** (`adr,module,role`): one `primary` row per ADR, `secondary` rows for the other modules
+  gen_overview declares for it (shown in the dossier header, no other effect). It was seeded from gen_overview's
+  declared modules and the ADR titles (S3 pilot, 2026-11-21). `process` is a non-code module for process ADRs
+  (ADR-0001 to 0005, 0022, 0073): it gets a dossier flagged non-code and no tables. The tools refuse an ADR
+  without a primary, with two, or with a module that is not in ADR-0022 rule 2 and not `process`.
 - **build step**: the first `step N` / `build step N` (vocabulary of spec 11) in the unit, for a note else in its
   owner; else the ADR's step: the first in its header and `.D0`, else the step it names most often.
 - **tokens** are bytes / 3.5. `chunks_needed` = tokens / 30,000 rounded up (ADR-0073 rule 6 context pack).
 
+## Dossier content
+
+Per module: its units (primary and shared), the `.E` and `.U` sections of its primary ADRs, the DDL of its owned
+tables, the CSV rows of every catalog row its units reference, and the full rows of every invariant and edge case
+referenced by its units or by those `.E`/`.U` sections, or whose `area` is the module. So sections 5 and 6 of the
+template can be written from the dossier alone.
+
 ## Lint checks
 
-L1 trace covers every module ID; L2 owned tables and catalog rows backticked in the body; L3 proposed rules only
+L1 trace covers every module ID, a `Where` cell is not empty and `not applicable:` has a reason (any other `Where`
+that is not an R-number or a heading of the spec is a warning); L2 owned tables and **owned** catalog rows backticked
+in the body. A catalog row is owned when a unit whose primary module is this module references it, unless its
+catalog has a `module` column naming another module; invariants and edge cases whose `area` is the module are
+owned too. Rows of other modules are not required and may be listed under `Reads`; L3 proposed rules only
 under `## Proposed (not law)` or with `[proposed]`, never on accepted rules; L4 no bare number before a counted noun,
 `<!-- count:KIND -->N<!-- /count -->` recomputed (tables, columns, rules, notes, sections, settings, invariants,
 edge-cases, catalog-rows; other kinds such as commands are a finding, as the index cannot count them); L5 every
 CONFLICT-marked unit as `CONFLICT <id>: <resolution>`, every conflict-flagged note as `CONFLICT` or
 `FALSE-POSITIVE <id>` under `## Conflicts`; L6 hard limit 16,000 tokens per file, section sizes reported; L7 trace IDs
-exist. Several files given together are the chunks of one module: L1, L2 and L5 run over all of them.
+exist; L8 a cross-module reference `<module> R-<n>` (or `` `<module> ADR-nnnn…` ``) names a module of ADR-0022
+rule 2 (or `process`, `cross`) and a numeric rule: `R-scrap`, `R-3` without a module and `nosuch R-1` are findings;
+L9 every setting key referenced by any unit of the module (primary or shared) is backticked in the body or in `Reads`.
+Several files given together are the chunks of one module: L1, L2, L5 and L9 run over all of them.
 
 ## Blind spots
 
@@ -113,6 +134,7 @@ exist. Several files given together are the chunks of one module: L1, L2 and L5 
   say which part of a rule is superseded.
 - Tables and keys are matched only in code spans; a table named in plain prose is not counted. One-word table names
   (`item`, `partner`, `site`) also match enum values or concepts written in code; the index summary lists them.
-- Module assignment uses only table ownership and gen_overview's declared ADRs; a rule about a module that names no
-  table and whose ADR declares no module is `unassigned`.
+- Module assignment is the ADR's primary module plus table ownership. A rule about a third module that names none
+  of its tables does not reach that module's dossier. The primary module was chosen by hand for ADRs with several
+  candidates; see adr-primary-module.csv.
 - `doc_lint` L4 recognises digits only, not number words, and allows one word between the number and the noun.

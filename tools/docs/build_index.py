@@ -19,7 +19,7 @@ from collections import Counter, defaultdict
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import nfdocs  # noqa: E402
 
-INDEX_FIELDS = ["id", "kind", "adr", "status", "modules", "modules_all", "tables", "catalog_rows", "xrefs_rules",
+INDEX_FIELDS = ["id", "kind", "adr", "status", "primary_module", "modules", "modules_all", "tables", "catalog_rows", "xrefs_rules",
                 "build_step", "relation", "conflict_flag", "conflict_phrases", "conflict_markers", "parent",
                 "source_file", "line_start", "line_end"]
 
@@ -47,20 +47,21 @@ def build(docs):
                 step = sorted(counts.items(), key=lambda x: (-x[1], nfdocs.STEP_ORDER.index(x[0])))[0][0]
         adr_step[a["adr"]] = step
 
+    primary, secondary = nfdocs.load_primary(modules, adrs=[a["adr"] for a in parsed])
     mods_of = {}
 
     def unit_modules(u):
+        """-> (modules column list, full list). Every unit is in its ADR's primary module, plus the owners of its
+        tables; a note also in its owner's modules. More than CROSS_LIMIT other modules -> primary plus `cross`."""
         if u["id"] in mods_of:
             return mods_of[u["id"]]
-        own = {owners[t] for t in u["_tables"] if owners.get(t)}
+        prim = primary[u["adr"]]
+        full = {prim} | {owners[t] for t in u["_tables"] if owners.get(t)}
         if u["kind"] == "note" and u["parent"] in by_id:
-            res = set(unit_modules(by_id[u["parent"]])) | own
-            res.discard("unassigned")
-        elif own:
-            res = own
-        else:
-            res = set(declared.get(u["adr"][4:], set()))
-        mods_of[u["id"]] = sorted(res) or ["unassigned"]
+            full |= set(unit_modules(by_id[u["parent"]])[1])
+        others = full - {prim}
+        col = [prim, "cross"] if len(others) > nfdocs.CROSS_LIMIT else sorted(full)
+        mods_of[u["id"]] = (sorted(col), sorted(full))
         return mods_of[u["id"]]
 
     for u in units:
@@ -69,14 +70,13 @@ def build(docs):
     for u in units:
         if not is_indexed(u):
             continue
-        mods = unit_modules(u)
+        mods, full = unit_modules(u)
         step = nfdocs.first_step(u["text"])
         if not step and u["kind"] == "note" and u["parent"] in by_id:
             step = nfdocs.first_step(by_id[u["parent"]]["text"])
         rows.append({
             "id": u["id"], "kind": u["kind"], "adr": u["adr"], "status": u["adr_status"],
-            "modules": "cross" if len(mods) > nfdocs.CROSS_LIMIT else ";".join(mods),
-            "modules_all": ";".join(mods),
+            "primary_module": primary[u["adr"]], "modules": ";".join(mods), "modules_all": ";".join(full),
             "tables": ";".join(u["_tables"]), "catalog_rows": ";".join(u["_rows"]),
             "xrefs_rules": ";".join(u["xrefs_rules"]), "build_step": step or adr_step.get(u["adr"], ""),
             "relation": u["relation"] or "", "conflict_flag": "1" if u["conflict"] else "",
@@ -85,7 +85,8 @@ def build(docs):
             "line_end": str(u["line_end"])})
     rows.sort(key=lambda r: (r["adr"], int(r["line_start"]), nfdocs.rule_sort_key(r["id"])))
     info = {"units": units, "parsed": parsed, "dangling": dangling, "modules": modules, "owners": owners,
-            "declared": declared, "files": files, "cats": cats, "skipped": skipped}
+            "declared": declared, "files": files, "cats": cats, "skipped": skipped, "primary": primary,
+            "secondary": secondary, "matcher": matcher}
     return rows, info
 
 
@@ -139,8 +140,9 @@ def report(rows, info):
         for m in r["modules"].split(";"):
             per[m] += 1
     lines.append("rows per module: " + ", ".join(f"{m} {n}" for m, n in sorted(per.items())))
-    un = [r["id"] for r in rows if r["modules"] == "unassigned" and r["kind"] == "rule"]
-    lines.append(f"unassigned rules: {len(un)}" + (": " + ", ".join(un) if un else ""))
+    un = [r["id"] for r in rows if r["modules"] == "unassigned"]
+    lines.append(f"unassigned units: {len(un)}" + (": " + ", ".join(un) if un else ""))
+    lines.append(f"units in cross (besides their primary module): {sum(1 for r in rows if 'cross' in r['modules'].split(';'))}")
     lines.append(f"rules without a build step: {sum(1 for r in rows if r['kind'] == 'rule' and not r['build_step'])}")
     unowned = sorted(t for t, o in info["owners"].items() if not o)
     lines.append(f"tables: {len(info['owners'])}; without owner: {len(unowned)}" + (": " + ", ".join(unowned) if unowned else ""))

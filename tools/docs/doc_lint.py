@@ -3,13 +3,17 @@
 
 Usage: doc_lint.py SPEC.md [SPEC-2.md ...] --module M [--index CSV] [--docs DIR] [--json]
 
-Several files are the chunks of one module: L1, L2 and L5 are checked over all of them together, the others per file.
-First output line: `LINT PASS findings=0` or `LINT FAIL findings=N`; then one finding per line
-(`L<n> <file>:<line>: <message>`), or with --json one line of JSON. Exit 0 on PASS, 1 on FAIL, 2 on bad input.
+Several files are the chunks of one module: L1, L2, L5 and L9 are checked over all of them together, the others per
+file. First output line: `LINT PASS findings=0` or `LINT FAIL findings=N`; then one finding per line
+(`L<n> <file>:<line>: <message>`) and warnings, or with --json one line of JSON. Exit 0 on PASS, 1 on FAIL, 2 on bad
+input.
 
 Checks:
-  L1  every rule, note and Decision text ID of the module in the index appears in the `## Trace` table;
-  L2  every table the module owns and every catalog row of the module is mentioned in backticks in the body;
+  L1  every rule, note and Decision text ID of the module in the index appears in the `## Trace` table; a `Where` cell
+      is not empty, and `not applicable:` carries a reason (a `Where` that is neither an R-number, a section or topic
+      heading of the spec, nor `not applicable: <reason>` is a warning, not a finding);
+  L2  every table the module owns and every catalog row the module owns (nfdocs.module_scope `owned_rows`) is
+      mentioned in backticks in the body; rows of other modules may be listed under `Reads` and are not required;
   L3  a line citing a rule of a proposed ADR is under `## Proposed (not law)` or carries `[proposed]`; a line citing
       only accepted rules carries no `[proposed]` and is not under that heading;
   L4  no bare number before a counted noun; `<!-- count:KIND -->N<!-- /count -->` is recomputed from the index
@@ -18,7 +22,10 @@ Checks:
       `CONFLICT <id>: <resolution>`; every conflict-flagged note as `CONFLICT <note or rule id>: ...` or
       `FALSE-POSITIVE <note id>`;
   L6  each file is within the hard budget (16,000 tokens, bytes / 3.5); sizes per `## ` section are reported;
-  L7  every ID in the trace table exists in the index.
+  L7  every ID in the trace table exists in the index;
+  L8  a cross-module reference `<module> R-<n>` (or `` `<module> ADR-nnnn...` `` in backticks) names an existing
+      module and a numeric rule; a placeholder such as `R-scrap` is a finding;
+  L9  every setting key referenced by the module's units appears in backticks in the body (or in `Reads`).
 """
 
 import argparse
@@ -31,12 +38,14 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import nfdocs  # noqa: E402
 import build_index  # noqa: E402
 
-ID_RE = re.compile(r"ADR-\d{4}(?:\.(?:L\d+\.)?(?:R\d+[a-z]?|D\d+|W\d*|[A-Z]\d*)(?:\.N\d+)?)?")
 UNIT_ID_RE = re.compile(r"ADR-\d{4}\.(?:L\d+\.)?(?:R\d+[a-z]?|D\d+|W\d*|[A-Z]\d*)(?:\.N\d+)?")
 COUNT_RE = re.compile(r"<!--\s*count:([\w-]+)\s*-->\s*(\d+)\s*<!--\s*/count\s*-->")
 NOUNS = r"(?:tables?|rules?|columns?|settings?|commands?|queries|query|notes?|invariants?|edge cases?|modules?|" \
         r"catalog rows?|events?|chunks?)"
 BARE_RE = re.compile(r"(?<![\w.,-])(\d[\d,]*)\s+(?:[a-z-]+\s+)?" + NOUNS + r"\b", re.I)
+XREF_R_RE = re.compile(r"(?:(?<![\w-])([A-Za-z_][\w]*)\s+)?(?<![\w-])R-([\w-]*)")
+XREF_ADR_RE = re.compile(r"`([a-z][a-z0-9_]*)`?\s+`?ADR-\d{4}")
+WHERE_R_RE = re.compile(r"(?<![\w-])R-?\d+[a-z]?\b")
 PROPOSED_HEADING = "Proposed (not law)"
 
 
@@ -49,6 +58,7 @@ class Spec:
         heads = [(i, l[3:].strip()) for i, l in enumerate(self.lines) if l.startswith("## ")]
         for k, (i, h) in enumerate(heads):
             self.sections.append((h, i, heads[k + 1][0] if k + 1 < len(heads) else len(self.lines)))
+        self.headings = {re.sub(r"[`#]", "", l).strip().lower() for l in self.lines if re.match(r"^#{2,3} ", l)}
 
     def section_of(self, i):
         for h, a, b in self.sections:
@@ -63,7 +73,7 @@ class Spec:
         return None
 
     def body_lines(self):
-        """Lines outside the Trace section, with code fences kept (L2 looks for backticks)."""
+        """Lines outside the Trace section."""
         return [(i, l) for i, l in enumerate(self.lines) if self.section_of(i) != "Trace"]
 
     def trace(self):
@@ -83,21 +93,38 @@ class Spec:
         return rows
 
 
+def where_kind(where, headings):
+    """-> 'empty' | 'na-no-reason' | 'ok' | 'unrecognised'."""
+    w = where.strip().strip("`").strip()
+    if not w:
+        return "empty"
+    m = re.match(r"(?i)^not applicable\s*:?\s*(.*)$", w)
+    if m:
+        return "ok" if m.group(1).strip() else "na-no-reason"
+    if WHERE_R_RE.search(w):
+        return "ok"
+    parts = [p.strip().lower() for p in re.split(r"[;,]", re.sub(r"[`#]", "", w)) if p.strip()]
+    return "ok" if parts and all(p in headings for p in parts) else "unrecognised"
+
+
 def lint(paths, module, index_path, docs):
-    findings, info = [], {"files": {}}
+    findings, warnings, info = [], [], {"files": {}}
 
     def f(check, path, line, msg):
         findings.append({"check": check, "file": path, "line": line, "message": msg})
 
     rows = build_index.read_index(index_path)
     by_id = {r["id"]: r for r in rows}
-    _modules, owners, _declared, _files = nfdocs.module_model(docs)
+    modules, owners, _declared, _files = nfdocs.module_model(docs)
+    known_modules = set(modules) | nfdocs.NON_CODE_MODULES | {"cross"}
     cats, _skipped = nfdocs.load_catalogs(docs)
-    units, tables, cat_rows = nfdocs.module_scope(rows, owners, cats, module)
+    scope = nfdocs.module_scope(rows, owners, cats, module)
+    units, tables = scope["units"], scope["tables"]
     if not units and not tables:
         raise SystemExit(f"doc_lint: module '{module}' has no units and no tables in the index")
     specs = [Spec(p) for p in paths]
     unit_ids = {r["id"] for r in units}
+    headings = set().union(*(s.headings for s in specs))
 
     # L7 and L1
     traced = {}
@@ -110,29 +137,53 @@ def lint(paths, module, index_path, docs):
             traced.setdefault(uid, (s.path, i + 1))
             if uid not in by_id:
                 f("L7", s.path, i + 1, f"trace ID {uid} is not in the rule index")
-            if not where.strip():
+            kind = where_kind(where, headings)
+            if kind == "empty":
                 f("L1", s.path, i + 1, f"trace row {uid} has an empty 'Where'")
+            elif kind == "na-no-reason":
+                f("L1", s.path, i + 1, f"trace row {uid}: 'not applicable' needs a reason")
+            elif kind == "unrecognised":
+                warnings.append(f"W1 {s.path}:{i + 1}: trace row {uid}: 'Where' is not an R-number, a heading or "
+                                f"'not applicable: <reason>': {where.strip()}")
     for uid in sorted(unit_ids - set(traced), key=nfdocs.rule_sort_key):
         f("L1", specs[0].path, 0, f"{uid} ({by_id[uid]['kind']}) is missing from the trace table")
 
-    # L2
+    # L2 and L9
     spans = []
     for s in specs:
         spans += nfdocs.code_spans("\n".join(l for _i, l in s.body_lines()))
     joined = "\n".join(spans)
+
+    def mentioned(key):
+        return key in joined and re.search(r"(?<![\w.])" + re.escape(key) + r"(?![\w.])", joined)
+
     for t in tables:
         if not nfdocs.key_regex(t).search(joined):
             f("L2", specs[0].path, 0, f"owned table `{t}` is not mentioned in backticks")
-    for c in cat_rows:
-        _cat, key = c.split(":", 1)
-        if not (key in joined and re.search(r"(?<![\w.])" + re.escape(key) + r"(?![\w.])", joined)):
-            f("L2", specs[0].path, 0, f"catalog row {c} is not mentioned in backticks (`{key}`)")
+    for c in scope["owned_rows"]:
+        if not mentioned(c.split(":", 1)[1]):
+            f("L2", specs[0].path, 0, f"owned catalog row {c} is not mentioned in backticks")
+    for c in scope["settings"]:
+        key = c.split(":", 1)[1]
+        if not mentioned(key) and c not in scope["owned_rows"]:
+            f("L9", specs[0].path, 0, f"setting `{key}` is referenced by the module's rules but not in the body "
+                                      f"or `Reads`")
 
-    # L3, L4 per file
+    # L3, L4, L8 per file
     columns = None
     for s in specs:
         for i, line in s.body_lines():
             sec = s.section_of(i)
+            for m in XREF_R_RE.finditer(line):
+                word, num = m.group(1), m.group(2)
+                if not re.fullmatch(r"\d+[a-z]?", num or ""):
+                    f("L8", s.path, i + 1, f"cross-module reference 'R-{num}' is not a rule number")
+                elif word not in known_modules:
+                    f("L8", s.path, i + 1, f"cross-module reference '{(word or '') + ' '}R-{num}' does not start "
+                                           f"with a module name")
+            for m in XREF_ADR_RE.finditer(line):
+                if m.group(1) not in known_modules:
+                    f("L8", s.path, i + 1, f"cross-module reference '{m.group(1)} ADR-…' names no module")
             if sec in ("Conflicts",):
                 continue
             cited = [u for u in UNIT_ID_RE.findall(line) if u in by_id]
@@ -153,7 +204,7 @@ def lint(paths, module, index_path, docs):
                 kind, n = m.group(1), int(m.group(2))
                 if kind == "columns" and columns is None:
                     columns = nfdocs.table_columns(docs)
-                want = expected_count(kind, units, tables, cat_rows, columns)
+                want = expected_count(kind, scope, columns)
                 if want is None:
                     f("L4", s.path, i + 1, f"count kind '{kind}' cannot be computed from the index")
                 elif want != n:
@@ -190,18 +241,17 @@ def lint(paths, module, index_path, docs):
         if tokens > nfdocs.SPEC_HARD_TOKENS:
             f("L6", s.path, 0, f"{tokens} tokens (bytes / 3.5) over the hard limit {nfdocs.SPEC_HARD_TOKENS}; "
                                f"split into chunks at '###' topics")
-    info["module"] = module
-    info["module_ids"] = len(unit_ids)
-    info["tables"] = len(tables)
-    info["catalog_rows"] = len(cat_rows)
+    info.update(module=module, module_ids=len(unit_ids), tables=len(tables), owned_rows=len(scope["owned_rows"]),
+                settings=len(scope["settings"]), warnings=warnings)
     findings.sort(key=lambda x: (x["check"], x["file"], x["line"], x["message"]))
     return findings, info
 
 
-def expected_count(kind, units, tables, cat_rows, columns):
+def expected_count(kind, scope, columns):
+    units, tables, cat_rows = scope["units"], scope["tables"], scope["catalog_rows"]
     k = {"rule": "rules", "note": "notes", "table": "tables", "setting": "settings", "invariant": "invariants",
-         "edge-case": "edge-cases", "catalog-row": "catalog-rows", "column": "columns", "section": "sections"}.get(kind,
-                                                                                                                  kind)
+         "edge-case": "edge-cases", "catalog-row": "catalog-rows", "column": "columns",
+         "section": "sections"}.get(kind, kind)
     if k == "rules":
         return sum(1 for r in units if r["kind"] == "rule")
     if k == "notes":
@@ -213,7 +263,7 @@ def expected_count(kind, units, tables, cat_rows, columns):
     if k == "columns":
         return sum(len(columns.get(t, [])) for t in tables)
     if k == "settings":
-        return sum(1 for c in cat_rows if c.startswith("settings:"))
+        return len(scope["settings"])
     if k == "invariants":
         return sum(1 for c in cat_rows if c.startswith("invariants:"))
     if k == "edge-cases":
@@ -247,6 +297,8 @@ def main(argv=None):
     else:
         for x in findings:
             print(f"{x['check']} {x['file']}:{x['line']}: {x['message']}")
+        for w in info["warnings"]:
+            print(w)
         for p, st in info["files"].items():
             print(f"size {p}: {st['bytes']} bytes, ~{st['est_tokens']} tokens; " +
                   ", ".join(f"{h} ~{t}" for h, t in st["sections"].items()))

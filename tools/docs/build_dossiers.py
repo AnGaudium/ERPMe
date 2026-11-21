@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
-"""Tool 3 (S3): write one Markdown dossier per module, plus cross.md, unassigned.md and MODULES.csv.
+"""Tool 3 (S3): write one Markdown dossier per module, plus cross.md and MODULES.csv.
 
 Usage: build_dossiers.py --out DIR [--docs DIR] [--quiet]
 
 A dossier holds, for one module: a header with counts and bytes; every rule, note and Decision text unit of the module
-in the rule index, verbatim, with ID and source lines (a unit of several modules is marked `shared`); the DDL of the
-tables the module owns; the catalog rows its units reference (CSV lines); the invariants and edge cases it references
-or whose area is the module; and the IDs of its `cross` units. Units of more than nfdocs.CROSS_LIMIT modules are in
-cross.md only. Tokens are estimated as bytes / 3.5. Deterministic; no timestamps.
+in the rule index, verbatim, with ID and source lines, marked `primary` (its ADR's primary module is this module,
+tools/docs/adr-primary-module.csv) or `shared` (it names a table this module owns); the `.E` (edge cases) and `.U`
+(documents updated) sections of the module's primary ADRs; the DDL of the tables the module owns; the catalog rows its
+units reference (CSV lines); the full rows of every invariant and edge case referenced by its units or by those
+sections, or whose area is the module; and the IDs of `cross` units that name it. A unit of more than
+nfdocs.CROSS_LIMIT other modules is in its primary module and in cross.md. `process` is a non-code module.
+Tokens are estimated as bytes / 3.5. Deterministic; no timestamps.
 """
 
 import argparse
@@ -15,6 +18,7 @@ import csv
 import io
 import math
 import os
+import re
 import sys
 from collections import Counter, defaultdict
 
@@ -22,38 +26,39 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import nfdocs  # noqa: E402
 import build_index  # noqa: E402
 
-MODULE_FIELDS = ["module", "rules", "notes", "sections", "tables", "catalog_rows", "bytes", "est_tokens",
-                 "conflict_flagged_notes", "supersedes_notes", "status_mix", "chunks_needed"]
+MODULE_FIELDS = ["module", "rules", "primary_rules", "notes", "sections", "tables", "catalog_rows", "bytes",
+                 "est_tokens", "conflict_flagged_notes", "supersedes_notes", "status_mix", "chunks_needed"]
+SECTION_SUFFIX = re.compile(r"\.(E|U)\d*(\.N\d+)?$")
 
 
-def module_units(rows):
-    by_mod = defaultdict(list)
-    for r in rows:
-        if r["modules"] == "cross":
-            by_mod["cross"].append(r)
-            for m in r["modules_all"].split(";"):
-                by_mod[("cross-of", m)].append(r)
-        else:
-            for m in r["modules"].split(";"):
-                by_mod[m].append(r)
-    return by_mod
+def adr_sections(info, module):
+    """The .E and .U sections (and their notes) of the ADRs whose primary module is `module`."""
+    prim = {a for a, m in info["primary"].items() if m == module}
+    return [u for u in info["units"] if u["adr"] in prim and SECTION_SUFFIX.search(u["id"])]
 
 
-def render(module, units, cross_ids, info, docs):
+def render(module, rows, info, docs):
     owners, files, cats = info["owners"], info["files"], info["cats"]
     text_of = {u["id"]: u["text"] for u in info["units"]}
-    _u, owned, cat_rows = nfdocs.module_scope(units, owners, cats, module)
+    scope = nfdocs.module_scope(rows, owners, cats, module)
+    units, owned = scope["units"], scope["tables"]
+    sections = adr_sections(info, module) if module != "cross" else []
+    refs = set(scope["catalog_rows"])
+    for u in sections:
+        refs.update(c for c in info["matcher"].find(u["text"])[1] if c.startswith(("invariants:", "edge-cases:")))
+    cat_rows = sorted(refs)
     inv_ec = [c for c in cat_rows if c.startswith(("invariants:", "edge-cases:"))]
     other_rows = [c for c in cat_rows if c not in inv_ec]
-    body = []
-    body.append("## Rules and notes\n")
+    body = ["## Rules and notes\n"]
     for r in units:
-        tag = r["kind"]
         mods = r["modules_all"].split(";")
-        if module != "cross" and len(mods) > 1:
-            tag += ", shared: " + ", ".join(mods)
-        elif module == "cross":
-            tag += ", modules: " + ", ".join(mods)
+        if module == "cross":
+            tag = f"{r['kind']}, primary {r['primary_module']}, modules: " + ", ".join(mods)
+        elif r["primary_module"] == module:
+            tag = f"{r['kind']}, primary" + (", shared with: " + ", ".join(m for m in mods if m != module)
+                                             if len(mods) > 1 else "")
+        else:
+            tag = f"{r['kind']}, shared, primary {r['primary_module']}"
         if r["status"] != "accepted":
             tag += f", {r['status']}"
         if r["relation"] and r["kind"] == "note":
@@ -67,21 +72,25 @@ def render(module, units, cross_ids, info, docs):
         body.append(f"### {r['id']} ({tag})\n")
         body.append(f"Source: {r['source_file']}:{r['line_start']}-{r['line_end']}\n")
         body.append(text_of[r["id"]] + "\n")
+    if sections:
+        body.append("## Edge-case and documents-updated sections of the primary ADRs\n")
+        for u in sections:
+            body.append(f"### {u['id']} ({u['kind']}, {u['section']})\n")
+            body.append(f"Source: {u['source_file']}:{u['line_start']}-{u['line_end']}\n")
+            body.append(u["text"] + "\n")
     if owned:
         body.append("## DDL of owned tables\n")
         for t in owned:
             path, line = files[t]
             body.append(f"### {t}\n\nSource: {path}:{line}\n\n```sql\n{nfdocs.table_ddl(docs, path, line)}\n```\n")
-    if other_rows:
-        body.append("## Catalog rows referenced\n")
-        for cat, keys in group_rows(other_rows).items():
-            body.append(f"### {cat}.csv\n\n```csv\n{header_line(docs, cat)}\n" +
-                        "\n".join(cats[cat][k][0] for k in keys) + "\n```\n")
-    if inv_ec:
-        body.append("## Invariants and edge cases\n")
-        for cat, keys in group_rows(inv_ec).items():
-            body.append(f"### {cat}.csv\n\n```csv\n{header_line(docs, cat)}\n" +
-                        "\n".join(cats[cat][k][0] for k in keys) + "\n```\n")
+    for title, picked in (("Catalog rows referenced", other_rows), ("Invariants and edge cases", inv_ec)):
+        if picked:
+            body.append(f"## {title}\n")
+            for cat, keys in group_rows(picked).items():
+                body.append(f"### {cat}.csv\n\n```csv\n{header_line(docs, cat)}\n" +
+                            "\n".join(cats[cat][k][0] for k in keys) + "\n```\n")
+    cross_ids = [r["id"] for r in rows if "cross" in r["modules"].split(";") and module in r["modules_all"].split(";")
+                 and module not in r["modules"].split(";")] if module != "cross" else []
     if cross_ids:
         body.append("## Cross units that name this module (full text in cross.md)\n")
         body.append(", ".join(cross_ids) + "\n")
@@ -89,17 +98,23 @@ def render(module, units, cross_ids, info, docs):
     kinds = Counter(r["kind"] for r in units)
     status = Counter(r["status"] for r in units)
     stats = {
-        "module": module, "rules": kinds["rule"], "notes": kinds["note"], "sections": kinds["section"],
-        "tables": len(owned), "catalog_rows": len(cat_rows),
+        "module": module, "rules": kinds["rule"],
+        "primary_rules": sum(1 for r in units if r["kind"] == "rule" and r["primary_module"] == module),
+        "notes": kinds["note"], "sections": kinds["section"], "tables": len(owned), "catalog_rows": len(cat_rows),
         "conflict_flagged_notes": sum(1 for r in units if r["kind"] == "note" and r["conflict_flag"]),
         "supersedes_notes": sum(1 for r in units if r["kind"] == "note" and r["relation"] == "supersedes"),
         "status_mix": ";".join(f"{k}:{v}" for k, v in sorted(status.items())),
     }
-    head = (f"# Dossier: `{module}`\n\nGenerated by tools/docs/build_dossiers.py from the rule index; do not edit.\n\n"
-            f"Rules {stats['rules']}, notes {stats['notes']}, Decision text units {stats['sections']}, owned tables "
-            f"{stats['tables']}, catalog rows {stats['catalog_rows']}, conflict-flagged notes "
-            f"{stats['conflict_flagged_notes']}, supersedes notes {stats['supersedes_notes']}, status "
-            f"{stats['status_mix'] or 'none'}. Body {len(body_text.encode('utf-8'))} bytes, about "
+    prim_adrs = sorted(a for a, m in info["primary"].items() if m == module)
+    sec_adrs = sorted(a for a, ms in info["secondary"].items() if module in ms)
+    flag = (" Non-code module: process law (how the project works), no code is generated from it."
+            if module in nfdocs.NON_CODE_MODULES else "")
+    head = (f"# Dossier: `{module}`\n\nGenerated by tools/docs/build_dossiers.py from the rule index; do not edit."
+            f"{flag}\n\nPrimary ADRs: {', '.join(prim_adrs) or 'none'}. Secondary in: {', '.join(sec_adrs) or 'none'}.\n\n"
+            f"Rules {stats['rules']} (primary {stats['primary_rules']}), notes {stats['notes']}, Decision text units "
+            f"{stats['sections']}, owned tables {stats['tables']}, catalog rows {stats['catalog_rows']}, "
+            f"conflict-flagged notes {stats['conflict_flagged_notes']}, supersedes notes {stats['supersedes_notes']}, "
+            f"status {stats['status_mix'] or 'none'}. Body {len(body_text.encode('utf-8'))} bytes, about "
             f"{round(len(body_text.encode('utf-8')) / nfdocs.TOKEN_BYTES)} tokens (bytes / 3.5).\n\n")
     content = head + body_text
     size = len(content.encode("utf-8"))
@@ -129,13 +144,11 @@ def header_line(docs, cat):
 
 def build_all(docs, out_dir):
     rows, info = build_index.build(docs)
-    by_mod = module_units(rows)
-    names = sorted(set(info["modules"]) | {m for m in by_mod if isinstance(m, str)})
+    names = sorted(set(info["modules"]) | set(info["primary"].values()) |
+                   {m for r in rows for m in r["modules"].split(";")})
     files, stats = {}, []
     for m in names:
-        units = by_mod.get(m, [])
-        cross_ids = [r["id"] for r in by_mod.get(("cross-of", m), [])] if m not in ("cross", "unassigned") else []
-        content, st = render(m, units, cross_ids, info, docs)
+        content, st = render(m, rows, info, docs)
         files[f"{m}.md"] = content
         stats.append(st)
     buf = io.StringIO()
@@ -145,6 +158,9 @@ def build_all(docs, out_dir):
         w.writerow({k: st[k] for k in MODULE_FIELDS})
     files["MODULES.csv"] = buf.getvalue()
     os.makedirs(out_dir, exist_ok=True)
+    for name in os.listdir(out_dir):   # drop dossiers of modules that no longer exist (e.g. unassigned.md)
+        if name.endswith(".md") and name not in files:
+            os.remove(os.path.join(out_dir, name))
     for name, content in sorted(files.items()):
         with open(os.path.join(out_dir, name), "w", encoding="utf-8", newline="") as fh:
             fh.write(content)

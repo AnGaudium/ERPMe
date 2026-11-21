@@ -25,9 +25,11 @@ def write_index(path, rows):
 
 
 def make_spec(rows, owners, cats, module, extra_rules=""):
-    """A compiled spec that satisfies every check: all IDs traced, all tables and catalog rows backticked."""
-    units, tables, cat_rows = nfdocs.module_scope(rows, owners, cats, module)
-    keys = [c.split(":", 1)[1] for c in cat_rows]
+    """A compiled spec that satisfies every check: all IDs traced, owned tables, owned catalog rows and the
+    referenced settings backticked. Rows the module does not own are left out on purpose (L2 must not ask for them)."""
+    scope = nfdocs.module_scope(rows, owners, cats, module)
+    units, tables = scope["units"], scope["tables"]
+    keys = sorted({c.split(":", 1)[1] for c in scope["owned_rows"] + scope["settings"]})
     flagged = [r for r in units if r["kind"] == "note" and r["conflict_flag"]]
     marked = [r for r in units if r["conflict_markers"] not in ("", "0", 0)]
     out = [f"# Compiled spec: `{module}`", "",
@@ -52,19 +54,20 @@ class LintMutations(unittest.TestCase):
         write_index(cls.index, rows)
         cls.rows = build_index.read_index(cls.index)
         cls.owners, cls.cats = info["owners"], info["cats"]
-        cls.units, cls.tables, cls.cat_rows = nfdocs.module_scope(cls.rows, cls.owners, cls.cats, MODULE)
+        cls.scope = nfdocs.module_scope(cls.rows, cls.owners, cls.cats, MODULE)
+        cls.units, cls.tables, cls.cat_rows = cls.scope["units"], cls.scope["tables"], cls.scope["owned_rows"]
         cls.spec = make_spec(cls.rows, cls.owners, cls.cats, MODULE)
 
     @classmethod
     def tearDownClass(cls):
         shutil.rmtree(cls.tmp)
 
-    def run_lint(self, text, index=None, name="spec.md"):
+    def run_lint(self, text, index=None, name="spec.md", module=MODULE, with_info=False):
         path = os.path.join(self.tmp, name)
         with open(path, "w", encoding="utf-8") as fh:
             fh.write(text)
-        findings, _info = doc_lint.lint([path], MODULE, index or self.index, nfdocs.DEFAULT_DOCS)
-        return findings
+        findings, info = doc_lint.lint([path], module, index or self.index, nfdocs.DEFAULT_DOCS)
+        return (findings, info) if with_info else findings
 
     def checks(self, findings):
         return sorted({f["check"] for f in findings})
@@ -84,6 +87,13 @@ class LintMutations(unittest.TestCase):
     def test_l2_table_not_mentioned(self):
         f = self.run_lint(self.spec.replace(f"- `{self.tables[0]}`\n", ""))
         self.assertEqual(self.checks(f), ["L2"])
+
+    def test_l2_rows_of_other_modules_not_required(self):
+        not_owned = [c for c in self.scope["catalog_rows"] if c not in self.scope["owned_rows"]]
+        self.assertTrue(not_owned, "precondition: the module references rows it does not own")
+        key = not_owned[0].split(":", 1)[1]
+        self.assertNotIn(f"`{key}`", self.spec)
+        self.assertEqual(self.run_lint(self.spec), [])
 
     def test_l2_catalog_row_not_mentioned(self):
         key = self.cat_rows[0].split(":", 1)[1]
@@ -144,6 +154,35 @@ class LintMutations(unittest.TestCase):
         f = self.run_lint(self.spec.replace("| Source | Where |\n| --- | --- |\n",
                                             "| Source | Where |\n| --- | --- |\n| `ADR-0999.R1` | R1 |\n"))
         self.assertEqual(self.checks(f), ["L7"])
+
+    def test_l8_cross_module_references(self):
+        self.assertEqual(self.run_lint(self.spec.replace("R1. A statement.", "R1. As `inventory R-12` says.")), [])
+        for bad in ("`inventory R-scrap`", "nosuchmodule R-12", "`nosuchmodule ADR-0070.R2`", "see R-3"):
+            f = self.run_lint(self.spec.replace("R1. A statement.", f"R1. As {bad} says."))
+            self.assertEqual(self.checks(f), ["L8"], bad)
+
+    def test_l9_setting_of_a_shared_rule(self):
+        module = "periods"
+        scope = nfdocs.module_scope(self.rows, self.owners, self.cats, module)
+        extra = [c for c in scope["settings"] if c not in scope["owned_rows"]]
+        self.assertTrue(extra, "precondition: a setting referenced only by a shared unit")
+        spec = make_spec(self.rows, self.owners, self.cats, module)
+        self.assertEqual(self.run_lint(spec, module=module), [])
+        key = extra[0].split(":", 1)[1]
+        f = self.run_lint(spec.replace(f"- `{key}`\n", ""), module=module)
+        self.assertEqual(self.checks(f), ["L9"])
+
+    def test_where_cells(self):
+        victim = self.units[2]["id"]
+        row = f"| `{victim}` | R1 |"
+        self.assertEqual(self.checks(self.run_lint(self.spec.replace(row, f"| `{victim}` |  |"))), ["L1"])
+        self.assertEqual(self.checks(self.run_lint(self.spec.replace(row, f"| `{victim}` | not applicable |"))),
+                         ["L1"])
+        for ok in ("not applicable: review credit", "Settings", "R1, R3", "Topic"):
+            self.assertEqual(self.run_lint(self.spec.replace(row, f"| `{victim}` | {ok} |")), [], ok)
+        f, info = self.run_lint(self.spec.replace(row, f"| `{victim}` | somewhere |"), with_info=True)
+        self.assertEqual(f, [])
+        self.assertEqual(len(info["warnings"]), 1)
 
     def test_cli_first_line(self):
         path = os.path.join(self.tmp, "cli.md")

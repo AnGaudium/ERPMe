@@ -612,25 +612,70 @@ def first_step(text):
 
 # ------------------------------------------------------------------------------------------------ module scope
 
+PRIMARY_CSV = os.path.join(HERE, "adr-primary-module.csv")
+NON_CODE_MODULES = {"process"}   # primary module of process ADRs (ADR-0003, 0005, 0073 ...): a dossier, no code
+
+
+def load_primary(modules, path=PRIMARY_CSV, adrs=None):
+    """adr-primary-module.csv -> ({ADR id: primary module}, {ADR id: [secondary modules]}). Raises ValueError when an
+    ADR in `adrs` has no primary, has two, or a module is neither in ADR-0022 rule 2 nor non-code."""
+    primary, secondary, errors = {}, defaultdict(list), []
+    with open(path, encoding="utf-8", newline="") as fh:
+        for row in csv.DictReader(fh):
+            adr, mod, role = row["adr"], row["module"], row["role"]
+            if mod not in modules and mod not in NON_CODE_MODULES:
+                errors.append(f"{adr}: unknown module {mod}")
+            if role == "primary":
+                if adr in primary:
+                    errors.append(f"{adr}: two primary modules")
+                primary[adr] = mod
+            elif role == "secondary":
+                secondary[adr].append(mod)
+            else:
+                errors.append(f"{adr}: role {role} is not primary|secondary")
+    for adr in adrs or []:
+        if adr not in primary:
+            errors.append(f"{adr}: no primary module in {os.path.basename(path)}")
+    if errors:
+        raise ValueError("; ".join(errors))
+    return primary, dict(secondary)
+
+
+def _list(v):
+    return v if isinstance(v, list) else [x for x in (v or "").split(";") if x]
+
+
 def module_scope(rows, owners, cats, module):
-    """What belongs to one module, shared by build_dossiers and doc_lint (one definition):
-    units: index rows of the module (rows whose `modules` is `cross` belong to module `cross` only);
-    tables: tables the module owns (none for `cross` and `unassigned`);
-    catalog_rows: rows its units reference, plus invariants and edge cases whose `area` is the module."""
-    def mods(r):
-        m = r["modules"]
-        return m if isinstance(m, list) else [x for x in m.split(";") if x]
-    units = [r for r in rows if module in mods(r)]
-    tables = [] if module in ("cross", "unassigned") else sorted(t for t, o in owners.items() if o == module)
-    refs = set()
+    """What belongs to one module; one definition for build_dossiers and doc_lint.
+    units: index rows whose `modules` name the module (every rule of an ADR is in its primary module);
+    tables: tables the module owns (none for `cross` and non-code modules);
+    catalog_rows: rows its units reference, plus invariants and edge cases whose `area` is the module (dossier);
+    owned_rows: the rows the module states itself (doc_lint L2): referenced by a unit whose primary module is this
+      module, minus rows of a catalog whose `module` column names another module, plus invariants and edge cases
+      whose `area` is the module;
+    settings: setting keys referenced by any unit of the module (doc_lint L9)."""
+    units = [r for r in rows if module in _list(r["modules"])]
+    tables = [] if module in ("cross",) or module in NON_CODE_MODULES else sorted(
+        t for t, o in owners.items() if o == module)
+    refs, owned = set(), set()
     for r in units:
-        cr = r["catalog_rows"]
-        refs.update(cr if isinstance(cr, list) else [x for x in cr.split(";") if x])
+        cr = _list(r["catalog_rows"])
+        refs.update(cr)
+        if r.get("primary_module") == module:
+            for c in cr:
+                cat, key = c.split(":", 1)
+                row = cats.get(cat, {}).get(key, (None, {}))[1]
+                if row.get("module") and row["module"] != module:
+                    continue
+                owned.add(c)
     for cat in ("invariants", "edge-cases"):
         for key, (_line, row) in cats.get(cat, {}).items():
             if row.get("area") == module:
                 refs.add(f"{cat}:{key}")
-    return units, tables, sorted(refs)
+                owned.add(f"{cat}:{key}")
+    settings = sorted(c for c in refs if c.startswith("settings:"))
+    return {"units": units, "tables": tables, "catalog_rows": sorted(refs), "owned_rows": sorted(owned),
+            "settings": settings}
 
 
 def table_columns(docs):
