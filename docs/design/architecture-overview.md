@@ -669,7 +669,7 @@ The production core step proposed by ADR-0032 rule 7 has no number yet ([open-qu
 
 ## B18. Open decisions and known limits
 
-[open-questions.md](../open-questions.md) holds 115 open and 210 closed items; 36 open items carry an interim (an entry counts when it says "interim").
+[open-questions.md](../open-questions.md) holds 114 open and 216 closed items; 37 open items carry an interim (an entry counts when it says "interim").
 
 **Author decisions that block coding** (examples)
 - Test server host (open-questions:8).

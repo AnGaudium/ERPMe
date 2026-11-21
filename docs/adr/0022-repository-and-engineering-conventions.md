@@ -15,6 +15,8 @@ Modules talk to each other only through their contracts:
 
 All tables are in one PostgreSQL schema `nativeflows`, plus `types` for domains and `procrastinate` for the job queue. Each table has one owning module, and lock helpers register in one global lock order.
 
+Note (S2 closure, 2026-11-21): Procrastinate is dropped by the author's decision of 2026-11-19 (OPT-08; [ADR-0031](0031-design-simplifications.md) rule 15 note; [ADR-0002](0002-core-technology-tools.md) note): once confirmed, there is no schema `procrastinate`. A spike at step 0 confirms it; if the spike needs more than one small module, Procrastinate stays and this text stands.
+
 Checks:
 - One developer CLI, `nativeflows-dev`, runs every check. CI jobs call only its subcommands, so an agent reproduces any failure with one command.
 - CI runs on GitHub-hosted runners, in parallel jobs of 15 minutes or less.
@@ -134,6 +136,8 @@ Checks:
    | `nativeflows admin migrate` | Rule 8 |
    | `nativeflows admin bootstrap` | ADR-0017 rule 7 |
 
+   Note (S2 closure, 2026-11-21): Procrastinate is dropped by the author's decision of 2026-11-19 (OPT-08; [ADR-0031](0031-design-simplifications.md) rule 15 note; [ADR-0002](0002-core-technology-tools.md) note): once confirmed, `nativeflows worker` runs only outbox workers, the `jobs` and `pdf` queues included (rule 12). A spike at step 0 confirms it; if the spike needs more than one small module, Procrastinate stays and this text stands.
+
 6. Import-linter contracts:
    - The layers of rule 2.
    - Independence between modules of layers 3 and 4, except their `contract`.
@@ -163,6 +167,8 @@ Checks:
    - **Roles.** Roles are cluster-level, so `backend/provision/roles.sql`, run as a superuser before any migration, creates the roles of ADR-0017 rule 18 and `nativeflows_check` (DS-16 rule 2: SELECT only, subject to RLS, never `BYPASSRLS`). The test fixture and the test server use the same file. Migrations only grant.
 
    Views are in schema `query`, owned by the role `nativeflows_query_owner`, which `provision/roles.sql` creates ([ADR-0050](0050-agent-runtime-and-query-layer.md) rules 42–43).
+
+   Note (S2 closure, 2026-11-21): Procrastinate is dropped by the author's decision of 2026-11-19 (OPT-08; [ADR-0031](0031-design-simplifications.md) rule 15 note; [ADR-0002](0002-core-technology-tools.md) note): once confirmed, there is no schema `procrastinate` to hold or exempt. A spike at step 0 confirms it; if the spike needs more than one small module, Procrastinate stays and this text stands.
 8. Migrations:
    - Alembic keeps one linear history in `backend/migrations/`. CI fails on more than one head and on any migration that does not upgrade an empty database to head.
    - The first migration creates the extensions `btree_gist` (ADR-0007) and `pg_trgm` (ADR-0002), the schemas, and the domains in `types`.
@@ -179,6 +185,8 @@ Checks:
    - Before go-live (B8), merged migrations may be squashed only in the author's commit that raises `build_step` at a gate. The test server rebuilds its database from empty every night.
    - Procrastinate's schema SQL is applied by an Alembic migration that pins its version.
    - `nativeflows admin migrate` runs Alembic, then loads the core catalogs, then the localization package data. Deployment and tests use this one command.
+
+   Note (S2 closure, 2026-11-21): Procrastinate is dropped by the author's decision of 2026-11-19 (OPT-08; [ADR-0031](0031-design-simplifications.md) rule 15 note; [ADR-0002](0002-core-technology-tools.md) note): once confirmed, no migration applies Procrastinate's schema SQL. A spike at step 0 confirms it; if the spike needs more than one small module, Procrastinate stays and this text stands.
 9. Session and runtime settings:
    - **How settings are applied.** Per role with `ALTER ROLE … SET` in `provision/roles.sql`, and with `SET LOCAL` inside a transaction when a registered job needs longer:
      - every session runs in UTC;

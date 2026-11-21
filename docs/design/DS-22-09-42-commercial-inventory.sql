@@ -45,7 +45,7 @@ CREATE TABLE movement_type (                               -- global catalog, uu
     name                    text NOT NULL,
     direction               text NOT NULL CONSTRAINT ck_movement_type_direction CHECK (direction IN ('in', 'out')),
     value_source            text NOT NULL CONSTRAINT ck_movement_type_value_source CHECK (value_source IN ('document', 'preliminary_price', 'issuing_value', 'regime')),
-    costing_role            text NOT NULL CONSTRAINT ck_movement_type_costing_role CHECK (costing_role IN ('receipt', 'revalued_issue', 'transfer', 'regime', 'production_input', 'production_output')),
+    costing_role            text NOT NULL CONSTRAINT ck_movement_type_costing_role CHECK (costing_role IN ('receipt', 'revalued_issue', 'issue_return', 'transfer', 'regime', 'production_input', 'production_output')),
     offset_transaction_key  text,                          -- empty for transfers
     needs_reference         boolean NOT NULL,
     sap_analog              text,
