@@ -775,6 +775,12 @@ for i, (ok_, name_, detail_) in enumerate(check_issue_returns()):   # U73-U80, t
 from costing_solver import check_group_currency  # noqa: E402
 ok_, name_, detail_ = check_group_currency()
 check("U89 " + name_, ok_, detail_)
+# U90-U100: the costing cases of the S2 adversarial review: the rounding bound at a zero closing quantity (S4), reversals (S5),
+# a late landed cost as a value-only receipt addition (S6), returns at the original cost (N7) and random scenarios
+# (ADR-0020 rules 7, 12, 13 and 15 notes of 2026-11-21)
+from costing_solver import check_adversarial_cases  # noqa: E402
+for i, (ok_, name_, detail_) in enumerate(check_adversarial_cases()):
+    check(f"U{90 + i} " + name_, ok_, detail_)
 ck_role = ds22.split("CONSTRAINT ck_movement_type_costing_role CHECK", 1)[1].split("\n", 1)[0]
 st = {r["key"]: r for r in read_csv(os.path.join(CAT, "settings.csv"))}
 srr = st["movement_type.sales_return_receipt.costing_role"]
