@@ -96,6 +96,14 @@ fks = X("""select r.relname, f.relname, k.conname, (select array_agg(a.attname::
            where n.nspname='nativeflows' and k.contype='f' and r.relname = any(%s)""", (NEW_TABLES,)).fetchall()
 loose = [(a, b, n) for a, b, n, cl in fks if b in company_keyed and "company_id" not in cl and a != "planning_setting"]
 check(f"S06 all {len(fks)} foreign keys of the new tables that reach a company-keyed table carry company_id", loose == [], loose[:5])
+# The rule for every key of the loaded schema (ADR-0017 rule 19 note, 2026-11-21; R2-N9): a key between two tables with
+# company_id NOT NULL is composite on (company_id, id); single-column keys to or from a nullable company_id only for the
+# tables of gen_overview.COMPANY_KEY_ALLOWLIST. lab t17 D01b runs the same catalog query on all design files.
+from gen_overview import COMPANY_KEY_ALLOWLIST  # noqa: E402
+from lab import company_key_findings  # noqa: E402
+n_company_keys, company_bad = company_key_findings(X, COMPANY_KEY_ALLOWLIST)
+check(f"S06b all {n_company_keys} foreign keys between company_id tables of the loaded schema (five design files and the stubs) are composite with company_id, outside the allowlist",
+      n_company_keys > 300 and company_bad == [], company_bad[:5])
 check("S07 the B3 columns exist as the interim: demand_supply_line production line keys, for_demand_supply_line_id and owner_partner_id; owner_partner_id on order components and outputs",
       {"production_order_component_id", "production_order_output_id", "for_demand_supply_line_id", "owner_partner_id"} <= set(cols["demand_supply_line"])
       and "for_demand_supply_line_id" in cols["production_order"] and "owner_partner_id" in cols["production_order_component"]

@@ -131,8 +131,8 @@ CREATE TABLE inspection_lot (                              -- [quality] ADR-0070
     inspection_point              text NOT NULL CONSTRAINT ck_inspection_lot_inspection_point CHECK (inspection_point IN ('goods_receipt', 'in_process', 'production_output', 'customer_return', 'stock_recheck')),
     item_id                       uuid NOT NULL,
     warehouse_id                  uuid NOT NULL,             -- record scope (ADR-0017 rule 9); for in_process the production warehouse
-    lot_id                        uuid REFERENCES lot (id),
-    serial_number_id              uuid REFERENCES serial_number (id),   -- a single-serial lot; a lot of several serials names them on its lines
+    lot_id                        uuid,
+    serial_number_id              uuid,   -- a single-serial lot; a lot of several serials names them on its lines
     held_stock_status             text CONSTRAINT ck_inspection_lot_held_stock_status CHECK (held_stock_status IN ('quality_inspection', 'blocked')),
     quantity                      types.quantity NOT NULL CONSTRAINT ck_inspection_lot_quantity CHECK (quantity > 0),   -- inventory unit
     sample_quantity               types.quantity NOT NULL CONSTRAINT ck_inspection_lot_sample_quantity CHECK (sample_quantity >= 0),
@@ -164,7 +164,9 @@ CREATE TABLE inspection_lot (                              -- [quality] ADR-0070
         WHEN 'customer_return' THEN held_stock_status = 'blocked' AND operation_number IS NULL
         WHEN 'stock_recheck' THEN held_stock_status IS NOT NULL AND operation_number IS NULL
         ELSE held_stock_status = 'quality_inspection' AND operation_number IS NULL END),
-    CONSTRAINT ck_inspection_lot_deviation CHECK ((outcome = 'accepted_with_deviation') = (coalesce(length(btrim(deviation_reason)), 0) > 0))
+    CONSTRAINT ck_inspection_lot_deviation CHECK ((outcome = 'accepted_with_deviation') = (coalesce(length(btrim(deviation_reason)), 0) > 0)),
+    FOREIGN KEY (company_id, lot_id) REFERENCES lot (company_id, id),   -- company key (ADR-0017 rule 19 note, 2026-11-21)
+    FOREIGN KEY (company_id, serial_number_id) REFERENCES serial_number (company_id, id)   -- company key (ADR-0017 rule 19 note, 2026-11-21)
 );
 CREATE INDEX ix_inspection_lot_stock_key ON inspection_lot (company_id, item_id, warehouse_id, lot_id);
 CREATE INDEX ix_inspection_lot_source_document_id ON inspection_lot (source_document_id) WHERE source_document_id IS NOT NULL;
@@ -176,7 +178,7 @@ CREATE TABLE inspection_lot_line (                         -- [quality] ADR-0070
     line_number         integer NOT NULL CONSTRAINT ck_inspection_lot_line_line_number CHECK (line_number > 0),
     disposition         text NOT NULL CONSTRAINT ck_inspection_lot_line_disposition CHECK (disposition IN ('release', 'block', 'return_to_supplier', 'scrap', 'rework', 'sample_consumption')),
     quantity            types.quantity NOT NULL CONSTRAINT ck_inspection_lot_line_quantity CHECK (quantity > 0),   -- inventory unit
-    serial_number_id    uuid REFERENCES serial_number (id),
+    serial_number_id    uuid,
     reason_id           uuid,                                -- only for scrap (kind scrap) and return_to_supplier (kind return); required while documents.reason_required.scrap or .return is true (ADR-0074 rule 22); the executor copies it to the draft it creates (rule 15)
     reason_kind         text CONSTRAINT ck_inspection_lot_line_reason_kind CHECK (reason_kind IN ('scrap', 'return')),
     recorded_at         timestamptz NOT NULL DEFAULT now(),
@@ -187,7 +189,8 @@ CREATE TABLE inspection_lot_line (                         -- [quality] ADR-0070
     FOREIGN KEY (company_id, reason_id, reason_kind) REFERENCES reason (company_id, id, kind),
     CONSTRAINT ck_inspection_lot_line_serial_quantity CHECK (serial_number_id IS NULL OR quantity = 1),
     CONSTRAINT ck_inspection_lot_line_reason CHECK ((reason_id IS NULL) = (reason_kind IS NULL)
-        AND (reason_id IS NULL OR (disposition = 'scrap' AND reason_kind = 'scrap') OR (disposition = 'return_to_supplier' AND reason_kind = 'return')))
+        AND (reason_id IS NULL OR (disposition = 'scrap' AND reason_kind = 'scrap') OR (disposition = 'return_to_supplier' AND reason_kind = 'return'))),
+    FOREIGN KEY (company_id, serial_number_id) REFERENCES serial_number (company_id, id)   -- company key (ADR-0017 rule 19 note, 2026-11-21)
 );
 -- What the executor created for a line, and how it ended (rule 15). Written only by RecordInspectionLotExecution;
 -- state moves created -> done | canceled once, by trigger; identity and target never change.
@@ -225,7 +228,7 @@ CREATE TABLE inspection_result (                           -- [quality] ADR-0070
     inspection_plan_revision_id   uuid NOT NULL,            -- the lot's revision (fk_inspection_result_lot); a lot without a plan has no results
     inspection_characteristic_id  uuid NOT NULL,
     sample_number                 integer CONSTRAINT ck_inspection_result_sample_number CHECK (sample_number > 0),   -- null: a summary result
-    serial_number_id              uuid REFERENCES serial_number (id),
+    serial_number_id              uuid,
     value                         types.quantity,           -- quantitative, in the characteristic's unit; typed for SPC later
     result_code                   text,                     -- qualitative, one of allowed_result_codes
     is_passed                     boolean NOT NULL,         -- computed by the handler from the immutable revision
@@ -262,7 +265,8 @@ CREATE TABLE inspection_result (                           -- [quality] ADR-0070
     -- person and integration rows are confirmed when written; certificate and agent rows only by a person later (rule 10)
     CONSTRAINT ck_inspection_result_confirmed CHECK ((confirmed_by_user_id IS NULL) = (confirmed_at IS NULL)
         AND (entry_source IN ('certificate', 'agent') OR confirmed_at IS NULL)),
-    CONSTRAINT ck_inspection_result_extraction_field CHECK (extraction_field_id IS NULL OR document_extraction_id IS NOT NULL)
+    CONSTRAINT ck_inspection_result_extraction_field CHECK (extraction_field_id IS NULL OR document_extraction_id IS NOT NULL),
+    FOREIGN KEY (company_id, serial_number_id) REFERENCES serial_number (company_id, id)   -- company key (ADR-0017 rule 19 note, 2026-11-21)
 );
 -- A row is superseded at most once, so the result in force per (lot, characteristic, unit) is unique (rule 10).
 CREATE UNIQUE INDEX ux_inspection_result_supersedes ON inspection_result (supersedes_result_id) WHERE supersedes_result_id IS NOT NULL;
@@ -278,8 +282,8 @@ CREATE TABLE nonconformance (                              -- [quality] ADR-0070
     state                       text NOT NULL DEFAULT 'open' CONSTRAINT ck_nonconformance_state CHECK (state IN ('open', 'closed', 'canceled')),
     defect_code_id              uuid,
     item_id                     uuid,
-    lot_id                      uuid REFERENCES lot (id),
-    serial_number_id            uuid REFERENCES serial_number (id),
+    lot_id                      uuid,
+    serial_number_id            uuid,
     quantity                    types.quantity CONSTRAINT ck_nonconformance_quantity CHECK (quantity > 0),   -- inventory unit
     partner_id                  uuid,                      -- the supplier or customer
     inspection_lot_id           uuid,
@@ -312,7 +316,9 @@ CREATE TABLE nonconformance (                              -- [quality] ADR-0070
         AND (state <> 'canceled' OR coalesce(length(btrim(cancel_reason)), 0) > 0)),
     CONSTRAINT ck_nonconformance_closed_after_opened CHECK (closed_at IS NULL OR closed_at >= opened_at),
     CONSTRAINT ck_nonconformance_containment CHECK ((containment_user_id IS NULL) = (containment_due_date IS NULL)),
-    CONSTRAINT ck_nonconformance_corrective CHECK ((corrective_user_id IS NULL) = (corrective_due_date IS NULL))
+    CONSTRAINT ck_nonconformance_corrective CHECK ((corrective_user_id IS NULL) = (corrective_due_date IS NULL)),
+    FOREIGN KEY (company_id, lot_id) REFERENCES lot (company_id, id),   -- company key (ADR-0017 rule 19 note, 2026-11-21)
+    FOREIGN KEY (company_id, serial_number_id) REFERENCES serial_number (company_id, id)   -- company key (ADR-0017 rule 19 note, 2026-11-21)
 );
 CREATE INDEX ix_nonconformance_company_id_partner_id ON nonconformance (company_id, partner_id) WHERE state = 'open';
 

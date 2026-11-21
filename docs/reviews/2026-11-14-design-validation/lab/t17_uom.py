@@ -801,6 +801,13 @@ if "--load" in sys.argv:
     check("D01 load_all.py loads every DDL file of design/ into one schema", n_tables > 200, n_tables)
     c = conn(); c.autocommit = True
     X = c.execute
+    # Company keys on all design files (ADR-0017 rule 19 note, 2026-11-21; R2-N9), the catalog query of lab.py that t16 S06b
+    # runs on its subset: uom, the main allowlisted target, is this lab's table.
+    from gen_overview import COMPANY_KEY_ALLOWLIST  # noqa: E402
+    from lab import company_key_findings  # noqa: E402
+    n_company_keys, company_bad = company_key_findings(X, COMPANY_KEY_ALLOWLIST)
+    check(f"D01b all {n_company_keys} foreign keys between company_id tables of the whole design are composite with company_id, outside the "
+          f"allowlist of {len(COMPANY_KEY_ALLOWLIST)} installation-or-company tables (uom and others)", n_company_keys > 900 and company_bad == [], company_bad[:5])
     cols = {}
     for t_, col, nullable in X("select table_name, column_name, is_nullable from information_schema.columns where table_schema='nativeflows'").fetchall():
         cols.setdefault(t_, {})[col] = nullable

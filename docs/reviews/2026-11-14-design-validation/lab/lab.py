@@ -108,3 +108,37 @@ def erasure_marker(X, scope="EraseDataSubject", company_id=None):
     # the record must belong to the current company (S2 schema review round 2, R2-N1), as the dispatcher sets it
     X("select set_config('nativeflows.company_id', %s, true)", (str(company_id) if company_id else "installation",))
     return rid
+
+
+COMPANY_KEY_SQL = """
+with fk as (
+  select r.relname src, f.relname tgt,
+    (select array_agg(a.attname::text order by u.o) from unnest(k.conkey) with ordinality u(x, o)
+       join pg_attribute a on a.attrelid = k.conrelid and a.attnum = u.x) cols,
+    (select array_agg(a.attname::text order by u.o) from unnest(k.confkey) with ordinality u(x, o)
+       join pg_attribute a on a.attrelid = k.confrelid and a.attnum = u.x) tcols,
+    (select a.attnotnull from pg_attribute a where a.attrelid = k.conrelid and a.attname = 'company_id' and not a.attisdropped) src_nn,
+    (select a.attnotnull from pg_attribute a where a.attrelid = k.confrelid and a.attname = 'company_id' and not a.attisdropped) tgt_nn
+  from pg_constraint k join pg_class r on r.oid = k.conrelid join pg_class f on f.oid = k.confrelid
+    join pg_namespace n on n.oid = r.relnamespace
+  where n.nspname = 'nativeflows' and k.contype = 'f' and k.conparentid = 0)
+select src, cols, tgt, tcols, src_nn, tgt_nn from fk where src_nn is not null and tgt_nn is not null"""
+
+
+def company_key_findings(X, allowlist):
+    """The company-key rule of the ADR-0017 rule 19 note (2026-11-21), read from the catalog of the loaded schema: every
+    foreign key between two tables with company_id NOT NULL that is single-column, or that pairs company_id with another
+    column, and every single-column key to or from a table with a nullable company_id that `allowlist` (gen_overview's
+    COMPANY_KEY_ALLOWLIST) does not name. Returns (number of keys between company_id tables, findings)."""
+    rows = X(COMPANY_KEY_SQL).fetchall()
+    bad = []
+    for src, cols, tgt, tcols, src_nn, tgt_nn in rows:
+        if "company_id" in cols:
+            if tcols[cols.index("company_id")] != "company_id":
+                bad.append(("mispaired", src, tuple(cols), tgt))
+        elif len(cols) == 1:
+            if src_nn and tgt_nn:
+                bad.append(("single-column", src, cols[0], tgt))
+            elif any(t not in allowlist for t, nn in ((src, src_nn), (tgt, tgt_nn)) if not nn):
+                bad.append(("not allowlisted", src, cols[0], tgt))
+    return len(rows), bad

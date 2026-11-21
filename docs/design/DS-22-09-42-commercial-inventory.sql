@@ -63,7 +63,7 @@ CREATE TABLE promotion (
     start_date               date NOT NULL,
     end_date                 date,                          -- inclusive (ADR-0027 rule 12)
     partner_id               uuid,                          -- optional customer
-    partner_group_id         uuid REFERENCES partner_group (id),
+    partner_group_id         uuid,
     price_list_id            uuid,
     price_list_kind          text NOT NULL DEFAULT 'sale' CONSTRAINT ck_promotion_price_list_kind CHECK (price_list_kind = 'sale'),
     item_id                  uuid,                          -- scope: exactly one of item, product, item group
@@ -92,7 +92,8 @@ CREATE TABLE promotion (
         OR (kind = 'amount_per_unit' AND amount_per_unit IS NOT NULL AND amount_per_unit > 0 AND discount_percent IS NULL AND free_item_id IS NULL)
         OR (kind = 'free_goods' AND free_item_id IS NOT NULL AND free_quantity IS NOT NULL AND qualifying_quantity IS NOT NULL
             AND free_quantity > 0 AND qualifying_quantity > 0 AND discount_percent IS NULL AND amount_per_unit IS NULL)),
-    FOREIGN KEY (company_id, item_group_id) REFERENCES item_group (company_id, id)   -- company key (S2 schema review S4)
+    FOREIGN KEY (company_id, item_group_id) REFERENCES item_group (company_id, id),   -- company key (S2 schema review S4)
+    FOREIGN KEY (company_id, partner_group_id) REFERENCES partner_group (company_id, id)   -- company key (ADR-0017 rule 19 note, 2026-11-21)
 );
 
 -- ===== Sales: quotation [sales] (ADR-0047 rule 3; holistic review B1, S4) =====
@@ -108,7 +109,7 @@ CREATE TABLE quotation (
     price_list_id              uuid,                          -- null when the default list's currency differs (holistic review S14)
     price_list_kind            text NOT NULL DEFAULT 'sale' CONSTRAINT ck_quotation_price_list_kind CHECK (price_list_kind = 'sale'),
     prices_include_tax         boolean NOT NULL DEFAULT false, -- from the list (ADR-0045 rule 5; ADR-0047 rule 16)
-    payment_term_id            uuid REFERENCES payment_term (id),
+    payment_term_id            uuid,
     salesperson_id             uuid,
     document_date              date NOT NULL,
     valid_until                date NOT NULL,
@@ -151,7 +152,8 @@ CREATE TABLE quotation (
     CONSTRAINT ck_quotation_valid_until CHECK (valid_until >= document_date),
     FOREIGN KEY (company_id, payment_method_id) REFERENCES payment_method (company_id, id),
     CONSTRAINT ck_quotation_incoterm_place CHECK (incoterm_place IS NULL OR incoterm_code IS NOT NULL),
-    FOREIGN KEY (company_id, business_unit_id) REFERENCES business_unit (company_id, id)
+    FOREIGN KEY (company_id, business_unit_id) REFERENCES business_unit (company_id, id),
+    FOREIGN KEY (company_id, payment_term_id) REFERENCES payment_term (company_id, id)   -- company key (ADR-0017 rule 19 note, 2026-11-21)
 );
 -- A quotation line may have no item: a configurable product with its configuration (holistic review B1; ADR-0045 rule 16;
 -- ADR-0046 rule 9). product_id is always set; an item, when set, belongs to it (the key item (id, product_id)), and so does
@@ -221,7 +223,7 @@ CREATE TABLE sales_order (
     price_list_id              uuid,
     price_list_kind            text NOT NULL DEFAULT 'sale' CONSTRAINT ck_sales_order_price_list_kind CHECK (price_list_kind = 'sale'),
     prices_include_tax         boolean NOT NULL DEFAULT false,
-    payment_term_id            uuid REFERENCES payment_term (id),
+    payment_term_id            uuid,
     salesperson_id             uuid,
     document_date              date NOT NULL,
     requested_delivery_date    date,
@@ -264,7 +266,8 @@ CREATE TABLE sales_order (
     FOREIGN KEY (company_id, payment_method_id) REFERENCES payment_method (company_id, id),
     FOREIGN KEY (company_id, delivery_method_id) REFERENCES delivery_method (company_id, id),
     CONSTRAINT ck_sales_order_incoterm_place CHECK (incoterm_place IS NULL OR incoterm_code IS NOT NULL),
-    FOREIGN KEY (company_id, business_unit_id) REFERENCES business_unit (company_id, id)
+    FOREIGN KEY (company_id, business_unit_id) REFERENCES business_unit (company_id, id),
+    FOREIGN KEY (company_id, payment_term_id) REFERENCES payment_term (company_id, id)   -- company key (ADR-0017 rule 19 note, 2026-11-21)
 );
 -- item_id is empty only on a draft line of an item created on order; the item exists once the order leaves draft
 -- (ADR-0045 rule 16; ADR-0046 rule 11; INV-113, checked by the command and the invariant, since state lives on document).
@@ -426,7 +429,7 @@ CREATE TABLE purchase_order (
     currency                   text NOT NULL REFERENCES currency (code),
     price_list_id              uuid,                          -- the supplier's purchase list (holistic review S16 for the fallback)
     price_list_kind            text NOT NULL DEFAULT 'purchase' CONSTRAINT ck_purchase_order_price_list_kind CHECK (price_list_kind = 'purchase'),
-    payment_term_id            uuid REFERENCES payment_term (id),
+    payment_term_id            uuid,
     buyer_id                   uuid,                          -- the supplier profile's default (ADR-0027 rule 6)
     document_date              date NOT NULL,
     document_discount_percent  types.percent NOT NULL DEFAULT 0 CONSTRAINT ck_purchase_order_document_discount_percent CHECK (document_discount_percent BETWEEN 0 AND 100),
@@ -460,7 +463,8 @@ CREATE TABLE purchase_order (
     FOREIGN KEY (company_id, payment_method_id) REFERENCES payment_method (company_id, id),
     FOREIGN KEY (company_id, delivery_method_id) REFERENCES delivery_method (company_id, id),
     CONSTRAINT ck_purchase_order_incoterm_place CHECK (incoterm_place IS NULL OR incoterm_code IS NOT NULL),
-    FOREIGN KEY (company_id, business_unit_id) REFERENCES business_unit (company_id, id)
+    FOREIGN KEY (company_id, business_unit_id) REFERENCES business_unit (company_id, id),
+    FOREIGN KEY (company_id, payment_term_id) REFERENCES payment_term (company_id, id)   -- company key (ADR-0017 rule 19 note, 2026-11-21)
 );
 CREATE TABLE purchase_order_line (
     id                             uuid PRIMARY KEY,
@@ -515,7 +519,7 @@ CREATE TABLE handling_unit (
     code                     text NOT NULL,
     barcode                  text NOT NULL,                  -- an SSCC (18 digits) or an internal code, registered across types (ADR-0061 rule 7)
     is_legacy_barcode        boolean NOT NULL DEFAULT false, -- an old system's label code kept on migration; set at creation (ADR-0061 rule 8)
-    handling_unit_type_id    uuid NOT NULL REFERENCES handling_unit_type (id),
+    handling_unit_type_id    uuid NOT NULL,
     parent_handling_unit_id  uuid,                           -- one nesting level in Phase 1 (handling_unit_nesting_exceeded, command)
     warehouse_id             uuid NOT NULL,
     bin_id                   uuid NOT NULL,                  -- the default bin in transit and goods_sent warehouses (ADR-0031 rule 8)
@@ -527,7 +531,8 @@ CREATE TABLE handling_unit (
     FOREIGN KEY (company_id, parent_handling_unit_id) REFERENCES handling_unit (company_id, id),
     FOREIGN KEY (company_id, warehouse_id) REFERENCES warehouse (company_id, id),
     CONSTRAINT fk_handling_unit_bin FOREIGN KEY (bin_id, warehouse_id) REFERENCES bin (id, warehouse_id),
-    CONSTRAINT ck_handling_unit_not_own_parent CHECK (parent_handling_unit_id IS DISTINCT FROM id)
+    CONSTRAINT ck_handling_unit_not_own_parent CHECK (parent_handling_unit_id IS DISTINCT FROM id),
+    FOREIGN KEY (company_id, handling_unit_type_id) REFERENCES handling_unit_type (company_id, id)   -- company key (ADR-0017 rule 19 note, 2026-11-21)
 );
 
 -- ===== Stock documents [inventory] (ADR-0027 rule 13; ADR-0047 rules 5, 7, 11, 15) =====
@@ -581,7 +586,7 @@ CREATE TABLE goods_receipt_line (
     inventory_quantity      types.quantity NOT NULL CONSTRAINT ck_goods_receipt_line_inventory_quantity CHECK (inventory_quantity > 0),
     warehouse_id            uuid NOT NULL,
     bin_id                  uuid,                            -- the line's bin, else the default receiving bin (ADR-0023 rule 7)
-    lot_id                  uuid REFERENCES lot (id),
+    lot_id                  uuid,
     gr_ir_position_from     types.quantity,                  -- positions [from, to) of the order line (ADR-0047 rule 13)
     gr_ir_position_to       types.quantity,
     recorded_at             timestamptz NOT NULL DEFAULT now(),
@@ -600,7 +605,8 @@ CREATE TABLE goods_receipt_line (
     CONSTRAINT ck_goods_receipt_line_uom_factor CHECK (uom_numerator > 0 AND uom_denominator > 0 AND uom_factor_source IN ('identity', 'item', 'product', 'global')
         AND (uom_factor_source <> 'identity' OR (uom_numerator = 1 AND uom_denominator = 1))),
     CONSTRAINT ck_goods_receipt_line_uom_quantity CHECK (abs(inventory_quantity * uom_denominator - quantity * uom_numerator) <= 2 * uom_denominator
-        AND (uom_factor_source <> 'identity' OR inventory_quantity = quantity))
+        AND (uom_factor_source <> 'identity' OR inventory_quantity = quantity)),
+    FOREIGN KEY (company_id, lot_id) REFERENCES lot (company_id, id)   -- company key (ADR-0017 rule 19 note, 2026-11-21)
 );
 CREATE INDEX ix_goods_receipt_line_purchase_order_line_id ON goods_receipt_line (purchase_order_line_id) WHERE purchase_order_line_id IS NOT NULL;
 CREATE TABLE return_to_supplier (
@@ -826,7 +832,7 @@ CREATE TABLE service_receipt_line (
     yield_quantity          types.quantity NOT NULL DEFAULT 0 CONSTRAINT ck_service_receipt_line_yield_quantity CHECK (yield_quantity >= 0),
     scrap_quantity          types.quantity NOT NULL DEFAULT 0 CONSTRAINT ck_service_receipt_line_scrap_quantity CHECK (scrap_quantity >= 0),
     is_final                boolean NOT NULL DEFAULT false,
-    output_lot_id           uuid REFERENCES lot (id),        -- for automatic receipt
+    output_lot_id           uuid,        -- for automatic receipt
     gr_ir_position_from     types.quantity NOT NULL CONSTRAINT ck_service_receipt_line_position_from CHECK (gr_ir_position_from >= 0),
     gr_ir_position_to       types.quantity NOT NULL,
     recorded_at             timestamptz NOT NULL DEFAULT now(),
@@ -841,7 +847,8 @@ CREATE TABLE service_receipt_line (
     CONSTRAINT ck_service_receipt_line_uom_factor CHECK (uom_numerator > 0 AND uom_denominator > 0 AND uom_factor_source IN ('identity', 'item', 'product', 'global')
         AND (uom_factor_source <> 'identity' OR (uom_numerator = 1 AND uom_denominator = 1))),
     CONSTRAINT ck_service_receipt_line_uom_quantity CHECK (abs(inventory_quantity * uom_denominator - quantity * uom_numerator) <= 2 * uom_denominator
-        AND (uom_factor_source <> 'identity' OR inventory_quantity = quantity))
+        AND (uom_factor_source <> 'identity' OR inventory_quantity = quantity)),
+    FOREIGN KEY (company_id, output_lot_id) REFERENCES lot (company_id, id)   -- company key (ADR-0017 rule 19 note, 2026-11-21)
 );
 
 -- ===== Sales: invoice and its corrections [sales] (ADR-0047 rules 6-8) =====
@@ -855,7 +862,7 @@ CREATE TABLE sales_invoice (
     partner_address            jsonb,
     currency                   text NOT NULL REFERENCES currency (code),
     prices_include_tax         boolean NOT NULL DEFAULT false,
-    payment_term_id            uuid REFERENCES payment_term (id),
+    payment_term_id            uuid,
     salesperson_id             uuid,
     document_date              date NOT NULL,
     posting_date               date NOT NULL,             -- frozen at Issue (ADR-0028 rule 7)
@@ -886,7 +893,8 @@ CREATE TABLE sales_invoice (
     FOREIGN KEY (company_id, salesperson_id) REFERENCES partner (company_id, id),
     FOREIGN KEY (company_id, payment_method_id) REFERENCES payment_method (company_id, id),
     CONSTRAINT ck_sales_invoice_incoterm_place CHECK (incoterm_place IS NULL OR incoterm_code IS NOT NULL),
-    FOREIGN KEY (company_id, business_unit_id) REFERENCES business_unit (company_id, id)
+    FOREIGN KEY (company_id, business_unit_id) REFERENCES business_unit (company_id, id),
+    FOREIGN KEY (company_id, payment_term_id) REFERENCES payment_term (company_id, id)   -- company key (ADR-0017 rule 19 note, 2026-11-21)
 );
 -- A stock line refers to a posted delivery line (invoice_exceeds_delivered); a non-stock or service line to an order
 -- line or to nothing (rule 6). A stock sale needs an order (sales_order_required, holistic review S9).
@@ -1141,7 +1149,7 @@ CREATE TABLE purchase_invoice (
     posting_date           date NOT NULL,
     currency               text NOT NULL REFERENCES currency (code),
     invoice_rate           types.exchange_rate,              -- interim: column not named in ADR-0047 (the invoice rate of ADR-0011 rule 12; null in company currency)
-    payment_term_id        uuid REFERENCES payment_term (id),
+    payment_term_id        uuid,
     document_discount_percent types.percent NOT NULL DEFAULT 0 CONSTRAINT ck_purchase_invoice_document_discount_percent CHECK (document_discount_percent BETWEEN 0 AND 100),
     print_language         text,
     payment_method_id      uuid,                          -- copied from the profile, then from the source; suggests only (ADR-0068 rules 15, 17)
@@ -1169,7 +1177,8 @@ CREATE TABLE purchase_invoice (
     CONSTRAINT ck_purchase_invoice_invoice_rate CHECK (invoice_rate IS NULL OR invoice_rate > 0),
     FOREIGN KEY (company_id, payment_method_id) REFERENCES payment_method (company_id, id),
     CONSTRAINT ck_purchase_invoice_incoterm_place CHECK (incoterm_place IS NULL OR incoterm_code IS NOT NULL),
-    FOREIGN KEY (company_id, business_unit_id) REFERENCES business_unit (company_id, id)
+    FOREIGN KEY (company_id, business_unit_id) REFERENCES business_unit (company_id, id),
+    FOREIGN KEY (company_id, payment_term_id) REFERENCES payment_term (company_id, id)   -- company key (ADR-0017 rule 19 note, 2026-11-21)
 );
 CREATE INDEX ix_purchase_invoice_company_id_partner_id_partner_reference ON purchase_invoice (company_id, coalesce(invoicing_party_partner_id, partner_id), partner_reference);
 CREATE TABLE purchase_invoice_line (
@@ -1505,8 +1514,8 @@ CREATE TABLE material_document_line (
     direction               text NOT NULL CONSTRAINT ck_material_document_line_direction CHECK (direction IN ('in', 'out')),   -- the type's, flipped when is_reversal
     is_reversal             boolean NOT NULL DEFAULT false,
     quantity                types.quantity NOT NULL CONSTRAINT ck_material_document_line_quantity CHECK (quantity > 0),   -- inventory unit (ADR-0018 rule 11)
-    lot_id                  uuid REFERENCES lot (id),
-    serial_number_id        uuid REFERENCES serial_number (id),
+    lot_id                  uuid,
+    serial_number_id        uuid,
     company_amount          types.amount NOT NULL CONSTRAINT ck_material_document_line_company_amount CHECK (company_amount >= 0),   -- the value moved; zero for non-owned stock
     valuation_warehouse_id  uuid,                            -- the area at level warehouse; null at levels company and site (ADR-0020 rule 2; ADR-0068 rule 8)
     valuation_site_id       uuid,                            -- the area at level site; null at levels company and warehouse; set by the stock lock helper (ADR-0068 rule 8; INV-810)
@@ -1515,7 +1524,7 @@ CREATE TABLE material_document_line (
     stock_status            text NOT NULL DEFAULT 'available' CONSTRAINT ck_material_document_line_stock_status CHECK (stock_status IN ('available', 'quality_inspection', 'blocked')),
     handling_unit_id        uuid,
     catch_weight_quantity   types.quantity,                  -- reserved, empty until after Phase 1
-    cost_object_id          uuid REFERENCES cost_object (id),
+    cost_object_id          uuid,
     owner_partner_id        uuid,                            -- reserved; null for own stock (ADR-0030 rule 8)
     valuation_type          text,                            -- reserved valuation axis, never set in Phase 1 (ADR-0020 rule 17 note of 2026-11-21)
     posting_date            date NOT NULL,                   -- copied from the posting document (ADR-0031 rule 12; INV-48)
@@ -1535,7 +1544,10 @@ CREATE TABLE material_document_line (
     CONSTRAINT ck_material_document_line_valuation_type CHECK (valuation_type IS NULL),   -- reserved until split valuation (ADR-0020 rule 17)
     FOREIGN KEY (company_id, valuation_site_id) REFERENCES site (company_id, id),
     CONSTRAINT ck_material_document_line_valuation_area CHECK (valuation_site_id IS NULL OR valuation_warehouse_id IS NULL),
-    FOREIGN KEY (company_id, derivation_trace_id) REFERENCES derivation_trace (company_id, id)   -- company key (S2 schema review S4)
+    FOREIGN KEY (company_id, derivation_trace_id) REFERENCES derivation_trace (company_id, id),   -- company key (S2 schema review S4)
+    FOREIGN KEY (company_id, lot_id) REFERENCES lot (company_id, id),   -- company key (ADR-0017 rule 19 note, 2026-11-21)
+    FOREIGN KEY (company_id, serial_number_id) REFERENCES serial_number (company_id, id),   -- company key (ADR-0017 rule 19 note, 2026-11-21)
+    FOREIGN KEY (company_id, cost_object_id) REFERENCES cost_object (company_id, id)   -- company key (ADR-0017 rule 19 note, 2026-11-21)
 );
 -- The dated negative-stock check reads posting_date per key (ADR-0020 rule 10; ADR-0031 rule 14).
 CREATE INDEX ix_material_document_line_company_id_item_id_warehouse_id_posting_date
@@ -1562,8 +1574,8 @@ CREATE TABLE stock_quantity (
     item_id            uuid NOT NULL,
     warehouse_id       uuid NOT NULL,
     bin_id             uuid NOT NULL,
-    lot_id             uuid REFERENCES lot (id),
-    serial_number_id   uuid REFERENCES serial_number (id),
+    lot_id             uuid,
+    serial_number_id   uuid,
     stock_status       text NOT NULL DEFAULT 'available' CONSTRAINT ck_stock_quantity_stock_status CHECK (stock_status IN ('available', 'quality_inspection', 'blocked')),
     handling_unit_id   uuid,
     owner_partner_id   uuid,
@@ -1577,7 +1589,9 @@ CREATE TABLE stock_quantity (
     FOREIGN KEY (company_id, handling_unit_id) REFERENCES handling_unit (company_id, id),
     FOREIGN KEY (company_id, owner_partner_id) REFERENCES partner (company_id, id),
     CONSTRAINT ck_stock_quantity_lot_or_serial CHECK (lot_id IS NULL OR serial_number_id IS NULL),
-    CONSTRAINT ck_stock_quantity_serial CHECK (serial_number_id IS NULL OR quantity <= 1)
+    CONSTRAINT ck_stock_quantity_serial CHECK (serial_number_id IS NULL OR quantity <= 1),
+    FOREIGN KEY (company_id, lot_id) REFERENCES lot (company_id, id),   -- company key (ADR-0017 rule 19 note, 2026-11-21)
+    FOREIGN KEY (company_id, serial_number_id) REFERENCES serial_number (company_id, id)   -- company key (ADR-0017 rule 19 note, 2026-11-21)
 );
 CREATE INDEX ix_stock_quantity_company_id_item_id_warehouse_id ON stock_quantity (company_id, item_id, warehouse_id);
 -- A serial has at most one unit on hand, whatever its bin, status or owner (ADR-0020 rule 10; INV-22).
@@ -1615,7 +1629,7 @@ CREATE TABLE stock_reservation (
     demand_supply_line_id   uuid NOT NULL,
     item_id                 uuid NOT NULL,
     warehouse_id            uuid NOT NULL,
-    lot_id                  uuid REFERENCES lot (id),        -- optional, by agreement; never a serial
+    lot_id                  uuid,        -- optional, by agreement; never a serial
     quantity                types.quantity NOT NULL CONSTRAINT ck_stock_reservation_quantity CHECK (quantity > 0),
     picked_quantity         types.quantity NOT NULL DEFAULT 0,
     fulfilled_quantity      types.quantity NOT NULL DEFAULT 0,
@@ -1635,7 +1649,8 @@ CREATE TABLE stock_reservation (
     -- fulfilled when fulfilled equals quantity (rule 13); a plain warehouse fulfils without picks (ADR-0023 rule 16).
     CONSTRAINT ck_stock_reservation_fulfilled CHECK ((state = 'fulfilled') = (fulfilled_quantity = quantity) OR state = 'canceled'),
     CONSTRAINT ck_stock_reservation_picked CHECK (state <> 'picked' OR picked_quantity > fulfilled_quantity),
-    CONSTRAINT ck_stock_reservation_transferred_from CHECK (transferred_from_reservation_id IS NULL OR transferred_from_reservation_id <> id)
+    CONSTRAINT ck_stock_reservation_transferred_from CHECK (transferred_from_reservation_id IS NULL OR transferred_from_reservation_id <> id),
+    FOREIGN KEY (company_id, lot_id) REFERENCES lot (company_id, id)   -- company key (ADR-0017 rule 19 note, 2026-11-21)
 );
 CREATE INDEX ix_stock_reservation_company_id_item_id_warehouse_id ON stock_reservation (company_id, item_id, warehouse_id) WHERE state IN ('open', 'picked');
 CREATE INDEX ix_stock_reservation_demand_supply_line_id ON stock_reservation (demand_supply_line_id);
@@ -1675,7 +1690,7 @@ CREATE TABLE warehouse_task (
     task_kind               text NOT NULL CONSTRAINT ck_warehouse_task_task_kind CHECK (task_kind IN ('putaway', 'pick', 'move', 'replenishment', 'status_change', 'count')),
     state                   text NOT NULL DEFAULT 'open' CONSTRAINT ck_warehouse_task_state CHECK (state IN ('open', 'in_progress', 'confirmed', 'canceled')),   -- interim: state names not listed in ADR-0023 (verbs Start, Confirm, Cancel)
     item_id                 uuid,                            -- empty on a count task over bins
-    lot_id                  uuid REFERENCES lot (id),
+    lot_id                  uuid,
     quantity                types.quantity CONSTRAINT ck_warehouse_task_quantity CHECK (quantity > 0),   -- inventory unit
     uom_id                  uuid REFERENCES uom (id),        -- the demand line's unit, for display (rule 14)
     from_bin_id             uuid,
@@ -1704,7 +1719,8 @@ CREATE TABLE warehouse_task (
     -- confirmed: the actual quantity, never above the task's (task_quantity_exceeded); a short one needs a reason (rule 15).
     CONSTRAINT ck_warehouse_task_confirmed CHECK ((state = 'confirmed') = (confirmed_quantity IS NOT NULL)
         AND (confirmed_quantity IS NULL OR quantity IS NULL OR confirmed_quantity <= quantity)
-        AND (confirmed_quantity IS NULL OR quantity IS NULL OR confirmed_quantity = quantity OR coalesce(length(btrim(shortage_reason)), 0) > 0))
+        AND (confirmed_quantity IS NULL OR quantity IS NULL OR confirmed_quantity = quantity OR coalesce(length(btrim(shortage_reason)), 0) > 0)),
+    FOREIGN KEY (company_id, lot_id) REFERENCES lot (company_id, id)   -- company key (ADR-0017 rule 19 note, 2026-11-21)
 );
 CREATE INDEX ix_warehouse_task_company_id_warehouse_id_state ON warehouse_task (company_id, warehouse_id, state) WHERE state IN ('open', 'in_progress');
 CREATE INDEX ix_warehouse_task_demand_supply_line_id ON warehouse_task (demand_supply_line_id) WHERE demand_supply_line_id IS NOT NULL;
@@ -1714,8 +1730,8 @@ CREATE TABLE warehouse_movement (
     company_id              uuid NOT NULL,
     warehouse_id            uuid NOT NULL,
     item_id                 uuid NOT NULL,
-    lot_id                  uuid REFERENCES lot (id),
-    serial_number_id        uuid REFERENCES serial_number (id),
+    lot_id                  uuid,
+    serial_number_id        uuid,
     quantity                types.quantity NOT NULL CONSTRAINT ck_warehouse_movement_quantity CHECK (quantity > 0),
     from_bin_id             uuid NOT NULL,
     to_bin_id               uuid NOT NULL,
@@ -1738,7 +1754,9 @@ CREATE TABLE warehouse_movement (
     FOREIGN KEY (company_id, owner_partner_id) REFERENCES partner (company_id, id),
     CONSTRAINT ck_warehouse_movement_source CHECK ((warehouse_task_id IS NULL) <> (source_command IS NULL)),
     CONSTRAINT ck_warehouse_movement_changes CHECK ((from_bin_id, from_stock_status, from_handling_unit_id) IS DISTINCT FROM (to_bin_id, to_stock_status, to_handling_unit_id)),
-    CONSTRAINT ck_warehouse_movement_lot_or_serial CHECK (lot_id IS NULL OR serial_number_id IS NULL)
+    CONSTRAINT ck_warehouse_movement_lot_or_serial CHECK (lot_id IS NULL OR serial_number_id IS NULL),
+    FOREIGN KEY (company_id, lot_id) REFERENCES lot (company_id, id),   -- company key (ADR-0017 rule 19 note, 2026-11-21)
+    FOREIGN KEY (company_id, serial_number_id) REFERENCES serial_number (company_id, id)   -- company key (ADR-0017 rule 19 note, 2026-11-21)
 );
 CREATE INDEX ix_warehouse_movement_company_id_item_id_warehouse_id ON warehouse_movement (company_id, item_id, warehouse_id);
 
@@ -1799,7 +1817,7 @@ CREATE TABLE pending_receipt_adjustment (
     company_id                  uuid NOT NULL,
     purchase_order_line_id      uuid NOT NULL,
     purchase_invoice_line_id    uuid NOT NULL,
-    clearing_journal_line_id    uuid NOT NULL REFERENCES journal_line (id),   -- the invoice's purchase_cost_clearing line, the source of the landed cost
+    clearing_journal_line_id    uuid NOT NULL,   -- the invoice's purchase_cost_clearing line, the source of the landed cost
     total_company_amount        types.amount NOT NULL,        -- the total difference in company currency (may be negative)
     quantity_to_receive         types.quantity NOT NULL CONSTRAINT ck_pending_receipt_adjustment_quantity_to_receive CHECK (quantity_to_receive >= 0),
     amount_to_apply             types.amount NOT NULL,
@@ -1808,7 +1826,8 @@ CREATE TABLE pending_receipt_adjustment (
     FOREIGN KEY (company_id, purchase_order_line_id) REFERENCES purchase_order_line (company_id, id),
     FOREIGN KEY (company_id, purchase_invoice_line_id) REFERENCES purchase_invoice_line (company_id, id),
     CONSTRAINT ck_pending_receipt_adjustment_amount CHECK (sign(amount_to_apply) * sign(total_company_amount) >= 0 AND abs(amount_to_apply) <= abs(total_company_amount)
-        AND (quantity_to_receive > 0 OR amount_to_apply = 0))
+        AND (quantity_to_receive > 0 OR amount_to_apply = 0)),
+    FOREIGN KEY (company_id, clearing_journal_line_id) REFERENCES journal_line (company_id, id)   -- company key (ADR-0017 rule 19 note, 2026-11-21)
 );
 CREATE INDEX ix_pending_receipt_adjustment_purchase_order_line_id ON pending_receipt_adjustment (purchase_order_line_id) WHERE quantity_to_receive > 0;
 
@@ -1904,8 +1923,8 @@ CREATE TABLE stock_transfer_line (                         -- [inventory] ADR-00
     inventory_quantity      types.quantity NOT NULL CONSTRAINT ck_stock_transfer_line_inventory_quantity CHECK (inventory_quantity > 0),
     from_bin_id             uuid,                            -- the line's bin, else the default bin (ADR-0023 rule 7)
     to_bin_id               uuid,                            -- the receiving bin, else the default receiving bin
-    lot_id                  uuid REFERENCES lot (id),
-    serial_number_id        uuid REFERENCES serial_number (id),
+    lot_id                  uuid,
+    serial_number_id        uuid,
     handling_unit_id        uuid,                            -- keeps its identity through transit (ADR-0023 rule 7); transfers move available stock only
     dispatch_line_id        uuid,                            -- a receive line names the dispatch line it receives
     transfer_order_line_id  uuid,                            -- the transfer order line it fulfils: a direct transfer between its two warehouses, a dispatch from its source, a receive into its destination (ADR-0075 rule 14; INV-871)
@@ -1924,7 +1943,9 @@ CREATE TABLE stock_transfer_line (                         -- [inventory] ADR-00
     CONSTRAINT ck_stock_transfer_line_uom_quantity CHECK (abs(inventory_quantity * uom_denominator - quantity * uom_numerator) <= 2 * uom_denominator
         AND (uom_factor_source <> 'identity' OR inventory_quantity = quantity)),
     CONSTRAINT ck_stock_transfer_line_lot_or_serial CHECK (lot_id IS NULL OR serial_number_id IS NULL),
-    CONSTRAINT ck_stock_transfer_line_serial_quantity CHECK (serial_number_id IS NULL OR inventory_quantity = 1)
+    CONSTRAINT ck_stock_transfer_line_serial_quantity CHECK (serial_number_id IS NULL OR inventory_quantity = 1),
+    FOREIGN KEY (company_id, lot_id) REFERENCES lot (company_id, id),   -- company key (ADR-0017 rule 19 note, 2026-11-21)
+    FOREIGN KEY (company_id, serial_number_id) REFERENCES serial_number (company_id, id)   -- company key (ADR-0017 rule 19 note, 2026-11-21)
 );
 CREATE INDEX ix_stock_transfer_line_dispatch_line_id ON stock_transfer_line (dispatch_line_id) WHERE dispatch_line_id IS NOT NULL;
 CREATE INDEX ix_stock_transfer_line_company_id_item_id ON stock_transfer_line (company_id, item_id);
@@ -1958,8 +1979,8 @@ CREATE TABLE stock_count_line (                            -- [inventory] ADR-00
     uom_factor_source       text NOT NULL,                      -- identity, item, product or global (ADR-0056 rule 6)
     inventory_quantity      types.quantity NOT NULL CONSTRAINT ck_stock_count_line_inventory_quantity CHECK (inventory_quantity >= 0),
     bin_id                  uuid NOT NULL,                   -- the counted bin; the default bin outside bin-managed warehouses
-    lot_id                  uuid REFERENCES lot (id),
-    serial_number_id        uuid REFERENCES serial_number (id),
+    lot_id                  uuid,
+    serial_number_id        uuid,
     stock_status            text NOT NULL DEFAULT 'available' CONSTRAINT ck_stock_count_line_stock_status CHECK (stock_status IN ('available', 'quality_inspection', 'blocked')),   -- the counted status
     book_quantity           types.quantity NOT NULL CONSTRAINT ck_stock_count_line_book_quantity CHECK (book_quantity >= 0),   -- inventory unit; the book quantity of the key, frozen at book_taken_at; equal on every line of one key (INV-865)
     book_taken_at           timestamptz NOT NULL,            -- the confirmation of the count task, else the creation of the draft (ADR-0023 rule 18)
@@ -1980,7 +2001,9 @@ CREATE TABLE stock_count_line (                            -- [inventory] ADR-00
     CONSTRAINT ck_stock_count_line_uom_quantity CHECK (abs(inventory_quantity * uom_denominator - quantity * uom_numerator) <= 2 * uom_denominator
         AND (uom_factor_source <> 'identity' OR inventory_quantity = quantity)),
     CONSTRAINT ck_stock_count_line_lot_or_serial CHECK (lot_id IS NULL OR serial_number_id IS NULL),
-    CONSTRAINT ck_stock_count_line_serial_quantity CHECK (serial_number_id IS NULL OR (inventory_quantity <= 1 AND book_quantity <= 1))
+    CONSTRAINT ck_stock_count_line_serial_quantity CHECK (serial_number_id IS NULL OR (inventory_quantity <= 1 AND book_quantity <= 1)),
+    FOREIGN KEY (company_id, lot_id) REFERENCES lot (company_id, id),   -- company key (ADR-0017 rule 19 note, 2026-11-21)
+    FOREIGN KEY (company_id, serial_number_id) REFERENCES serial_number (company_id, id)   -- company key (ADR-0017 rule 19 note, 2026-11-21)
 );
 CREATE INDEX ix_stock_count_line_company_id_item_id ON stock_count_line (company_id, item_id);
 CREATE INDEX ix_stock_count_line_count_task_id ON stock_count_line (count_task_id) WHERE count_task_id IS NOT NULL;
@@ -2011,8 +2034,8 @@ CREATE TABLE scrap_line (                                  -- [inventory] ADR-00
     uom_factor_source       text NOT NULL,                      -- identity, item, product or global (ADR-0056 rule 6)
     inventory_quantity      types.quantity NOT NULL CONSTRAINT ck_scrap_line_inventory_quantity CHECK (inventory_quantity > 0),
     bin_id              uuid NOT NULL,                       -- the line's bin; the default bin outside bin-managed warehouses (ADR-0023 rule 7)
-    lot_id              uuid REFERENCES lot (id),
-    serial_number_id    uuid REFERENCES serial_number (id),
+    lot_id              uuid,
+    serial_number_id    uuid,
     stock_status        text NOT NULL DEFAULT 'available' CONSTRAINT ck_scrap_line_stock_status CHECK (stock_status IN ('available', 'quality_inspection', 'blocked')),   -- the held status the goods are scrapped from (ADR-0070 rule 15)
     handling_unit_id    uuid,
     scrap_reason_id     uuid,                                -- reason, kind scrap; required while documents.reason_required.scrap is true (ADR-0074 rule 22)
@@ -2037,7 +2060,9 @@ CREATE TABLE scrap_line (                                  -- [inventory] ADR-00
         AND (uom_factor_source <> 'identity' OR inventory_quantity = quantity)),
     CONSTRAINT ck_scrap_line_lot_or_serial CHECK (lot_id IS NULL OR serial_number_id IS NULL),
     CONSTRAINT ck_scrap_line_serial_quantity CHECK (serial_number_id IS NULL OR inventory_quantity = 1),
-    CONSTRAINT ck_scrap_line_dimension CHECK (num_nonnulls(cost_center_id, project_id) <= 1)
+    CONSTRAINT ck_scrap_line_dimension CHECK (num_nonnulls(cost_center_id, project_id) <= 1),
+    FOREIGN KEY (company_id, lot_id) REFERENCES lot (company_id, id),   -- company key (ADR-0017 rule 19 note, 2026-11-21)
+    FOREIGN KEY (company_id, serial_number_id) REFERENCES serial_number (company_id, id)   -- company key (ADR-0017 rule 19 note, 2026-11-21)
 );
 CREATE INDEX ix_scrap_line_company_id_item_id ON scrap_line (company_id, item_id);
 
@@ -2067,8 +2092,8 @@ CREATE TABLE internal_consumption_line (                   -- [inventory] ADR-00
     uom_factor_source       text NOT NULL,                      -- identity, item, product or global (ADR-0056 rule 6)
     inventory_quantity      types.quantity NOT NULL CONSTRAINT ck_internal_consumption_line_inventory_quantity CHECK (inventory_quantity > 0),
     bin_id              uuid NOT NULL,
-    lot_id              uuid REFERENCES lot (id),
-    serial_number_id    uuid REFERENCES serial_number (id),
+    lot_id              uuid,
+    serial_number_id    uuid,
     stock_status        text NOT NULL DEFAULT 'available' CONSTRAINT ck_internal_consumption_line_stock_status CHECK (stock_status IN ('available', 'quality_inspection', 'blocked')),   -- the held status of a sample (ADR-0070 rule 15)
     handling_unit_id    uuid,
     consumption_kind    text NOT NULL DEFAULT 'internal' CONSTRAINT ck_internal_consumption_line_consumption_kind CHECK (consumption_kind IN ('internal', 'quality_sample')),   -- movement type internal_consumption or quality_sample
@@ -2092,7 +2117,9 @@ CREATE TABLE internal_consumption_line (                   -- [inventory] ADR-00
     CONSTRAINT ck_internal_consumption_line_serial_quantity CHECK (serial_number_id IS NULL OR inventory_quantity = 1),
     -- exactly one cost center or project bears an internal consumption; a quality sample may name none (ADR-0075 rule 5)
     CONSTRAINT ck_internal_consumption_line_dimension CHECK (num_nonnulls(cost_center_id, project_id) = 1
-        OR (consumption_kind = 'quality_sample' AND num_nonnulls(cost_center_id, project_id) = 0))
+        OR (consumption_kind = 'quality_sample' AND num_nonnulls(cost_center_id, project_id) = 0)),
+    FOREIGN KEY (company_id, lot_id) REFERENCES lot (company_id, id),   -- company key (ADR-0017 rule 19 note, 2026-11-21)
+    FOREIGN KEY (company_id, serial_number_id) REFERENCES serial_number (company_id, id)   -- company key (ADR-0017 rule 19 note, 2026-11-21)
 );
 CREATE INDEX ix_internal_consumption_line_company_id_item_id ON internal_consumption_line (company_id, item_id);
 
@@ -2122,8 +2149,8 @@ CREATE TABLE other_receipt_line (                                  -- [inventory
     uom_factor_source       text NOT NULL,                      -- identity, item, product or global (ADR-0056 rule 6)
     inventory_quantity      types.quantity NOT NULL CONSTRAINT ck_other_receipt_line_inventory_quantity CHECK (inventory_quantity > 0),
     bin_id              uuid,                                -- the line's bin, else the default receiving bin (ADR-0023 rule 7)
-    lot_id              uuid REFERENCES lot (id),
-    serial_number_id    uuid REFERENCES serial_number (id),
+    lot_id              uuid,
+    serial_number_id    uuid,
     stock_status        text NOT NULL DEFAULT 'available' CONSTRAINT ck_other_receipt_line_stock_status CHECK (stock_status IN ('available', 'quality_inspection', 'blocked')),   -- quality_inspection when the product requires inspection at receipt (ADR-0070 rule 2)
     handling_unit_id    uuid,
     company_amount      types.amount NOT NULL CONSTRAINT ck_other_receipt_line_company_amount CHECK (company_amount >= 0),   -- the line's value in company currency (value source document)
@@ -2144,7 +2171,9 @@ CREATE TABLE other_receipt_line (                                  -- [inventory
     CONSTRAINT ck_other_receipt_line_uom_quantity CHECK (abs(inventory_quantity * uom_denominator - quantity * uom_numerator) <= 2 * uom_denominator
         AND (uom_factor_source <> 'identity' OR inventory_quantity = quantity)),
     CONSTRAINT ck_other_receipt_line_lot_or_serial CHECK (lot_id IS NULL OR serial_number_id IS NULL),
-    CONSTRAINT ck_other_receipt_line_serial_quantity CHECK (serial_number_id IS NULL OR inventory_quantity = 1)
+    CONSTRAINT ck_other_receipt_line_serial_quantity CHECK (serial_number_id IS NULL OR inventory_quantity = 1),
+    FOREIGN KEY (company_id, lot_id) REFERENCES lot (company_id, id),   -- company key (ADR-0017 rule 19 note, 2026-11-21)
+    FOREIGN KEY (company_id, serial_number_id) REFERENCES serial_number (company_id, id)   -- company key (ADR-0017 rule 19 note, 2026-11-21)
 );
 CREATE INDEX ix_other_receipt_line_company_id_item_id ON other_receipt_line (company_id, item_id);
 
@@ -2174,8 +2203,8 @@ CREATE TABLE other_issue_line (                                  -- [inventory] 
     uom_factor_source       text NOT NULL,                      -- identity, item, product or global (ADR-0056 rule 6)
     inventory_quantity      types.quantity NOT NULL CONSTRAINT ck_other_issue_line_inventory_quantity CHECK (inventory_quantity > 0),
     bin_id              uuid NOT NULL,                       -- the line's bin; the default bin outside bin-managed warehouses (ADR-0023 rule 7; ADR-0031 rule 8)
-    lot_id              uuid REFERENCES lot (id),
-    serial_number_id    uuid REFERENCES serial_number (id),
+    lot_id              uuid,
+    serial_number_id    uuid,
     stock_status        text NOT NULL DEFAULT 'available' CONSTRAINT ck_other_issue_line_stock_status CHECK (stock_status IN ('available', 'quality_inspection', 'blocked')),   -- the status the goods leave
     handling_unit_id    uuid,
     reason_id           uuid,                                -- reason, kind other_issue; required while documents.reason_required.other_issue is true (ADR-0074 rule 22)
@@ -2200,7 +2229,9 @@ CREATE TABLE other_issue_line (                                  -- [inventory] 
         AND (uom_factor_source <> 'identity' OR inventory_quantity = quantity)),
     CONSTRAINT ck_other_issue_line_lot_or_serial CHECK (lot_id IS NULL OR serial_number_id IS NULL),
     CONSTRAINT ck_other_issue_line_serial_quantity CHECK (serial_number_id IS NULL OR inventory_quantity = 1),
-    CONSTRAINT ck_other_issue_line_dimension CHECK (num_nonnulls(cost_center_id, project_id) <= 1)
+    CONSTRAINT ck_other_issue_line_dimension CHECK (num_nonnulls(cost_center_id, project_id) <= 1),
+    FOREIGN KEY (company_id, lot_id) REFERENCES lot (company_id, id),   -- company key (ADR-0017 rule 19 note, 2026-11-21)
+    FOREIGN KEY (company_id, serial_number_id) REFERENCES serial_number (company_id, id)   -- company key (ADR-0017 rule 19 note, 2026-11-21)
 );
 CREATE INDEX ix_other_issue_line_company_id_item_id ON other_issue_line (company_id, item_id);
 
@@ -2228,8 +2259,8 @@ CREATE TABLE opening_balance_line (                                  -- [invento
     uom_factor_source       text NOT NULL,                      -- identity, item, product or global (ADR-0056 rule 6)
     inventory_quantity      types.quantity NOT NULL CONSTRAINT ck_opening_balance_line_inventory_quantity CHECK (inventory_quantity > 0),
     bin_id              uuid NOT NULL,                       -- the line's bin; the default bin outside bin-managed warehouses (ADR-0023 rule 7; ADR-0031 rule 8)
-    lot_id              uuid REFERENCES lot (id),
-    serial_number_id    uuid REFERENCES serial_number (id),
+    lot_id              uuid,
+    serial_number_id    uuid,
     stock_status        text NOT NULL DEFAULT 'available' CONSTRAINT ck_opening_balance_line_stock_status CHECK (stock_status IN ('available', 'quality_inspection', 'blocked')),   -- any status, as in the old books (ADR-0023 rule 7)
     handling_unit_id    uuid,
     company_amount      types.amount NOT NULL CONSTRAINT ck_opening_balance_line_company_amount CHECK (company_amount >= 0),   -- the line's value in company currency (value source document)
@@ -2246,7 +2277,9 @@ CREATE TABLE opening_balance_line (                                  -- [invento
     CONSTRAINT ck_opening_balance_line_uom_quantity CHECK (abs(inventory_quantity * uom_denominator - quantity * uom_numerator) <= 2 * uom_denominator
         AND (uom_factor_source <> 'identity' OR inventory_quantity = quantity)),
     CONSTRAINT ck_opening_balance_line_lot_or_serial CHECK (lot_id IS NULL OR serial_number_id IS NULL),
-    CONSTRAINT ck_opening_balance_line_serial_quantity CHECK (serial_number_id IS NULL OR inventory_quantity = 1)
+    CONSTRAINT ck_opening_balance_line_serial_quantity CHECK (serial_number_id IS NULL OR inventory_quantity = 1),
+    FOREIGN KEY (company_id, lot_id) REFERENCES lot (company_id, id),   -- company key (ADR-0017 rule 19 note, 2026-11-21)
+    FOREIGN KEY (company_id, serial_number_id) REFERENCES serial_number (company_id, id)   -- company key (ADR-0017 rule 19 note, 2026-11-21)
 );
 CREATE INDEX ix_opening_balance_line_company_id_item_id ON opening_balance_line (company_id, item_id);
 
@@ -2284,7 +2317,7 @@ CREATE TABLE transfer_order_line (                         -- [inventory] ADR-00
     uom_denominator         bigint NOT NULL,
     uom_factor_source       text NOT NULL,                      -- identity, item, product or global (ADR-0056 rule 6)
     inventory_quantity      types.quantity NOT NULL CONSTRAINT ck_transfer_order_line_inventory_quantity CHECK (inventory_quantity > 0),
-    lot_id                  uuid REFERENCES lot (id),        -- optional, by agreement; never a serial (as a reservation, ADR-0023 rule 13)
+    lot_id                  uuid,        -- optional, by agreement; never a serial (as a reservation, ADR-0023 rule 13)
     recorded_at             timestamptz NOT NULL DEFAULT now(),
     UNIQUE (transfer_order_id, line_number),
     UNIQUE (company_id, id),
@@ -2293,7 +2326,8 @@ CREATE TABLE transfer_order_line (                         -- [inventory] ADR-00
     CONSTRAINT ck_transfer_order_line_uom_factor CHECK (uom_numerator > 0 AND uom_denominator > 0 AND uom_factor_source IN ('identity', 'item', 'product', 'global')
         AND (uom_factor_source <> 'identity' OR (uom_numerator = 1 AND uom_denominator = 1))),
     CONSTRAINT ck_transfer_order_line_uom_quantity CHECK (abs(inventory_quantity * uom_denominator - quantity * uom_numerator) <= 2 * uom_denominator
-        AND (uom_factor_source <> 'identity' OR inventory_quantity = quantity))
+        AND (uom_factor_source <> 'identity' OR inventory_quantity = quantity)),
+    FOREIGN KEY (company_id, lot_id) REFERENCES lot (company_id, id)   -- company key (ADR-0017 rule 19 note, 2026-11-21)
 );
 CREATE INDEX ix_transfer_order_line_company_id_item_id ON transfer_order_line (company_id, item_id);
 -- demand_supply_line gets the key its step 3 column was waiting for (ADR-0028 rule 2).

@@ -171,7 +171,7 @@ Generated counts from the DDL drafts (2026-11-21): 399 tables, each with a state
 
 ### Spines
 
-Four small ERDs, drawn from the DDL drafts. Columns are omitted, and so is how each key is composed; the DDL shows that (composite company keys are required in `master_data` and `crm` by ADR-0045 rule 1 and ADR-0052 rule 3).
+Four small ERDs, drawn from the DDL drafts. Columns are omitted, and so is how each key is composed; the DDL shows that (every key between company tables is composite with `company_id`: ADR-0017 rule 19 note of 2026-11-21, after ADR-0045 rule 1 and ADR-0052 rule 3).
 
 **Master data** (DS-20-master-data.sql)
 
@@ -263,7 +263,7 @@ erDiagram
 
 ### Cross-module references
 
-- **Foreign keys are not imports.** All tables share schema `nativeflows` and keys cross modules by design (ADR-0022 rule 7), often pointing up the layers (e.g. `document.partner_id`, layer 2 → layer 3). The [data map](generated/data-map.md#cross-module-foreign-keys-report) reports 679 cross-module foreign keys with their direction. It gives no allowlist verdicts; an allowlist with a reason per edge is a later step.
+- **Foreign keys are not imports.** All tables share schema `nativeflows` and keys cross modules by design (ADR-0022 rule 7), often pointing up the layers (e.g. `document.partner_id`, layer 2 → layer 3). The [data map](generated/data-map.md#cross-module-foreign-keys-report) reports 675 cross-module foreign keys with their direction. It gives no allowlist verdicts; an allowlist with a reason per edge is a later step.
 - **Polymorphic references** (`subject_table`/`subject_id`, `target_table`/`target_id`, `case_table`/`case_id`) are listed separately: 26 pairs, in `outbox_event`, `event_delivery`, `event_subject`, `audit_record`, `audit_denial`, `work_item`, `work_item_link`, `attachment_link`, `change_proposal_item` and others. Invariants check them, e.g. INV-83 for `attachment_link` (ADR-0027 rule 2).
 - **Event coupling.** The [event matrix](generated/event-matrix.md) lists 106 event types named in the ADRs, their producing module and the consumers named with them. Generic document events (`<Type>Posted` for every type, ADR-0009 rule 22) are not enumerated there.
 
@@ -669,7 +669,7 @@ The production core step proposed by ADR-0032 rule 7 has no number yet ([open-qu
 
 ## B18. Open decisions and known limits
 
-[open-questions.md](../open-questions.md) holds 118 open and 220 closed items; 36 open items carry an interim (an entry counts when it says "interim").
+[open-questions.md](../open-questions.md) holds 117 open and 221 closed items; 36 open items carry an interim (an entry counts when it says "interim").
 
 **Author decisions that block coding** (examples)
 - Test server host (open-questions:8).

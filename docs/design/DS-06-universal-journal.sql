@@ -171,7 +171,8 @@ CREATE TABLE cost_object (                                 -- [production] ADR-0
     CONSTRAINT uq_cost_object_company_id_id_production_order_id UNIQUE (company_id, id, production_order_id),   -- an order's cost_object_id names the cost object that names it (DS-43-54)
     CONSTRAINT ck_cost_object_kind_reference CHECK ((kind = 'production_order') = (production_order_id IS NOT NULL)
         AND (kind = 'cost_pool') = (cost_center_id IS NOT NULL)),
-    FOREIGN KEY (company_id, cost_center_id) REFERENCES cost_center (company_id, id)   -- company key (S2 schema review S4)
+    FOREIGN KEY (company_id, cost_center_id) REFERENCES cost_center (company_id, id),   -- company key (S2 schema review S4)
+    CONSTRAINT uq_cost_object_company_id_id UNIQUE (company_id, id)   -- target of company keys (ADR-0017 rule 19 note, 2026-11-21)
 );
 CREATE UNIQUE INDEX uq_cost_object_cost_center_id ON cost_object (cost_center_id) WHERE cost_center_id IS NOT NULL;
 CREATE UNIQUE INDEX uq_cost_object_production_order_id ON cost_object (production_order_id) WHERE production_order_id IS NOT NULL;
@@ -181,7 +182,8 @@ CREATE TABLE fixed_asset (                                 -- [ledger] ADR-0025 
     code        text NOT NULL,
     name        text NOT NULL,
     recorded_at timestamptz NOT NULL DEFAULT now(),
-    UNIQUE (company_id, code)
+    UNIQUE (company_id, code),
+    CONSTRAINT uq_fixed_asset_company_id_id UNIQUE (company_id, id)   -- target of company keys (ADR-0017 rule 19 note, 2026-11-21)
 );
 -- Both are under row-level security (last section; ADR-0022 rule 8).
 
@@ -218,7 +220,8 @@ CREATE TABLE journal_entry (                               -- [ledger] ADR-0014 
     FOREIGN KEY (company_id, fiscal_year_id, posting_period_id) REFERENCES posting_period (company_id, fiscal_year_id, id),   -- the period belongs to the entry's fiscal year (S2 schema review N1)
     FOREIGN KEY (company_id, fiscal_year_id) REFERENCES fiscal_year (company_id, id),   -- company key (S2 schema phase B)
     FOREIGN KEY (company_id, document_id) REFERENCES document (company_id, id),   -- company key (S2 schema review S4)
-    FOREIGN KEY (company_id, close_task_id) REFERENCES close_task (company_id, id)   -- company key (S2 schema review S4)
+    FOREIGN KEY (company_id, close_task_id) REFERENCES close_task (company_id, id),   -- company key (S2 schema review S4)
+    CONSTRAINT uq_journal_entry_company_id_id UNIQUE (company_id, id)   -- target of company keys (ADR-0017 rule 19 note, 2026-11-21)
 );
 
 CREATE INDEX ix_journal_entry_company_id_posting_date
@@ -235,12 +238,13 @@ CREATE TABLE payment_term (                                -- [ledger] ADR-0026 
     name        text NOT NULL,
     is_active   boolean NOT NULL DEFAULT true,
     recorded_at timestamptz NOT NULL DEFAULT now(),
-    UNIQUE (company_id, code)
+    UNIQUE (company_id, code),
+    CONSTRAINT uq_payment_term_company_id_id UNIQUE (company_id, id)   -- target of company keys (ADR-0017 rule 19 note, 2026-11-21)
 );
 CREATE TABLE payment_term_line (                           -- [ledger] ADR-0026 rule 5
     id               uuid PRIMARY KEY,
     company_id       uuid NOT NULL REFERENCES company (id),
-    payment_term_id  uuid NOT NULL REFERENCES payment_term (id),
+    payment_term_id  uuid NOT NULL,
     line_number      integer NOT NULL,
     amount_percent   types.percent NOT NULL,
     due_days         integer NOT NULL,
@@ -248,7 +252,8 @@ CREATE TABLE payment_term_line (                           -- [ledger] ADR-0026 
     discount_percent types.percent,
     discount_days    integer,
     recorded_at      timestamptz NOT NULL DEFAULT now(),
-    UNIQUE (payment_term_id, line_number)
+    UNIQUE (payment_term_id, line_number),
+    FOREIGN KEY (company_id, payment_term_id) REFERENCES payment_term (company_id, id)   -- company key (ADR-0017 rule 19 note, 2026-11-21)
 );
 CREATE TABLE open_item (                                   -- [ledger] ADR-0026 rule 1
     id                          uuid PRIMARY KEY,
@@ -261,7 +266,7 @@ CREATE TABLE open_item (                                   -- [ledger] ADR-0026 
     origin_document_id          uuid NOT NULL,
     origin_journal_line_id      uuid NOT NULL UNIQUE,   -- FK below, deferred: the item is inserted before its line
     installment_number          integer NOT NULL DEFAULT 1,
-    payment_term_id             uuid REFERENCES payment_term (id),
+    payment_term_id             uuid,
     document_date               date NOT NULL,
     posting_date                date NOT NULL,
     original_posting_date       date NOT NULL,          -- the posting date, or the old system's date for opening items (ADR-0026 rule 1; ADR-0044 rule 8; ADR-0048 rule 18)
@@ -293,7 +298,8 @@ CREATE TABLE open_item (                                   -- [ledger] ADR-0026 
     FOREIGN KEY (company_id, account_id) REFERENCES account (company_id, id),   -- company key (S2 schema phase B)
     FOREIGN KEY (company_id, partner_id) REFERENCES partner (company_id, id),   -- company key (S2 schema review S4)
     FOREIGN KEY (company_id, origin_document_id) REFERENCES document (company_id, id),   -- company key (S2 schema review S4)
-    FOREIGN KEY (company_id, predecessor_open_item_id) REFERENCES open_item (company_id, id)   -- company key (S2 schema review S4)
+    FOREIGN KEY (company_id, predecessor_open_item_id) REFERENCES open_item (company_id, id),   -- company key (S2 schema review S4)
+    FOREIGN KEY (company_id, payment_term_id) REFERENCES payment_term (company_id, id)   -- company key (ADR-0017 rule 19 note, 2026-11-21)
 );
 CREATE INDEX ix_open_item_company_id_partner_id ON open_item (company_id, partner_id) WHERE NOT is_settled AND NOT is_reversed;
 CREATE INDEX ix_open_item_company_id_account_id ON open_item (company_id, account_id) WHERE NOT is_settled AND NOT is_reversed;
@@ -302,7 +308,7 @@ CREATE INDEX ix_open_item_origin_document_id ON open_item (origin_document_id);
 
 CREATE TABLE journal_line (                                -- [ledger] ADR-0014 rule 5
     id                         uuid          PRIMARY KEY,
-    journal_entry_id           uuid          NOT NULL REFERENCES journal_entry (id),
+    journal_entry_id           uuid          NOT NULL,
     company_id                 uuid          NOT NULL REFERENCES company (id),
     line_number                integer       NOT NULL,
     posting_period_id          uuid          NOT NULL,
@@ -327,8 +333,8 @@ CREATE TABLE journal_line (                                -- [ledger] ADR-0014 
     warehouse_id               uuid,
     cost_center_id             uuid,
     project_id                 uuid,
-    cost_object_id             uuid          REFERENCES cost_object (id),   -- ADR-0025; production orders and pools (ADR-0035), Phase 1
-    fixed_asset_id             uuid          REFERENCES fixed_asset (id),   -- ADR-0025, empty until Phase 3
+    cost_object_id             uuid,   -- ADR-0025; production orders and pools (ADR-0035), Phase 1
+    fixed_asset_id             uuid,   -- ADR-0025, empty until Phase 3
     salesperson_id             uuid,   -- partner with the employee role (ADR-0027 rule 6)
     tax_code_id                uuid          REFERENCES tax_code (id),
     material_document_line_id  uuid,          -- company key in DS-22-09-42 (S2 schema review S4)
@@ -365,7 +371,11 @@ CREATE TABLE journal_line (                                -- [ledger] ADR-0014 
     FOREIGN KEY (company_id, project_id) REFERENCES project (company_id, id),   -- company key (S2 schema review S4)
     FOREIGN KEY (company_id, salesperson_id) REFERENCES partner (company_id, id),   -- company key (S2 schema review S4)
     FOREIGN KEY (company_id, open_item_id) REFERENCES open_item (company_id, id),   -- company key (S2 schema review S4)
-    FOREIGN KEY (company_id, derivation_trace_id) REFERENCES derivation_trace (company_id, id)   -- company key (S2 schema review S4)
+    FOREIGN KEY (company_id, derivation_trace_id) REFERENCES derivation_trace (company_id, id),   -- company key (S2 schema review S4)
+    CONSTRAINT uq_journal_line_company_id_id UNIQUE (company_id, id),   -- target of company keys (ADR-0017 rule 19 note, 2026-11-21)
+    FOREIGN KEY (company_id, journal_entry_id) REFERENCES journal_entry (company_id, id),   -- company key (ADR-0017 rule 19 note, 2026-11-21)
+    FOREIGN KEY (company_id, cost_object_id) REFERENCES cost_object (company_id, id),   -- company key (ADR-0017 rule 19 note, 2026-11-21)
+    FOREIGN KEY (company_id, fixed_asset_id) REFERENCES fixed_asset (company_id, id)   -- company key (ADR-0017 rule 19 note, 2026-11-21)
 );
 
 CREATE INDEX ix_journal_line_company_id_account_id_posting_period_id
@@ -666,7 +676,7 @@ CREATE TABLE opening_turnover (                            -- [ledger] ADR-0044 
 
 -- ADR-0026 rule 3: the cycle open_item <-> journal_line is closed by a deferred foreign key.
 ALTER TABLE open_item ADD CONSTRAINT fk_open_item_origin_journal_line_id_journal_line
-    FOREIGN KEY (origin_journal_line_id) REFERENCES journal_line (id) DEFERRABLE INITIALLY DEFERRED;
+    FOREIGN KEY (company_id, origin_journal_line_id) REFERENCES journal_line (company_id, id) DEFERRABLE INITIALLY DEFERRED;
 
 -- ADR-0026 rules 1 and 4: identity of an open item is immutable; a referring line matches its item.
 CREATE FUNCTION open_item_identity_immutable() RETURNS trigger LANGUAGE plpgsql AS $$

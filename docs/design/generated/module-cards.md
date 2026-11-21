@@ -338,7 +338,7 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Work item kinds (2):** `event_delivery_held`, `external_call_outcome_unknown`
 - **Authorization areas (1):** `event_delivery`
 - **ADRs (declared):** [ADR-0013](../../adr/0013-outbox-and-events.md)
-- **ADRs that name this module most (mentions; not complete):** [ADR-0013](../../adr/0013-outbox-and-events.md), [ADR-0073](../../adr/0073-coding-pipeline-and-mechanical-assurance.md)
+- **ADRs that name this module most (mentions; not complete):** [ADR-0013](../../adr/0013-outbox-and-events.md), [ADR-0017](../../adr/0017-permission-envelope.md), [ADR-0073](../../adr/0073-coding-pipeline-and-mechanical-assurance.md)
 
 ## `periods` (layer 2)
 

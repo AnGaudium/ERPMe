@@ -24,7 +24,7 @@ Title, status and design item come from each ADR's first lines. **Declared** ADR
 | [ADR-0014](../../adr/0014-universal-journal.md) | Universal journal data model | accepted 2026-11-14 | DS-06 | `ledger`, `production` | 3 | `ledger` |
 | [ADR-0015](../../adr/0015-account-determination.md) | Account determination | accepted 2026-11-14 | DS-08 | `ledger`, `registry` | 3, 2 | `master_data`, `ledger` |
 | [ADR-0016](../../adr/0016-localization-package-structure.md) | Localization package structure | accepted 2026-11-14 | DS-14 | `tax`, `localization` | 3, 2 | — |
-| [ADR-0017](../../adr/0017-permission-envelope.md) | Permission model, envelope part | accepted 2026-11-14 | DS-15 (envelope part for step 0; the full model is due at step 5) | `permissions`, `registry` | 2 | `permissions`, `master_data`, `registry` |
+| [ADR-0017](../../adr/0017-permission-envelope.md) | Permission model, envelope part | accepted 2026-11-14 | DS-15 (envelope part for step 0; the full model is due at step 5) | `permissions`, `registry` | 2 | `permissions`, `master_data`, `registry`, `outbox` |
 | [ADR-0018](../../adr/0018-product-and-item-model.md) | Product and item model | accepted 2026-11-14 | DS-20 (item part; partners, warehouses and price lists follow in DS-20 for step 2) | `master_data` | 3 | `master_data` |
 | [ADR-0019](../../adr/0019-partners-and-crm-foundation.md) | Partners, contacts and CRM foundation | accepted 2026-11-14 | DS-20 (partner part) and DS-35 (minimal CRM), drafted ahead of steps 2 and 5 | `crm`, `master_data`, `audit` | 4, 3, 2 | `master_data`, `crm`, `audit` |
 | [ADR-0020](../../adr/0020-inventory-and-costing-model.md) | Inventory and costing model | accepted 2026-11-14 | DS-09 (ADR part for step 0; the period-end costing algorithm is specified for step 3) | `inventory`, `master_data` | 3 | `inventory`, `documents`, `master_data`, `purchasing` |
@@ -119,7 +119,7 @@ Title, status and design item come from each ADR's first lines. **Declared** ADR
 | 2 | `db` | — | — |
 | 2 | `documents` | ADR-0004, ADR-0008, ADR-0009, ADR-0026, ADR-0028, ADR-0029, ADR-0030, ADR-0043, ADR-0045, ADR-0046, ADR-0047, ADR-0052, ADR-0054, ADR-0055, ADR-0066 | ADR-0009, ADR-0020, ADR-0022, ADR-0028, ADR-0029, ADR-0038, ADR-0043, ADR-0047, ADR-0052, ADR-0054, ADR-0055, ADR-0061, ADR-0062, ADR-0075, ADR-0079 |
 | 2 | `localization` | ADR-0016, ADR-0063 | — |
-| 2 | `outbox` | ADR-0013 | ADR-0013, ADR-0073 |
+| 2 | `outbox` | ADR-0013 | ADR-0013, ADR-0017, ADR-0073 |
 | 2 | `periods` | ADR-0007, ADR-0012, ADR-0028, ADR-0029, ADR-0038, ADR-0043, ADR-0044, ADR-0055 | ADR-0007, ADR-0012, ADR-0060 |
 | 2 | `permissions` | ADR-0017, ADR-0040, ADR-0054 | ADR-0017, ADR-0042, ADR-0054, ADR-0055, ADR-0067 |
 | 2 | `policy` | ADR-0009, ADR-0028, ADR-0029, ADR-0043, ADR-0055 | ADR-0029, ADR-0042, ADR-0043, ADR-0055, ADR-0059, ADR-0065, ADR-0067 |

@@ -1054,7 +1054,7 @@ CREATE TABLE tax_line (                                    -- the immutable tax 
     declaring_branch_id      uuid,                         -- the declaring unit: null for the company, or a branch with is_declaring_unit
     document_id              uuid NOT NULL,
     line_number              integer NOT NULL,
-    journal_entry_id         uuid NOT NULL REFERENCES journal_entry (id),
+    journal_entry_id         uuid NOT NULL,
     partner_tax_id           text,                         -- from the partner snapshot (ADR-0028 rule 16)
     tax_code_id              uuid NOT NULL REFERENCES tax_code (id),
     tax_rate_id              uuid,
@@ -1075,7 +1075,8 @@ CREATE TABLE tax_line (                                    -- the immutable tax 
     FOREIGN KEY (company_id, document_id) REFERENCES document (company_id, id),
     FOREIGN KEY (company_id, declaring_branch_id) REFERENCES branch (company_id, id),
     CONSTRAINT ck_tax_line_purchase CHECK ((direction = 'sale') = (initial_deductibility IS NULL)
-        AND (input_use IS NULL OR direction <> 'sale') AND (deductibility_rule_id IS NULL OR direction <> 'sale'))
+        AND (input_use IS NULL OR direction <> 'sale') AND (deductibility_rule_id IS NULL OR direction <> 'sale')),
+    FOREIGN KEY (company_id, journal_entry_id) REFERENCES journal_entry (company_id, id)   -- company key (ADR-0017 rule 19 note, 2026-11-21)
 );
 CREATE INDEX ix_tax_line_declaration ON tax_line (company_id, declaring_branch_id, declaration_date);
 CREATE INDEX ix_tax_line_document_id ON tax_line (document_id);
@@ -1088,13 +1089,15 @@ CREATE TABLE tax_line_adjustment (                         -- append-only (rule 
     deductible_delta_company_amount     types.amount NOT NULL,
     declaration_date                    date NOT NULL,
     reason                              text,              -- the condition type's reason for condition_failed (failing_method, lapsed)
-    journal_entry_id                    uuid REFERENCES journal_entry (id),
+    journal_entry_id                    uuid,
     reversal_of_id                      uuid,              -- interim: not stated in ADR-0041 (the adjustment a reversal_of_adjustment undoes)
     recorded_at                         timestamptz NOT NULL DEFAULT now(),
     FOREIGN KEY (company_id, adjusts_tax_line_id) REFERENCES tax_line (company_id, id),
-    FOREIGN KEY (reversal_of_id) REFERENCES tax_line_adjustment (id),
+    FOREIGN KEY (company_id, reversal_of_id) REFERENCES tax_line_adjustment (company_id, id),
     CONSTRAINT ck_tax_line_adjustment_reason CHECK (kind <> 'condition_failed' OR reason IS NOT NULL),
-    CONSTRAINT ck_tax_line_adjustment_reversal CHECK ((kind = 'reversal_of_adjustment') = (reversal_of_id IS NOT NULL))
+    CONSTRAINT ck_tax_line_adjustment_reversal CHECK ((kind = 'reversal_of_adjustment') = (reversal_of_id IS NOT NULL)),
+    CONSTRAINT uq_tax_line_adjustment_company_id_id UNIQUE (company_id, id),   -- target of company keys (ADR-0017 rule 19 note, 2026-11-21)
+    FOREIGN KEY (company_id, journal_entry_id) REFERENCES journal_entry (company_id, id)   -- company key (ADR-0017 rule 19 note, 2026-11-21)
 );
 
 -- ===== Agent promotion evidence [agent_runs] (ADR-0050 rule 14) =====

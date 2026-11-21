@@ -15,9 +15,16 @@ What it does to every CREATE TABLE of docs/design/*.sql (partitions inherit from
    unique constraint. Exception class E1 (gen_overview.KEY_ALLOWLIST) keeps its natural key. E2 registries get a comment that the
    loader computes the id as uuid5; E3 (one row per company) is the general case with the old key UNIQUE (company_id).
    `id` has no default (ADR-0006 rule 2) except on DB_WRITTEN tables, whose rows database code inserts.
-3. Company keys (S06 of lab t16; S2 schema review finding S4): a single-column foreign key to account, posting_period,
-   fiscal_year or any table whose CREATE TABLE declares UNIQUE (company_id, id) (except COMPANY_KEYED_EXCEPT), in a table
-   with `company_id ... NOT NULL`, becomes `FOREIGN KEY (company_id, <column>) REFERENCES <table> (company_id, id)`.
+3. Company keys (S06 of lab t16; S2 schema review finding S4; the ADR-0017 rule 19 note of 2026-11-21, R2-N9): every
+   single-column foreign key from a company table (`company_id ... NOT NULL`) to a company table becomes
+   `FOREIGN KEY (company_id, <column>) REFERENCES <table> (company_id, id)`, whatever its form: a column's REFERENCES
+   (removed and appended as a table element, its ON DELETE / ON UPDATE / DEFERRABLE clauses kept), a table element
+   FOREIGN KEY, or ALTER TABLE ... ADD FOREIGN KEY (both rewritten in place, clauses untouched). A target without
+   UNIQUE (company_id, id) first gets `CONSTRAINT uq_<table>_company_id_id UNIQUE (company_id, id)`; a lab stub of
+   00_stubs.sql that is a target must already have it (the script stops otherwise). Keys to or from a table whose
+   company_id is nullable or absent stay single-column (gen_overview.COMPANY_KEY_ALLOWLIST). The script stops on a key
+   it cannot convert safely: a target column other than id, or ON DELETE / ON UPDATE SET NULL or SET DEFAULT without a
+   column list (it would null company_id).
 4. The recorded_at trigger: each file ends with one section that defines set_recorded_at() and runs one DO block, which
    attaches `trg_<table>_set_recorded_at` (BEFORE UPDATE) to every table of the file except its append-only tables. The
    phase A CREATE TRIGGER ... set_recorded_at statements and the function definitions at the top of the files are
@@ -37,35 +44,49 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
 from gen_overview import KEY_ALLOWLIST, PURE_LOGS, RECORDED_AT_END as SECTION_END, RECORDED_AT_SECTION as SECTION_START  # noqa: E402
-from gen_overview import classify, mask_sql as mask, table_spans  # noqa: E402
+from gen_overview import UQ_COMPANY_RE, classify, company_scan, mask_sql as mask, table_spans  # noqa: E402
 
 REGISTRIES = {"setting_definition", "setting_preset", "setting_preset_item", "extension_point", "event_consumer",
               "public_mail_domain"}   # E2 (ADR-0006 rule 1 note)
 DB_WRITTEN = {"barcode": "barcode_register inserts the rows"}   # id DEFAULT uuidv7() (ADR-0006 rule 2)
-COMPANY_KEYED = ("account", "posting_period", "fiscal_year")
-# Rule 3 extension (S2 schema review finding S4): every target whose CREATE TABLE has UNIQUE (company_id, id) is company
-# keyed too, except these, whose lab stub (00_stubs.sql, the standard load of DS-06 without DS-22) has no company_id; the
-# file that defines the target adds the composite keys to it by ALTER TABLE.
-COMPANY_KEYED_EXCEPT = {"material_document_line": "DS-22-09-42-commercial-inventory.sql adds the composite keys"}
+STUBS = os.path.join(HERE, "00_stubs.sql")
+ACTIONS = (r"((?:\s+ON (?:DELETE|UPDATE) (?:NO ACTION|RESTRICT|CASCADE|SET NULL|SET DEFAULT)(?: \([^)]*\))?)*"
+           r"(?:\s+(?:NOT )?DEFERRABLE)?(?:\s+INITIALLY (?:DEFERRED|IMMEDIATE))?)")
+INLINE_RE = re.compile(r"\s+REFERENCES (\w+) \(([^)]*)\)" + ACTIONS)
+ELEMENT_RE = re.compile(r"((?:CONSTRAINT \w+ )?FOREIGN KEY \()(\w+)\) REFERENCES (\w+) \(([^)]*)\)" + ACTIONS)
+ALTER_RE = re.compile(r"^ALTER TABLE (\w+)\s+ADD\s+(?:CONSTRAINT \w+\s+)?(FOREIGN KEY\s*\((\w+)\)\s*REFERENCES (\w+)\s*\(([^)]*)\))"
+                      + ACTIONS, re.M)
 
 
 def line_start(text, pos):
     return text.rfind("\n", 0, pos) + 1
 
 
-def company_keyed_targets(files):
-    """COMPANY_KEYED plus every table whose CREATE TABLE declares UNIQUE (company_id, id), minus COMPANY_KEYED_EXCEPT."""
-    out = set(COMPANY_KEYED)
-    for p in files:
-        text = open(p, encoding="utf-8").read()
-        masked = mask(text)
-        for table, _, _, spans in table_spans(text, masked):
-            if any(re.fullmatch(r"(?:CONSTRAINT \w+ )?UNIQUE \(company_id, id\)", " ".join(masked[a:b].split())) for a, b in spans):
-                out.add(table)
-    return sorted(out - set(COMPANY_KEYED_EXCEPT))
+def company_plan(files):
+    """(company status of every design table, the company tables that need UNIQUE (company_id, id)): every company table
+    that a single-column key from a company table targets and that lacks the key. Stops on a lab stub target without it."""
+    tables, fks = company_scan([(os.path.basename(p), open(p, encoding="utf-8").read()) for p in files])
+    company = {t: v["company"] for t, v in tables.items()}
+    need = {tgt for _, _, src, cols, tgt, _ in fks
+            if len(cols) == 1 and company.get(src) == "not null" and company.get(tgt) == "not null" and not tables[tgt]["uq"]}
+    stubs, _ = company_scan([("00_stubs.sql", open(STUBS, encoding="utf-8").read())])
+    # a stub stands in for its table only in labs that load a referencing file without the defining one
+    targets = {tgt for _, f, src, cols, tgt, _ in fks if company.get(src) == "not null" and company.get(tgt) == "not null"
+               and (tgt in need or "company_id" in cols) and tables[tgt]["file"] != f}
+    for t in sorted(targets & set(stubs)):
+        if not stubs[t]["uq"]:
+            raise SystemExit(f"00_stubs.sql: stub {t} is a company-key target; give it company_id NOT NULL and UNIQUE (company_id, id)")
+    return company, need
 
 
-def convert_file(path, append_only, keyed=COMPANY_KEYED):
+def check_actions(where, actions):
+    if re.search(r"SET (?:NULL|DEFAULT)(?! \()", actions):
+        raise SystemExit(f"{where}: ON ... SET NULL / SET DEFAULT on a key that becomes composite would null company_id; "
+                         "name the column, e.g. ON DELETE SET NULL (x_id)")
+
+
+def convert_file(path, append_only, company=None, need_uq=()):
+    company = company or {}
     text = open(path, encoding="utf-8").read()
     name = os.path.basename(path)
     # drop the phase A trigger statements and the function definitions; the end section replaces them
@@ -155,21 +176,41 @@ def convert_file(path, append_only, keyed=COMPANY_KEYED):
                 edits.append((s + nm.end(), s + nm.end(), " DEFAULT now()"))
                 report.append(f"recorded_at {table}: default added")
         # --- company keys
-        if "company_id" in cols and "NOT NULL" in codes[cols["company_id"]]:
+        if table in need_uq and not any(UQ_COMPANY_RE.fullmatch(c) for c in codes):
+            uq = f"uq_{table}_company_id_id"
+            if len(uq.encode()) > 63:
+                raise SystemExit(f"{name} {table}: {uq} exceeds 63 bytes (ADR-0004 rule 6)")
+            appended.insert(0, (f"CONSTRAINT {uq} UNIQUE (company_id, id)",
+                                "   -- target of company keys (ADR-0017 rule 19 note, 2026-11-21)"))
+            report.append(f"company key target {table}: {uq} added")
+        if company.get(table) == "not null":
             for col, k in cols.items():
                 s, e = spans[k]
-                rm = re.search(r"\s+REFERENCES (" + "|".join(keyed) + r") \(id\)", masked[s:e])
-                if rm:
+                rm = INLINE_RE.search(masked[s:e])
+                if rm and company.get(rm.group(1)) == "not null":
+                    if rm.group(2).strip() != "id":
+                        raise SystemExit(f"{name} {table}.{col}: key to {rm.group(1)} ({rm.group(2)}), not id")
+                    check_actions(f"{name} {table}.{col}", rm.group(3))
                     edits.append((s + rm.start(), s + rm.end(), ""))
-                    why = "S2 schema phase B" if rm.group(1) in COMPANY_KEYED else "S2 schema review S4"
-                    appended.append((f"FOREIGN KEY (company_id, {col}) REFERENCES {rm.group(1)} (company_id, id)",
-                                     f"   -- company key ({why})"))
+                    appended.append((f"FOREIGN KEY (company_id, {col}) REFERENCES {rm.group(1)} (company_id, id){' '.join(rm.group(3).split()) and ' ' + ' '.join(rm.group(3).split())}",
+                                     "   -- company key (ADR-0017 rule 19 note, 2026-11-21)"))
                     report.append(f"company key {table}.{col} -> {rm.group(1)}")
+            for k, c in enumerate(codes):
+                s, e = spans[k]
+                em = ELEMENT_RE.match(masked[s:e])
+                if em and company.get(em.group(3)) == "not null":
+                    if em.group(4).strip() != "id":
+                        raise SystemExit(f"{name} {table}.{em.group(2)}: key to {em.group(3)} ({em.group(4)}), not id")
+                    check_actions(f"{name} {table}.{em.group(2)}", em.group(5))
+                    edits.append((s, s + em.end(4) + 1,
+                                  f"{em.group(1)}company_id, {em.group(2)}) REFERENCES {em.group(3)} (company_id, id)"))
+                    report.append(f"company key {table}.{em.group(2)} -> {em.group(3)} (in place)")
         else:
             for col, k in cols.items():
                 s, e = spans[k]
-                if re.search(r"\s+REFERENCES (" + "|".join(keyed) + r") \(id\)", masked[s:e]):
-                    report.append(f"company key {table}.{col}: kept single-column (company_id nullable or absent)")
+                rm = INLINE_RE.search(masked[s:e])
+                if rm and company.get(rm.group(1)):
+                    report.append(f"company key {table}.{col} -> {rm.group(1)}: kept single-column (company_id nullable or absent)")
         if appended:
             ls, le = spans[-1]
             after = masked[le:text.find("\n", le)]
@@ -185,6 +226,14 @@ def convert_file(path, append_only, keyed=COMPANY_KEYED):
             else:
                 edits.append((le, le, ","))
                 edits.append((eol, eol, "".join(parts)))
+    for am in ALTER_RE.finditer(masked):
+        src, col, tgt = am.group(1), am.group(3), am.group(4)
+        if company.get(src) == "not null" and company.get(tgt) == "not null":
+            if am.group(5).strip() != "id":
+                raise SystemExit(f"{name} ALTER TABLE {src}.{col}: key to {tgt} ({am.group(5)}), not id")
+            check_actions(f"{name} {src}.{col}", am.group(6))
+            edits.append((am.start(2), am.end(2), f"FOREIGN KEY (company_id, {col}) REFERENCES {tgt} (company_id, id)"))
+            report.append(f"company key {src}.{col} -> {tgt} (ALTER TABLE, in place)")
     edits.sort(key=lambda x: (x[0], x[1]), reverse=True)
     last = None
     for s, e, new in edits:
@@ -255,10 +304,10 @@ def main():
     for p in files:
         stmts += [re.sub(r"--[^\n]*", "", s) for s, _ in split_statements(open(p, encoding="utf-8").read(), os.path.basename(p))[0]]
     append_only = classify(stmts)
-    keyed = company_keyed_targets(files)
+    company, need_uq = company_plan(files)
     n_tables = n_ao = 0
     for p in files:
-        new, report, tables, ao = convert_file(p, append_only, keyed)
+        new, report, tables, ao = convert_file(p, append_only, company, need_uq)
         n_tables += len(tables); n_ao += len(ao)
         for r in report:
             print(f"{os.path.basename(p)}: {r}")
