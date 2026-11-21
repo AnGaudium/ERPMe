@@ -767,10 +767,10 @@ check("U72 preliminary price of a purchased item before its first receipt: the s
       and preliminary_price("I_STD", produced=True, estimate=8000, list_entries=both) == (8000, "cost_estimate")
       and preliminary_price("I_STD", produced=True, list_entries=both, last_invoice=last_inv)[0] == "preliminary_price_missing"
       and "'purchase_list'" in ck_src and "'last_purchase_invoice'" in ck_src)
-# U73-U81: a sales return at the original issue cost, costing role issue_return (ADR-0020 rules 4, 5, 12 notes; OQ-150)
+# U73-U83: a sales return at the original issue cost, costing role issue_return (ADR-0020 rules 4, 5, 12 notes; OQ-150)
 from costing_solver import check_issue_returns  # noqa: E402
-for i, (ok_, name_, detail_) in enumerate(check_issue_returns()):
-    check(f"U{73 + i} issue_return: " + name_, ok_, detail_)
+for i, (ok_, name_, detail_) in enumerate(check_issue_returns()):   # U73-U80, then U82-U83 (U81 below)
+    check(f"U{73 + i if i < 8 else 74 + i} issue_return: " + name_, ok_, detail_)
 ck_role = ds22.split("CONSTRAINT ck_movement_type_costing_role CHECK", 1)[1].split("\n", 1)[0]
 st = {r["key"]: r for r in read_csv(os.path.join(CAT, "settings.csv"))}
 srr = st["movement_type.sales_return_receipt.costing_role"]
