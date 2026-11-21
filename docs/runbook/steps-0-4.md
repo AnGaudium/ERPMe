@@ -138,7 +138,7 @@ Note ([ADR-0073](../adr/0073-coding-pipeline-and-mechanical-assurance.md), 2026-
 3. Lots and serials tracked in stock movements, with no cost of their own.
 4. Stock count with differences.
 5. Preliminary price and period-end actual costing across warehouses, porting the existing periodic-average engine (see the DS-09 open question on where it lives).
-6. Landed cost: same open period added to the receipt value; a cost for an earlier period, unlocked or locked, posted on its own date in the current open period as a receipt addition that enters that period's average, with no charge to past consumers (DS-11; ADR-0021 rule 6 note, the author, 2026-11-21).
+6. Landed cost: same open period added to the receipt value; a cost for an earlier period, unlocked or locked, posted on its own date in the current period (the period of its posting date, which is not locked) as a receipt addition that enters that period's average, with no charge to past consumers; dated in an earlier period that is not locked, it makes that period stale like any backdated document (DS-11; ADR-0021 rule 6 note: the author's decision of 2026-11-21 and the chief architect's translation).
 7. Valuation postings to the journal through account determination.
 8. Cost trace for costing (Principle 6, built thin).
 9. Simulator adapter for step 3: stock and cost events to commands.

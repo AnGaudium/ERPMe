@@ -91,7 +91,7 @@ Everything else for these phases is additive: new tables, movement types, transa
 
    The landed cost consumer split (ADR-0021 rule 7) and reservations (ADR-0023 rule 11) already treat production consumers and demand lines generically.
 
-   Note (the author, 2026-11-21): the landed cost consumer split of ADR-0021 rule 7 is superseded: a late landed cost now enters the current period's average as a `receipt_addition` ([ADR-0021](0021-landed-cost.md) rule 6 note), so production consumers need no special treatment there.
+   Note (chief architect, 2026-11-21, following the author's decision of that day that a late purchase cost is booked in the current period): the landed cost consumer split of ADR-0021 rule 7 is superseded: a late landed cost now enters the current period's average as a `receipt_addition` ([ADR-0021](0021-landed-cost.md) rule 6 note), so production consumers need no special treatment there.
 9. Planning's design is [ADR-0024](0024-planning.md). Bills of materials become one more edge type there, and one more node and edge kind here.
 10. Phase 3 assets and loans add:
     - the `assets` module, depreciation runs as close tasks (ADR-0012), and `ActivateSubledger` with the asset register as opening detail;
