@@ -195,6 +195,8 @@ The accounting choices are the author's (ADR-0005 item 1). Each one below is a r
 
     Note: the core provides the row source `production_order_period_cost` for books; `l10n_vn`'s cost sheet is a book definition over it, with field class `cost` ([ADR-0049](0049-statutory-reporting-and-printing.md) rules 10, 22).
 
+    Note (the author, 2026-11-21: costing follows SAP): the choice the standard method leaves open is answered. Standard cost valuation becomes, as in SAP, a price-control option with variance postings beside periodic actual costing (the default, D6), chosen per item and valuation area and fixed while stock exists; overhead is applied by costing sheet with the over- or under-absorption left as a variance; the released cost estimate (rule 14) gives the standard price. The design comes by an ADR after step 5, on the seam of [ADR-0072](0072-costing-sheet-and-cost-component-structure.md) rule 21. Price control is a product field today ([ADR-0018](0018-product-and-item-model.md) rules 3 and 18); that ADR states the granularity and amends ADR-0018 if it moves the field ([open-questions.md](../open-questions.md), DS-53 entries).
+
 **Data, catalogs and checks**
 
 17. Tables and commands. All maintenance commands are `master_data_change`, because they change valuation:

@@ -198,7 +198,7 @@ A case never widens an agent's read scope.
   - extractions with evidence (ADR-0057);
   - command batches (ADR-0008 rule 20);
   - bulk review (ADR-0042 rule 12 note);
-  - the auto-post gateway (ADR-0065, proposed).
+  - the auto-post gateway (ADR-0065, accepted 2026-11-21).
 - **The gap.** A work item is one exception, and it closes when the exception ends. A customer e-mail that becomes a quotation passes through `inbound_message_matched`, an agent run, a draft, possibly `approval_pending`, and `follow_up_due`, and no record says these belong together. People handling exception work need one place per intent.
 - **Practice** confirms the narrow form:
   - SAP S/4HANA Situation Handling keeps a situation with an anchor object, related objects and actions above the business documents, and opening a related app leaves the situation unchanged.

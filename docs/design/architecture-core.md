@@ -193,7 +193,7 @@ Some DDL drafts break these rules ([findings](architecture-overview.md#findings-
 | Import a tool package, a lab script or `l10n_*` from `nativeflows` | ADR-0022 rule 6; [lab README](../reviews/2026-11-14-design-validation/README.md):5 | import-linter for tools and `l10n_*`; no check exists yet for lab code (finding) |
 | Edit a document in a final state | ADR-0009 rules 14, 23 | Database triggers (ADR-0009 rule 14); trigger tests |
 | Let an agent submit, post, issue, approve or send | ADR-0050 rule 30; ADR-0017 rule 15 | Registry CI check and INV-214 |
-| Post as `system` or `integration` outside the auto-post gateway, or change a draft or call an LLM in a checker | [ADR-0065](../adr/0065-deterministic-auto-post-gateway.md) rules 3, 7, accepted 2026-11-21) | INV-760, INV-762; no check exists yet (finding) |
+| Post as `system` or `integration` outside the auto-post gateway, or change a draft or call an LLM in a checker | [ADR-0065](../adr/0065-deterministic-auto-post-gateway.md) rules 3, 7 (accepted 2026-11-21) | INV-760, INV-762; no check exists yet (finding) |
 | Check permissions or policy inside a handler, except the one `context.evaluate_policy` call of an `is_policy_in_handler` command | ADR-0008 rule 5; ADR-0030 rule 7 | no check exists yet (finding) |
 | Give a plan row its `id` from a column default, trigger or sequence | ADR-0008 rule 12; ADR-0006 rule 2 | Test named in ADR-0008 rule 12 |
 | Use sequences, session advisory locks or non-`LOCAL` `SET` on handler or trigger paths | ADR-0008 rule 9; ADR-0022 rule 13 note | check: Session locks and settings |
