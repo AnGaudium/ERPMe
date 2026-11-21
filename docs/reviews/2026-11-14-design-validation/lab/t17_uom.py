@@ -771,6 +771,10 @@ check("U72 preliminary price of a purchased item before its first receipt: the s
 from costing_solver import check_issue_returns  # noqa: E402
 for i, (ok_, name_, detail_) in enumerate(check_issue_returns()):   # U73-U80, then U82-U83 (U81 below)
     check(f"U{73 + i if i < 8 else 74 + i} issue_return: " + name_, ok_, detail_)
+# U89: the group-currency amount of costing lines, solved on group amounts (ADR-0020 rule 12 note of the chief architect, 2026-11-21)
+from costing_solver import check_group_currency  # noqa: E402
+ok_, name_, detail_ = check_group_currency()
+check("U89 " + name_, ok_, detail_)
 ck_role = ds22.split("CONSTRAINT ck_movement_type_costing_role CHECK", 1)[1].split("\n", 1)[0]
 st = {r["key"]: r for r in read_csv(os.path.join(CAT, "settings.csv"))}
 srr = st["movement_type.sales_return_receipt.costing_role"]
