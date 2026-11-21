@@ -7,6 +7,8 @@ Design items: DS-64 (personal data), DS-36 (audit), DS-35 (CRM), DS-15 (access),
 
 Personal data is protected by one mechanism for the whole core, not only on the path to an LLM. The core provides the mechanism; every period, deadline and legal basis is a package rule (ADR-0016), so the core holds no country's values (ADR-0053).
 
+Note (author, 2026-11-21): retention periods and the breach notification deadline are set per company, with package defaults; see the notes at rules 9 and 16.
+
 - **One catalog.** [personal-data-fields.csv](../catalogs/personal-data-fields.csv) lists every column that holds personal data. It is the single source for the access export, blocking and destruction, the LLM gateway labels, masking and the retention job.
 - **Block, then destroy.** A data subject whose purpose has ended is *blocked*: hidden from ordinary users and from all new processing, and kept only for the legal retention period. When that period ends, the subject's data is *destroyed* in place, in every store the catalog names, posted documents included. This is the model SAP uses (blocking and information lifecycle management); it lets accounting records stay complete for as long as the law requires and no longer.
 - **Destruction reaches immutable stores through one controlled exception.** Posted documents, document versions, the journal, audit rows and logs are rewritten only by the destruction path (`EraseDataSubject` on a request, `DestroyRetainedPersonalData` when a retention period ends), column by column as the catalog says, and every rewrite leaves an entry in an erasure journal that a restore re-applies.
@@ -79,6 +81,8 @@ Personal data is protected by one mechanism for the whole core, not only on the 
    - **Evidence** is the `data_erasure_entry` rows and one processing log entry of kind `retention` per subject and run (a kind this ADR adds to ADR-0052 rule 26).
    - **Existing retention settings stay** (`messaging.message_retention_days`, the analysis question retention, the agent run step retention). They bound technical stores and may be shorter than a retention rule; where both apply, the shorter wins for stores that are not accounting evidence.
 
+   Note (author, 2026-11-21): retention periods are configurable per customer. Each company sets its own rule per retention class (start event, months until blocking, months until destruction); a localization package may supply defaults, flagged verified or unverified as before. A company's own rule needs no package rule and no "adjustable" mark, and its legal correctness is the company's responsibility, as with the routing switch (D12). A company's own rule counts as verified for rules 7 and 9, INV-894 and EC-354: the person who records it confirms it (`is_verified` true), and because destruction cannot be undone the rule is set or changed through a change proposal that another person approves. A package default counts as verified only when the package flags it verified. The core still seeds no period, and "no rule, no destruction by the job" stays. The constraints of `retention_rule` that require a package rule (`package_rule_ref` NOT NULL, `ck_retention_rule_adjusted`) change with the DDL work of session S2: `package_rule_ref` becomes nullable for source `company` (which then also means a rule the company wrote itself, not only an adjusted package rule), `is_adjustable` no longer applies to it, and `is_verified` is set as above.
+
 **Reading**
 
 10. Personal columns are read under the record scope and leaves a role already has (ADR-0054). No new field class covers ordinary personal data: a sales clerk must read a customer's name.
@@ -113,6 +117,8 @@ Personal data is protected by one mechanism for the whole core, not only on the 
     - **Steps:** assess, contain, record, notify, close. The case cannot be resolved while the notification fields a package rule requires are empty.
     - **Deadlines** are package rules (`breach_notification_hours` per regime). The core computes `notification_due_at` from the rule and raises the due date on the case; with no rule the due date is empty and the case says so.
     - **Evidence** is the audit records, denials, the read log and the processing log (ADR-0038 rule 9).
+
+    Note (author, 2026-11-21): the breach notification deadline is configurable per customer: the setting `breach_notification_hours` (scopes regime and company, core default unset), for which a localization package may supply the regime value; with no value the due date stays empty and the case says so. The setting row is added to `settings.csv` with the work of session S2. The core holds no country's value.
 
 **Scope**
 
