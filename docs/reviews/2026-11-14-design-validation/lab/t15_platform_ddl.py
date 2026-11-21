@@ -865,6 +865,49 @@ trial("K12 N5: the migration period never unlocks, even with an approved request
 trial("K13 N5: a locked area's row is never deleted (and so never recreated as open)", lambda cx: cx.execute(
     "delete from posting_period_area_state where posting_period_id = %s and area = 'general'", (PER10,)), True, "never deleted")
 
+# T3-1 (S2 adversarial review, third pass): a locked period was reopened by moving its dates. A period with an area row that is not
+# open, or with a journal entry, never changes its dates, fiscal year, kind or number and is never deleted; its fiscal year never
+# changes its dates or code and is never deleted. PER10 (October) is locked; I["per"] (November) is open and has the entry JE.
+PER12, FY27 = new(), new()
+ins_posting_period(X, PER12, I["co"], I["fy"], 12, "2026-12-01", "2026-12-31")     # no area row and no entry yet
+ins_fiscal_year(X, FY27, I["co"], "2027", "2027-01-01", "2027-12-31")              # no period yet
+period_dates = lambda cx, pid, s, e: cx.execute("update posting_period set start_date = %s, end_date = %s where id = %s", (s, e, pid))
+
+
+def reviewer_sequence(cx):
+    """The reviewer's reproduction: shrink the locked period, extend the open one, post inside the locked dates, set the dates back."""
+    period_dates(cx, PER10, "2026-10-01", "2026-10-10")
+    period_dates(cx, I["per"], "2026-10-11", "2026-11-30")
+    je = new()
+    cx.execute("insert into journal_entry (id, company_id, document_id, posting_date, document_date, posting_period_id, fiscal_year_id, line_count) values (%s,%s,%s,%s,%s,%s,%s,2)",
+               (je, I["co"], doc(cx, new(), "purchase_invoice", partner=I["p1"]), "2026-10-15", "2026-10-15", I["per"], I["fy"]))
+    for n, side, amt, acc in ((1, "debit", 1000, "acRev"), (2, "credit", -1000, "acBank2")):
+        cx.execute("""insert into journal_line (id, journal_entry_id, company_id, line_number, posting_period_id, posting_date, fiscal_year_id, account_id,
+                      system_account_id, side, transaction_currency, transaction_amount, company_currency, company_amount) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'VND',%s,'VND',%s)""",
+                   (new(), je, I["co"], n, I["per"], "2026-10-15", I["fy"], I[acc], I["sa"], side, amt, amt))
+    period_dates(cx, I["per"], "2026-11-01", "2026-11-30")
+    period_dates(cx, PER10, "2026-10-01", "2026-10-31")
+
+
+trial("K14 T3-1: the reviewer's sequence (shrink the locked October, extend November, post on 2026-10-15 in November, set the dates back) is "
+      "refused at its first step", reviewer_sequence, True, "posting_period_frozen")
+trial("K15 T3-1: an open period with a journal entry (November) never moves its dates", lambda cx: period_dates(cx, I["per"], "2026-11-01", "2026-11-25"),
+      True, "posting_period_frozen")
+trial("K16 T3-1: ... nor changes its number", lambda cx: cx.execute("update posting_period set number = 13 where id = %s", (I["per"],)),
+      True, "posting_period_frozen")
+trial("K17 T3-1: a locked period (October) is never deleted", lambda cx: cx.execute("delete from posting_period where id = %s", (PER10,)), True,
+      "posting_period_frozen")
+trial("K18 T3-1: the fiscal year of a locked period never moves its dates", lambda cx: cx.execute(
+    "update fiscal_year set end_date = '2026-12-30' where id = %s", (I["fy"],)), True, "posting_period_frozen")
+trial("K19 T3-1: ... nor changes its code", lambda cx: cx.execute("update fiscal_year set code = '2026b' where id = %s", (I["fy"],)), True,
+      "posting_period_frozen")
+trial("K19a T3-1: ... nor is it deleted", lambda cx: cx.execute("delete from fiscal_year where id = %s", (I["fy"],)), True, "posting_period_frozen")
+trial("K20 T3-1: the trigger lets a period with no area row that is not open and no entry (December) change its dates; the rest of ADR-0007 rule 20 is the command's (rolled back afterwards)",
+      lambda cx: (period_dates(cx, PER12, "2026-12-01", "2026-12-30"), cx.execute("select 1/0")), True, "division by zero")
+trial("K20a T3-1: ... and a fiscal year with no such period may change its dates and code (rolled back afterwards)", lambda cx: (cx.execute(
+    "update fiscal_year set end_date = '2027-12-30', code = '2027b' where id = %s", (FY27,)), cx.execute("select 1/0")), True, "division by zero")
+trial("K20b T3-1: a soft-locked area counts too: December, once soft-locked, never moves its dates", lambda cx: (
+    ins_area_state(cx.execute, I["co"], PER12, "general", "soft_locked"), period_dates(cx, PER12, "2026-12-01", "2026-12-30")), True, "posting_period_frozen")
 
 # ======================================================================= L: final simulation review, 2026-11-15
 # The payment block on open_item_collection (ADR-0048 rule 17 note; ADR-0063 rule 27 note) and the settings auto-post evidence

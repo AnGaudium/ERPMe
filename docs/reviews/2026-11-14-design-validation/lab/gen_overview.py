@@ -37,7 +37,9 @@ and on a BEFORE INSERT trigger that reads NEW.recorded_at and sorts before it. T
 statement it cannot read: a CREATE TABLE, ALTER, REFERENCES, trigger, policy, DROP or DO outside the one form it parses, DDL
 inside a function body, and a function that does not pin search_path (S2 adversarial review S3, N3; R5-N2); it also refuses
 statements that bypass row triggers or policies: CREATE RULE, GRANT ... TO PUBLIC, SET session_replication_role (also through
-set_config), CREATE EVENT TRIGGER and SELECT ... INTO (S2 adversarial review, second pass, N2). Company keys
+set_config), CREATE EVENT TRIGGER and SELECT ... INTO (S2 adversarial review, second pass, N2), and, since the third pass, CREATE
+TABLE ... INHERITS (with a message, no longer an IndexError) and a hand-written definition of a function the generated
+sections define (set_recorded_at, refuse_truncate). Company keys
 (check_company_keys): it fails on a foreign key between two company tables (company_id NOT NULL on both) without
 company_id, on a key to or from a table with a nullable company_id that COMPANY_KEY_ALLOWLIST does not list, and on a lab
 stub that a composite company key targets without UNIQUE (company_id, id). --check also runs the mutation self-tests.
@@ -168,6 +170,8 @@ def table_spans(text, masked):
         for s, e in elems:
             seg = masked[s:e]
             spans.append((s + len(seg) - len(seg.lstrip()), s + len(seg.rstrip())))
+        if not any(e > s for s, e in spans):   # an empty column list (CREATE TABLE x () INHERITS (y)): not read; syntax_errors refuses it
+            continue
         out.append((m.group(1), start, i, spans))
     return out
 
@@ -521,6 +525,11 @@ BYPASS_RES = (
     (re.compile(r"\bCREATE\s+EVENT\s+TRIGGER\b", re.I), "CREATE EVENT TRIGGER"),
     (re.compile(r"\bSELECT\b[^;]*?\bINTO\s+(?:TEMP|TEMPORARY|UNLOGGED|TABLE)\b", re.I), "SELECT ... INTO a table (it creates a table the guard cannot read)"),
 )
+# The functions the generated sections define (render_sections): a definition of one of them in the hand-written part of a
+# file, under any spelling, would replace it for every table (S2 adversarial review, third pass).
+GENERATED_FUNCTIONS = ("set_recorded_at", "refuse_truncate")
+GENERATED_FUNCTION_RE = re.compile(r"CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+(?:\"?\w+\"?\.)?\"?(" + "|".join(GENERATED_FUNCTIONS)
+                                   + r")\"?\s*\(", re.I)
 # A top-level SELECT (or WITH ... SELECT) with INTO creates a table; inside a PL/pgSQL body SELECT ... INTO sets a variable.
 SELECT_INTO_RE = re.compile(r"(?:WITH\b.*?)?\bSELECT\b.*?\bINTO\b", re.I)
 
@@ -537,7 +546,10 @@ def syntax_errors(fname, pre):
             ok = bool(PARTITION_RE.match(code)) or (m and table_spans(code, code)
                                                     and re.fullmatch(r"\s*(?:PARTITION BY RANGE \(id\))?\s*;?\s*",
                                                                      code[table_spans(code, code)[0][2] + 1:]))
-            if not ok:
+            if re.search(r"\bINHERITS\b", code, re.I):
+                errors.append(f"{where}: CREATE TABLE ... INHERITS, which the guard cannot read (the child table's columns, keys and "
+                              "triggers come from its parent); write the table's own column list")
+            elif not ok:
                 errors.append(f"{where}: CREATE TABLE statement the guard cannot parse (write CREATE TABLE <name> (...) or "
                               "CREATE TABLE <name> PARTITION OF <parent> DEFAULT; no IF NOT EXISTS, schema, UNLOGGED, AS or lowercase)")
         elif re.match(r"ALTER\b", code, re.I):
@@ -562,6 +574,10 @@ def syntax_errors(fname, pre):
             if not re.match(r"REFERENCES \w+ \((?!\s*\))", code[m.start():]):
                 errors.append(f"{where}: REFERENCES the guard cannot parse (write REFERENCES <table> (<columns>): uppercase, "
                               "no schema, a space before the column list)")
+        gm = GENERATED_FUNCTION_RE.match(code)
+        if gm:
+            errors.append(f"{where}: a hand-written definition of {gm.group(1)}(), a function the generated sections define "
+                          "(a second definition would replace the guard every table relies on; S2 adversarial review, third pass)")
         if re.match(r"CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\b", code, re.I) and \
                 not re.match(r"CREATE (?:OR REPLACE )?FUNCTION [^$]*? SET search_path = nativeflows, pg_temp AS \$", code):
             errors.append(f"{where}: function without SET search_path = nativeflows, pg_temp before AS (S2 adversarial review N3)")
@@ -1426,6 +1442,15 @@ SELFTESTS = (
         ("CREATE EVENT TRIGGER", "CREATE EVENT TRIGGER lab_e ON ddl_command_start EXECUTE FUNCTION set_recorded_at();", "CREATE EVENT TRIGGER"),
         ("SELECT ... INTO a table", "SELECT * INTO lab_t FROM list_variant;", "SELECT ... INTO a table"),
         ("SELECT ... INTO TEMP in a DO block", "DO $$ BEGIN EXECUTE 'SELECT * INTO TEMP lab_t FROM list_variant'; END $$;", "SELECT ... INTO a table"),
+        # adversarial third pass: an inherited table ended in an IndexError; a second definition of a generated function passed
+        ("CREATE TABLE ... () INHERITS", "CREATE TABLE lab_x () INHERITS (list_variant);", "CREATE TABLE ... INHERITS"),
+        ("CREATE TABLE ... (columns) INHERITS", "CREATE TABLE lab_x (note text) INHERITS (list_variant);", "CREATE TABLE ... INHERITS"),
+        ("a second set_recorded_at() that does nothing",
+         "CREATE OR REPLACE FUNCTION set_recorded_at() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$ "
+         "BEGIN RETURN NEW; END $$;", "a hand-written definition of set_recorded_at()"),
+        ("a schema-qualified refuse_truncate()",
+         "CREATE OR REPLACE FUNCTION nativeflows.refuse_truncate() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$ "
+         "BEGIN RETURN NULL; END $$;", "a hand-written definition of refuse_truncate()"),
     )),
     ("a company table updated in place (stock_value) left out of the TRUNCATE guards", "DS-22-09-42-commercial-inventory.sql",
      "'material_document', 'stock_value', 'stock_quantity',", "'material_document', 'stock_quantity',",

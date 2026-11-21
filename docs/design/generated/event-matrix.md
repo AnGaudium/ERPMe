@@ -70,10 +70,10 @@ Event types named in backticks in the ADRs, recognised by the event forms of the
 | `PlannedOrderConverted` | `planned_order` | planning | — | ADR-0024:286 |
 | `PlannedOrderFirmed` | `planned_order` | planning | — | ADR-0024:286 |
 | `PlanningCompleted` | — | — | `planning_work_items` | ADR-0024:226, ADR-0024:286 |
-| `PostingPeriodLocked` | `posting_period` | periods | — | ADR-0012:42 |
-| `PostingPeriodOpened` | `posting_period` | periods | — | ADR-0012:42 |
-| `PostingPeriodRestricted` | `posting_period` | periods | — | ADR-0012:42 |
-| `PostingPeriodUnlocked` | `posting_period` | periods | — | ADR-0012:42 |
+| `PostingPeriodLocked` | `posting_period` | periods | — | ADR-0012:44 |
+| `PostingPeriodOpened` | `posting_period` | periods | — | ADR-0012:44 |
+| `PostingPeriodRestricted` | `posting_period` | periods | — | ADR-0012:44 |
+| `PostingPeriodUnlocked` | `posting_period` | periods | — | ADR-0012:44 |
 | `PriceListEntriesSet` | `price_list` | master_data | — | ADR-0045:92 |
 | `PrintRenderRequested` | — | — | — | ADR-0049:196 |
 | `ProcessingBasisClosed` | `processing_basis` | crm | — | ADR-0052:371 |

@@ -56,6 +56,8 @@ with open(os.path.join(CAT, "invariants.csv"), encoding="utf-8", newline="") as 
     inv = {r["code"]: r for r in csv.DictReader(f)}
 check("C03 invariants.csv has INV-302 (company tax rows approved, no shadowing), area tax", inv.get("INV-302", {}).get("area") == "tax")
 i302 = " ".join(inv.get("INV-302", {}).values())
+check("C05 T3-2: DS-04 lists the check result tax_treatment_rule_never_applies, and the R7-N1 and posting results tax_rate_missing",
+      "| `tax_treatment_rule_never_applies` |" in ds04 and "| `tax_rate_missing` |" in ds04)
 check("C04 INV-302 covers tax_treatment_rule (approval and the package precedence) and no longer names a partner tax group or group codes (R6-S1, W4)",
       "tax_treatment_rule" in i302 and "partner tax group" not in i302 and "group codes" not in i302, i302[:300])
 
@@ -428,31 +430,52 @@ if "--load" in sys.argv:
           (chain("2026-12-31"), chain("2027-01-01")) == (8, 10), (chain("2026-12-31"), chain("2027-01-01")))
     # D14: company rules keep the package protection (ADR-0041 rule 4 note)
     def own_rule(cx, cp="cp", direction="sale", day="2026-01-01", priority=0, **det):
+        rid = new()
         cx.execute("""insert into tax_treatment_rule (id, company_id, source, direction, ship_from_country, ship_to_country, is_tax_zone, item_kind, priority,
                       effective_from, tax_treatment_code, basis, change_proposal_id) values (%s,%s,'company',%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
-                   (new(), I["co"], direction, det.get("ship_from"), det.get("ship_to"), det.get("zone"), det.get("kind"), priority, day,
+                   (rid, I["co"], direction, det.get("ship_from"), det.get("ship_to"), det.get("zone"), det.get("kind"), priority, day,
                     det.get("treatment", "export"), B, I[cp] if cp else None))
+        return rid
+
+    # T3-2: the change proposal of a company rule gets the check result tax_treatment_rule_never_applies when the validation's
+    # function tax_treatment_rule_never_applies returns a covering package rule (the rule's id), else null
+    never = lambda rid: X("select tax_treatment_rule_never_applies(r) from tax_treatment_rule r where r.id = %s", (rid,)).fetchone()[0]
     trial("D14 a company rule with the determinants of a package rule not marked adjustable is refused", lambda cx: own_rule(cx, ship_to="XX"), "tax_treatment_rule_invalid")
     trial("D14a a company rule without a proposal is refused", lambda cx: own_rule(cx, cp=None, ship_to="YY"), "ck_tax_treatment_rule_scope")
     trial("D14a1 S2-5: a company rule whose proposal is a draft is refused", lambda cx: own_rule(cx, cp="cp_draft", ship_to="YY"), "tax_change_proposal_invalid")
     trial("D14b a company rule names a treatment of its company", lambda cx: own_rule(cx, ship_to="YY", treatment="no_such"), "tax_treatment_rule_invalid")
-    own_rule(c, ship_to="YY", zone=True, treatment="export_zone")
+    C_YYZ = own_rule(c, ship_to="YY", zone=True, treatment="export_zone")
     # The earlier D14c ("a company rule with new determinants is accepted and used") treated the defeat of a package rule as intended;
     # under the precedence of the ADR-0080 rule 3 note (S2-2) the general package rule R_EXP, in force and not adjustable, decides.
-    check("D14c S2-2: a company rule with new determinants is accepted, but the general package rule R_EXP matches and is not adjustable, so it decides "
-          "(export) and the company rule does not override it", derive("YY", zone=True)[1:] == ("export", R_EXP), derive("YY", zone=True))
+    check("D14c S2-2, T3-2: a company rule with new determinants is accepted, but the general package rule R_EXP matches and is not adjustable, so it "
+          "decides (export) and the company rule does not override it; its proposal gets the check result tax_treatment_rule_never_applies, naming R_EXP",
+          derive("YY", zone=True)[1:] == ("export", R_EXP) and never(C_YYZ) == R_EXP, (derive("YY", zone=True), never(C_YYZ)))
     own_rule(c, ship_to="XX", kind="goods", treatment="export")
     check("D16 S2-2: a company rule with one more determinant than the package rule R_DOM (ship-to XX and goods) does not turn a domestic sale of goods "
           "into an export: R_DOM is in force, matches and is not adjustable", derive("XX")[1:] == ("domestic", R_DOM), derive("XX"))
     own_rule(c, kind="goods", priority=99, treatment="export")
     check("D16a S2-2: nor does a company rule of as many determinants (goods) with a higher priority (99)", derive("XX")[1:] == ("domestic", R_DOM), derive("XX"))
     R_ADJ = rule(treatment="export", ship_to_country="ZZ", adjustable=True)
-    own_rule(c, ship_to="ZZ", treatment="export_zone", priority=100)
-    check("D16b a matching package rule marked adjustable lets a company rule decide (export_zone for ship-to ZZ instead of the package's export)",
-          derive("ZZ")[1] == "export_zone", derive("ZZ"))
-    # R6-S1: a package rule loaded after the company rule; the purchase direction has no other package rule
+    C_ZZ = own_rule(c, ship_to="ZZ", treatment="export_zone", priority=100)
+    check("D16b a matching package rule marked adjustable lets a company rule with its determinants decide (export_zone for ship-to ZZ instead of the "
+          "package's export); no check result (tax_treatment_rule_never_applies gives null)", derive("ZZ")[1] == "export_zone" and never(C_ZZ) is None,
+          (derive("ZZ"), never(C_ZZ)))
+    # R7-S1: a company row replaces an adjustable package winner only when it is at least as specific on the same key. The purchase
+    # direction has no package rule yet, so a company catch-all is accepted there (in the sale direction R_EXP, not adjustable, refuses it).
     I["tt_imp"] = new()
     X("insert into tax_treatment (id, company_id, code, name, directions, basis) values (%s,%s,'import_goods','import_goods','{purchase}',%s)", (I["tt_imp"], I["co"], B))
+    R_QQ = rule(direction="purchase", treatment="import_goods", ship_from_country="QQ", adjustable=True)
+    C_ALL = own_rule(c, direction="purchase", treatment="own_partner")             # a company catch-all of the purchase direction
+    dq = lambda frm, kind="goods": X("select * from tax_treatment_derive(%s,'purchase','purchase_invoice',%s,'XX',false,'registered',%s,'2026-11-21')",
+                                     (I["co"], frm, kind)).fetchone()
+    check("D16c R7-S1: a company catch-all does not replace the adjustable package rule ship-from QQ, which is more specific (import_goods, R_QQ); "
+          "where no package rule matches (ship-from XZ) the catch-all applies; no check result for it",
+          dq("QQ")[1:] == ("import_goods", R_QQ) and dq("XZ")[1] == "own_partner" and never(C_ALL) is None, (dq("QQ"), dq("XZ"), never(C_ALL)))
+    C_QQG = own_rule(c, direction="purchase", ship_from="QQ", kind="goods", treatment="domestic")
+    check("D16d R7-S1: a company rule with R_QQ's determinant and one more (ship-from QQ and goods) replaces it for goods; a service from QQ keeps "
+          "the package's import_goods", dq("QQ")[1] == "domestic" and dq("QQ", "service")[1:] == ("import_goods", R_QQ) and never(C_QQG) is None,
+          (dq("QQ"), dq("QQ", "service")))
+    # R6-S1: a package rule loaded after the company rule; the purchase direction has no other package rule for ship-from YY
     own_rule(c, direction="purchase", ship_from="YY", treatment="domestic")
     dp = lambda day: X("select * from tax_treatment_derive(%s,'purchase','purchase_invoice','YY','XX',false,'registered','goods',%s)", (I["co"], day)).fetchone()
     first = dp("2026-03-01")
@@ -513,6 +536,59 @@ if "--load" in sys.argv:
                                                                                        cx.execute("select 1/0")), "division by zero")
     trial("H08 an unused rate may be deleted, as the comment on tax_rate says (rolled back afterwards)", lambda cx: (cx.execute(
         "delete from tax_rate where id = %s", (r10b,)), cx.execute("select 1/0")), "division by zero")
+    # Third pass: a future-dated rate that a draft was computed with is held by the draft's tax row (document_line_tax.tax_rate_id),
+    # so it cannot disappear before posting; posting re-reads the rate in force (ADR-0041 rule 6), and none is tax_rate_missing.
+    fd = document("draft")
+    ins(c, "document_line_tax", id=new(), company_id=I["co"], document_id=fd, line_number=1, tax_code_id=I["vat"], tax_rate_id=r10b, rate_percent=10,
+        item_tax_group_id=I["std"], item_tax_group_source="product", base_transaction_amount=100, tax_transaction_amount=10, computed_tax_transaction_amount=10)
+    trial("H08a third pass: a future-dated rate (2027-01-01) that a draft's tax row names is not deleted while the draft holds it", lambda cx: cx.execute(
+        "delete from tax_rate where id = %s", (r10b,)), "document_line_tax_tax_rate_id_fkey")
+
+    # R7-N1: the history guards under an application role without BYPASSRLS, under installation (the scope that writes package rows):
+    # tax_line rows of the companies are invisible to it, yet a back-dated package row is still refused.
+    APP = "nativeflows_lab_t34"
+    if not X("select 1 from pg_roles where rolname = %s", (APP,)).fetchone():
+        X(f"CREATE ROLE {APP} NOLOGIN NOSUPERUSER NOBYPASSRLS")
+    X(f"GRANT USAGE ON SCHEMA nativeflows, types TO {APP}")
+    X(f"GRANT SELECT ON ALL TABLES IN SCHEMA nativeflows TO {APP}")
+    X(f"GRANT INSERT ON tax_rate, tax_matrix, tax_treatment_rule TO {APP}")
+    X(f"""DO $$ DECLARE f regprocedure; BEGIN
+            FOR f IN SELECT p.oid::regprocedure FROM pg_proc p WHERE p.pronamespace = 'nativeflows'::regnamespace AND p.proname IN ('tax_matrix_key_last_use', 'tax_treatment_rule_key_last_use', 'tax_code_last_use', 'tax_code_is_used') LOOP
+                EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO {APP}', f);
+            END LOOP; END $$""")
+
+    def as_app(fn):
+        def run(cx):
+            cx.execute(f"set local role {APP}")
+            cx.execute("select set_config('nativeflows.company_id', 'installation', true)")
+            assert cx.execute("select count(*) from tax_line").fetchone()[0] == 0, "the role sees tax lines"
+            return fn(cx)
+        return run
+    check("H09 R7-N1: the role has no BYPASSRLS and, under installation, sees no tax line of the company", X(
+        "select rolbypassrls, rolsuper from pg_roles where rolname = %s", (APP,)).fetchone() == (False, False))
+    trial("H09a R7-N1: as that role, a package rate back-dated before the latest posted use of its code is refused", as_app(pkg_rate("2024-01-01")), "latest tax date")
+    trial("H09b R7-N1: ... and a package matrix row back-dated before the latest posted use of its key", as_app(lambda cx: cx.execute(
+        """insert into tax_matrix (id, localization_package, direction, tax_treatment_code, item_tax_group_code, effective_from, tax_code_ids, basis)
+           values (%s,'l10n_xx','sale','domestic','standard','2026-11-01',%s,%s)""", (new(), [I["vat0"]], PKG))), "latest posted use")
+    trial("H09c R7-N1: ... and a package rule with R_DOM's determinants back-dated before its latest posted use",
+          as_app(lambda cx: rule(treatment="export", priority=10, day="2026-11-01", ship_to_country="XX", cx=cx)), "latest posted use")
+    trial("H09d R7-N1: as that role, a package rate dated after the latest posted use is accepted (rolled back afterwards)",
+          as_app(lambda cx: (pkg_rate("2026-11-12")(cx), cx.execute("select 1/0"))), "division by zero")
+    exe = X("""select p.proname, p.prosecdef, has_function_privilege('public', p.oid, 'EXECUTE'),
+                      'search_path=nativeflows, pg_temp' = any (coalesce(p.proconfig, '{}')) from pg_proc p
+               where p.pronamespace = 'nativeflows'::regnamespace and p.proname in ('tax_matrix_key_last_use', 'tax_treatment_rule_key_last_use', 'tax_code_last_use', 'tax_code_is_used')
+               order by 1""").fetchall()
+    check("H09e R7-N1: the functions computing the latest posted use run with definer rights, pin search_path and are not executable by PUBLIC",
+          len(exe) == 4 and all(sd and not pub and pinned for _, sd, pub, pinned in exe), exe)
+    X(f"GRANT UPDATE ON tax_code TO {APP}")
+    trial("H09f R7-N1: as that role, a package code that a posted line uses never changes its calculation", as_app(lambda cx: cx.execute(
+        "update tax_code set calculation = 'none' where id = %s", (I["vat"],))), "tax_code_used")
+    ix = X("""select pg_get_indexdef(i.indexrelid) from pg_index i join pg_class c on c.oid = i.indexrelid
+              where i.indrelid = 'nativeflows.tax_line'::regclass and c.relname = 'ix_tax_line_direction_tax_code_id_tax_date'""").fetchone()
+    check("H10 R7-N3: tax_line has an index on (direction, tax_code_id, tax_date) for the latest posted use of a matrix key or a code",
+          ix is not None and ix[0].endswith("(direction, tax_code_id, tax_date)"), ix)
+    X(f"DROP OWNED BY {APP}")
+    X(f"DROP ROLE {APP}")
     c.close()
 
 passed = sum(1 for ok_, *_ in RESULTS if ok_)

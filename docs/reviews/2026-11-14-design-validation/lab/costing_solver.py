@@ -660,17 +660,23 @@ def check_issue_returns():
 
 def random_scenario(rng, n_periods=4, areas=("A", "B")):
     """A random multi-period, two-area scenario: receipts (some value-only), issues, partial and cross-area returns of
-    issues, and reversals of issues that have no return, never a negative closing quantity."""
+    issues, reversals of issues that have no return, transfers between the two areas (one direction per period, so no
+    cycle within a period), reversals of transfers and of receipts, in the same period or a later one (S2 adversarial
+    review, third pass: N5 in the random comparison), never a negative closing quantity."""
     op = {a_: (F(rng.randint(0, 20)), F(rng.randint(0, 400))) for a_ in areas}
     op = {a_: (q, v if q else F(0)) for a_, (q, v) in op.items()}
     lines, ps, qty, n = [], [], {a_: op[a_][0] for a_ in areas}, 0
     left, reversed_, has_ret = {}, set(), set()
+    receipts, transfers = [], []                     # reversible receipts and transfers not yet reversed
     for k in range(n_periods):
-        P = {a_: dict(receipts=[], issues=[], returns=[], reversals=[]) for a_ in areas}
+        P = {a_: dict(receipts=[], issues=[], returns=[], reversals=[], transfers=[], transfer_reversals=[], receipt_reversals=[])
+             for a_ in areas}
         for a_ in areas:
             for _ in range(rng.randint(0, 2)):
                 q = rng.randint(0, 15); v = rng.randint(0, 40 * max(q, 1))
                 P[a_]["receipts"].append((q, v)); qty[a_] += q
+                if q > 0:
+                    n += 1; receipts.append(dict(id=f"G{n}", period=k, area=a_, q=F(q), v=F(v)))
             avail = qty[a_]
             for _ in range(rng.randint(0, 3)):
                 if avail <= 0:
@@ -678,6 +684,23 @@ def random_scenario(rng, n_periods=4, areas=("A", "B")):
                 q = rng.randint(1, int(avail)); avail -= q; qty[a_] -= q; n += 1
                 ln = dict(id=f"I{n}", period=k, area=a_, q=F(q), kind="issue"); P[a_]["issues"].append(ln)
                 lines.append(ln); left[ln["id"]] = F(q)
+        src, dst = rng.sample(list(areas), 2)            # this period's transfer direction
+        for _ in range(rng.randint(0, 2)):
+            if qty[src] <= 0:
+                break
+            q = F(rng.randint(1, int(qty[src]))); qty[src] -= q; qty[dst] += q; n += 1
+            tr = dict(id=f"T{n}", period=k, area=src, q=q, to=dst, kind="transfer")
+            P[src]["transfers"].append(tr); transfers.append(tr)
+        if transfers and rng.random() < 0.3:             # a whole transfer goes back, from its destination into its source
+            tr = rng.choice(transfers)
+            if qty[tr["to"]] >= tr["q"]:
+                transfers.remove(tr); qty[tr["to"]] -= tr["q"]; qty[tr["area"]] += tr["q"]; n += 1
+                P[tr["area"]]["transfer_reversals"].append(dict(id=f"TV{n}", q=tr["q"], kind="transfer_reversal", orig=tr))
+        if receipts and rng.random() < 0.3:              # a whole receipt is reversed at its document value
+            rc = rng.choice(receipts)
+            if qty[rc["area"]] >= rc["q"]:
+                receipts.remove(rc); qty[rc["area"]] -= rc["q"]; n += 1
+                P[rc["area"]]["receipt_reversals"].append(dict(id=f"GV{n}", q=rc["q"], v=rc["v"], kind="receipt_reversal", orig=rc))
         for _ in range(rng.randint(0, 3)):
             cand = [l for l in lines if left[l["id"]] > 0 and l["id"] not in reversed_]
             if not cand:
@@ -794,8 +817,15 @@ def check_adversarial_cases():
     # Random scenarios: cost_period = independent_values; the bound never moves issues to the preliminary price
     import random
     rng = random.Random(20261121); before = cost_period.prelim_switches; bad = []; zero_areas = 0
+    kinds = defaultdict(int)                       # line kinds generated, reversals split by same or later period
     for i in range(600):
         ps_, op_ = random_scenario(rng)
+        for k_, P_ in enumerate(ps_):
+            for X_ in P_.values():
+                kinds["transfers"] += len(X_["transfers"])
+                for key in ("transfer_reversals", "receipt_reversals"):
+                    for l_ in X_[key]:
+                        kinds[key + (" same" if l_["orig"]["period"] == k_ else " later")] += 1
         try:
             fa, ha = naive_periods(ps_, op_); fb_, hb = independent_values(ps_, op_)
         except ValueError as e:
@@ -803,11 +833,12 @@ def check_adversarial_cases():
         if fa != fb_ or ha != hb:
             bad.append(i)
         zero_areas += sum(1 for h in ha for a_ in h if h[a_][1][0] == 0)
-    R.append((not bad and cost_period.prelim_switches == before and zero_areas > 100,
-              "random: on 600 random four-period, two-area scenarios with value-only receipts, partial and cross-area returns and "
-              "reversals, cost_period and independent_values agree on every line value, price, closing and residual; in "
+    R.append((not bad and cost_period.prelim_switches == before and zero_areas > 100 and len(kinds) == 5 and min(kinds.values()) >= 50,
+              "random: on 600 random four-period, two-area scenarios with value-only receipts, partial and cross-area returns, "
+              "reversals of issues, transfers, and reversals of transfers and of receipts in the same and a later period (third pass), "
+              "cost_period and independent_values agree on every line value, price, closing and residual; in "
               f"{zero_areas} area-periods closing at quantity 0 the remainder never exceeds the rounding bound without a fixed-value "
-              "line, so the bound never moves issues to the preliminary price", bad[:3] or zero_areas))
+              "line, so the bound never moves issues to the preliminary price", bad[:3] or (zero_areas, dict(kinds))))
     return R
 
 
