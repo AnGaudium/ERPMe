@@ -163,6 +163,8 @@ The retention periods and the strictness of scanning are flagged for the author.
     Note (Design hardening, 2026-11-16): "their bytes are deleted at once" now reads: a rejected attachment stops being served at once, and the transaction that records the rejection sets its `bytes_released_at`; its bytes are physically removed only by the orphan sweep of rule 15's note, after the grace period. Bytes that are not `clean` are never served in the meantime.
 
     Note ([ADR-0076](0076-internal-messaging-and-notifications.md), 2026-11-21): an attachment linked to a message (`target_table` `message`) is served only to those who may read the message's conversation now; withdrawing a message, and message retention, end its links (ADR-0076 rules 4, 10).
+
+    Note (S2 open questions, 2026-11-21): `production` installations require `attachment_scan_mode` = `required`, checked at startup; the requirement is no longer flagged or open.
 15. Retention:
     - **Accounting attachments.** `Post` sets `attachment.is_accounting_evidence` on every linked attachment; it is never unset. Bytes of such an attachment are kept `attachment_retention_years` after its last link ends. This is a regime setting, seeded `unverified` at 10 years for accounting vouchers. Under ADR-0016 rule 12 an unverified setting fails closed, so such bytes are not purged until the author verifies it. TT99 seed: package `settings.yaml` ([ADR-0039](0039-vietnam-package-tt99.md) rule 9).
     - **Erasure.** Erasure removes a subject's links except links to posted accounting documents, which stay as voucher evidence; ADR-0027 rule 2 gets a note.

@@ -58,6 +58,7 @@ Applies to every step below:
 3. Lead-time offsetting and planned production orders.
 4. The capacity check and conversion of planned orders.
 5. Step 5b simulator adapter: planning events of the manufacturing company to commands.
+6. Subcontracting ([ADR-0037](../adr/0037-subcontracting.md), DS-55), which needs the production core (step 4b) and purchase orders (step 5): built in this step, after both gates.
 
 **How agents are used:** builders implement; the reviewer checks that planning writes only planned orders, pegging and exceptions, and that it changes no document except through conversion. The recomputation writer completes the naive planning recomputation straight from raw demand, supply and bills of materials, without reading planning code, as for costing at step 3.
 

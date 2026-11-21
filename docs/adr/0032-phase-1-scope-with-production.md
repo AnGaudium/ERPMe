@@ -85,6 +85,8 @@ On 2026-11-14 the author decided that every capability a customer cannot operate
 
    Note (author's delegation, 2026-11-21; decided by the chief architect): the planning slice with multi-level MRP is the build step 5b ([runbook](../runbook/steps-5-9.md), [spec 11](../spec/11-build-order.md)), after the gates of steps 5 and 4b. The planning agent starts after the step 5b gate ([ADR-0078](0078-agent-simplification-for-phase-1.md) rule 1); this replaces "the runbook does not place that work yet" in the note above.
 
+   Note (S2 open questions, 2026-11-21): the open points of this rule's note are answered: standard cost does not become a valuation method (rule 3 keeps periodic actual cost); subcontracting ([ADR-0037](0037-subcontracting.md), DS-55) is built in step 5b, after the gates of steps 4b and 5; the phase labels and the production-in-Phase-1 statement of spec 01, 05, 08, the README and the risks file now follow this rule's draft wording (spec 00 rule 2 needed no change).
+
 8. **Questions this decision answers:**
    - planning's phase (DS-43): Phase 1;
    - the proposed cuts of warehouse and first-slice planning features (OPT-12): no cut. Confirming the items left for later stays open;

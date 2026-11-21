@@ -149,7 +149,7 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Item group | item\_group | Company grouping of items for revenue, cost of goods sold and consumption accounts |
 | Partner group | partner\_group | Company grouping of partners that gives new partners their default reconciliation accounts |
 | Valuation class | valuation\_class | Attribute of a stock item; company data seeded from the regime template; drives inventory account determination |
-| Valuation area | valuation\_area\_level, valuation\_warehouse\_id | The company, or a physical warehouse with its attached transit and goods-sent warehouses, per the company's costing policy (`valuation_area_level`), not changeable by command once stock is posted; a line records it as `valuation_warehouse_id` (null at company level) |
+| Valuation area | valuation\_area\_level, valuation\_site\_id, valuation\_warehouse\_id | The company, a site, or a physical warehouse, each with its attached transit and goods-sent warehouses, per the company's costing policy (`valuation_area_level`: `company`, `site` or `warehouse`), not changeable by command once stock is posted; a line records it as `valuation_site_id` or `valuation_warehouse_id`, both null at company level ([ADR-0068](../adr/0068-sites-and-core-logistics-payment-master-data.md) rules 7, 8) |
 | Site | site, site\_id | A physical and operational unit between company and warehouse (SAP plant, Dynamics 365 site): a factory, distribution centre, store or office. Every physical warehouse belongs to one, and the site of a production warehouse is the plant. Independent of the branch ([ADR-0068](../adr/0068-sites-and-core-logistics-payment-master-data.md) rules 1–4, 10) |
 | Payment method | payment\_method | How a partner pays or is paid (cash, bank transfer, card, e-wallet, cheque, direct debit, cash on delivery, offset, other): a default on partner profiles and a header field of commercial documents and payments; it suggests and never posts ([ADR-0068](../adr/0068-sites-and-core-logistics-payment-master-data.md) rules 15, 17) |
 | Payment method money account | payment\_method\_money\_account | The default money account of a payment method per branch and currency, owned by `cash` so the commercial master data stays free of it ([ADR-0068](../adr/0068-sites-and-core-logistics-payment-master-data.md) rule 16) |
@@ -267,7 +267,7 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Shared user | — | A user account with current or future role assignments in more than one company; only an operator changes its e-mail or credentials |
 | User invitation | user\_invitation | A company's request to link an existing login, pending until that user confirms it or it expires (30 days by default); a new login's invitation is confirmed at creation |
 | Permission hold | role\_permission\_hold | A permission an upgrade would have added to a role but held back because it would break segregation mode block or the small-company bound; a person confirms or ignores it |
-| Delegation | delegation | A dated lending of a user's approval authority or role assignments to another user, never to an agent |
+| Delegation | delegation | A dated lending of a user's approval authority to another user, never to an agent |
 | Segregation rule | segregation\_rule (catalog), company\_segregation\_rule | A pair of conflicting permission sets, checked on every change of rights and on related documents |
 | Small-company mode | permissions.small\_company\_mode, segregation\_exception | Company mode for at most two posting or approving users: segregation refusals become recorded exceptions, reviewed by the owner each period (flagged) |
 | Policy, approval | policy, approval | An approval row binds to a document version and its `version_hash`; a new version voids it ([ADR-0009](../adr/0009-document-lifecycle.md) rule 11) |
@@ -680,12 +680,12 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Reject | Reject a document version | Rejected |
 | Post | Make a document part of the books or the stock records | Posted |
 | Reverse | Post a reversal document for a posted document | Reversed |
-| Cancel | End an open document that is not posted, or an open warehouse task, reservation, work item, delegation or invitation | Canceled |
+| Cancel | End an open document that is not posted, or an open warehouse task, reservation, work item, delegation or invitation; or an unconfirmed WO time log (`CancelOperationTimeLog`) | Canceled |
 | Clear | Remove a flag deliberately with a reason, e.g. a document version's taint (`ClearTaint`) or a sign-in lockout (`ClearUserAccountLockout`) | Cleared |
 | Resume | Continue a stopped job from where it stopped, e.g. an import batch (`ResumeImport`) | Resumed |
 | Abandon | Stop a job for good; what it already posted stays until reversed, e.g. an import batch | Abandoned |
 | Issue | Request legal issuance of a document; it posts when the issue is accepted (e.g. `IssueSalesInvoice`) | IssueRequested |
-| Record | Store an outcome reported by an outside system or by a worker that ran outside the transaction, e.g. an e-invoice outcome or a rendered file ([ADR-0049](../adr/0049-statutory-reporting-and-printing.md) rule 20) | Recorded |
+| Record | Store an outcome reported by an outside system or by a worker that ran outside the transaction, e.g. an e-invoice outcome or a rendered file ([ADR-0049](../adr/0049-statutory-reporting-and-printing.md) rule 20); or a measured inspection result (`RecordInspectionResult`, [ADR-0070](../adr/0070-quality-management-core.md) rule 10) | Recorded |
 | Recall | Take back a request sent to an outside system before it took effect | Recalled |
 | Complete | Finish a held step by a human, e.g. a posting after acceptance; or end the logistics of a production order (technical completion); or finish a migration; or finish an agent run with its outcome (`CompleteAgentRun`) | Completed |
 | Reopen | Return a document to draft after an outside step failed; or return a technically complete production order to in progress; or return a closed complaint to open | Reopened |
@@ -709,7 +709,7 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Match | Link bank lines or documents, or an interaction and its partner; open items are settled against each other by an `open_item_matching` document | Matched |
 | Unmatch | Undo a match: unlink bank lines or documents, or an interaction and its partner | Unmatched |
 | Ignore | Set an imported line aside with a reason, so that no rule or person matches it ([ADR-0048](../adr/0048-cash-bank-receivables-payables.md) rule 8); or keep withheld a permission an upgrade held back (`IgnoreRolePermissionHold`) | Ignored |
-| Transfer | Move records to another account or owner, e.g. a partner's open items | Transferred |
+| Transfer | Move records to another account or owner, e.g. a partner's open items; or move a WO to another work center of its resource group (`TransferOperation`) | Transferred |
 | Allocate | Distribute an amount or quantity over targets | Allocated |
 | Import | Read an external file into the system | Imported |
 | Set | Replace a record's whole list of values in one command, e.g. a price list's entries (`SetPriceListEntries`) | Set |
@@ -719,8 +719,8 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Bind | Replace a draft's reference to a proposal item by the item its execution created (`BindProposedItems`) | Bound |
 | End | End or narrow a dated permission or setting (`EndDataProcessingPermission`) | Ended |
 | Run | Start a deterministic system job, e.g. period-end actual costing | Completed (`<job noun>Completed`) |
-| Assign | Set the owner of a work item or a warehouse task; or attach output serials to a production order | Assigned |
-| Start | A person begins work on an assigned warehouse task; or start a migration's loading or reconciliation; or start an agent run (`StartAgentRun`) | Started |
+| Assign | Set the owner of a work item or a warehouse task; or attach output serials to a production order; or set the people and teams of a WO (`AssignOperation`) | Assigned |
+| Start | A person begins work on an assigned warehouse task; or start a migration's loading or reconciliation; or start an agent run (`StartAgentRun`); or begin or resume work on a WO (`StartOperation`) | Started |
 | Pause | Stop work on a WO for now, closing its open clock records (`PauseOperation`) | Paused |
 | Block | Declare that a WO cannot go on, with a stop reason (`BlockOperation`) | Blocked |
 | Close | End further activity on an approved record that has had some, e.g. an order, or a change proposal once executed; or end a processing basis when consent is withdrawn or its purpose ends | Closed |
@@ -728,7 +728,7 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Open | Let a restricted posting period accept postings from everyone with permission again (soft-locked to open) | Opened |
 | Lock | Stop all postings in a posting period (soft-locked to locked) | Locked |
 | Unlock | Take a locked posting period back to soft-locked, with approval | Unlocked |
-| Confirm | A human confirms a fact the system cannot check, e.g. a manual close task or that they are the person a company invited (`ConfirmUserInvitation`), or accepts a result the system produced, e.g. auto-posts (`ConfirmAutoPost`) or a permission an upgrade held back (`ConfirmRolePermissionHold`) | Confirmed |
+| Confirm | A human confirms a fact the system cannot check, e.g. a manual close task or that they are the person a company invited (`ConfirmUserInvitation`), or accepts a result the system produced, e.g. auto-posts (`ConfirmAutoPost`) or a permission an upgrade held back (`ConfirmRolePermissionHold`); or accepts an agent's draft time log (`ConfirmOperationTimeLog`) | Confirmed |
 | Skip | Leave out an optional step with a reason, e.g. an optional close task | Skipped |
 | Retry | Try a held step again, e.g. a held event delivery | Retried |
 | Replay | Deliver retained events again to a consumer that has not handled them | Replayed |

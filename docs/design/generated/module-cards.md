@@ -118,12 +118,12 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Owned tables (17):** `demand_event`, `demand_event_window`, `forecast_adjustment`, `forecast_line`, `forecast_run`, `item_warehouse_planning`, `planned_order`, `planned_order_component`, `planned_order_operation`, `planned_order_pegging`, `planning_action_message`, `planning_exception`, `sales_history`, `supplier_item`, `supplier_item_lead_time`, `supplier_purchasing_term`, `transfer_route`
 - **Events produced (2):** `PlannedOrderConverted`, `PlannedOrderFirmed`
 - **Commands and queries named in ADRs (11):** `CancelForecastAdjustment`, `CancelPlannedOrder`, `ConvertPlannedOrder`, `CreateForecastAdjustment`, `CreateSupplierItem`, `CreateTransferRoute`, `FirmPlannedOrder`, `ImportSalesHistory`, `ListPlannedOrder`, `UpdatePlannedOrder`, `UpdateSupplierItem`
-- **Settings (3):** `planning.production_reschedule_in_tolerance_days`, `planning.production_reschedule_out_tolerance_days`, `planning.production_rescheduling_horizon_days`
+- **Settings (5):** `planning.cancel_horizon_days`, `planning.container_underfilled_pct`, `planning.production_reschedule_in_tolerance_days`, `planning.production_reschedule_out_tolerance_days`, `planning.production_rescheduling_horizon_days`
 - **Work item kinds (3):** `capacity_overload`, `planning_exception`, `production_order_exception`
 - **Authorization areas (4):** `forecast`, `planned_order`, `planning_run`, `supplier_item`
 - **Tables in DS-43-54-planning-production.sql with no stated owner:** `planning_run` (section names planning, production), `planning_setting` (section names planning, production), `planning_state` (section names planning, production), `production_structure` (section names planning, production) ([data-map findings](data-map.md#findings-tables-without-an-owner-and-lab-stubs))
 - **ADRs (declared):** [ADR-0024](../../adr/0024-planning.md), [ADR-0031](../../adr/0031-design-simplifications.md), [ADR-0036](../../adr/0036-multi-level-mrp.md), [ADR-0037](../../adr/0037-subcontracting.md)
-- **ADRs that name this module most (mentions; not complete):** [ADR-0024](../../adr/0024-planning.md), [ADR-0036](../../adr/0036-multi-level-mrp.md), [ADR-0037](../../adr/0037-subcontracting.md), [ADR-0051](../../adr/0051-agent-workflows.md), [ADR-0056](../../adr/0056-multiple-units-of-measure.md), [ADR-0064](../../adr/0064-production-agent.md), [ADR-0078](../../adr/0078-agent-simplification-for-phase-1.md)
+- **ADRs that name this module most (mentions; not complete):** [ADR-0024](../../adr/0024-planning.md), [ADR-0036](../../adr/0036-multi-level-mrp.md), [ADR-0037](../../adr/0037-subcontracting.md), [ADR-0050](../../adr/0050-agent-runtime-and-query-layer.md), [ADR-0051](../../adr/0051-agent-workflows.md), [ADR-0056](../../adr/0056-multiple-units-of-measure.md), [ADR-0064](../../adr/0064-production-agent.md), [ADR-0078](../../adr/0078-agent-simplification-for-phase-1.md)
 
 ## `purchasing` (layer 4)
 
@@ -271,7 +271,7 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Work item kinds (2):** `attachment_rejected`, `document_extraction_review`
 - **Authorization areas (0):** none
 - **ADRs (declared):** [ADR-0027](../../adr/0027-cross-cutting-ownership.md), [ADR-0038](../../adr/0038-audit-and-observability.md), [ADR-0049](../../adr/0049-statutory-reporting-and-printing.md), [ADR-0057](../../adr/0057-document-intake-and-extraction.md)
-- **ADRs that name this module most (mentions; not complete):** [ADR-0050](../../adr/0050-agent-runtime-and-query-layer.md), [ADR-0057](../../adr/0057-document-intake-and-extraction.md), [ADR-0078](../../adr/0078-agent-simplification-for-phase-1.md)
+- **ADRs that name this module most (mentions; not complete):** [ADR-0057](../../adr/0057-document-intake-and-extraction.md), [ADR-0078](../../adr/0078-agent-simplification-for-phase-1.md)
 
 ## `audit` (layer 2)
 

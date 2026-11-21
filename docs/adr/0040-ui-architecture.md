@@ -248,6 +248,8 @@ Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), 2026-11-
 
     Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), 2026-11-21): the data grid is the in-repo TanStack Table grid, not AG Grid (ADR-0077 rules 5, 20).
 
+    Note (S2 open questions, 2026-11-21): the targets are accepted, no longer open: WCAG 2.2 AA on desktop screens, the stated browsers, Chrome on Android 10 or later for the warehouse PWA, and touch targets of at least 24 by 24 CSS pixels on the PWA's key controls.
+
 **Structure, tests and scope**
 
 18. `frontend/src/` holds:

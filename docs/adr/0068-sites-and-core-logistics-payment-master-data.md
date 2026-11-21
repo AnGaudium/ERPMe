@@ -95,6 +95,8 @@ The CRM-only deployment profile holds: the four `master_data` tables reference n
 
     Note ([ADR-0071](0071-work-orders-and-shop-floor-execution.md), 2026-11-21): besides the change order that moves the planned work center (which, before start, also resets the execution work center), a WO not yet started moves inside its group by `TransferOperation` without a new version; "the work center on the operation when it is confirmed" is `operation_confirmation.work_center_id`, the execution work center (ADR-0071 rule 16).
 
+    Note (S2 open questions, 2026-11-21): both routes for moving an operation inside a resource group stand: a change order on a released order (ADR-0034 rule 8), and `TransferOperation` for a WO not yet started, with no new version (ADR-0071 rule 16). Either way cost follows `operation_confirmation.work_center_id`.
+
 **Payment methods**
 
 15. `payment_method` (company data, `master_data`, effect class `master_data_change`, change-tracked): `code`, `name`, `kind`, `is_active` and `recorded_at`.

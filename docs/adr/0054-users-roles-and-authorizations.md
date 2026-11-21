@@ -65,6 +65,8 @@ ADR-0017 fixed the envelope: permissions are the names of registered commands, q
    - **No escalation inside a company.** For the name or e-mail change and `CreateCredentialReset`, a company caller must hold every permission the target user holds in the company (assignments and delegations in force), with a company-wide assignment; otherwise `grant_exceeds_own_rights`. So an IT administrator cannot reset an owner's password and sign in as the owner. `ClearUserAccountLockout` is exempt, because it grants no access: the person still needs their password and TOTP.
    - **Never deleted.** No `Delete` command exists, so history keeps every reference. Erasing a former user's personal data (`EraseDataSubject`, ADR-0019 rule 10) replaces name, login and e-mail with a token and sets `erased_at`; the ID stays.
    - **INV-227** checks the shared-user and escalation conditions from the audit records.
+
+   Note (S2 open questions, 2026-11-21): user invitations (this rule) and credential resets (rule 4) are sent through the one system e-mail transport of ADR-0076 rule 7: one SMTP submission account in the deployment configuration.
 4. Authentication (ADR-0017 rule 2, unchanged where not stated):
    - **Credentials:** `password_hash` (argon2), `totp_secret` (encrypted at rest, DS-18), `is_totp_enabled`, and `oidc_issuer` with `oidc_subject`, unique together.
    - **Lockout:** `failed_sign_in_count` and `locked_until`. After the installation's limit (default 10 failures), sign-in is refused with `user_account_locked` until `locked_until` (default 15 minutes later). `ClearUserAccountLockout` ends a lockout early (rule 3's conditions). A successful sign-in resets the count.

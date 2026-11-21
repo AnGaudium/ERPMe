@@ -13,6 +13,8 @@ A partner is one record per company for every party the company deals with — c
 1. A `partner` belongs to one company and has `code` (unique in the company), `name`, `legal_name`, `partner_kind` (`organization`, `household_business`, `individual`), `tax_id` (normalized, optional), `parent_partner_id` (for a dependent unit, e.g. a supplier's branch), `represents_company_id` (set when the partner is another company of the same installation, for intercompany open items, ADR-0010 rule 14), `country`, `partner_group_id` (ADR-0015 defaults), `partner_tax_group_id` (ADR-0018 rule 16), `preferred_language`, `is_active`. A partner referred to by a document is never deleted; it is deactivated. Note: `household_business` is renamed `sole_proprietorship` (an unincorporated business not registered as an enterprise, whose identifiers are its owner's; `l10n_vn` maps the private enterprise to `organization`), here and wherever this ADR says household business (rules 4, 9, 11, 18); `l10n_vn`'s terminology names it "Hộ kinh doanh" ([ADR-0053](0053-core-neutrality.md) rule 7).
 
     Note (author's delegation, 2026-11-21; decided by the chief architect): a partner belongs to one company in Phase 1, and so do items and products. The seam for a group is distribution, not shared rows: a group key per record through `external_id_map` with the reserved source system `group` ([ADR-0074](0074-core-data-structure-additions.md) rule 7), and a later command that copies a master and keeps it in step across the companies of one installation.
+
+   Note (S2 open questions, 2026-11-21): the DDL value is the authority: `ck_partner_kind` in DS-20 allows `organization`, `sole_proprietorship` and `individual`, as ADR-0053 rule 7 renames `household_business`. The list above reads accordingly.
 2. Roles are rows of `partner_role` (`partner_id`, `role`, `is_active`), with `role` one of `customer`, `supplier`, `employee` in Phase 1 (`lead` and `prospect` after Phase 1, [13](../spec/13-crm.md)). A partner may have no role yet (e.g. a contact's organization). Carriers, customs brokers and banks that invoice the company are suppliers; the tax authority is not a partner (tax payables carry no partner, ADR-0014 rule 10). A role is deactivated, never deleted, once used. Being a customer and a supplier at once is normal and allows netting ([08](../spec/08-l10n-vn.md#minimum-processes-to-operate-for-real)).
 3. Profiles hold the data of one role; the role of the document (sales, purchase, employee advance) selects the profile whose accounts and terms it uses:
 
@@ -45,6 +47,8 @@ Employees are partners so that advances to them are open items per person (141 i
    The gateway evaluates the label per value and row when it renders a prompt, and removes personal values when the routing switch is on ([ADR-0050](0050-agent-runtime-and-query-layer.md) rules 8–9).
 
    Note ([ADR-0079](0079-personal-data-protection.md), 2026-11-21): the labels, categories and conditions of every field come from [personal-data-fields.csv](../catalogs/personal-data-fields.csv); the fields named here are an extract of it, and where they disagree the catalog wins (ADR-0079 rules 1-2).
+
+   Note (S2 open questions, 2026-11-21): the condition for personal labels reads `partner_kind` is `individual` or `sole_proprietorship` (the DDL value, ADR-0053 rule 7); the catalog condition `partner_is_person` already uses these values.
 
 **Contacts, processing basis and data subjects**
 

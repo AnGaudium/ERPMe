@@ -215,6 +215,8 @@ Leads, opportunities, marketing automation, appointments, chat connectors and se
     - **Agents propose tasks.** `CreateInteraction` is `is_proposal_bound` (rule 10), so an agent's task is a change proposal that a person submits and approves; a tainted run may create the proposal, which is a draft (ADR-0050 rule 26). ADR-0013 rule 11 limits consumers of tainted events and does not grant this. A task executed from a tainted proposal is untrusted.
     - **Scope.** These are the minimal follow-ups of Phase 1. Activities with calendars, recurrence and invitations stay after Phase 1 (ADR-0019 rule 21 gets a note). Spec 09 places "activities and appointments" after Phase 1, and tasks with an assignee and a due date resemble activities; tasks stay as the flagged interim (open question).
 
+    Note (S2 open questions, 2026-11-21): the strict reading stays for Phase 1: spec 03 rule 1 permits an untrusted-content run to write interactions, tasks and summaries, but rules 10, 19 and 31 keep them proposal-bound, so a person submits them. Revisit with measured intake volumes.
+
 **Complaints**
 
 20. `complaint`:

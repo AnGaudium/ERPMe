@@ -227,6 +227,8 @@ ZPL and a print agent, GS1 location and asset keys, Digital Link generation, an 
 
 26. **Build placement** (proposed; the runbook and spec 11 are the author's): the registry, the trigger and the commands with master data at step 2; `nativeflows.gs1`, `EvaluateBarcode` and scan-to-confirm in the warehouse core at step 3; desktop capture on receipts and labels with the print worker at step 5; camera, wedge capture, profiles and the check page with the PWA at step 9.
 
+    Note (S2 open questions, 2026-11-21): build-time verifications, not design choices: the GS1 Application Identifier table and its lengths are generated from the GS1 Barcode Syntax Dictionary at build (rule 1); BarcodeDetector's passing of FNC1 and GS is proved on devices at step 9 (rule 22); the Zint licence is checked before the step 5 print worker (rule 21). `barcode.sscc_reuse_months` stays flagged (rule 7).
+
 **Invariants, catalogs and lab**
 
 27. **Invariants and edge cases.**

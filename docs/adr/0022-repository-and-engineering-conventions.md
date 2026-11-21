@@ -279,6 +279,20 @@ Checks:
     - **Imports of lab code:** the lab README says the lab is "never imported by the product".
     - **Writes to change-tracked tables outside the `context` helpers:** the DS-18 guard of [ADR-0038](0038-audit-and-observability.md) rule 3. It is not in the list above, and it is part of the gate's backlog (coding-rules gate note above).
 
+    Note (2026-11-16 additions review, 2026-11-21): the "Database access through `context` only" bullet of the coding-rules gate note now reads: (1) only `db` imports `psycopg`, by a `forbidden` contract on `nativeflows` except `nativeflows.db`; services and `tables.py` may import `sqlalchemy` (ADR-0073 rule 12); (2) `.execute(`, `.executemany(`, `.exec_driver_sql(` and `.scalars(` calls appear only in `db`, migrations and a module's `tables.py`; (3) every public function of `tables.py` takes the connection as its first parameter, typed `db.Connection`, which a service passes from `context.db`. No check follows values through calls.
+
+    Note (2026-11-16 additions review, 2026-11-21): the static lock check scans Python under `nativeflows` outside `nativeflows.db` and forbids the strings `FOR UPDATE`, `FOR NO KEY UPDATE`, `FOR SHARE`, `FOR KEY SHARE`, `LOCK TABLE` and `pg_advisory`, and the call `.with_for_update(`. SQL in migrations (trigger and function bodies) is outside this check; its locks are the ADR-0063 note above and ADR-0027 rule 10's trigger locks, proved by the SQL tests of ADR-0073 rule 11.
+
+    Note (2026-11-16 additions review, 2026-11-21): type suppressions are written `# pyright: ignore[<rule>]  # <reason>`; `# type: ignore` is refused (pyright `enableTypeIgnoreComments = false`), and pyright `reportUnnecessaryTypeIgnoreComment` is an error. The suppression count includes them.
+
+    Note (2026-11-16 additions review, 2026-11-21): the `Any` exemption is the ruff per-file-ignores globs `backend/src/nativeflows/**/adapters/**` and `**/generated/**`.
+
+    Note (2026-11-16 additions review, 2026-11-21): changed files are those differing from `git merge-base HEAD origin/main`, plus untracked files; cross-file rule 13 checks always run whole in `--fast`.
+
+    Note (2026-11-16 additions review, 2026-11-21): `lock_order_violation` and `declaration_violation` are test and development exceptions (subclasses of `AssertionError`), never API error codes; they are not in DS-04's catalog and no declaration lists them.
+
+    Note (2026-11-16 additions review, 2026-11-21): `check` runs `generate --check` as its last step; the rule 14 row of `generate` stays for local use.
+
 **One command for agents and CI**
 
 14. `nativeflows-dev` subcommands. Each prints a JSON summary as its last line with `--json`; at `build_step` 0 a subcommand whose inputs do not exist yet reports `skipped` with the reason:

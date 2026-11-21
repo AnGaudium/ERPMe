@@ -2,7 +2,7 @@
 
 | Risk | Mitigation |
 | --- | --- |
-| The ERP pull toward doing everything | The not-doing list is written down. Every new feature must name the trading or assembly workflow that needs it |
+| The ERP pull toward doing everything | The not-doing list is written down. Every new feature must name the trading or manufacturing workflow that needs it |
 | Accounting core correctness: double entry, tax, FX, rounding | Invariant tests and the synthetic dataset from the first commits |
 | Non-deterministic AI in financial operations | Deterministic core, agents only propose, the policy engine decides, every change is traced |
 | Vietnamese compliance: e-invoice law, TT99 templates | Track regulatory changes; templates are configurable data |
