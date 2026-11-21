@@ -11,8 +11,9 @@ difference is a defect of the compiled spec.
    "Note (…)" and no history. The history stays in the ADR.
 2. **Nothing new.** Every statement comes from a source rule or note, and cites it in the trace table. Where notes contradict
    each other or their rule, do not pick silently: apply the later accepted source (by date, then by ADR number), and list the
-   case under `## Conflicts` as `CONFLICT <rule id>: <how resolved>`. If the order does not decide it, the entry says
-   `OPEN` and goes to `docs/open-questions.md`.
+   case under `## Conflicts` as `CONFLICT <unit id>: <how resolved, naming the governing ADR unit ID or R-number>`. If the
+   order does not decide it, the entry says `OPEN <unit id>: …`, quotes its entry in `docs/open-questions.md` (20 characters
+   or more of an unchecked entry), and the spec does not choose.
 3. **Proposed is not law.** A rule of a proposed ADR goes only under `## Proposed (not law)`, or carries `[proposed]`.
 4. **Generated numbers.** Never type a count of tables, rules, catalog rows or settings (the lint recomputes these four; do not count anything else in words, list it). Write
    `<!-- count:tables -->N<!-- /count -->`; the lint recomputes it. Identifiers, thresholds and defaults taken from a rule
@@ -39,16 +40,17 @@ Build step(s): <n, …>    Generated from index: <git commit of docs/design/gene
 | 1 | `## Purpose` | Two to five sentences: what the module owns, what it does not, its layer (ADR-0022 rule 2). | 2% |
 | 2 | `## Entities and tables` | One row per owned table: name, one-line meaning, key, parent, owner module. Columns are in the DDL file, which the spec names (`docs/design/<file>.sql`); do not copy DDL. Other modules' tables it reads are listed apart, as "Reads". | 10% |
 | 3 | `## Commands and queries` | One row per command or query: name, actor/authorization (area and verb level), input in one line, effect, emitted events, error codes. Registered names only. | 15% |
-| 4 | `## Rules` | Numbered `R1…Rn` (the module's own numbering, stable inside the file). Each rule: statement, then `Source: ADR-nnnn.Rk[, ….Nj]`. Notes are folded in. Group by topic with `###` headings. | 45% |
+| 4 | `## Rules` | Numbered `R1…Rn` (the module's own numbering, stable inside the file). Each rule: statement, then `Source: ADR-nnnn.Rk[, ….Nj]`. The `Source` IDs of an R-number and the IDs traced to it in section 11 are the same set (a superseding ID of another module may stand in `Source` without a trace row). Notes are folded in. Accepted law stands here, never in section 10. Group by topic with `###` headings. | 45% |
 | 5 | `## Invariants` | Each `INV-nn` that concerns the module, with its check point, in one line, and the rule (R-number) it protects. | 5% |
 | 6 | `## Edge cases` | Each `EC-nn` of the module: the case and the required outcome (`must_succeed` or `must_reject:<code>`). | 5% |
 | 7 | `## Settings` | Each setting key of the module: value type, scopes, core default (or "unset"), and the rule that uses it. | 5% |
 | 8 | `## UI annotations` | The annotations of ADR-0077 the module's declarations carry: floorplan per route, titles, facets, field annotations, work item kinds, tiles. Headless modules write `None (headless step)`. | 5% |
-| 9 | `## Conflicts` | Every `CONFLICT <rule id>: <resolution>` (rule of compiling 2), also those found by the extractor's conflict flag that proved harmless: `FALSE-POSITIVE <note id>`. | 3% |
+| 9 | `## Conflicts` | One entry per line and nothing else: `CONFLICT <unit id>: <resolution>` (rule of compiling 2; required for every superseding note and superseded rule), `OPEN <unit id>: …`, and, only for a note the extractor's conflict flag marked and that proved harmless, `FALSE-POSITIVE <note id>: <reason>`. A flagged note needs its own entry. `None` when there is none. | 3% |
 | 10 | `## Proposed (not law)` | Rules of proposed ADRs, or none. | as needed |
-| 11 | `## Trace` | Table `Source | Where`: one row per source rule and note ID of the module in the rule index, `Where` is one or more of the spec's R-numbers, a section name, or `not applicable: <reason>` or `ref: <module> R-<n>` / `ref: ADR-nnnn.Rn` for law that another module's spec states (never empty; any other value is a lint warning) (only for notes and sections, never for a rule; for non-normative text such as review credits or history). No ID may be missing; none may be invented. | 10% |
+| 11 | `## Trace` | Table `Source | Where`: one row per source rule and note ID of the module in the rule index, `Where` is: one or more of the spec's R-numbers; or, when the module is not primary for the unit, `ref: <module> R-<n>` / `ref: ADR-nnnn.Rk` (the primary module's spec states it; the ADR ID is the unit's own or its rule's); or, for a note or a Decision text unit only, `not applicable: <reason>` (non-normative text such as review credits or history; at most 15% of the units); or, for a Decision text unit only, a heading of the spec. Never empty; any other value is a lint finding. No ID may be missing; none may be invented; none of another module. | 10% |
 
-Heading levels: `#` title, `##` sections above, `###` topics inside. Lint chunks by `## ` headings.
+Heading levels: `#` title, `##` sections above, `###` topics inside. Lint chunks by `## ` headings. No section is empty:
+sections 3 and 5 to 8 without content say `None: <reason>`; sections 9 and 10 may say `None`.
 
 ## Size budget
 
@@ -71,7 +73,11 @@ Heading levels: `#` title, `##` sections above, `###` topics inside. Lint chunks
 
 ## Acceptance of a compiled spec (mechanical first)
 
-1. `doc_lint.py <file> --module <m>` prints `LINT PASS`.
-2. A reviewer on a different model spot-checks **20 rules** drawn by seed from the trace table: each statement is
-   what the source rules and notes say, and nothing in the spec lacks a source.
-3. The lint's REVIEW LIST (every `CONFLICT`, `FALSE-POSITIVE` and `OPEN` entry with its reason) has been read by the chief architect; every `CONFLICT` and `OPEN` entry is accepted by them; an `OPEN` entry has an open question.
+1. `doc_lint.py <file> [<chunk 2> ...] --module <m>`, with all chunks of the module together, prints `LINT PASS`.
+   `LINT PARTIAL` (one chunk linted with `--partial`) is not a pass.
+2. A reviewer on a different model spot-checks **20 rules** drawn by seed from the trace table, and every rule the
+   lint prints under `SUPERSEDED RULES`: each statement is what the source rules and notes say (for a superseded rule,
+   the superseding text and not the old one), and nothing in the spec lacks a source.
+3. The lint's REVIEW LIST (every `CONFLICT`, `FALSE-POSITIVE` and `OPEN` entry with its reason, counted per kind, and
+   the stable-key mismatches after it) has been read by the chief architect; every `CONFLICT` and `OPEN` entry is
+   accepted by them; an `OPEN` entry quotes its open question in `docs/open-questions.md`.

@@ -12,7 +12,7 @@ tools/docs/run_all.sh [--out DIR]      # index, units, dossiers, tests; without 
 python tools/docs/extract_rules.py --out OUT/units.jsonl [--markers-out OUT/conflict-markers.jsonl] [--strict]
 python tools/docs/build_index.py [--check]                 # writes docs/design/generated/rule-index.csv
 python tools/docs/build_dossiers.py --out OUT/dossiers     # <module>.md, cross.md, MODULES.csv
-python tools/docs/doc_lint.py SPEC.md [SPEC-2.md ...] --module M [--index-commit SHA] [--json]
+python tools/docs/doc_lint.py SPEC.md [SPEC-2.md ...] --module M [--index-commit SHA] [--partial] [--strict] [--json]
 python -m unittest discover tools/docs/tests
 ```
 
@@ -26,7 +26,7 @@ repository.
 | `extract_rules.py` | `docs/adr/[0-9]*.md`; for markers also `docs/spec`, `docs/design` | units JSON Lines; marker JSON Lines; summary on stdout |
 | `build_index.py` | ADRs, `docs/design/**/*.sql`, `docs/catalogs/*.csv`, ADR-0022 rule 2 through `gen_overview.py` | `docs/design/generated/rule-index.csv` |
 | `build_dossiers.py` | same as the index | `<module>.md` per module of ADR-0022 rule 2 and `process`, `cross.md`, `MODULES.csv` |
-| `doc_lint.py` | the compiled spec, the index, the DDL and catalogs | findings on stdout |
+| `doc_lint.py` | the compiled spec, the index, the ADRs (rule texts, vocabulary), the DDL and catalogs, `docs/open-questions.md`, other modules' compiled specs beside the linted file, git (index commit) | findings on stdout |
 
 `nfdocs.py` holds the shared parsing. The table -> owner mapping and the ADR -> declared modules mapping are
 **imported** from `docs/reviews/2026-11-14-design-validation/lab/gen_overview.py` (`module_map`, `parse_ddl`,
@@ -123,50 +123,116 @@ template can be written from the dossier alone. A superseded rule carries `SUPER
 
 ## Lint checks
 
-The lint is a completeness and trace backstop against cooperative compilers. Whether a statement says what its
-sources say is the template's different-model spot check; the lint closes the known shortcuts and ends its output
-with a REVIEW LIST of every CONFLICT, FALSE-POSITIVE and OPEN entry, which the chief architect reads (template
-acceptance step 3). The full list is the docstring of `doc_lint.py`; in short:
+The lint connects the trace table to the rule bodies and closes the known shortcuts. Whether a statement says what
+its sources say is the template's different-model spot check; the lint prints what that check and the chief
+architect must read. The full list, with every threshold, is the docstring of `doc_lint.py`; in short:
+
+**Output.** Line 1 is `LINT PASS findings=0`, `LINT FAIL findings=N` or `LINT PARTIAL findings=0 deferred=N`. Line 2
+is `measured: module=… files=… units=… rules=… primary_rules=… notes=… sections=… tables=… r_numbers=… trace_rows=…
+traced_units=…`, so a pass that measured nothing is visible. Then the findings (`L<n> <file>:<line>: <message>`),
+warnings, deferred counts, sizes, and per file `retention` (share of source rule identifiers kept) and `size-ratio`
+(statement bytes / source rule bytes). Last: the REVIEW LIST (entries counted per kind), the SUPERSEDED RULES and
+the STABLE-KEY MISMATCHES. Exit 0 on PASS and PARTIAL, 1 on FAIL, 2 on bad input.
+
+**Refused (exit 2).** A missing file or the same file twice; `--module cross` and any module that is primary for no
+rule (their units are compiled in their primary modules); `process` without `--allow-process`.
+
+**Before every check** invisible characters (zero-width, joiners, soft hyphen, bidi marks) are removed, Unicode
+spaces become a space, and HTML comments (count markers kept), ```` ``` ```` and `~~~` fences and indented code
+blocks (4 spaces or a tab after a blank line, outside a list) are blanked. Nothing inside them counts, front matter
+included.
 
 - **L0** front matter (`Module` equal to `--module`, `Chunk`, `Source ADRs`, `Build step(s)`, `Generated from index`,
-  `Compiled by`) and the template's eleven `##` sections, in order, no others; `Purpose` and `Trace` in every chunk,
-  all eleven across the chunks. `Generated from index` must be the last commit of the index file in HEAD.
-- **L1** every module ID is traced. An R-number is defined by `R<n>.` in `## Rules` or `## Proposed (not law)`,
-  outside code fences, HTML comments and `Reads` lines, with a statement of 40 characters or more (its `Source:`
-  not counted) that repeats no other. A rule's `Where` is defined R-numbers, or `ref: <module> R-<n>` /
-  `ref: ADR-nnnn.Rk` when the module is not primary for it (template rule 6); a heading alone is refused. A note's
-  or section's `Where` may also be a heading or `not applicable: <reason>`, for at most 15% of the module's units.
-  Coverage: rule units mapped to R-numbers, at most 4 IDs counted per R-number, are 60% or more of the rule units
-  not traced as `ref:`.
-- **L2** owned tables and **owned** catalog rows backticked in the body. A row is owned when a unit whose primary
-  module is this module references it, unless its catalog has a `module` column naming another module; invariants
-  and edge cases whose `area` is the module are owned too. Other modules' rows may stand under `Reads`.
-- **L3** proposed rules (cited as `ADR-0070.R12`, `ADR-0070 rule 12`, `ADR-0070, rule 12` or `rule 12 of ADR-0070`)
-  only under `## Proposed (not law)` or with `[proposed]`, never accepted ones; a proposed ID's trace R-numbers must
-  be stated that way.
-- **L4** no typed count: digits or number words (`two` and up, `twenty-one`, `a dozen`) before a counted noun (up
-  to three words between, backticks and `&nbsp;` included), after it (`Tables owned: 10`), or in a table row
-  (`| Owned tables | 16 |`). `one` is not a count; citations (`rule 15 note`, `7 of rule`, `INV-12`, a noun
-  followed by a number) and `at most|at least|up to|more than|fewer than|less than` pass; `exactly` and `only` do
-  not. On the ADR rule and note text it fires 98 times (222 before round 2), mostly real counts such as
-  `two nullable columns`; on the pilot `quality` spec once, a real count. Count markers are recomputed.
-- **L5** `## Conflicts`: `CONFLICT <id>: <reason>` and `FALSE-POSITIVE <id>: <reason>` (25 characters or more; one
-  reason, or a near copy at 0.8 similarity, serves at most 3 entries), `OPEN <id>: ...` with an `OQ-nnn` or an
-  open-questions anchor, every ID in the index. Required: every CONFLICT-marked unit (CONFLICT or OPEN); every
-  conflict-flagged note (any entry); every note whose relation is `supersedes` or `superseded-by` as CONFLICT naming
-  the governing text (an ADR unit ID or an R-number) or OPEN, never FALSE-POSITIVE, unless its Where is `ref:`.
-- **L6** hard limit 16,000 tokens per file; **L7** trace and `ref:` IDs exist.
+  `Compiled by`).
+  - Index: `Generated from index` (7 or more hex digits) is the last commit of the index file, or `--index-commit`,
+    which must be a commit; the index file must equal its version in that commit. An index that differs and a commit
+    that cannot be read are findings.
+  - Chunks: one file is `whole` or `1 of 1`; several files are `k of n` with one n, each k once, 1..n all given. A
+    lone chunk of n > 1 is a finding and prints a NOTICE; with `--partial` the module-level checks that need the
+    other chunks (missing IDs, missing sections, owned names, coverage, R-numbers and entries of other chunks) are
+    counted as `deferred` and line 1 says `LINT PARTIAL`. The chunk's own checks still run.
+  - Sections: the template's eleven, in order, no others; `Purpose` and `Trace` in every chunk, all eleven across
+    the chunks. Each has content (a `###` heading is not content). `None` needs a reason (`None (reason)` or
+    `None: reason`) for Commands and queries, Invariants, Edge cases, Settings and UI annotations; it may stand bare
+    for Conflicts and Proposed (not law); for Entities and tables only when the module owns no table; never for
+    Purpose, Rules and Trace.
+- **L1** trace and rule bodies.
+  - Every module ID is traced; the trace table and the set of R-numbers are not empty.
+  - An R-number is defined by `R<n>.` (at most 3 spaces of indent) in `## Rules` or `## Proposed (not law)`, outside
+    a `Reads` paragraph, up to the next blank line, once in the module's files.
+  - Its statement (the text before `Source:`) has 12 or more letters and digits after markup, tags and entities are
+    removed, 2 or more distinct words (3 letters or more) that occur in the ADRs, no placeholder (`TBD`, `TODO`,
+    `FIXME`, `to be compiled|written|…`, `see|per|as in|follows the source`, `as stated|written|given in the
+    source`, `lorem ipsum`) outside backticks, and repeats no other.
+  - `Source:` is required; its IDs (`ADR-nnnn.Rk`; `.Nj` after an ID is a note of it) exist in the index and are
+    units of the module (L7).
+  - **Source/trace agreement**, both directions, across chunks: a unit traced to R-n is in the Source of R-n, and a
+    unit in the Source of R-n is traced to R-n. Exception: an ID that supersedes a unit of R-n may stand in its
+    Source without a trace row, also when it is another module's unit (L10).
+  - `Where` of a rule: defined R-numbers (`R3`, `R3-R7`, `R50a-R50e`; `R50` means `R50a`..), or `ref:` when the
+    module is not primary for it. Of a note: R-numbers, `ref:` or `not applicable: <reason>` (the whole cell). Of a
+    Decision text unit (`.D*`, `.W`): also an existing heading of the spec. A heading may be added to an R-number,
+    never stand alone for a rule or a note. Any other part, a heading that does not exist, `Reads` and an empty
+    cell are findings.
+  - `ref: ADR-nnnn.Rk` is the unit's own ID, its parent rule's ID or an ID its index row cross-references.
+    `ref: <module> R-<n>` names a primary module of the unit; when that module's compiled spec lies beside the
+    linted file (`<module>.md`, `<module>-<k>.md`), R-n is defined there and its Source holds the unit's ID.
+  - At most 15% of the module's units are `not applicable`. Coverage: the rule units mapped to an R-number whose
+    Source cites them, counting at most 4 IDs per R-number, are 60% or more of the rule units not traced as `ref:`.
+- **L2** owned tables and **owned** catalog rows backticked in the body, outside `Reads` paragraphs and the trace
+  table. A row is owned when a unit whose primary module is this module references it, unless its catalog has a
+  `module` column naming another module; invariants and edge cases whose `area` is the module are owned too.
+- **L3** proposed rules (cited as `ADR-0070.R12`, `ADR-0070 rule 12`, `ADR-0070, rule 12`, `rule 12 of|in ADR-0070`,
+  `ADR-0070 (rule 12)`, `ADR 0070 rule 12`, `ADR-0070 §12`, `Rule`, `rules 12 through 14`) only under
+  `## Proposed (not law)` or with `[proposed]`, never accepted ones. A proposed unit's R-numbers are stated that
+  way; an accepted unit's R-numbers are defined under `## Rules` without `[proposed]`; a proposed Decision text
+  unit names only headings of `## Proposed (not law)`.
+- **L4** no typed count: digits, number words (`two` and up, `twenty-one`, `a dozen`) or Roman numerals of I, V, X
+  before a counted noun (up to three words between), after it (`Tables owned: 10`, `Tables owned — 10`,
+  `Owned tables (10)`), glued to it (`16tables`, `16-table`), or in a table row (`| Owned tables | 16 |`,
+  `| 16 | owned tables |`). Bold, italics, links, tags and `&nbsp;` are removed first; a code span that is a number,
+  a word or a phrase is read as text, any other span (`days:5`) is a name. `one` is not a count; citations
+  (`rule 15 note`, `7 of rule`, `INV-12`, `rules 22–23`) and `at most|at least|up to|more than|fewer than|less than`
+  pass; `exactly` and `only` do not. On the ADR rule and note text it fires 78 times (75 before round 3; the 3 new
+  ones are real counts, `**Settings:** 11 definitions`); on the pilot `quality` spec once, a real count. Count
+  markers are recomputed.
+- **L5** `## Conflicts`: every line is an entry, its continuation, a `###` heading, blank, or the single line
+  `None`. Entries are `CONFLICT <id>: <reason>`, `FALSE-POSITIVE <id>: <reason>`, `OPEN <id>: <text>`; a list
+  marker, bold, backticks, `CONFLICT: <id>` and a table row are read as entries; any other line, and an entry line
+  outside `## Conflicts`, is a finding.
+  - Every ID is a unit of the module; one ID has entries of one kind.
+  - A CONFLICT or FALSE-POSITIVE reason has 25 characters or more and 4 or more distinct words (3 letters or more)
+    that occur in the ADRs; one reason, or a near copy at 0.8 similarity, serves at most 3 entries of its kind.
+  - OPEN quotes, in double quotes, 20 or more characters of an unchecked entry of `docs/open-questions.md`. That
+    file numbers no questions (entries are `- [ ]` list items under `##` headings; `OQ-074`, `OQ-116` and `OQ-150`
+    occur in it only as mentions), so an `OQ-nnn` counts only when an unchecked entry starts with it; an
+    `open-questions.md#anchor` must be a heading of the file.
+  - FALSE-POSITIVE is for conflict-flagged notes only; an ID without flag, marker or supersession may be CONFLICT
+    or OPEN.
+  - Required: every CONFLICT-marked unit (CONFLICT or OPEN); every conflict-flagged note (its own entry; the
+    parent's does not serve); every note whose relation is `supersedes` or `superseded-by` as CONFLICT naming the
+    governing text (an ADR unit ID or an R-number) or OPEN, on the note or its parent rule, never FALSE-POSITIVE,
+    unless its Where is `ref:`.
+- **L6** hard limit 16,000 tokens per file; **L7** trace, Source and `ref:` IDs exist and, for trace and Source,
+  are units of the module.
 - **L8** `<module> R-<n>` (also in `ref:`) names a module of ADR-0022 rule 2 (or `process`, `cross`) and a numeric
   rule; a backticked `` `<word> ADR-nnnn` `` names a module too.
-- **L9** every setting key referenced by any unit of the module is backticked in the body or `Reads`.
-- **L10** every rule of the module that another unit supersedes, or whose text says it is superseded, has a
-  CONFLICT naming the governing text, or OPEN (FALSE-POSITIVE is refused), unless its Where is `ref:`.
-- Warnings: W0 index commit not readable, or the index differs from its committed version; W1 a `Where` part of no
-  known form; W2 a Source cell's `#<stable_key>` differs from the index; W3 a superseded rule traced to an R-number
-  whose text names none of the superseding IDs.
+- **L9** every setting key referenced by any unit of the module is backticked in the body; a `Reads` paragraph
+  serves for a key the module does not own.
+- **L10** every rule of the module that another unit supersedes, or whose text says it is superseded, has, unless
+  its Where is `ref:`, an OPEN entry or a CONFLICT that names a superseding ID (any ADR unit ID or R-number when
+  the index names none); with a CONFLICT, that superseding ID is in the Source of every R-number the rule is traced
+  to. The lint cannot judge that the statement is the new text: every such rule is printed under SUPERSEDED RULES
+  and belongs to the spot check (template acceptance step 2).
+- **L11** identifier retention: a source rule (not superseded, no superseding note) whose text holds 3 or more
+  distinct identifiers in backticks, traced to R-numbers whose statements hold none of them in backticks, is a
+  finding. An identifier is a code span that is one name of 4 or more characters. Calibration on the pilot
+  `quality` spec (honest text): 349 of 393 identifiers kept (89%); the lowest rule keeps 6 of 35 (its content is a
+  table of the spec); size ratio 0.81. The lazy probe keeps 0 of 382, ratio 0.01.
+- Warning **W2**: a Source cell's `#<stable_key>` differs from the index; listed under STABLE-KEY MISMATCHES, a
+  finding with `--strict`. (W0, W1 and W3 of earlier rounds are findings now: L0, L1, L10.)
 
-Several files given together are the chunks of one module: L1, L2, L5, L9, L10 and the section list run over all
-of them.
+Several files given together are the chunks of one module: every module-level check runs over all of them.
 
 ## Note IDs move; compile against one index commit
 
@@ -175,8 +241,8 @@ or a parser fix splits one (S3 review: ADR-0063 line 258), the later notes are r
 compiled spec is compiled against one committed index: L0 fails when `Generated from index` is not the index's last
 commit in HEAD, and the spec is re-linted (and re-traced) after every index commit. The index column `stable_key`
 (first 12 hex of sha1 of the unit's whitespace-normalised text) may follow an ID in a Source cell
-(`ADR-0063.R29.N13 #abc123def456`); the lint warns (W2) when it no longer matches and names the ID that now holds that
-text.
+(`ADR-0063.R29.N13 #abc123def456`); the lint warns (W2) when it no longer matches, names the ID that now holds that
+text and lists the row under STABLE-KEY MISMATCHES.
 
 ## Blind spots
 
@@ -197,3 +263,9 @@ text.
   20 rules after the overrides: 19 right (the miss: ADR-0041.R21, the Vietnamese draft, reads as localization).
 - Inbound supersession is found only in sentences with the verbs above; 11 rules are linked today.
 - `doc_lint` L4 knows number words up to `hundred` only; `cross` units reach other modules only through `cross.md`.
+- `doc_lint` cannot judge meaning. A statement that keeps the identifiers and cites the right sources but says
+  something else passes L1 and L11; a CONFLICT that names the superseding ID while the statement keeps the old text
+  passes L10. Both are the spot check's (template acceptance step 2). "Words that occur in the ADRs" is a
+  vocabulary test, not a grammar test.
+- A definition ends at the first blank line: a `Source:` in a later paragraph is not read (finding "no Source").
+  Text inside code fences and indented code blocks counts for nothing, also not for L2.
