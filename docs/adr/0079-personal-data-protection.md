@@ -79,6 +79,8 @@ Personal data is protected by one mechanism for the whole core, not only on the 
    - **Evidence** is the `data_erasure_entry` rows and one processing log entry of kind `retention` per subject and run (a kind this ADR adds to ADR-0052 rule 26).
    - **Existing retention settings stay** (`messaging.message_retention_days`, the analysis question retention, the agent run step retention). They bound technical stores and may be shorter than a retention rule; where both apply, the shorter wins for stores that are not accounting evidence.
 
+   Note (author, 2026-11-21): retention periods are configurable per customer. Each company sets its own rule per retention class (start event, months until blocking, months until destruction); a localization package may supply defaults, flagged verified or unverified as before. A company's own rule needs no package rule and no "adjustable" mark, and its legal correctness is the company's responsibility, as with the routing switch (D12). The core still seeds no period, and "no rule, no destruction by the job" stays. The constraints of `retention_rule` that require a package rule (`package_rule_ref` NOT NULL, `ck_retention_rule_adjusted`) change with the DDL work of session S2: a row with source `company` needs no package reference.
+
 **Reading**
 
 10. Personal columns are read under the record scope and leaves a role already has (ADR-0054). No new field class covers ordinary personal data: a sales clerk must read a customer's name.
@@ -113,6 +115,8 @@ Personal data is protected by one mechanism for the whole core, not only on the 
     - **Steps:** assess, contain, record, notify, close. The case cannot be resolved while the notification fields a package rule requires are empty.
     - **Deadlines** are package rules (`breach_notification_hours` per regime). The core computes `notification_due_at` from the rule and raises the due date on the case; with no rule the due date is empty and the case says so.
     - **Evidence** is the audit records, denials, the read log and the processing log (ADR-0038 rule 9).
+
+    Note (author, 2026-11-21): the breach notification deadline is configurable per customer: a company setting in hours, for which a localization package may supply a default; with no value the due date stays empty and the case says so. The setting row is added to `settings.csv` with the work of session S2. The core holds no country's value.
 
 **Scope**
 
