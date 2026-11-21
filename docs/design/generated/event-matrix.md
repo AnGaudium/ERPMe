@@ -144,4 +144,4 @@ A module name here means the ADR speaks of a consumer of that module without nam
 | `tax_payment_evidence` | 2 | ADR-0044:150, ADR-0053:182 |
 | `usage_decision_auto_drafter` | 1 | ADR-0070:138 |
 | `usage_decision_executor` | 1 | ADR-0070:140 |
-| `work_case_opener` | 4 | ADR-0013:55, ADR-0022:76, ADR-0052:169 |
+| `work_case_opener` | 4 | ADR-0013:55, ADR-0022:78, ADR-0052:169 |

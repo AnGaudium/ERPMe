@@ -23,6 +23,9 @@ class Model:
         self.purch = defaultdict(list)   # n -> [(qty, value)]
         self.transfers = []      # (src, dst, qty)
         self.issues_out = defaultdict(F)  # n -> qty issued to sales/consumption (valued at p_n)
+        # issue returns (costing role issue_return, ADR-0020 rule 12 note): never in the receipts or the revalued issues
+        self.returns_same = defaultdict(F)   # n -> qty returned of an issue of this period: revalued with it at p_n
+        self.returns_fixed = defaultdict(list)   # n -> [(qty, value)]: original in an earlier period, value kept
         self.orders = {}         # o -> dict
 
     def node(self, n, q0=0, v0=0):
@@ -86,6 +89,8 @@ class Model:
         value_in = sum(nd["v0"] for nd in self.nodes.values()) + sum(F(v) for l in self.purch.values() for _, v in l)
         value_in += sum(od["activities"] + od["wip0"] for od in self.orders.values())
         out_sales = sum(q * p[n] for n, q in self.issues_out.items())
+        out_sales -= sum(q * p[n] for n, q in self.returns_same.items())
+        value_in += sum(F(v) for l in self.returns_fixed.values() for _, v in l)
         byp_external = 0  # by-products stay in stock nodes
         # closing stock quantities
         qty = {n: nd["q0"] for n, nd in self.nodes.items()}
@@ -99,7 +104,12 @@ class Model:
             if od["complete"] or od["wip_rule"] != "actual":
                 for n, q, _ in od["outputs"]: qty[n] += q
         for n, q in self.issues_out.items(): qty[n] -= F(q)
-        closing_stock = sum(qty[n] * p[n] for n in qty)
+        for n, q in self.returns_same.items(): qty[n] += F(q)
+        fixed_q = defaultdict(F)
+        for n, l in self.returns_fixed.items():
+            for q, _ in l: qty[n] += F(q); fixed_q[n] += F(q)
+        # a fixed-value return sits in the closing value at its own value; its difference from p_n stays there
+        closing_stock = sum((qty[n] - fixed_q[n]) * p[n] for n in qty) + sum(F(v) for l in self.returns_fixed.values() for _, v in l)
         closing_wip = F(0)
         for o, od in self.orders.items():
             coef, const, keep_all = self.order_cost[o]
@@ -147,6 +157,169 @@ def naive_iteration(m, rounds=200):
     return p
 
 
+
+# ----- sales returns at the original issue cost: costing role issue_return (ADR-0020 rules 4, 5, 12 notes; OQ-150)
+def round_amount(x):
+    """Minor unit, half away from zero (ADR-0006 rule 18)."""
+    x = F(x); s = -1 if x < 0 else 1; h = abs(x) + F(1, 2)
+    return s * (h.numerator // h.denominator)
+
+
+def line_target(line, period, p, final):
+    """The final value of a line by definition. Issues and same-period returns (case a) at the period's actual average;
+    a return of an earlier period's issue (case b) at the original's final unit cost (lab assumption for a partial return:
+    round(q x final value / original q))."""
+    if line["kind"] == "issue":
+        return round_amount(line["q"] * p)
+    o = line["orig"]
+    if o["period"] == period:
+        return round_amount(line["q"] * p)
+    return round_amount(line["q"] * final[o["id"]] / o["q"])
+
+
+def cost_period(period, opening, P, final, prelim):
+    """One area, one period: the actual average from the opening and the receipts only; the targets of the issue and
+    return lines; the closing value with the case (b) residual kept and the rounding residual posted (rule 13). When the
+    closing quantity is zero but value remains (rule 13), issues and same-period returns keep the preliminary price and the
+    residual is posted. Returns (p, targets, closing (q, v), posted residual)."""
+    q0, v0 = opening
+    rq = sum(F(q) for q, _ in P["receipts"]); rv = sum(F(v) for _, v in P["receipts"])
+    p = (v0 + rv) / (q0 + rq)
+    cq = q0 + rq - sum(l["q"] for l in P["issues"]) + sum(l["q"] for l in P["returns"])
+    kept_lines = [l for l in P["returns"] if l["orig"]["period"] != period]
+    kept_q = sum(l["q"] for l in kept_lines)
+
+    def run(price):
+        tg = {ln["id"]: line_target(ln, period, price, final) for ln in P["issues"] + P["returns"]}
+        value = v0 + rv - sum(tg[l["id"]] for l in P["issues"]) + sum(tg[l["id"]] for l in P["returns"])
+        return tg, value
+    tg, value = run(p)
+    if cq == 0 and value != 0:                                    # rule 13: the area keeps the preliminary price
+        tg, value = run(prelim)
+        return p, tg, (cq, 0), value
+    kept = sum(tg[l["id"]] for l in kept_lines)
+    target = 0 if cq == 0 else round_amount(p * (cq - kept_q)) + kept
+    return p, tg, (cq, target), value - target
+
+
+def rule11_prelim(k, out, opening):
+    """The deterministic preliminary price of period k: the actual average of k-1, else the opening unit value."""
+    return out[k - 1][0] if k else opening[1] / opening[0]
+
+
+def naive_periods(periods, opening):
+    """From scratch: every period by definition, in order."""
+    final, out, op = {}, [], opening
+    for k, P in enumerate(periods):
+        p, tg, close, resid = cost_period(k, op, P, final, rule11_prelim(k, out, opening))
+        final.update(tg); out.append((p, close, resid)); op = close
+    return final, out
+
+
+def incremental(periods, opening, prelim, posted=None, done=None):
+    """The posting path: lines post at a preliminary price (returns at the original's current value), then the
+    sequential close task costs each period and posts only differences (ADR-0012 rules 15, 16); a rerun posts the
+    difference again. `posted` carries the values already in the books (for a rerun). The posting prices are free: the
+    result must not depend on them, except where rule 13 keeps the rule 11 price."""
+    cur = dict(posted or {})
+    for k, P in enumerate(periods):
+        for ln in P["issues"]:
+            cur.setdefault(ln["id"], round_amount(ln["q"] * prelim[k]))
+        for ln in P["returns"]:
+            o = ln["orig"]
+            cur.setdefault(ln["id"], round_amount(ln["q"] * cur[o["id"]] / o["q"]))
+    adjustments, resid_posted, op, out = [], dict(done or {}), opening, []
+    for k, P in enumerate(periods):
+        p, tg, close, resid = cost_period(k, op, P, cur, rule11_prelim(k, out, opening))
+        for lid, t in tg.items():
+            if t != cur[lid]:
+                adjustments.append((k, lid, t - cur[lid])); cur[lid] = t
+        prev = resid_posted.get(k, 0)
+        if resid != prev:
+            adjustments.append((k, "residual", resid - prev)); resid_posted[k] = resid
+        out.append((p, close, resid)); op = close
+    return cur, out, adjustments, resid_posted
+
+
+def issue_return_example():
+    """Three periods in one area. P1: opening 100 @ 1,000; receipt 100 for 1,400; delivery D1 of 50; a return of 10 of D1
+    in P1 (case a). P2: receipt 40 for 600; delivery D2 of 30; a return of 5 of D1 (case b). P3: receipt 25 for 400;
+    delivery D3 of 20 (absorption of P2's residual through the opening value)."""
+    mk = lambda i, k, q: dict(id=i, period=k, q=F(q), kind="issue")
+    d1, d2, d3 = mk("D1", 0, 50), mk("D2", 1, 30), mk("D3", 2, 20)
+    periods = [dict(receipts=[(100, 1400)], issues=[d1], returns=[dict(id="R1", q=F(10), kind="return", orig=d1)]),
+               dict(receipts=[(40, 600)], issues=[d2], returns=[dict(id="R2", q=F(5), kind="return", orig=d1)]),
+               dict(receipts=[(25, 400)], issues=[d3], returns=[])]
+    return periods, (F(100), F(1000))
+
+
+def check_issue_returns():
+    """The checks of the issue_return role against a naive recomputation. Returns [(ok, name, detail)]."""
+    R = []
+    periods, opening = issue_return_example()
+    fin, nv = naive_periods(periods, opening)
+    p1, p2, p3 = (x[0] for x in nv)
+    # path 1: everything posted first at stale prices, then costed in order; path 2: each period costed before the next
+    cur1, out1, adj1, _ = incremental(periods, opening, prelim=[F(10), F(10), F(10)])
+    cur2, out2, adj2 = None, None, None
+    acc, done = {}, {}
+    for k in range(3):
+        pre = [F(10)] + [nv[j][0] for j in range(k)]
+        acc, out2, adj2, done = incremental(periods[:k + 1], opening, prelim=pre + [pre[-1]] * 3, posted=acc, done=done)
+    R.append((cur1 == fin == acc and [o[:2] for o in out1] == [o[:2] for o in nv] == [o[:2] for o in out2],
+              "both posting paths end at the naive recomputation: line values and closing (quantity, value) per period",
+              (p1, p2, p3)))
+    # case (a): D1 and R1 revalued together at P1's average, the pair nets to an issue of 40, no residual
+    R.append((p1 == 12 and fin["D1"] == 600 and fin["R1"] == 120 and fin["D1"] - fin["R1"] == round_amount(40 * p1)
+              and nv[0][1] == (160, 1920) and nv[0][2] == 0,
+              "case (a): opening 100 @ 1,000 plus 100 for 1,400 gives 12; delivery 50 = 600, its return of 10 = 120, net 480 = 40 x 12; "
+              "closing 160 for 1,920 = 160 x 12, no residual", (fin["D1"], fin["R1"], nv[0][1])))
+    # the average ignores returns: adding R1 as a receipt would change it
+    as_receipt = (1000 + 1400 + 100) / F(210)
+    R.append((p1 != as_receipt, "case (a): the return stays out of the average (as a receipt at its preliminary value 100 the average "
+              "would be 2,500/210, not 12)", as_receipt))
+    # case (b): R2 keeps D1's final unit cost 12 (60), P2's average is (1,920 + 600)/200 = 12.6, residual 60 - 63 = -3 stays
+    R.append((p2 == F(63, 5) and fin["R2"] == 60 and nv[1][1] == (175, 2202) and round_amount(p2 * 170) + 60 == 2202
+              and nv[1][2] == 0,
+              "case (b): the return of 5 of D1 keeps 12 (value 60); P2's average (1,920 + 600)/200 = 12.6 ignores it; closing 175 "
+              "for 2,202 = 170 x 12.6 + 60: the residual -3 stays in the closing value, nothing posted", (p2, nv[1])))
+    # absorption: P3's opening value carries the residual
+    R.append((p3 == F(2602, 200) and nv[2][1][1] == round_amount(p3 * 180),
+              "next period: P3's average (2,202 + 400)/200 = 13.01 absorbs the residual through the opening value", p3))
+    # rule 13: a closing quantity of zero posts the residual
+    z = [dict(receipts=[], issues=[dict(id="X", period=0, q=F(10), kind="issue")], returns=[]),
+         dict(receipts=[(10, 150)], issues=[dict(id="Y", period=1, q=F(10), kind="issue")], returns=[])]
+    z[1]["returns"] = [dict(id="RX", q=F(4), kind="return", orig=z[0]["issues"][0])]
+    z[1]["issues"][0]["q"] = F(14)
+    fz, nz = naive_periods(z, (F(10), F(100)))
+    cz, oz, _, _ = incremental(z, (F(10), F(100)), prelim=[F(10), F(10)])
+    R.append((nz[1][1] == (0, 0) and fz["Y"] == 140 and nz[1][2] == 150 - 140 + 40 and fz == cz
+              and [o[:2] for o in oz] == [o[:2] for o in nz],
+              "case (b) with closing quantity zero: rule 13 keeps the preliminary price 10 for the issue of 14 (140), the return "
+              "keeps 40, and the residual 150 - 140 + 40 = 50 is posted, closing value 0", nz[1]))
+    # case (c): a backdated receipt in P1 reruns P1 to P3; R2 follows D1 by a value-only adjustment in P2's rerun
+    late = [dict(P) for P in periods]; late[0] = dict(late[0], receipts=late[0]["receipts"] + [(50, 900)])
+    fin_l, nv_l = naive_periods(late, opening)
+    cur_r, out_r, adj_r, _ = incremental(late, opening, prelim=[F(10)] * 3, posted=cur1)
+    r2_adj = [a for a in adj_r if a[1] == "R2"]
+    R.append((cur_r == fin_l and [o[:2] for o in out_r] == [o[:2] for o in nv_l] and r2_adj == [(1, "R2", fin_l["R2"] - fin["R2"])]
+              and fin_l["R2"] == round_amount(5 * fin_l["D1"] / 50),
+              "case (c): a backdated receipt of 50 for 900 in P1 moves P1's average to 13.2; the rerun posts only differences, "
+              "R2 follows D1 by one value-only line in P2 (60 -> 66), and every value equals the naive recomputation",
+              (nv_l[0][0], r2_adj)))
+    # multi-area: the exact solve over areas linked by transfers is unchanged by issue returns
+    m = Model()
+    m.node("A@W1", 100, 1000); m.node("A@W2", 0, 0)
+    m.purch["A@W1"].append((100, 1400)); m.transfers.append(("A@W1", "A@W2", 30))
+    m.issues_out.update({"A@W1": F(50), "A@W2": F(10)})
+    before = dict(m.solve())
+    m.returns_same["A@W1"] += 10; m.returns_fixed["A@W2"].append((F(5), F(55)))
+    after = m.solve(); vin, vout, _ = m.check_conservation(); it = naive_iteration(m)
+    R.append((before == after and vin == vout and all(after[n] == it[n] or abs(after[n] - it[n]) < F(1, 10**30) for n in after),
+              "areas linked by a transfer: issue returns change no average of the exact solve, value is conserved with the case (b) "
+              "value kept, and the solve equals the naive iteration", (after, vin, vout)))
+    return R
+
 if __name__ == "__main__":
     m = Model()
     # stock nodes: (item, area)
@@ -177,3 +350,7 @@ if __name__ == "__main__":
     naive = naive_iteration(m)
     diff = max(abs(float(price[n] - naive[n])) for n in price)
     print("max |exact - iterated| =", diff)
+    rs = check_issue_returns()
+    for ok, name, detail in rs:
+        print(("PASS " if ok else "FAIL ") + name + " -- " + str(detail))
+    raise SystemExit(0 if all(ok for ok, *_ in rs) else 1)

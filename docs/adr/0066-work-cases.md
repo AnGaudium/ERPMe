@@ -229,6 +229,8 @@ A case never widens an agent's read scope.
 - **For auditors:** every action in a case is an ordinary audited command. The case adds no record that a posting depends on.
 - **For the build:** the tables, commands and queries land with the step-5 work-queue screens, after the `work` core is built with the first agent (ADR-0042 rule 20). The case view and case list are generated screens. Nothing in steps 0 to 4 depends on this ADR. The work is small-model friendly: CRUD with links, one consumer and SQL views.
 - **CRM-only deployments (a consequence, not a rule):** a deployment that runs only `crm` and master data would use the case list and case view as its main surface, since its work is mostly external exceptions. This ADR adds nothing that stands in the way. The separability question itself, including the ledger account references on partner profiles, stays open for the author (architecture overview B17).
+
+  Note (S2 closure, 2026-11-21): the separability question was decided on 2026-11-17: CRM runs on its own as a deployment profile of the one product ([ADR-0052](0052-minimal-crm.md) rule 1 note).
 - **Revisit when:**
   - a company asks for internal case kinds (shortage, count difference, variance, close issue, engineering change);
   - an agent needs to read a whole case, which would widen ADR-0050 rule 27 and needs the author;
