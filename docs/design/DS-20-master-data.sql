@@ -1229,9 +1229,10 @@ CREATE TABLE reason (                                      -- [master_data] ADR-
 -- Append-only tables are those whose guard trigger refuses every update outside an erasure, and pure logs.
 -- Row guards without UPDATE OF on in-place tables sort before set_recorded_at, so they compare rows before it runs; a
 -- BEFORE INSERT trigger whose function reads NEW.recorded_at sorts after it, so it sees the system's value.
--- TRUNCATE skips row triggers, so every append-only table and every table with a BEFORE DELETE guard, unless it has a
--- TRUNCATE trigger of its own, is listed in v_refuse_truncate (default partitions with their parent) and gets
--- trg_<table>_refuse_truncate (BEFORE TRUNCATE, function refuse_truncate; S2 adversarial review N4).
+-- TRUNCATE skips row triggers and row-level security, so every table with company_id, every append-only table and every
+-- table with a BEFORE DELETE guard, unless it has a TRUNCATE trigger of its own, is listed in v_refuse_truncate (default
+-- partitions with their parent) and gets trg_<table>_refuse_truncate (BEFORE TRUNCATE, function refuse_truncate; S2
+-- adversarial review N4; S2 schema review R6-N2). Retention drops partitions and never truncates (ADR-0017 rule 19 note).
 -- Lab gen_overview.py --check compares this section with what schema_phase_b.py writes from the table definitions and
 -- triggers of the design files. The functions are defined in every file because the labs load subsets.
 CREATE OR REPLACE FUNCTION set_recorded_at() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
@@ -1241,7 +1242,7 @@ BEGIN
 END $$;
 CREATE OR REPLACE FUNCTION refuse_truncate() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 BEGIN
-    RAISE EXCEPTION '% is never truncated (append-only or guarded rows)', TG_TABLE_NAME USING ERRCODE = 'restrict_violation';
+    RAISE EXCEPTION '% is never truncated (company, append-only or guarded rows)', TG_TABLE_NAME USING ERRCODE = 'restrict_violation';
 END $$;
 DO $$
 DECLARE
@@ -1258,7 +1259,17 @@ DECLARE
         'price_list_option_extra', 'barcode', 'gs1_company_prefix', 'partner_relationship', 'external_id_map',
         'custom_field_definition', 'reason'];
     v_append_only       text[] := ARRAY[]::text[];
-    v_refuse_truncate   text[] := ARRAY[]::text[];
+    v_refuse_truncate   text[] := ARRAY['company_currency_activation', 'uom', 'uom_alias', 'branch', 'print_profile', 'business_unit', 'cost_center',
+        'working_calendar', 'working_calendar_holiday', 'site', 'data_translation', 'partner_group', 'partner_tax_status',
+        'tax_treatment', 'item_group', 'valuation_class', 'item_tax_group', 'partner', 'project', 'partner_role',
+        'payment_method', 'delivery_method', 'price_list', 'customer_profile', 'supplier_profile', 'employee_profile',
+        'partner_address', 'partner_bank_account', 'contact', 'product_category', 'storage_condition',
+        'handling_unit_type', 'product', 'product_uom', 'variant_attribute', 'variant_attribute_value',
+        'product_variant_attribute', 'product_attribute_value', 'item', 'item_variant_value', 'item_barcode',
+        'partner_item', 'item_manufacturer_part', 'code_series', 'product_category_requirement', 'classification_scheme',
+        'classification_value', 'product_classification', 'warehouse', 'zone', 'bin', 'lot', 'serial_number',
+        'price_list_entry', 'price_list_option_extra', 'barcode', 'gs1_company_prefix', 'partner_relationship',
+        'external_id_map', 'custom_field_definition', 'reason']::text[];
     v_table             text;
 BEGIN
     FOREACH v_table IN ARRAY v_tables LOOP

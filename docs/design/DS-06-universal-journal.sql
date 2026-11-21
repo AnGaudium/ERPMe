@@ -18,7 +18,8 @@
 -- table whose rows are updated in place, BEFORE INSERT on an append-only table (a guard trigger refuses every update outside
 -- an erasure, or a pure log). A BEFORE INSERT trigger that reads NEW.recorded_at sorts after it (S2 adversarial review S2).
 -- The generated sections at the end of each design file define the functions with CREATE OR REPLACE (the labs load subsets
--- of the files), attach these triggers in one DO block, refuse TRUNCATE on append-only and delete-guarded tables, and write
+-- of the files), attach these triggers in one DO block, refuse TRUNCATE on every table with company_id and on append-only
+-- and delete-guarded tables (ADR-0017 rule 19 note, 2026-11-21), and write
 -- the row-level security of every table with company_id (ADR-0017 rule 19); lab schema_phase_b.py writes them and
 -- gen_overview.py --check compares them with the files and refuses DDL it cannot read.
 -- Key convention (ADR-0006 rule 1 and its note of 2026-11-21): every table's primary key is the single column id uuid; a former
@@ -718,9 +719,10 @@ CREATE TRIGGER trg_journal_line_check_open_item
 -- Append-only tables are those whose guard trigger refuses every update outside an erasure, and pure logs (here: journal_reject_change).
 -- Row guards without UPDATE OF on in-place tables sort before set_recorded_at, so they compare rows before it runs; a
 -- BEFORE INSERT trigger whose function reads NEW.recorded_at sorts after it, so it sees the system's value.
--- TRUNCATE skips row triggers, so every append-only table and every table with a BEFORE DELETE guard, unless it has a
--- TRUNCATE trigger of its own, is listed in v_refuse_truncate (default partitions with their parent) and gets
--- trg_<table>_refuse_truncate (BEFORE TRUNCATE, function refuse_truncate; S2 adversarial review N4).
+-- TRUNCATE skips row triggers and row-level security, so every table with company_id, every append-only table and every
+-- table with a BEFORE DELETE guard, unless it has a TRUNCATE trigger of its own, is listed in v_refuse_truncate (default
+-- partitions with their parent) and gets trg_<table>_refuse_truncate (BEFORE TRUNCATE, function refuse_truncate; S2
+-- adversarial review N4; S2 schema review R6-N2). Retention drops partitions and never truncates (ADR-0017 rule 19 note).
 -- Lab gen_overview.py --check compares this section with what schema_phase_b.py writes from the table definitions and
 -- triggers of the design files. The functions are defined in every file because the labs load subsets.
 CREATE OR REPLACE FUNCTION set_recorded_at() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
@@ -730,7 +732,7 @@ BEGIN
 END $$;
 CREATE OR REPLACE FUNCTION refuse_truncate() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 BEGIN
-    RAISE EXCEPTION '% is never truncated (append-only or guarded rows)', TG_TABLE_NAME USING ERRCODE = 'restrict_violation';
+    RAISE EXCEPTION '% is never truncated (company, append-only or guarded rows)', TG_TABLE_NAME USING ERRCODE = 'restrict_violation';
 END $$;
 DO $$
 DECLARE
@@ -738,7 +740,8 @@ DECLARE
         'subledger_activation', 'journal_entry', 'payment_term', 'payment_term_line', 'open_item', 'journal_line',
         'account_period_balance', 'opening_turnover'];
     v_append_only       text[] := ARRAY['applied_rate', 'derivation_trace', 'journal_entry', 'journal_line', 'subledger_activation']::text[];
-    v_refuse_truncate   text[] := ARRAY['derivation_trace', 'applied_rate', 'subledger_activation']::text[];
+    v_refuse_truncate   text[] := ARRAY['derivation_trace', 'account', 'applied_rate', 'cost_object', 'fixed_asset', 'subledger_activation',
+        'payment_term', 'payment_term_line', 'open_item', 'account_period_balance', 'opening_turnover']::text[];
     v_table             text;
 BEGIN
     FOREACH v_table IN ARRAY v_tables LOOP

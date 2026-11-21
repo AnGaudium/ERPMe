@@ -2342,9 +2342,10 @@ ALTER TABLE demand_supply_line ADD CONSTRAINT fk_demand_supply_line_transfer_ord
 -- Append-only tables are those whose guard trigger refuses every update outside an erasure, and pure logs (here: inventory_reject_change).
 -- Row guards without UPDATE OF on in-place tables sort before set_recorded_at, so they compare rows before it runs; a
 -- BEFORE INSERT trigger whose function reads NEW.recorded_at sorts after it, so it sees the system's value.
--- TRUNCATE skips row triggers, so every append-only table and every table with a BEFORE DELETE guard, unless it has a
--- TRUNCATE trigger of its own, is listed in v_refuse_truncate (default partitions with their parent) and gets
--- trg_<table>_refuse_truncate (BEFORE TRUNCATE, function refuse_truncate; S2 adversarial review N4).
+-- TRUNCATE skips row triggers and row-level security, so every table with company_id, every append-only table and every
+-- table with a BEFORE DELETE guard, unless it has a TRUNCATE trigger of its own, is listed in v_refuse_truncate (default
+-- partitions with their parent) and gets trg_<table>_refuse_truncate (BEFORE TRUNCATE, function refuse_truncate; S2
+-- adversarial review N4; S2 schema review R6-N2). Retention drops partitions and never truncates (ADR-0017 rule 19 note).
 -- Lab gen_overview.py --check compares this section with what schema_phase_b.py writes from the table definitions and
 -- triggers of the design files. The functions are defined in every file because the labs load subsets.
 CREATE OR REPLACE FUNCTION set_recorded_at() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
@@ -2354,7 +2355,7 @@ BEGIN
 END $$;
 CREATE OR REPLACE FUNCTION refuse_truncate() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 BEGIN
-    RAISE EXCEPTION '% is never truncated (append-only or guarded rows)', TG_TABLE_NAME USING ERRCODE = 'restrict_violation';
+    RAISE EXCEPTION '% is never truncated (company, append-only or guarded rows)', TG_TABLE_NAME USING ERRCODE = 'restrict_violation';
 END $$;
 DO $$
 DECLARE
@@ -2374,7 +2375,20 @@ DECLARE
         'other_issue_line', 'opening_balance', 'opening_balance_line', 'transfer_order', 'transfer_order_line'];
     v_append_only       text[] := ARRAY['material_document', 'material_document_line', 'purchase_order_line_gr_ir_layer',
         'purchase_order_line_gr_ir_posting', 'warehouse_movement']::text[];
-    v_refuse_truncate   text[] := ARRAY['material_document', 'warehouse_movement', 'purchase_order_line_gr_ir_layer', 'purchase_order_line_gr_ir_posting']::text[];
+    v_refuse_truncate   text[] := ARRAY['promotion', 'quotation', 'quotation_line', 'sales_order', 'sales_order_line', 'credit_hold', 'purchase_request',
+        'purchase_request_line', 'purchase_order', 'purchase_order_line', 'handling_unit', 'goods_receipt',
+        'goods_receipt_line', 'return_to_supplier', 'return_to_supplier_line', 'delivery', 'delivery_line',
+        'return_from_customer', 'return_from_customer_line', 'service_receipt', 'service_receipt_line', 'sales_invoice',
+        'sales_invoice_line', 'sales_return', 'sales_return_line', 'credit_note', 'credit_note_line', 'debit_note',
+        'debit_note_line', 'purchase_invoice', 'purchase_invoice_line', 'purchase_return', 'purchase_return_line',
+        'purchase_credit_note', 'purchase_credit_note_line', 'purchase_debit_note', 'purchase_debit_note_line',
+        'gr_ir_write_off', 'gr_ir_write_off_line', 'document_line_price_step', 'document_line_custom_text',
+        'document_installment', 'material_document', 'stock_value', 'stock_quantity', 'preliminary_price',
+        'stock_reservation', 'warehouse_task', 'warehouse_movement', 'purchase_order_line_gr_ir_layer',
+        'purchase_order_line_gr_ir_posting', 'pending_receipt_adjustment', 'stock_transfer', 'stock_transfer_line',
+        'stock_count', 'stock_count_line', 'scrap', 'scrap_line', 'internal_consumption', 'internal_consumption_line',
+        'other_receipt', 'other_receipt_line', 'other_issue', 'other_issue_line', 'opening_balance',
+        'opening_balance_line', 'transfer_order', 'transfer_order_line']::text[];
     v_table             text;
 BEGIN
     FOREACH v_table IN ARRAY v_tables LOOP

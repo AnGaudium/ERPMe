@@ -980,6 +980,19 @@ if "--load" in sys.argv:
           got is False and "recorded_at DESC" not in src, got)
     trial("Y13 (c) a value whose id does not follow the ids already written for the key and date is refused", lambda cx: sv(cx, first.__class__(int=first.int - 1), "true"),
           "does not follow the ids")
+
+    def sqlstate_of(fn):
+        cx = conn()
+        try:
+            with cx.transaction():
+                fn(cx)
+                cx.execute("select 1/0")
+        except Exception as e:  # noqa: BLE001
+            return getattr(e, "sqlstate", None)
+        finally:
+            cx.close()
+    st = sqlstate_of(lambda cx: sv(cx, first.__class__(int=first.int - 2), "true"))
+    check("Y13a R6-N4: the refusal is serialization_failure (SQLSTATE 40001), so the ADR-0008 retry runs again with a fresh, greater id", st == "40001", st)
     # (e) only erasure_command_record() writes the two erasure scopes
     def idem(cx, scope):
         cx.execute("insert into idempotency_record (id, company_id, actor_kind, actor_id, scope, idempotency_key, request_hash) values (%s,%s,'human',%s,%s,%s,%s)",
@@ -988,6 +1001,10 @@ if "--load" in sys.argv:
           "written only by erasure_command_record")
     trial("Y15 (e) ... nor a DestroyRetainedPersonalData record", lambda cx: (as_role(cx, str(I["co"])), idem(cx, "DestroyRetainedPersonalData")),
           "written only by erasure_command_record")
+    trial("Y20 R6-N3: EXECUTE on erasure_command_record() is revoked from PUBLIC; a role without the grant cannot call it", lambda cx: (as_role(cx, str(I["co"])), cx.execute(
+        "select erasure_command_record(%s, 'human', %s, 'EraseDataSubject', %s, %s)", (new(), new(), "y-" + str(new()), "0" * 64))), "permission denied")
+    # the lab role stands in for the dispatcher's role, which DS-18 grants EXECUTE (design change R6-N3)
+    X(f"GRANT EXECUTE ON FUNCTION erasure_command_record(uuid, text, uuid, text, text, text) TO {ROLE}")
     trial("Y16 (e) the same role writes it through erasure_command_record(), for its session's company, and the marker validates (rolled back afterwards)",
           lambda cx: (as_role(cx, str(I["co"])), cx.execute("select erasure_command_record(%s, 'human', %s, 'EraseDataSubject', %s, %s)",
                                                            (new(), new(), "y-" + str(new()), "0" * 64)),
@@ -1000,6 +1017,18 @@ if "--load" in sys.argv:
     trial("Y19 (e) a record's scope never changes into an erasure scope", lambda cx: (idem(cx, "PostSalesInvoice"), as_role(cx, str(I["co"])), cx.execute(
         "update idempotency_record set scope = 'EraseDataSubject' where scope = 'PostSalesInvoice' and transaction_id = pg_current_xact_id()")),
           "written only by erasure_command_record")
+    # S2-1 (adversarial, second pass): a committed erasure record of an earlier transaction cannot be re-armed
+    old_er = new()
+    with c.transaction():
+        X("select set_config('nativeflows.company_id', %s, true)", (str(I["co"]),))
+        X("select erasure_command_record(%s, 'human', %s, 'EraseDataSubject', %s, %s)", (old_er, new(), "y-old-" + str(new()), "0" * 64))
+    trial("Y21 S2-1: an old erasure record's transaction_id cannot be moved to the current transaction (re-arming the marker)", lambda cx: (as_role(cx, str(I["co"])), cx.execute(
+        "update idempotency_record set transaction_id = pg_current_xact_id() where id = %s", (old_er,))), "never change")
+    trial("Y22 S2-1: ... nor its id or company (any row, not only erasure rows)", lambda cx: (idem(cx, "PostSalesInvoice"), cx.execute(
+        "update idempotency_record set id = %s where scope = 'PostSalesInvoice' and transaction_id = pg_current_xact_id()", (new(),))), "never change")
+    trial("Y23 ... while response is still written before commit (rolled back afterwards)", lambda cx: (idem(cx, "PostSalesInvoice"), cx.execute(
+        "update idempotency_record set response = '{}' where scope = 'PostSalesInvoice' and transaction_id = pg_current_xact_id()"), cx.execute("select 1/0")),
+          "division by zero")
 
     # ---- Z: the conventions on the catalog of the full load, which no DDL syntax can evade (S2 adversarial review S3, N1,
     # N3, N4; the text guard of gen_overview.py reads the files, these read pg_catalog). Partitions follow their parent.
@@ -1022,41 +1051,77 @@ if "--load" in sys.argv:
                  where n.nspname = 'nativeflows' and c.relkind in ('r', 'p') and not c.relispartition""").fetchall())
     bad = sorted(t for t in tops if (pk.get(t) == ["id:uuid"]) == (t in KEY_ALLOWLIST))
     check(f"Z02 every table has the single primary key id uuid, except the {len(KEY_ALLOWLIST)} of KEY_ALLOWLIST (ADR-0006 rule 1)", not bad, bad)
-    trg = X("""select c.relname, t.tgname, t.tgtype from pg_trigger t join pg_class c on c.oid = t.tgrelid join pg_namespace n on n.oid = c.relnamespace
+    trg = X("""select c.relname, t.tgname, t.tgtype, t.tgenabled, p.proname from pg_trigger t join pg_class c on c.oid = t.tgrelid
+              join pg_namespace n on n.oid = c.relnamespace join pg_proc p on p.oid = t.tgfoid
               where n.nspname = 'nativeflows' and not t.tgisinternal""").fetchall()
     ROW, BEFORE, INS, DEL, UPD, TRUNC = 1, 2, 4, 8, 16, 32
-    by = {}
-    for rel, name, typ in trg:
+    by, fn_of = {}, {}
+    for rel, name, typ, enabled, fname in trg:
         by.setdefault(rel, []).append((name, typ))
+        fn_of[(rel, name)] = (enabled, fname)
     bad = []
     for t in tops:
         mine = dict(by.get(t, []))
         typ = mine.get(f"trg_{t}_set_recorded_at")
         guarded = any(ty & ROW and ty & BEFORE and ty & UPD for n_, ty in mine.items() if n_ != f"trg_{t}_set_recorded_at")
-        if typ is None or not (typ & ROW and typ & BEFORE and typ & INS) or not (typ & UPD or guarded):
+        if typ is None or not (typ & ROW and typ & BEFORE and typ & INS) or not (typ & UPD or guarded) \
+                or fn_of[(t, f"trg_{t}_set_recorded_at")] != ("O", "set_recorded_at"):
             bad.append(t)
-    check("Z03 every table has trg_<table>_set_recorded_at BEFORE INSERT, also on UPDATE unless an append-only guard refuses updates (S2 adversarial review S2)", not bad, bad[:8])
+    check("Z03 every table has trg_<table>_set_recorded_at BEFORE INSERT, also on UPDATE unless an append-only guard refuses updates, enabled and running "
+          "set_recorded_at (S2 adversarial review S2; second pass N2)", not bad, bad[:8])
+    off = sorted(f"{r}.{n_}" for (r, n_), (en, _) in fn_of.items() if en != "O")
+    check(f"Z03a every one of the {len(fn_of)} triggers of the design is enabled for ordinary sessions (tgenabled O; second pass N2)", not off and len(fn_of) > 600, off[:8])
+    rules = [r[0] for r in X("""select c.relname || '.' || w.rulename from pg_rewrite w join pg_class c on c.oid = w.ev_class
+              join pg_namespace n on n.oid = c.relnamespace where n.nspname = 'nativeflows' and w.rulename <> '_RETURN'""").fetchall()]
+    check("Z03b no rewrite rule on any table of the design (a DO INSTEAD rule would bypass triggers; second pass N2)", not rules, rules[:8])
+    from gen_overview import RLS_SHARED_READ
     want_rls = [r for r in rels if r[4] is not None and (r[5] or r[0]) not in RLS_ALLOWLIST]
+    # the expected predicates, as PostgreSQL deparses them: the policies of ADR-0017 rule 19 created on a scratch table (second pass N2)
+    with c.transaction():
+        X("create temp table lab_pol (company_id uuid)")
+        X("create policy company_policy on lab_pol using (company_id::text = current_setting('nativeflows.company_id', true))")
+        X("create policy company_policy_nullable on lab_pol using (company_id::text = current_setting('nativeflows.company_id', true)"
+          " or (company_id is null and current_setting('nativeflows.company_id', true) = 'installation'))")
+        X("create policy company_ids_policy on lab_pol for select using (company_id::text = any (string_to_array(current_setting('nativeflows.company_ids', true), ',')))")
+        X("create policy shared_read_policy on lab_pol for select using (company_id is null)")
+        ref = {n_: (cmd, q) for n_, cmd, q in X("select policyname, cmd, qual from pg_policies where tablename = 'lab_pol'").fetchall()}
+        X("drop table lab_pol")
     pol = {}
-    for rel, name, qual in X("select tablename, policyname, qual from pg_policies where schemaname = 'nativeflows'").fetchall():
-        pol.setdefault(rel, {})[name] = qual
-    bad = [r[0] for r in want_rls if not (r[2] and r[3] and set(pol.get(r[0], {})) >= {"company_policy", "company_ids_policy"}
-                                         and ("installation" in pol[r[0]]["company_policy"]) == (r[4] is False))]
-    check(f"Z04 every one of the {len(want_rls)} tables and partitions with company_id has forced row-level security, company_policy (the installation "
-          f"variant exactly where company_id is nullable) and company_ids_policy; exceptions only in RLS_ALLOWLIST ({', '.join(RLS_ALLOWLIST) or 'none'})",
-          not bad and len(want_rls) > 370, bad[:8])
+    for rel, name, qual, cmd, perm, roles, wcheck in X("""select tablename, policyname, qual, cmd, permissive, roles::text, with_check
+                                                           from pg_policies where schemaname = 'nativeflows'""").fetchall():
+        pol.setdefault(rel, {})[name] = (cmd, qual, perm, roles, wcheck)
+    bad = []
+    for r in want_rls:
+        mine = pol.get(r[0], {})
+        expect = {"company_policy": ref["company_policy_nullable" if r[4] is False else "company_policy"], "company_ids_policy": ref["company_ids_policy"]}
+        if (r[5] or r[0]) in RLS_SHARED_READ:
+            expect["shared_read_policy"] = ref["shared_read_policy"]
+        if not (r[2] and r[3]) or set(mine) != set(expect) or any(
+                (mine[n_][0], mine[n_][1]) != expect[n_] or mine[n_][2] != "PERMISSIVE" or mine[n_][3] != "{public}" or mine[n_][4] is not None for n_ in expect):
+            bad.append(r[0])
+    check(f"Z04 every one of the {len(want_rls)} tables and partitions with company_id has forced row-level security and exactly its policies with the "
+          f"expected predicates: company_policy (the installation variant exactly where company_id is nullable), company_ids_policy for SELECT, "
+          f"shared_read_policy only on the shared reference catalogs, and no other permissive policy (second pass N2); exceptions only in RLS_ALLOWLIST "
+          f"({', '.join(RLS_ALLOWLIST) or 'none'})", not bad and len(want_rls) > 370, bad[:8])
     need = {t for t in tops if any(ty & BEFORE and ty & DEL for n_, ty in by.get(t, []))
             or (dict(by.get(t, [])).get(f"trg_{t}_set_recorded_at", UPD) & UPD) == 0}
+    need |= {r[0] for r in rels if r[4] is not None}          # every table with company_id (R6-N2; second pass N7)
     need |= {r[0] for r in rels if r[1] and r[5] in need}
-    bad = sorted(t for t in need if not any(ty & BEFORE and ty & TRUNC for n_, ty in by.get(t, [])))
-    check(f"Z05 every one of the {len(need)} append-only or delete-guarded tables (and their partitions) refuses TRUNCATE with a BEFORE TRUNCATE trigger "
-          "(S2 adversarial review N4)", not bad and len(need) > 90, bad[:8])
+    # the generated guard runs refuse_truncate; the three hand-written ones of DS-06 and DS-22 run their tables' reject functions
+    truncate_fns = {"refuse_truncate", "journal_reject_change", "inventory_reject_change"}
+    bad = sorted(t for t in need if not any(ty & BEFORE and ty & TRUNC and fn_of[(t, n_)][0] == "O" and fn_of[(t, n_)][1] in truncate_fns
+                                            for n_, ty in by.get(t, [])))
+    check(f"Z05 every one of the {len(need)} tables with company_id, append-only or delete-guarded tables (and their partitions) refuses TRUNCATE with an "
+          "enabled BEFORE TRUNCATE trigger running refuse_truncate or a hand-written reject function (S2 adversarial review N4; R6-N2; second pass N2, N7)", not bad and len(need) > 380, bad[:8])
     bad = [r[0] for r in X("""select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
               where n.nspname = 'nativeflows' and not exists (select 1 from pg_depend d where d.classid = 'pg_proc'::regclass and d.objid = p.oid and d.deptype = 'e')
                 and not coalesce(p.proconfig, '{}') @> array['search_path=nativeflows, pg_temp']""").fetchall()]
     check("Z06 every function of the design pins search_path = nativeflows, pg_temp (S2 adversarial review N3; extension functions aside)", not bad, bad[:8])
     for t in ("audit_record", "document_version", "approval"):
         trial(f"Z07 TRUNCATE {t} is refused (S2 adversarial review N4)", lambda cx, t=t: cx.execute(f"truncate {t} cascade"), "never truncated")
+    for t in ("stock_value", "stock_quantity", "idempotency_record", "posting_period_area_state", "uom_alias", "account_period_balance"):
+        trial(f"Z08 TRUNCATE {t} is refused (R6-N2; second pass N7: tables updated in place)", lambda cx, t=t: cx.execute(f"truncate {t} cascade"), "never truncated")
+
     c.close()
 
 passed = sum(1 for ok_, *_ in RESULTS if ok_)

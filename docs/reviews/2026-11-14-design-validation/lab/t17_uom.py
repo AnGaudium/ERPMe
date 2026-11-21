@@ -781,6 +781,11 @@ check("U89 " + name_, ok_, detail_)
 from costing_solver import check_adversarial_cases  # noqa: E402
 for i, (ok_, name_, detail_) in enumerate(check_adversarial_cases()):
     check(f"U{90 + i} " + name_, ok_, detail_)
+# U101-U105: the second pass of the S2 adversarial review: N4, a late landed cost in an area whose only quantity came back by
+# returns (the chief architect's decision, ADR-0020 rule 12/13 notes), and N5, reversals of receipts and transfers (rule 7 note)
+from costing_solver import check_second_pass_cases  # noqa: E402
+for i, (ok_, name_, detail_) in enumerate(check_second_pass_cases()):
+    check(f"U{101 + i} " + name_, ok_, detail_)
 ck_role = ds22.split("CONSTRAINT ck_movement_type_costing_role CHECK", 1)[1].split("\n", 1)[0]
 st = {r["key"]: r for r in read_csv(os.path.join(CAT, "settings.csv"))}
 srr = st["movement_type.sales_return_receipt.costing_role"]

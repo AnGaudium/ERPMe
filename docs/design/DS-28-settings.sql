@@ -335,12 +335,15 @@ BEGIN
         END IF;
     END IF;
     -- the tie-breaker among rows of one effective date is the id (rule 2's order; ADR-0007 rule 10): a new row's id must exceed
-    -- every id already written for the same key, scope and date, so "the latest written" is the greatest id by construction
+    -- every id already written for the same key, scope and date, so "the latest written" is the greatest id by construction.
+    -- The refusal is serialization_failure (SQLSTATE 40001), so the ADR-0008 retry runs again with a fresh, greater id: two
+    -- writers of one key and date, or an import in another id order, are retried, not failed (S2 schema review R6-N4).
     IF EXISTS (SELECT 1 FROM nativeflows.setting_value v
                 WHERE v.company_id IS NOT DISTINCT FROM NEW.company_id AND v.setting_key = NEW.setting_key AND v.scope_kind = NEW.scope_kind
                   AND v.scope_ref = NEW.scope_ref AND v.placeholder_values = NEW.placeholder_values
                   AND v.effective_from = NEW.effective_from AND v.id >= NEW.id) THEN
-        RAISE EXCEPTION 'setting_value id % does not follow the ids already written for % on %', NEW.id, NEW.setting_key, NEW.effective_from USING ERRCODE = 'check_violation';
+        RAISE EXCEPTION 'setting_value id % does not follow the ids already written for % on %', NEW.id, NEW.setting_key, NEW.effective_from USING ERRCODE = 'serialization_failure';
+
     END IF;
     SELECT v.value, true INTO v_in, v_found FROM nativeflows.setting_value v
      WHERE v.company_id IS NOT DISTINCT FROM NEW.company_id AND v.setting_key = NEW.setting_key AND v.scope_kind = NEW.scope_kind
@@ -402,9 +405,10 @@ CREATE TRIGGER trg_setting_value_check_insert BEFORE INSERT ON setting_value
 -- Append-only tables are those whose guard trigger refuses every update outside an erasure, and pure logs (here: platform_reject_change).
 -- Row guards without UPDATE OF on in-place tables sort before set_recorded_at, so they compare rows before it runs; a
 -- BEFORE INSERT trigger whose function reads NEW.recorded_at sorts after it, so it sees the system's value.
--- TRUNCATE skips row triggers, so every append-only table and every table with a BEFORE DELETE guard, unless it has a
--- TRUNCATE trigger of its own, is listed in v_refuse_truncate (default partitions with their parent) and gets
--- trg_<table>_refuse_truncate (BEFORE TRUNCATE, function refuse_truncate; S2 adversarial review N4).
+-- TRUNCATE skips row triggers and row-level security, so every table with company_id, every append-only table and every
+-- table with a BEFORE DELETE guard, unless it has a TRUNCATE trigger of its own, is listed in v_refuse_truncate (default
+-- partitions with their parent) and gets trg_<table>_refuse_truncate (BEFORE TRUNCATE, function refuse_truncate; S2
+-- adversarial review N4; S2 schema review R6-N2). Retention drops partitions and never truncates (ADR-0017 rule 19 note).
 -- Lab gen_overview.py --check compares this section with what schema_phase_b.py writes from the table definitions and
 -- triggers of the design files. The functions are defined in every file because the labs load subsets.
 CREATE OR REPLACE FUNCTION set_recorded_at() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
@@ -414,14 +418,14 @@ BEGIN
 END $$;
 CREATE OR REPLACE FUNCTION refuse_truncate() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 BEGIN
-    RAISE EXCEPTION '% is never truncated (append-only or guarded rows)', TG_TABLE_NAME USING ERRCODE = 'restrict_violation';
+    RAISE EXCEPTION '% is never truncated (company, append-only or guarded rows)', TG_TABLE_NAME USING ERRCODE = 'restrict_violation';
 END $$;
 DO $$
 DECLARE
     v_tables            text[] := ARRAY['setting_definition', 'setting_preset', 'setting_preset_item', 'company_setup_acknowledgement', 'setting_value',
         'extension_point', 'module_activation'];
     v_append_only       text[] := ARRAY['setting_value']::text[];
-    v_refuse_truncate   text[] := ARRAY['company_setup_acknowledgement', 'setting_value']::text[];
+    v_refuse_truncate   text[] := ARRAY['company_setup_acknowledgement', 'setting_value', 'module_activation']::text[];
     v_table             text;
 BEGIN
     FOREACH v_table IN ARRAY v_tables LOOP

@@ -827,6 +827,44 @@ trial("K06 a period unlock request names an area of the period (ADR-0043 rule 16
     doc(cx, (d := new()), "period_unlock_request"),
     cx.execute("insert into period_unlock_request (id, company_id, posting_period_id, area, reason, recorded_at) values (%s,%s,%s,'tax','late invoice',now())", (d, I["co"], I["per"]))),
       True, "ck_period_unlock_request_area")
+# Period lock (ADR-0012 rule 7; ADR-0043 rule 16; S2 adversarial review N5): a locked period leaves locked only to soft_locked,
+# with an approved period_unlock_request of the period and area, never for the migration period; a locked area is never deleted.
+PER10, FYM, PERM = new(), new(), new()
+ins_posting_period(X, PER10, I["co"], I["fy"], 10, "2026-10-01", "2026-10-31")
+for area in ("general", "inventory"):
+    ins_area_state(X, I["co"], PER10, area, "locked")
+ins_fiscal_year(X, FYM, I["co"], "M2025", "2025-12-31", "2025-12-31", is_migration=True)
+ins_posting_period(X, PERM, I["co"], FYM, 1, "2025-12-31", "2025-12-31")
+ins_area_state(X, I["co"], PERM, "general", "locked")
+
+
+def unlock_request(cx, period, area, state):
+    d = doc(cx, new(), "period_unlock_request")
+    cx.execute("insert into period_unlock_request (id, company_id, posting_period_id, area, reason, recorded_at) values (%s,%s,%s,%s,'late invoice',now())",
+               (d, I["co"], period, area))
+    if state != "draft":
+        cx.execute("update document set state = %s where id = %s", (state, d))
+
+
+def set_state(cx, period, area, state):
+    cx.execute("update posting_period_area_state set state = %s where posting_period_id = %s and area = %s", (state, period, area))
+
+
+trial("K07 N5: a locked period is not reopened by a plain UPDATE of its state to open", lambda cx: set_state(cx, PER10, "general", "open"), True,
+      "goes back only to soft_locked")
+trial("K08 N5: locked to soft_locked without an approved period_unlock_request is refused", lambda cx: set_state(cx, PER10, "general", "soft_locked"), True,
+      "needs an approved period_unlock_request")
+trial("K09 N5: ... a draft request does not count", lambda cx: (unlock_request(cx, PER10, "general", "draft"), set_state(cx, PER10, "general", "soft_locked")), True,
+      "needs an approved period_unlock_request")
+trial("K10 N5: ... nor an approved request of another area", lambda cx: (unlock_request(cx, PER10, "inventory", "approved"), set_state(cx, PER10, "general", "soft_locked")),
+      True, "needs an approved period_unlock_request")
+trial("K11 N5: with an approved request of the period and area the unlock to soft_locked is accepted (rolled back afterwards)", lambda cx: (
+    unlock_request(cx, PER10, "general", "approved"), set_state(cx, PER10, "general", "soft_locked"), cx.execute("select 1/0")), True, "division by zero")
+trial("K12 N5: the migration period never unlocks, even with an approved request (ADR-0044 rule 2)", lambda cx: (
+    unlock_request(cx, PERM, "general", "approved"), set_state(cx, PERM, "general", "soft_locked")), True, "migration period")
+trial("K13 N5: a locked area's row is never deleted (and so never recreated as open)", lambda cx: cx.execute(
+    "delete from posting_period_area_state where posting_period_id = %s and area = 'general'", (PER10,)), True, "never deleted")
+
 
 # ======================================================================= L: final simulation review, 2026-11-15
 # The payment block on open_item_collection (ADR-0048 rule 17 note; ADR-0063 rule 27 note) and the settings auto-post evidence

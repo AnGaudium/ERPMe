@@ -35,7 +35,9 @@ refuse_truncate, row-level security) differ from what schema_phase_b.py writes, 
 trigger (outside PURE_LOGS), on an in-place table with a BEFORE UPDATE guard that sorts after its set_recorded_at trigger,
 and on a BEFORE INSERT trigger that reads NEW.recorded_at and sorts before it. The syntax guard (syntax_errors) fails on any
 statement it cannot read: a CREATE TABLE, ALTER, REFERENCES, trigger, policy, DROP or DO outside the one form it parses, DDL
-inside a function body, and a function that does not pin search_path (S2 adversarial review S3, N3; R5-N2). Company keys
+inside a function body, and a function that does not pin search_path (S2 adversarial review S3, N3; R5-N2); it also refuses
+statements that bypass row triggers or policies: CREATE RULE, GRANT ... TO PUBLIC, SET session_replication_role (also through
+set_config), CREATE EVENT TRIGGER and SELECT ... INTO (S2 adversarial review, second pass, N2). Company keys
 (check_company_keys): it fails on a foreign key between two company tables (company_id NOT NULL on both) without
 company_id, on a key to or from a table with a nullable company_id that COMPANY_KEY_ALLOWLIST does not list, and on a lab
 stub that a composite company key targets without UNIQUE (company_id, id). --check also runs the mutation self-tests.
@@ -353,7 +355,10 @@ def design_context(named):
         if fm and re.search(r"\bNEW\.recorded_at\b(?!\s*:=)", code):
             reads_recorded.add(fm.group(1))
     append_only = classify(stmts)
-    need = set(append_only) | {g["table"] for g in triggers if g["timing"] == "BEFORE" and re.search(r"\bDELETE\b", g["events"])}
+    # TRUNCATE skips row triggers and row-level security (S2 schema review R6-N2; adversarial second pass N7): every table with
+    # company_id (nullable or not), every append-only table and every table with a BEFORE DELETE guard gets the guard.
+    need = (set(append_only) | {g["table"] for g in triggers if g["timing"] == "BEFORE" and re.search(r"\bDELETE\b", g["events"])}
+            | {t for t, v in tables.items() if v["company"]})
     hand_truncate = {g["table"] for g in triggers if re.search(r"\bTRUNCATE\b", g["events"])}
     return {"company": {t: v["company"] for t, v in tables.items()}, "append_only": append_only, "triggers": triggers,
             "partitions": partitions, "reads_recorded": reads_recorded, "truncate_need": need, "hand_truncate": hand_truncate}
@@ -405,9 +410,10 @@ def render_sections(fname, text, ctx):
         + (f" (here: {', '.join(reasons)})." if reasons else "."),
         "-- Row guards without UPDATE OF on in-place tables sort before set_recorded_at, so they compare rows before it runs; a",
         "-- BEFORE INSERT trigger whose function reads NEW.recorded_at sorts after it, so it sees the system's value.",
-        "-- TRUNCATE skips row triggers, so every append-only table and every table with a BEFORE DELETE guard, unless it has a",
-        "-- TRUNCATE trigger of its own, is listed in v_refuse_truncate (default partitions with their parent) and gets",
-        "-- trg_<table>_refuse_truncate (BEFORE TRUNCATE, function refuse_truncate; S2 adversarial review N4).",
+        "-- TRUNCATE skips row triggers and row-level security, so every table with company_id, every append-only table and every",
+        "-- table with a BEFORE DELETE guard, unless it has a TRUNCATE trigger of its own, is listed in v_refuse_truncate (default",
+        "-- partitions with their parent) and gets trg_<table>_refuse_truncate (BEFORE TRUNCATE, function refuse_truncate; S2",
+        "-- adversarial review N4; S2 schema review R6-N2). Retention drops partitions and never truncates (ADR-0017 rule 19 note).",
         "-- Lab gen_overview.py --check compares this section with what schema_phase_b.py writes from the table definitions and",
         "-- triggers of the design files. The functions are defined in every file because the labs load subsets.",
         "CREATE OR REPLACE FUNCTION set_recorded_at() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$",
@@ -417,7 +423,7 @@ def render_sections(fname, text, ctx):
         "END $$;",
         "CREATE OR REPLACE FUNCTION refuse_truncate() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$",
         "BEGIN",
-        "    RAISE EXCEPTION '% is never truncated (append-only or guarded rows)', TG_TABLE_NAME USING ERRCODE = 'restrict_violation';",
+        "    RAISE EXCEPTION '% is never truncated (company, append-only or guarded rows)', TG_TABLE_NAME USING ERRCODE = 'restrict_violation';",
         "END $$;",
         "DO $$",
         "DECLARE",
@@ -508,6 +514,16 @@ TABLE_WORD_RE = re.compile(r"CREATE\s+(?:(?:GLOBAL|LOCAL|TEMP|TEMPORARY|UNLOGGED
 BODY_DDL_RE = re.compile(r"\b(?:CREATE|ALTER|DROP)\s+(?:(?:GLOBAL|LOCAL|TEMP|TEMPORARY|UNLOGGED|OR\s+REPLACE|CONSTRAINT)\s+)*"
                          r"(?:TABLE|TRIGGER|POLICY|FUNCTION)\b|\bROW\s+LEVEL\s+SECURITY\b|\b(?:DISABLE|ENABLE)\s+TRIGGER\b", re.I)
 ALTER_OK_RE = re.compile(r"ALTER TABLE \w+ ADD (?:CONSTRAINT \w+ )?(?:FOREIGN KEY|UNIQUE|CHECK|EXCLUDE)\b")
+BYPASS_RES = (
+    (re.compile(r"\bCREATE\s+(?:OR\s+REPLACE\s+)?RULE\b", re.I), "CREATE RULE (a rewrite rule runs instead of the statement)"),
+    (re.compile(r"\bGRANT\b[^;]*\bTO\s+(?:[\w\", ]*,\s*)?PUBLIC\b", re.I), "GRANT ... TO PUBLIC"),
+    (re.compile(r"\bsession_replication_role\b", re.I), "SET session_replication_role (it switches off row triggers and keys)"),
+    (re.compile(r"\bCREATE\s+EVENT\s+TRIGGER\b", re.I), "CREATE EVENT TRIGGER"),
+    (re.compile(r"\bSELECT\b[^;]*?\bINTO\s+(?:TEMP|TEMPORARY|UNLOGGED|TABLE)\b", re.I), "SELECT ... INTO a table (it creates a table the guard cannot read)"),
+)
+# A top-level SELECT (or WITH ... SELECT) with INTO creates a table; inside a PL/pgSQL body SELECT ... INTO sets a variable.
+SELECT_INTO_RE = re.compile(r"(?:WITH\b.*?)?\bSELECT\b.*?\bINTO\b", re.I)
+
 
 
 def syntax_errors(fname, pre):
@@ -532,6 +548,16 @@ def syntax_errors(fname, pre):
             errors.append(f"{where}: {code.split()[0]} statement outside the generated sections, which the guard cannot check")
         if re.search(r"\bROW\s+LEVEL\s+SECURITY\b|\bCREATE\s+POLICY\b", code, re.I):
             errors.append(f"{where}: row-level security outside the generated section (schema_phase_b.py writes it)")
+        # statements that bypass row triggers or policies (S2 adversarial review, second pass, N2), anywhere in the hand-written
+        # part, function bodies and DO blocks included (bodies are not masked here: their text is code)
+        raw = " ".join(re.sub(r"--[^\n]*", "", stmt).split())
+        for pattern, what in BYPASS_RES:
+            if pattern.search(raw):
+                errors.append(f"{where}: {what}, which bypasses the triggers or policies the guard checks")
+        if re.match(r"(?:WITH|SELECT)\b", code, re.I) and SELECT_INTO_RE.match(code):
+            errors.append(f"{where}: SELECT ... INTO a table (it creates a table the guard cannot read), which bypasses the triggers "
+                          "or policies the guard checks")
+
         for m in re.finditer(r"\bREFERENCES\b", code, re.I):
             if not re.match(r"REFERENCES \w+ \((?!\s*\))", code[m.start():]):
                 errors.append(f"{where}: REFERENCES the guard cannot parse (write REFERENCES <table> (<columns>): uppercase, "
@@ -1389,7 +1415,26 @@ SELFTESTS = (
          "function without SET search_path"),
         ("a lowercase trigger statement", "create trigger trg_lab before update on list_variant for each row execute function set_recorded_at();",
          "trigger statement the guard cannot parse"),
+        # adversarial second pass N2: statements that bypass row triggers or policies
+        ("CREATE RULE ... DO INSTEAD NOTHING", "CREATE RULE lab_r AS ON UPDATE TO list_variant DO INSTEAD NOTHING;", "CREATE RULE"),
+        ("GRANT ALL ... TO PUBLIC", "GRANT ALL ON list_variant TO PUBLIC;", "GRANT ... TO PUBLIC"),
+        ("SET session_replication_role", "SET session_replication_role = replica;", "SET session_replication_role"),
+        ("session_replication_role through set_config", "SELECT set_config('session_replication_role', 'replica', false);", "SET session_replication_role"),
+        ("session_replication_role inside a function body",
+         "CREATE FUNCTION lab_f() RETURNS void LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$ BEGIN "
+         "PERFORM set_config('session_replication_role', 'replica', true); END $$;", "SET session_replication_role"),
+        ("CREATE EVENT TRIGGER", "CREATE EVENT TRIGGER lab_e ON ddl_command_start EXECUTE FUNCTION set_recorded_at();", "CREATE EVENT TRIGGER"),
+        ("SELECT ... INTO a table", "SELECT * INTO lab_t FROM list_variant;", "SELECT ... INTO a table"),
+        ("SELECT ... INTO TEMP in a DO block", "DO $$ BEGIN EXECUTE 'SELECT * INTO TEMP lab_t FROM list_variant'; END $$;", "SELECT ... INTO a table"),
     )),
+    ("a company table updated in place (stock_value) left out of the TRUNCATE guards", "DS-22-09-42-commercial-inventory.sql",
+     "'material_document', 'stock_value', 'stock_quantity',", "'material_document', 'stock_quantity',",
+     "DS-22-09-42-commercial-inventory.sql: the generated sections differ"),
+    ("a shared reference table (uom_alias) left out of the TRUNCATE guards", "DS-20-master-data.sql",
+     "v_refuse_truncate   text[] := ARRAY['company_currency_activation', 'uom', 'uom_alias',", "v_refuse_truncate   text[] := ARRAY['company_currency_activation', 'uom',",
+     "DS-20-master-data.sql: the generated sections differ"),
+
+
     ("a company table left out of the row-level security section", "DS-30-ui.sql",
      "    v_tables    text[] := ARRAY['assist_request', 'list_variant'];", "    v_tables    text[] := ARRAY['assist_request'];",
      "DS-30-ui.sql: the generated sections differ"),

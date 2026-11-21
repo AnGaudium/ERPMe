@@ -1880,9 +1880,10 @@ ALTER TABLE production_order ADD CONSTRAINT fk_production_order_cost_object FORE
 -- Append-only tables are those whose guard trigger refuses every update outside an erasure, and pure logs.
 -- Row guards without UPDATE OF on in-place tables sort before set_recorded_at, so they compare rows before it runs; a
 -- BEFORE INSERT trigger whose function reads NEW.recorded_at sorts after it, so it sees the system's value.
--- TRUNCATE skips row triggers, so every append-only table and every table with a BEFORE DELETE guard, unless it has a
--- TRUNCATE trigger of its own, is listed in v_refuse_truncate (default partitions with their parent) and gets
--- trg_<table>_refuse_truncate (BEFORE TRUNCATE, function refuse_truncate; S2 adversarial review N4).
+-- TRUNCATE skips row triggers and row-level security, so every table with company_id, every append-only table and every
+-- table with a BEFORE DELETE guard, unless it has a TRUNCATE trigger of its own, is listed in v_refuse_truncate (default
+-- partitions with their parent) and gets trg_<table>_refuse_truncate (BEFORE TRUNCATE, function refuse_truncate; S2
+-- adversarial review N4; S2 schema review R6-N2). Retention drops partitions and never truncates (ADR-0017 rule 19 note).
 -- Lab gen_overview.py --check compares this section with what schema_phase_b.py writes from the table definitions and
 -- triggers of the design files. The functions are defined in every file because the labs load subsets.
 CREATE OR REPLACE FUNCTION set_recorded_at() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
@@ -1892,7 +1893,7 @@ BEGIN
 END $$;
 CREATE OR REPLACE FUNCTION refuse_truncate() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 BEGIN
-    RAISE EXCEPTION '% is never truncated (append-only or guarded rows)', TG_TABLE_NAME USING ERRCODE = 'restrict_violation';
+    RAISE EXCEPTION '% is never truncated (company, append-only or guarded rows)', TG_TABLE_NAME USING ERRCODE = 'restrict_violation';
 END $$;
 DO $$
 DECLARE
@@ -1915,9 +1916,24 @@ DECLARE
         'production_cost_settlement', 'production_cost_settlement_line', 'production_order_period_cost',
         'production_order_period_cost_detail'];
     v_append_only       text[] := ARRAY[]::text[];
-    v_refuse_truncate   text[] := ARRAY['bill_of_materials_revision', 'bill_of_materials_component', 'bill_of_materials_output', 'routing_revision',
-        'routing_operation', 'routing_operation_activity', 'cost_estimate', 'cost_estimate_line',
-        'cost_estimate_sheet_row', 'cost_estimate_gap']::text[];
+    v_refuse_truncate   text[] := ARRAY['planning_setting', 'planning_run', 'planning_state', 'production_structure', 'transfer_route',
+        'item_warehouse_planning', 'supplier_item', 'supplier_purchasing_term', 'supplier_item_lead_time', 'sales_history',
+        'demand_event', 'demand_event_window', 'forecast_run', 'forecast_line', 'forecast_adjustment',
+        'demand_supply_line', 'activity_type', 'stop_reason', 'resource_group', 'work_center', 'work_center_activity',
+        'bill_of_materials', 'bill_of_materials_revision', 'bill_of_materials_component', 'bill_of_materials_output',
+        'routing', 'routing_revision', 'routing_operation', 'routing_operation_activity', 'production_version',
+        'item_production_setting', 'item_low_level_code', 'planned_order', 'planned_order_component',
+        'planned_order_operation', 'planned_order_pegging', 'planning_action_message', 'planning_exception',
+        'replenishment_request', 'replenishment_request_line', 'production_order', 'production_order_component',
+        'production_order_output', 'production_order_operation', 'production_order_operation_activity',
+        'operation_execution', 'operation_assignment', 'operation_time_log', 'production_order_output_serial',
+        'production_issue', 'production_issue_line', 'operation_confirmation', 'operation_confirmation_activity',
+        'operation_confirmation_time_log', 'production_receipt', 'production_receipt_line', 'operation_progress_component',
+        'cost_component_detail', 'cost_component_detail_mapping', 'costing_sheet', 'costing_sheet_row',
+        'costing_sheet_base_member', 'costing_sheet_rate', 'site_costing_sheet', 'cost_estimate', 'cost_estimate_line',
+        'cost_estimate_sheet_row', 'cost_estimate_gap', 'activity_rate', 'pool_allocation_rule', 'normal_capacity',
+        'production_cost_settlement', 'production_cost_settlement_line', 'production_order_period_cost',
+        'production_order_period_cost_detail']::text[];
     v_table             text;
 BEGIN
     FOREACH v_table IN ARRAY v_tables LOOP

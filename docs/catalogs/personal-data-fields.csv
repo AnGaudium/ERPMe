@@ -262,6 +262,7 @@ company_setup_acknowledgement,reason,other,free_text,personal,may_contain,append
 credit_hold,release_reason,other,free_text,personal,may_contain,master,tokenize,accounting_document,ck_credit_hold_manual_release needs a non-empty reason on a manual release: tokenized (ADR-0079 rule 1)
 forecast_adjustment,reason,other,free_text,personal,may_contain,master,blank,master_data,blank gives the marker '' (rule 1)
 gr_ir_write_off,reason,other,free_text,personal,may_contain,frozen_document,tokenize,accounting_document,NOT NULL with a non-empty CHECK: tokenized
+document_tax_treatment,reason,other,free_text,personal,may_contain,frozen_document,tokenize,accounting_document,"a correction's stated treatment (ADR-0080 rule 4 note, 2026-11-21); a non-empty CHECK: tokenized"
 inspection_lot,deviation_reason,other,free_text,personal,may_contain,master,tokenize,master_data,"ck_inspection_lot_deviation needs a non-empty value when its condition holds, so NULL and the marker are both refused: tokenized (ADR-0079 rule 1)"
 nonconformance,cancel_reason,other,free_text,personal,may_contain,master,tokenize,master_data,"ck_nonconformance_closed needs a non-empty value when its condition holds, so NULL and the marker are both refused: tokenized (ADR-0079 rule 1)"
 setting_value,reason,other,free_text,personal,may_contain,append_only,tokenize,audit,NOT NULL with a non-empty CHECK: tokenized

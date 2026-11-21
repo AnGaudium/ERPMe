@@ -22,6 +22,13 @@ D: the transaction axis (ADR-0080, --load): the author's example (one product at
    tax_treatment_ambiguous; no rule raises tax_treatment_missing; a manual override is flagged; a credit note copies the
    original's treatment after the rules changed; a rate change by date through the whole chain; company rules keep the package
    protection; a posted document's treatment rows never change.
+   Closing round of S2 (2026-11-21): the precedence of package rows over company rows, whatever the load order (D14c, D16 to
+   D18; R6-S1, S2-2, S2-3); company rows only while their change proposal executes (T19 to T19e, T26a, D14a1; S2-5); a
+   correction's lines keep the original's treatment and a correction may state a corrected one with source manual and a reason
+   (D11c to D11g; N6, W6); a looping category chain and inactive item tax groups (T09a to T09c; R6-N6, N6); INV-302 (C04).
+H: tax history (--load; S2-4, R6-N5): no rate, matrix row or rule dated on or before the latest posted use of its key, no
+   delete of a used matrix row, a used tax code changes only its name and basis; unused rows may be deleted. The posted tax
+   line is written with row triggers off (the posting chain is lab t15's); every guard under test runs with them on.
 Synthetic package l10n_xx and country codes XX and YY only (D16); no country's values. The example rows live in the lab, not
 in DS-16-l10n_xx, which holds only settings.
 """
@@ -48,6 +55,10 @@ check("C02 DS-04 lists item_tax_group_missing and tax_rate_row_invalid", "| `ite
 with open(os.path.join(CAT, "invariants.csv"), encoding="utf-8", newline="") as f:
     inv = {r["code"]: r for r in csv.DictReader(f)}
 check("C03 invariants.csv has INV-302 (company tax rows approved, no shadowing), area tax", inv.get("INV-302", {}).get("area") == "tax")
+i302 = " ".join(inv.get("INV-302", {}).values())
+check("C04 INV-302 covers tax_treatment_rule (approval and the package precedence) and no longer names a partner tax group or group codes (R6-S1, W4)",
+      "tax_treatment_rule" in i302 and "partner tax group" not in i302 and "group codes" not in i302, i302[:300])
+
 
 # ======================================================================= T: the DDL (--load)
 if "--load" in sys.argv:
@@ -125,6 +136,24 @@ if "--load" in sys.argv:
         "select * from tax_effective_item_tax_group(%s, %s, '2026-11-30')", (I["co"], I["p_def"])), "item_tax_group_missing")
     check("T09 the levels stay in order with a default set: product, then category, then company",
           (resolve("p_own", "2026-12-01")[1], resolve("p_cat3", "2026-12-01")[1], resolve("p_def", "2026-12-01")[1]) == ("product", "product_category", "company"))
+    # R6-N6: a looping category chain ends with item_tax_group_missing, never a loop
+    for k in ("loopA", "loopB", "p_loop", "old", "cat_old", "p_inact", "p_cat_old"):
+        I[k] = new()
+    X("insert into product_category (id, company_id, code, name, basis) values (%s,%s,'LA','LA',%s)", (I["loopA"], I["co"], B))
+    X("insert into product_category (id, company_id, code, name, parent_id, basis) values (%s,%s,'LB','LB',%s,%s)", (I["loopB"], I["co"], I["loopA"], B))
+    X("update product_category set parent_id = %s where id = %s", (I["loopB"], I["loopA"]))
+    product("p_loop", cat="loopA")
+    trial("T09a R6-N6: a product under a looping category chain (LA -> LB -> LA) raises item_tax_group_missing, bounded at depth 64", lambda cx: cx.execute(
+        "select * from tax_effective_item_tax_group(%s, %s, '2026-11-21')", (I["co"], I["p_loop"])), "cyclic")
+    # second pass N6: an inactive item tax group found at a level is an error, never skipped for a lower level
+    X("insert into item_tax_group (id, company_id, code, name, basis, is_active) values (%s,%s,'old_rate','old_rate',%s,false)", (I["old"], I["co"], PKG))
+    X("insert into product_category (id, company_id, code, name, default_item_tax_group_id, basis) values (%s,%s,'CO','CO',%s,%s)", (I["cat_old"], I["co"], I["old"], B))
+    product("p_inact", cat="cat1", group="old")
+    product("p_cat_old", cat="cat_old")
+    trial("T09b N6 (second pass): a product naming an inactive item tax group raises item_tax_group_inactive, not its category's group", lambda cx: cx.execute(
+        "select * from tax_effective_item_tax_group(%s, %s, '2026-12-01')", (I["co"], I["p_inact"])), "item_tax_group_inactive")
+    trial("T09c ... the same at the category level: the company default is not used instead", lambda cx: cx.execute(
+        "select * from tax_effective_item_tax_group(%s, %s, '2026-12-01')", (I["co"], I["p_cat_old"])), "item_tax_group_inactive")
 
     # ---- package codes, dated rates and matrix
     X("""insert into transaction_key (id, code, name, determinants, required_system_accounts, has_regime_alternatives, added_in, meaning)
@@ -191,9 +220,32 @@ if "--load" in sys.argv:
            computed_tax_transaction_amount) values (%s,%s,%s,2,%s,%s,1,0,0)""", (new(), I["co"], document("draft"), I["vat"], I["std"])), "ck_document_line_tax_item_tax_group")
 
     # ---- a company's own codes, rates and matrix rows (ADR-0041 rule 4 note, 2026-11-21)
-    for k in ("cp", "cp2"):
-        document("draft", I[k])
+    # A company tax row is written only by executing an approved change proposal of its company (S2-5): the proposal document is
+    # a change_proposal in state approved, it has an item for the table, and its change_proposal_execution exists by commit.
+    # The earlier fixture used draft sales_invoice documents as proposals; it is replaced by real proposals (design change S2-5).
+    TAX_TABLES = ("tax_code", "tax_rate", "company_tax_matrix", "tax_treatment_rule")
+
+    def proposal(k, tables=TAX_TABLES, state="approved", executed=True):
+        I[k] = new()
+        ins(c, "document", id=I[k], company_id=I["co"], document_type="change_proposal", state="draft", version=1, document_date="2026-11-21",
+            created_by_user_id=I["user"], recorded_at=datetime.now(timezone.utc))
         ins(c, "change_proposal", id=I[k], company_id=I["co"], plan="{}", plan_hash="0" * 64, reason="lab: own tax rows", document_date="2026-11-21")
+        for n_, tbl in enumerate(tables):
+            ins(c, "change_proposal_item", id=new(), company_id=I["co"], change_proposal_id=I[k], item_index=n_, command_type="CreateTaxConfiguration",
+                schema_version=1, payload="{}", target_table=tbl, field_changes="[]")
+        vid = new()
+        ins(c, "document_version", id=vid, company_id=I["co"], document_id=I[k], version=1, content='{"items": []}', version_hash="0" * 64,
+            actor_kind="human", actor_id=I["user"], is_tainted=False)
+        if state != "draft":
+            X("update document set state = %s where id = %s", (state, I[k]))
+        if executed:
+            ins(c, "change_proposal_execution", id=new(), company_id=I["co"], change_proposal_id=I[k], document_version_id=vid,
+                executed_at=datetime.now(timezone.utc))
+    proposal("cp")                                             # approved and executed, items for the four tables
+    proposal("cp_draft", state="draft", executed=False)        # a draft, as the old fixture
+    proposal("cp_unexec", executed=False)                      # approved, never executed
+    proposal("cp_noitem", tables=("tax_rate",))                # executed, but no item for tax_code
+    proposal("cp_closed", state="closed")                      # executed and closed: nothing more is written under it
 
     def own_code(cx, code="x-own", cp="cp", co="co", direction="sale"):
         cx.execute("""insert into tax_code (id, company_id, source, code, name, tax_kind, direction, calculation, sequence, transaction_key_id, deductibility, basis,
@@ -202,8 +254,19 @@ if "--load" in sys.argv:
                     I[cp] if cp else None))
     own_code(c)
     rate("x_own", "2026-01-01", 7, co="co", cp="cp", source="company")
-    check("T19 a company's own code (x- prefix, source company) and its dated rate are accepted with an approved proposal",
+    check("T19 a company's own code (x- prefix, source company) and its dated rate are accepted while their change proposal executes (approved, an item "
+          "for each table, change_proposal_execution by commit; S2-5)",
           X("select count(*) from tax_rate r join tax_code k on k.id = r.tax_code_id where k.company_id = %s and r.source = 'company'", (I["co"],)).fetchone()[0] == 1)
+    trial("T19a S2-5: a company code whose proposal is a draft is refused", lambda cx: own_code(cx, code="x-draft", cp="cp_draft"), "tax_change_proposal_invalid")
+    trial("T19b S2-5: a company code whose proposal is approved but never executed is refused at commit", lambda cx: own_code(cx, code="x-unexec", cp="cp_unexec"),
+          "was not executed")
+    trial("T19c S2-5: a company code under a proposal without an item for tax_code is refused", lambda cx: own_code(cx, code="x-noitem", cp="cp_noitem"),
+          "tax_change_proposal_invalid")
+    trial("T19d S2-5: a company code under a closed proposal is refused (its execution is over)", lambda cx: own_code(cx, code="x-closed", cp="cp_closed"),
+          "tax_change_proposal_invalid")
+    trial("T19e S2-5: a company rate whose proposal is a draft is refused", lambda cx: cx.execute(
+        "insert into tax_rate (id, company_id, source, tax_code_id, effective_from, rate_percent, basis, change_proposal_id) values (%s,%s,'company',%s,'2026-06-01',6,%s,%s)",
+        (new(), I["co"], I["x_own"], B, I["cp_draft"])), "tax_change_proposal_invalid")
     trial("T20 a company code without its proposal is refused", lambda cx: own_code(cx, code="x-no-proposal", cp=None), "ck_tax_code_scope")
     trial("T21 a company code must begin with x-, so it never equals a package code", lambda cx: own_code(cx, code="VAT_OUT" + t), "ck_tax_code_company_code")
     trial("T22 a company rate without a proposal is refused", lambda cx: cx.execute(
@@ -225,6 +288,9 @@ if "--load" in sys.argv:
     check("T25 accepted: an adjustable package key (domestic x reduced), a key with the company's own item group and one with its own treatment",
           X("select count(*) from company_tax_matrix where company_id = %s", (I["co"],)).fetchone()[0] == 3)
     trial("T26 a company matrix row without a proposal is refused", lambda cx: own_row(cx, itg="own", cp=None, day="2026-06-01"), "change_proposal_id")
+    trial("T26a S2-5: a company matrix row whose proposal is a draft is refused", lambda cx: own_row(cx, itg="own", cp="cp_draft", day="2026-06-01"),
+          "tax_change_proposal_invalid")
+
     trial("T27 a company matrix row names only codes of its package or of the company, of its direction", lambda cx: (
         own_code(cx, code="x-purchase", direction="purchase"),
         own_row(cx, itg="own", codes=("vat",), day="2026-06-01"),
@@ -253,12 +319,12 @@ if "--load" in sys.argv:
         X("""insert into tax_matrix (id, localization_package, direction, tax_treatment_code, item_tax_group_code, effective_from, tax_code_ids, basis)
              values (%s,'l10n_xx','sale',%s,'standard','2020-01-01',%s,%s)""", (new(), tr, [I["vat0"]], PKG))
 
-    def rule(direction="sale", treatment=None, priority=0, day="2020-01-01", **det):
+    def rule(direction="sale", treatment=None, priority=0, day="2020-01-01", adjustable=False, cx=None, **det):
         rid = new()
         cols_ = ["document_type", "ship_from_country", "ship_to_country", "is_tax_zone", "partner_tax_status_code", "item_kind"]
-        X(f"""insert into tax_treatment_rule (id, localization_package, direction, {', '.join(cols_)}, priority, effective_from, tax_treatment_code, basis)
-              values (%s,'l10n_xx',%s,{', '.join(['%s'] * len(cols_))},%s,%s,%s,%s)""",
-          [rid, direction] + [det.get(k) for k in cols_] + [priority, day, treatment, PKG])
+        (cx or c).execute(f"""insert into tax_treatment_rule (id, localization_package, direction, {', '.join(cols_)}, priority, effective_from, tax_treatment_code,
+              is_adjustable, basis) values (%s,'l10n_xx',%s,{', '.join(['%s'] * len(cols_))},%s,%s,%s,%s,%s)""",
+          [rid, direction] + [det.get(k) for k in cols_] + [priority, day, treatment, adjustable, PKG])
         return rid
     R_EXP = rule(treatment="export")                                                  # any sale: export (0 determinants)
     R_DOM = rule(treatment="domestic", priority=10, ship_to_country="XX")             # destination XX: domestic (1)
@@ -329,6 +395,30 @@ if "--load" in sys.argv:
     check("D11a ... it copies the original's treatment (source original), though the rules now derive export",
           later[1] == "export" and X("select tax_treatment_id, source from document_tax_treatment where document_id=%s and line_number is null", (cn,)).fetchone() == (dom[0], "original"))
     trial("D11b source original needs a corrected or reversed document", lambda cx: doc_tt(cx, document("draft"), None, dom[0], "original"), "source original needs")
+    # second pass N6 and W6: a correction's lines keep the original's treatment too (a line without its own original row takes the header's)
+    trial("D11c N6 (second pass): a credit note's line may not take the newly derived treatment either", lambda cx: doc_tt(cx, cn, 1, later[0], "rule", later[2], later[0]),
+          "copies the original")
+    doc_tt(c, cn, 1, dom[0], "original")
+    check("D11d ... its line copies the original's header treatment (the original has no line row)",
+          X("select tax_treatment_id, source from document_tax_treatment where document_id=%s and line_number = 1", (cn,)).fetchone() == (dom[0], "original"))
+
+    def correction(reversal=False):
+        did = new()
+        ins(c, "document", id=did, company_id=I["co"], document_type="credit_note", state="draft", version=1, document_date="2026-12-15",
+            created_by_user_id=I["user"], recorded_at=datetime.now(timezone.utc), **({"reversal_of_id": orig} if reversal else {"correction_of_id": orig}))
+        return did
+
+    def doc_tt_reason(cx, did, line, treatment, reason):
+        cx.execute("""insert into document_tax_treatment (id, company_id, document_id, line_number, tax_treatment_id, source, reason)
+                      values (%s,%s,%s,%s,%s,'manual',%s)""", (new(), I["co"], did, line, treatment, reason))
+    cn2 = correction()
+    doc_tt_reason(c, cn2, None, exp_[0], "lab: the original was an export billed as domestic")
+    flagged = X("select tax_treatment_id, source, differs_from_rule from document_tax_treatment where document_id=%s and line_number is null", (cn2,)).fetchone()
+    check("D11e W6: a correction that fixes a wrong treatment states the corrected one with source manual and a reason; the row is flagged (differs_from_rule)",
+          flagged == (exp_[0], "manual", True), flagged)
+    trial("D11f ... without a reason it is refused", lambda cx: doc_tt(cx, correction(), None, exp_[0], "manual"), "copies the original")
+    trial("D11g ... and a reversal, which repeats the original exactly, never states another treatment", lambda cx: doc_tt_reason(cx, correction(reversal=True), None, exp_[0], "lab"),
+          "copies the original")
     trial("D12 a posted document's treatment rows never change", lambda cx: cx.execute(
         "update document_tax_treatment set tax_treatment_id = %s where document_id = %s", (exp_[0], orig)), "immutable")
     # D13: a rate change by date through the whole chain (treatment -> matrix -> code -> rate)
@@ -337,17 +427,92 @@ if "--load" in sys.argv:
     check("D13 a rate change by date through the chain: a domestic standard sale is taxed at 8% on 2026-12-31 and 10% on 2027-01-01",
           (chain("2026-12-31"), chain("2027-01-01")) == (8, 10), (chain("2026-12-31"), chain("2027-01-01")))
     # D14: company rules keep the package protection (ADR-0041 rule 4 note)
-    def own_rule(cx, cp="cp", **det):
-        cx.execute("""insert into tax_treatment_rule (id, company_id, source, direction, ship_to_country, is_tax_zone, effective_from, tax_treatment_code, basis, change_proposal_id)
-                      values (%s,%s,'company','sale',%s,%s,'2026-01-01',%s,%s,%s)""",
-                   (new(), I["co"], det.get("ship_to"), det.get("zone"), det.get("treatment", "export"), B, I[cp] if cp else None))
+    def own_rule(cx, cp="cp", direction="sale", day="2026-01-01", priority=0, **det):
+        cx.execute("""insert into tax_treatment_rule (id, company_id, source, direction, ship_from_country, ship_to_country, is_tax_zone, item_kind, priority,
+                      effective_from, tax_treatment_code, basis, change_proposal_id) values (%s,%s,'company',%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                   (new(), I["co"], direction, det.get("ship_from"), det.get("ship_to"), det.get("zone"), det.get("kind"), priority, day,
+                    det.get("treatment", "export"), B, I[cp] if cp else None))
     trial("D14 a company rule with the determinants of a package rule not marked adjustable is refused", lambda cx: own_rule(cx, ship_to="XX"), "tax_treatment_rule_invalid")
     trial("D14a a company rule without a proposal is refused", lambda cx: own_rule(cx, cp=None, ship_to="YY"), "ck_tax_treatment_rule_scope")
+    trial("D14a1 S2-5: a company rule whose proposal is a draft is refused", lambda cx: own_rule(cx, cp="cp_draft", ship_to="YY"), "tax_change_proposal_invalid")
     trial("D14b a company rule names a treatment of its company", lambda cx: own_rule(cx, ship_to="YY", treatment="no_such"), "tax_treatment_rule_invalid")
     own_rule(c, ship_to="YY", zone=True, treatment="export_zone")
-    check("D14c a company rule with new determinants is accepted and used", derive("YY", zone=True)[1] == "export_zone")
+    # The earlier D14c ("a company rule with new determinants is accepted and used") treated the defeat of a package rule as intended;
+    # under the precedence of the ADR-0080 rule 3 note (S2-2) the general package rule R_EXP, in force and not adjustable, decides.
+    check("D14c S2-2: a company rule with new determinants is accepted, but the general package rule R_EXP matches and is not adjustable, so it decides "
+          "(export) and the company rule does not override it", derive("YY", zone=True)[1:] == ("export", R_EXP), derive("YY", zone=True))
+    own_rule(c, ship_to="XX", kind="goods", treatment="export")
+    check("D16 S2-2: a company rule with one more determinant than the package rule R_DOM (ship-to XX and goods) does not turn a domestic sale of goods "
+          "into an export: R_DOM is in force, matches and is not adjustable", derive("XX")[1:] == ("domestic", R_DOM), derive("XX"))
+    own_rule(c, kind="goods", priority=99, treatment="export")
+    check("D16a S2-2: nor does a company rule of as many determinants (goods) with a higher priority (99)", derive("XX")[1:] == ("domestic", R_DOM), derive("XX"))
+    R_ADJ = rule(treatment="export", ship_to_country="ZZ", adjustable=True)
+    own_rule(c, ship_to="ZZ", treatment="export_zone", priority=100)
+    check("D16b a matching package rule marked adjustable lets a company rule decide (export_zone for ship-to ZZ instead of the package's export)",
+          derive("ZZ")[1] == "export_zone", derive("ZZ"))
+    # R6-S1: a package rule loaded after the company rule; the purchase direction has no other package rule
+    I["tt_imp"] = new()
+    X("insert into tax_treatment (id, company_id, code, name, directions, basis) values (%s,%s,'import_goods','import_goods','{purchase}',%s)", (I["tt_imp"], I["co"], B))
+    own_rule(c, direction="purchase", ship_from="YY", treatment="domestic")
+    dp = lambda day: X("select * from tax_treatment_derive(%s,'purchase','purchase_invoice','YY','XX',false,'registered','goods',%s)", (I["co"], day)).fetchone()
+    first = dp("2026-03-01")
+    R_IMP = rule(direction="purchase", treatment="import_goods", day="2025-01-01", ship_from_country="YY")
+    check("D17 R6-S1: a company rule decides while no package rule matches; a package rule with the same determinants, not adjustable, loaded later, "
+          "decides from its own date whatever the load order or the company rule's later date",
+          first[1] == "domestic" and dp("2026-03-01")[1:] == ("import_goods", R_IMP) and dp("2025-06-01")[1:] == ("import_goods", R_IMP), (first, dp("2026-03-01")))
+    # S2-3: a company matrix row dated before a later package row
+    X("""insert into tax_matrix (id, localization_package, direction, tax_treatment_code, item_tax_group_code, effective_from, tax_code_ids, is_adjustable, basis)
+         values (%s,'l10n_xx','sale','domestic','reduced','2027-01-01',%s,false,%s)""", (new(), [I["vat"]], PKG))
+    mc = lambda day: X("select tax_code_ids, source from tax_matrix_codes(%s,'sale',%s,%s,%s)", (I["co"], dom[0], I["red"], day)).fetchone()
+    check("D18 S2-3: the company row for the adjustable key domestic x reduced (2026-01-01) is used in 2026; a package row of 2027-01-01 not marked "
+          "adjustable, loaded after it, decides from 2027 (the same precedence as the treatment rules)",
+          mc("2026-06-01") == ([I["x_own"]], "company") and mc("2027-06-01") == ([I["vat"]], "package"), (mc("2026-06-01"), mc("2027-06-01")))
+
     trial("D15 a rule's determinants never change after insert", lambda cx: cx.execute("update tax_treatment_rule set ship_to_country = 'YY' where id = %s", (R_DOM,)),
           "append-only")
+
+    # ======================================================================= H: tax history (S2-4, R6-N5; the ADR-0041 rule 2 note of 2026-11-21)
+    hd = document("draft")
+    doc_tt(c, hd, None, dom[0], "rule", R_DOM, dom[0])
+    ins(c, "document_line_tax", id=new(), company_id=I["co"], document_id=hd, line_number=1, tax_code_id=I["vat"], tax_rate_id=r8, rate_percent=8,
+        item_tax_group_id=I["std"], item_tax_group_source="product", base_transaction_amount=100, tax_transaction_amount=8, computed_tax_transaction_amount=8)
+    X("update document set state = 'posted', posted_at = now() where id = %s", (hd,))
+    # The posted tax line of hd (tax date 2026-11-10). The posting chain (journal entry, period, accounts, balance) is lab t15's; here the
+    # entry and the line are written with row triggers and keys off (the lab's superuser, session_replication_role replica, this connection
+    # only), and switched back on before any guard under test runs.
+    X("set session_replication_role = replica")
+    je = new()
+    X("""insert into journal_entry (id, company_id, document_id, posting_date, document_date, posting_period_id, fiscal_year_id, database_transaction_number, line_count)
+         values (%s,%s,%s,'2026-11-10','2026-11-10',%s,%s,pg_current_xact_id(),2)""", (je, I["co"], hd, new(), new()))
+    X("""insert into tax_line (id, company_id, document_id, line_number, journal_entry_id, tax_code_id, tax_rate_id, direction, rate_percent, transaction_currency,
+         base_transaction_amount, tax_transaction_amount, base_company_amount, tax_company_amount, tax_date, declaration_date)
+         values (%s,%s,%s,1,%s,%s,%s,'sale',8,'USD',100,8,100,8,'2026-11-10','2026-11-10')""", (new(), I["co"], hd, je, I["vat"], r8))
+    X("set session_replication_role = origin")
+    pkg_rate = lambda day: (lambda cx: cx.execute("insert into tax_rate (id, tax_code_id, effective_from, rate_percent, basis) values (%s,%s,%s,5,%s)",
+                                                  (new(), I["vat"], day, PKG)))
+    trial("H01 S2-4: a package rate of VAT_OUT dated on the latest posted tax date of the code (2026-11-10) is refused", pkg_rate("2026-11-10"), "latest tax date")
+    trial("H01a S2-4: ... and one back-dated to 2024-01-01, which would change the rate applied in 2024", pkg_rate("2024-01-01"), "latest tax date")
+    trial("H02 a rate dated after the latest posted use is accepted (rolled back afterwards)", lambda cx: (pkg_rate("2026-11-11")(cx), cx.execute("select 1/0")),
+          "division by zero")
+    trial("H03 S2-4: a package matrix row for (sale, domestic, standard) dated on or before the latest posted use of the key is refused", lambda cx: cx.execute(
+        """insert into tax_matrix (id, localization_package, direction, tax_treatment_code, item_tax_group_code, effective_from, tax_code_ids, basis)
+           values (%s,'l10n_xx','sale','domestic','standard','2026-11-01',%s,%s)""", (new(), [I["vat0"]], PKG)), "latest posted use")
+    trial("H04 S2-4: a package rule with R_DOM's determinants (sale, ship-to XX) dated before its latest posted use is refused",
+          lambda cx: rule(treatment="export", priority=10, day="2026-11-01", ship_to_country="XX", cx=cx), "latest posted use")
+    trial("H05 R6-N5: a tax code that a posted line uses never changes its calculation or sequence", lambda cx: cx.execute(
+        "update tax_code set calculation = 'none', sequence = 9 where id = %s", (I["vat"],)), "tax_code_used")
+    trial("H05a ... its name and basis may change (rolled back afterwards)", lambda cx: (cx.execute("update tax_code set name = 'Output VAT' where id = %s", (I["vat"],)),
+                                                                                       cx.execute("select 1/0")), "division by zero")
+    trial("H06 S2-4: the package matrix row a posted line used (domestic x standard, 2020) is never deleted", lambda cx: cx.execute(
+        "delete from tax_matrix where tax_treatment_code = 'domestic' and item_tax_group_code = 'standard'"), "tax_matrix_row_used")
+    trial("H06a ... an unused matrix row may be deleted by the loader (rolled back afterwards)", lambda cx: (cx.execute(
+        "delete from tax_matrix where tax_treatment_code = 'foreign_service'"), cx.execute("select 1/0")), "division by zero")
+    trial("H07 a used treatment rule (R_DOM, named by a posted treatment row) is never deleted", lambda cx: cx.execute("delete from tax_treatment_rule where id = %s", (R_DOM,)),
+          "foreign key")
+    trial("H07a ... an unused rule may be deleted (rolled back afterwards)", lambda cx: (cx.execute("delete from tax_treatment_rule where id = %s", (R_TIE,)),
+                                                                                       cx.execute("select 1/0")), "division by zero")
+    trial("H08 an unused rate may be deleted, as the comment on tax_rate says (rolled back afterwards)", lambda cx: (cx.execute(
+        "delete from tax_rate where id = %s", (r10b,)), cx.execute("select 1/0")), "division by zero")
     c.close()
 
 passed = sum(1 for ok_, *_ in RESULTS if ok_)
