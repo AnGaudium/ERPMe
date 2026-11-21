@@ -18,7 +18,12 @@ difference is a defect of the compiled spec.
    `<!-- count:tables -->N<!-- /count -->`; the lint recomputes it. Identifiers, thresholds and defaults taken from a rule
    are quoted from it, not counted.
 5. **Plain, short sentences** (AGENTS.md). One rule, one numbered statement, one predicate. IDs in backticks.
-6. **Law of other modules** is referenced by the other module's compiled spec and rule ID (`ledger R-12`), never restated.
+6. **Law of other modules** is referenced by the other module's compiled spec and rule number in the form `<module> R-<n>`
+   (`ledger R-12`), never restated. While that module has no compiled spec yet, cite its source ID (`ADR-0014.R12`). A
+   placeholder such as `inventory R-scrap` is a lint finding (L8). The `Reads` list of a section may name other modules' tables,
+   catalog rows and settings without restating them.
+7. **`process` is not a code module.** Its dossier (ADR-0001 to 0005, 0022, 0073) is compiled only if the author asks; the
+   coder's `AGENTS.md` and the runbook carry those rules.
 
 ## Required sections, in this order
 
@@ -26,7 +31,7 @@ Front matter, as a first block:
 
 ```
 Module: <module>    Chunk: <n of m | whole>    Source ADRs: <ADR-nnnn, …>
-Build step(s): <n, …>    Generated from index: <rule-index.csv commit>    Compiled by: <model>, <date>
+Build step(s): <n, …>    Generated from index: <git commit of docs/design/generated/rule-index.csv>    Compiled by: <model>, <date>
 ```
 
 | # | Section | Content | Share of budget |
@@ -41,7 +46,7 @@ Build step(s): <n, …>    Generated from index: <rule-index.csv commit>    Comp
 | 8 | `## UI annotations` | The annotations of ADR-0077 the module's declarations carry: floorplan per route, titles, facets, field annotations, work item kinds, tiles. Headless modules write `None (headless step)`. | 5% |
 | 9 | `## Conflicts` | Every `CONFLICT <rule id>: <resolution>` (rule of compiling 2), also those found by the extractor's conflict flag that proved harmless: `FALSE-POSITIVE <note id>`. | 3% |
 | 10 | `## Proposed (not law)` | Rules of proposed ADRs, or none. | as needed |
-| 11 | `## Trace` | Table `Source | Where`: one row per source rule and note ID of the module in the rule index, `Where` is the spec's R-number, section or `not applicable: <reason>` (only for non-normative notes such as thanks, review credits, history). No ID may be missing; none may be invented. | 10% |
+| 11 | `## Trace` | Table `Source | Where`: one row per source rule and note ID of the module in the rule index, `Where` is one or more of the spec's R-numbers, a section name, or `not applicable: <reason>` (never empty; any other value is a lint warning) (only for non-normative notes such as thanks, review credits, history). No ID may be missing; none may be invented. | 10% |
 
 Heading levels: `#` title, `##` sections above, `###` topics inside. Lint chunks by `## ` headings.
 
