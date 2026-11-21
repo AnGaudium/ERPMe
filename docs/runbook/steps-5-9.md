@@ -132,7 +132,7 @@ Applies to every step below:
 
 > Tax amounts on the synthetic dataset match the independent tax recomputation; the 01/GTGT return matches a hand-built golden return
 
-**Gate item** ([ADR-0078](../adr/0078-agent-simplification-for-phase-1.md) rule 13; author's delegation, 2026-11-21): the purchase invoice flow runs as a golden scenario in two variants over the same input files, with agents on recorded responses and with the LLM off, and both end in the same posted invoice.
+**Gate item** ([ADR-0078](../adr/0078-agent-simplification-for-phase-1.md) rule 13; author's delegation, 2026-11-21): the purchase invoice flow runs as a golden scenario with the LLM off, from the input files to a posted invoice. The same scenario with agents on recorded responses, over the same input files and ending in the same posted invoice, is an item of the completion of `purchase_invoice` and `document_reader`, which start only after this gate, not of this gate.
 
 **Artifacts:** tax engine; e-invoice adapter interface and BKAV adapter; 01/GTGT generator; golden return.
 

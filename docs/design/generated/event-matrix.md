@@ -9,7 +9,7 @@ Event types named in backticks in the ADRs, recognised by the event forms of the
 | `AgentRunCompleted` | `agent_run` | agent_runs | — | ADR-0050:192, ADR-0060:267 |
 | `AgentRunStarted` | `agent_run` | agent_runs | — | ADR-0050:166, ADR-0050:176 |
 | `AttachmentCreated` | `attachment` | attachments | — | ADR-0038:144, ADR-0038:152 |
-| `BankLineSuggestionRecorded` | — | — | a consumer in `cash` | ADR-0048:126, ADR-0051:196, ADR-0051:200 |
+| `BankLineSuggestionRecorded` | — | — | a consumer in `cash` | ADR-0048:126, ADR-0051:198, ADR-0051:202 |
 | `ChangeProposalApproved` | `change_proposal` | documents | — | ADR-0029:48 |
 | `ComplaintClosed` | `complaint` | crm | a consumer in `cash` | ADR-0048:243, ADR-0052:226, ADR-0052:364 |
 | `ComplaintCreated` | `complaint` | crm | a consumer in `cash` | ADR-0048:243, ADR-0052:226, ADR-0052:364 |
@@ -124,7 +124,7 @@ A module name here means the ADR speaks of a consumer of that module without nam
 | `agent_runner` | 3 | ADR-0013:30, ADR-0013:58, ADR-0013:66 |
 | `agent_wake_up` | 3 | ADR-0013:58, ADR-0050:159, ADR-0050:174 |
 | `automation_dispatch` | 3 | ADR-0013:36, ADR-0058:27, ADR-0058:97 |
-| a consumer in `cash` | 7 | ADR-0048:221, ADR-0048:243, ADR-0051:200 |
+| a consumer in `cash` | 7 | ADR-0048:221, ADR-0048:243, ADR-0051:202 |
 | `certificate_result_drafter` | 1 | ADR-0070:103 |
 | a consumer in `crm` | 7 | ADR-0048:245, ADR-0052:122, ADR-0052:177 |
 | `crm_mail_sender` | 1 | ADR-0052:292 |

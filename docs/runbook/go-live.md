@@ -6,7 +6,7 @@ No parallel run with the old software; the pilot goes live fully on NativeFlows,
 
 ## Step 10 · Platform completion (months 10–12)
 
-**Entry criteria:** step 9 gate passed; the six Phase 1 agents built ([steps-5-9.md](steps-5-9.md#agents)).
+**Entry criteria:** step 9 gate and the step 4b and 5b gates passed; the six Phase 1 agents built ([steps-5-9.md](steps-5-9.md#agents)).
 
 **Design items first:** DS-36 operations dashboard; DS-37 deployment and operations; DS-38 localization skill and basic US package; DS-39 TT133 regime. TT133 status and B03 are verified before this gate ([ADR-0003](../adr/0003-build-operating-rules.md) R10).
 
