@@ -1905,6 +1905,10 @@ if "--load" in sys.argv:
     for k, fy, n, kind, a, b in (("mig", "fym", 1, "regular", "2026-09-30", "2026-09-30"), ("oct", "fy", 1, "regular", "2026-10-01", "2026-10-31"),
                                  ("nov", "fy", 2, "regular", "2026-11-01", "2026-11-30"), ("spc", "fy", 3, "special", "2026-11-30", "2026-11-30")):
         ins_posting_period(X, I[k], I["co"], I[fy], n, a, b, kind)
+        if kind == "special":   # ADR-0012 rules 4, 6 (enforced since the adversarial fourth pass, F4-1): general only, created soft_locked,
+            ins_area_state(X, I["co"], I[k], "general", "soft_locked")   # then opened (OpenPostingPeriod) so the lab can post into it
+            X("update posting_period_area_state set state = 'open' where posting_period_id = %s", (I[k],))
+            continue
         for area in ("general", "inventory", "receivable", "payable"):
             ins_area_state(X, I["co"], I[k], area, "open")
     has_snap = "uom_numerator" in cols["sales_invoice_line"]

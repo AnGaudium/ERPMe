@@ -596,6 +596,7 @@ def check_keys_and_recorded_at(docs):
     named = design_texts(design)
     ctx = design_context(named)
     seen_rls, seen_shared, seen_self = set(), set(), set()
+    defined_functions = {}
     for fname, text in named:
         start = generated_start(text)
         pre = text[:start]
@@ -634,6 +635,15 @@ def check_keys_and_recorded_at(docs):
                 if not ctx["company"].get(name):
                     errors.append(f"RLS_ALLOWLIST names {name}, which has no company_id; remove it")
         errors += syntax_errors(fname, pre)
+        for stmt, line in split_sql(pre, fname):   # one definition per hand-written function across the files (fourth pass note)
+            fm = re.match(r"CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+(?:\"?\w+\"?\.)?\"?(\w+)\"?\s*\(", " ".join(mask_sql(stmt).split()), re.I)
+            if fm and fm.group(1).lower() not in GENERATED_FUNCTIONS:
+                name = fm.group(1).lower()
+                if name in defined_functions:
+                    errors.append(f"design/{fname}:{line}: function {name}() is defined a second time (first in {defined_functions[name]}); "
+                                  "a later definition would replace the guard every earlier table relies on (S2 adversarial review, fourth pass)")
+                else:
+                    defined_functions[name] = f"design/{fname}:{line}"
         # the generated sections, character for character
         if text != render_file(fname, text, ctx):
             errors.append(f"design/{fname}: the generated sections differ from what schema_phase_b.py writes (run it)")
@@ -1448,6 +1458,9 @@ SELFTESTS = (
         ("a second set_recorded_at() that does nothing",
          "CREATE OR REPLACE FUNCTION set_recorded_at() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$ "
          "BEGIN RETURN NEW; END $$;", "a hand-written definition of set_recorded_at()"),
+        ("a second definition of a hand-written guard function in a later file (journal_reject_change)",
+         "CREATE OR REPLACE FUNCTION journal_reject_change() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$ "
+         "BEGIN RETURN NEW; END $$;", "function journal_reject_change() is defined a second time"),
         ("a schema-qualified refuse_truncate()",
          "CREATE OR REPLACE FUNCTION nativeflows.refuse_truncate() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$ "
          "BEGIN RETURN NULL; END $$;", "a hand-written definition of refuse_truncate()"),

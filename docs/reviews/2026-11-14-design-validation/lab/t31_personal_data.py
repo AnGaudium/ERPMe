@@ -1117,6 +1117,18 @@ if "--load" in sys.argv:
               where n.nspname = 'nativeflows' and not exists (select 1 from pg_depend d where d.classid = 'pg_proc'::regclass and d.objid = p.oid and d.deptype = 'e')
                 and not coalesce(p.proconfig, '{}') @> array['search_path=nativeflows, pg_temp']""").fetchall()]
     check("Z06 every function of the design pins search_path = nativeflows, pg_temp (S2 adversarial review N3; extension functions aside)", not bad, bad[:8])
+    # Adversarial fourth pass F4-2: a trigger function with its caller's rights that calls a function revoked from PUBLIC fails for
+    # every application role (a trigger fires without EXECUTE on its own function, but not on what it calls). Read from the catalog:
+    # the functions of the design that PUBLIC cannot execute, and the bodies of the trigger functions without definer rights that
+    # name one of them as a call (name followed by a parenthesis, schema-qualified or not; comments and string literals stripped).
+    revoked = {r[0] for r in X("""select p.proname from pg_proc p where p.pronamespace = 'nativeflows'::regnamespace
+              and not has_function_privilege('public', p.oid, 'EXECUTE')""").fetchall()}
+    callers = X("""select distinct p.proname, p.prosrc from pg_trigger g join pg_proc p on p.oid = g.tgfoid
+              where p.pronamespace = 'nativeflows'::regnamespace and not g.tgisinternal and not p.prosecdef""").fetchall()
+    bad = sorted({(n, f) for n, src in callers for f in revoked
+                  if re.search(r"(?<![\w.])(?:nativeflows\.)?" + re.escape(f) + r"\s*\(", re.sub(r"'(?:[^']|'')*'", "''", re.sub(r"--[^\n]*", "", src)))})
+    check(f"Z09 F4-2: no trigger function with its caller's rights calls one of the {len(revoked)} functions revoked from PUBLIC "
+          f"({len(callers)} such trigger functions read)", not bad and len(revoked) >= 5 and len(callers) > 50, bad[:8])
     for t in ("audit_record", "document_version", "approval"):
         trial(f"Z07 TRUNCATE {t} is refused (S2 adversarial review N4)", lambda cx, t=t: cx.execute(f"truncate {t} cascade"), "never truncated")
     for t in ("stock_value", "stock_quantity", "idempotency_record", "posting_period_area_state", "uom_alias", "account_period_balance"):

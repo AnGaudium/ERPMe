@@ -868,6 +868,8 @@ trial("K13 N5: a locked area's row is never deleted (and so never recreated as o
 # T3-1 (S2 adversarial review, third pass): a locked period was reopened by moving its dates. A period with an area row that is not
 # open, or with a journal entry, never changes its dates, fiscal year, kind or number and is never deleted; its fiscal year never
 # changes its dates or code and is never deleted. PER10 (October) is locked; I["per"] (November) is open and has the entry JE.
+# The lab stub of material_document (moved, part A) lacks the design columns posting_period_in_use reads (R8-N1); add them here.
+X("ALTER TABLE material_document ADD COLUMN IF NOT EXISTS company_id uuid, ADD COLUMN IF NOT EXISTS posting_date date")
 PER12, FY27 = new(), new()
 ins_posting_period(X, PER12, I["co"], I["fy"], 12, "2026-12-01", "2026-12-31")     # no area row and no entry yet
 ins_fiscal_year(X, FY27, I["co"], "2027", "2027-01-01", "2027-12-31")              # no period yet
@@ -908,6 +910,51 @@ trial("K20a T3-1: ... and a fiscal year with no such period may change its dates
     "update fiscal_year set end_date = '2027-12-30', code = '2027b' where id = %s", (FY27,)), cx.execute("select 1/0")), True, "division by zero")
 trial("K20b T3-1: a soft-locked area counts too: December, once soft-locked, never moves its dates", lambda cx: (
     ins_area_state(cx.execute, I["co"], PER12, "general", "soft_locked"), period_dates(cx, PER12, "2026-12-01", "2026-12-30")), True, "posting_period_frozen")
+
+# F4-1 (adversarial fourth pass): a one-day special period inserted on a date of a locked month with open areas let an entry post
+# there. ADR-0012 rules 1, 2, 4, 6: a special period lies on its fiscal year's last day, has only the general area and starts
+# soft_locked; a regular period lies inside its fiscal year. October (PER10) is locked; the fiscal year ends 2026-12-31.
+
+
+def special_period(cx, day, areas=(("general", "soft_locked"),), number=13):
+    pid = new()
+    ins_posting_period(cx.execute, pid, I["co"], I["fy"], number, day, day, kind="special")
+    for area, state in areas:
+        ins_area_state(cx.execute, I["co"], pid, area, state)
+    return pid
+
+
+def f41_sequence(cx):
+    """The reviewer's reproduction: a special period on 2026-10-15 with four open areas, and an entry posted into it."""
+    pid = special_period(cx, "2026-10-15", areas=[(a, "open") for a in ("general", "inventory", "receivable", "payable")])
+    je = new()
+    cx.execute("insert into journal_entry (id, company_id, document_id, posting_date, document_date, posting_period_id, fiscal_year_id, line_count) values (%s,%s,%s,%s,%s,%s,%s,2)",
+               (je, I["co"], doc(cx, new(), "purchase_invoice", partner=I["p1"]), "2026-10-15", "2026-10-15", pid, I["fy"]))
+    for n, side, amt, acc in ((1, "debit", 1000, "acRev"), (2, "credit", -1000, "acBank2")):
+        cx.execute("""insert into journal_line (id, journal_entry_id, company_id, line_number, posting_period_id, posting_date, fiscal_year_id, account_id,
+                      system_account_id, side, transaction_currency, transaction_amount, company_currency, company_amount) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'VND',%s,'VND',%s)""",
+                   (new(), je, I["co"], n, pid, "2026-10-15", I["fy"], I[acc], I["sa"], side, amt, amt))
+
+
+trial("K21 F4-1: the reviewer's sequence (a special period on 2026-10-15 in locked October with four open areas, and an entry posted into it) is "
+      "refused at its first step", f41_sequence, True, "posting_period_invalid")
+trial("K22 F4-1: a special period on the fiscal year's last day (2026-12-31) with general soft_locked is accepted (rolled back afterwards)",
+      lambda cx: (special_period(cx, "2026-12-31"), cx.execute("select 1/0")), True, "division by zero")
+trial("K23 F4-1: a special period has only the general area", lambda cx: special_period(cx, "2026-12-31", areas=(("general", "soft_locked"), ("inventory", "soft_locked"))),
+      True, "only the general area")
+trial("K24 F4-1: a special period's area row does not start open", lambda cx: special_period(cx, "2026-12-31", areas=(("general", "open"),)), True,
+      "starting soft_locked")
+trial("K25 F4-1: a regular period lies inside its fiscal year (2027-02 in the fiscal year 2026 is refused)", lambda cx: ins_posting_period(
+    cx.execute, new(), I["co"], I["fy"], 14, "2027-02-01", "2027-02-28"), True, "inside its fiscal year")
+trial("K26 F4-1: an unused period cannot be moved outside its fiscal year either", lambda cx: period_dates(cx, PER12, "2027-01-01", "2027-01-31"), True,
+      "inside its fiscal year")
+trial("K27 fourth pass: an area row of a period with a journal entry (November, open) is never deleted", lambda cx: cx.execute(
+    "delete from posting_period_area_state where posting_period_id = %s and area = 'general'", (I["per"],)), True, "posting_period_frozen")
+trial("K27a ... an area row of a period without one may be (rolled back afterwards)", lambda cx: (ins_area_state(cx.execute, I["co"], PER12, "general", "open"),
+      cx.execute("delete from posting_period_area_state where posting_period_id = %s", (PER12,)), cx.execute("select 1/0")), True, "division by zero")
+trial("K28 R8-N1: a material document dated in a period (December, no area row, no entry) freezes the period's dates", lambda cx: (
+    cx.execute("insert into material_document (id, document_id, company_id, posting_date) values (%s,%s,%s,'2026-12-10')",
+               (new(), doc(cx, new(), "purchase_invoice", partner=I["p1"]), I["co"])), period_dates(cx, PER12, "2026-12-01", "2026-12-30")), True, "posting_period_frozen")
 
 # ======================================================================= L: final simulation review, 2026-11-15
 # The payment block on open_item_collection (ADR-0048 rule 17 note; ADR-0063 rule 27 note) and the settings auto-post evidence

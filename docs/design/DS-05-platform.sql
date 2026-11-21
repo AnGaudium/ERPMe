@@ -1191,18 +1191,36 @@ CREATE TABLE document_tax_treatment (
         WHEN 'original' THEN tax_treatment_rule_id IS NULL AND derived_tax_treatment_id IS NULL
         ELSE (tax_treatment_rule_id IS NULL) = (derived_tax_treatment_id IS NULL) END)
 );
--- The latest tax date of a posted use of a matrix key (ADR-0041 rule 2 note of 2026-11-21, S2-4): the posted tax_line rows of
--- the direction whose document line has the item tax group code and whose treatment (the line's row, else the header's) has the
--- treatment code, in the package's companies (p_company_id null) or in one company. Read by the matrix insert and delete
--- guards. R7-N1 (S2 schema review round 7): the guards run in the writer's session, and row-level security would hide the other
--- companies' tax lines from it (under installation, all of them), so a back-dated package row would pass. This function and the
--- three below (tax_treatment_rule_key_last_use, tax_code_last_use, tax_code_is_used) therefore run with definer rights: they
--- are owned by nativeflows_migration, the loading role and the one role with BYPASSRLS (ADR-0017 rule 18; the ownership is set
--- with the database roles, DS-18, and until then the owner is whoever loaded the DDL, in the labs the superuser), name every
--- table with the schema, pin search_path = nativeflows, pg_temp, and return only a date or a boolean, never a row. EXECUTE is
--- revoked from PUBLIC beside each function; DS-18 grants it to the application roles that write tax rows. No side effects; STABLE.
+-- Tax history helpers (ADR-0041 rule 2 note of 2026-11-21, S2-4; R7-N1; adversarial fourth pass F4-2; S2 schema review R8-S1).
+-- The guards that read posted tax lines across companies are trigger functions with definer rights (tax_rate_check_insert,
+-- tax_matrix_check_insert, tax_matrix_check_delete, tax_treatment_rule_check_insert, tax_code_check_change): a trigger fires
+-- without EXECUTE on its function, so no session can call them, and they run as their owner, nativeflows_migration, the loading
+-- role and the one role with BYPASSRLS (ADR-0017 rule 18; the ownership is set with the database roles, DS-18; until then the
+-- owner is whoever loaded the DDL, in the labs the superuser). Each first calls tax_history_check_scope with the company of the
+-- row being written: a company row only in its own company's session, a package row (company_id null) only under the
+-- installation scope or by a role with BYPASSRLS, so no session learns anything about another company's posted lines, not even
+-- through whether a refusal comes. The helpers below take the company from that row (a company row's own company; null, all
+-- companies of the package, only for a package row), run with their caller's rights and have EXECUTE revoked from PUBLIC for
+-- good: only those definer triggers (as owner) and the package loader (the migration role, installation scope) call them; no
+-- application role is ever granted them. They name every table with the schema, pin search_path = nativeflows, pg_temp, and
+-- return only a date or a boolean. No side effects; STABLE.
+CREATE FUNCTION tax_history_check_scope(p_company_id uuid) RETURNS void LANGUAGE plpgsql STABLE SET search_path = nativeflows, pg_temp AS $$
+DECLARE
+    v_role  text := CASE WHEN current_setting('role') = 'none' THEN session_user::text ELSE current_setting('role') END;   -- the invoking role, also inside a definer function
+BEGIN
+    IF coalesce(current_setting('nativeflows.company_id', true), '') = coalesce(p_company_id::text, 'installation')
+       OR EXISTS (SELECT 1 FROM pg_catalog.pg_roles r WHERE r.rolname = v_role AND (r.rolbypassrls OR r.rolsuper)) THEN
+        RETURN;
+    END IF;
+    RAISE EXCEPTION 'tax_history_scope: a % tax row is written only under %', CASE WHEN p_company_id IS NULL THEN 'package' ELSE 'company' END,
+        CASE WHEN p_company_id IS NULL THEN 'the installation scope' ELSE 'its own company''s scope' END USING ERRCODE = 'insufficient_privilege';
+END
+$$;
+-- The latest tax date of a posted use of a matrix key: the posted tax_line rows of the direction whose document line has the item
+-- tax group code and whose treatment (the line's row, else the header's) has the treatment code, in the package's companies
+-- (p_company_id null: a package row) or in the row's company. Read by the matrix insert and delete guards.
 CREATE FUNCTION tax_matrix_key_last_use(p_package text, p_company_id uuid, p_direction text, p_tax_treatment_code text, p_item_tax_group_code text)
-    RETURNS date LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = nativeflows, pg_temp AS $$
+    RETURNS date LANGUAGE plpgsql STABLE SET search_path = nativeflows, pg_temp AS $$
 BEGIN
     RETURN (SELECT max(l.tax_date) FROM nativeflows.tax_line l
       JOIN nativeflows.company co ON co.id = l.company_id
@@ -1216,15 +1234,15 @@ BEGIN
 END
 $$;
 REVOKE EXECUTE ON FUNCTION tax_matrix_key_last_use(text, uuid, text, text, text) FROM PUBLIC;
--- The latest tax date of a posted use of a treatment rule's determinant set (ADR-0041 rule 2 note of 2026-11-21): the posted
--- tax_line rows of documents whose treatment row names a rule of the same source (package or company), direction and
--- determinants. Definer rights, as tax_matrix_key_last_use (R7-N1). No side effects; STABLE.
-CREATE FUNCTION tax_treatment_rule_key_last_use(p tax_treatment_rule) RETURNS date LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = nativeflows, pg_temp AS $$
+-- The latest tax date of a posted use of a treatment rule's determinant set: the posted tax_line rows of documents whose
+-- treatment row names a rule of the same source (package or the row's company), direction and determinants.
+CREATE FUNCTION tax_treatment_rule_key_last_use(p tax_treatment_rule) RETURNS date LANGUAGE plpgsql STABLE SET search_path = nativeflows, pg_temp AS $$
 BEGIN
     RETURN (SELECT max(l.tax_date) FROM nativeflows.document_tax_treatment d
       JOIN nativeflows.tax_treatment_rule r ON r.id = d.tax_treatment_rule_id
       JOIN nativeflows.tax_line l ON l.document_id = d.document_id AND (d.line_number IS NULL OR l.line_number = d.line_number)
      WHERE r.company_id IS NOT DISTINCT FROM p.company_id AND r.localization_package IS NOT DISTINCT FROM p.localization_package
+       AND (p.company_id IS NULL OR l.company_id = p.company_id)
        AND r.direction = p.direction AND r.document_type IS NOT DISTINCT FROM p.document_type
        AND r.ship_from_country IS NOT DISTINCT FROM p.ship_from_country AND r.ship_to_country IS NOT DISTINCT FROM p.ship_to_country
        AND r.is_tax_zone IS NOT DISTINCT FROM p.is_tax_zone AND r.partner_tax_status_code IS NOT DISTINCT FROM p.partner_tax_status_code
@@ -1233,26 +1251,27 @@ END
 $$;
 REVOKE EXECUTE ON FUNCTION tax_treatment_rule_key_last_use(tax_treatment_rule) FROM PUBLIC;
 -- The latest tax date of a posted tax_line of a code, and whether a posted tax row uses the code (a tax_line, or a
--- document_line_tax of a document that is no longer a draft): read by tax_rate_check_insert and tax_code_check_change. Definer
--- rights, as tax_matrix_key_last_use (R7-N1). No side effects; STABLE.
-CREATE FUNCTION tax_code_last_use(p_tax_code_id uuid) RETURNS date LANGUAGE sql STABLE SECURITY DEFINER SET search_path = nativeflows, pg_temp AS $$
-    SELECT max(l.tax_date) FROM nativeflows.tax_line l WHERE l.tax_code_id = p_tax_code_id
+-- document_line_tax of a document that is no longer a draft), in the row's company (p_company_id: a company code is used only
+-- by its company) or in every company (null: a package code). Read by tax_rate_check_insert and tax_code_check_change.
+CREATE FUNCTION tax_code_last_use(p_tax_code_id uuid, p_company_id uuid) RETURNS date LANGUAGE sql STABLE SET search_path = nativeflows, pg_temp AS $$
+    SELECT max(l.tax_date) FROM nativeflows.tax_line l WHERE l.tax_code_id = p_tax_code_id AND (p_company_id IS NULL OR l.company_id = p_company_id)
 $$;
-REVOKE EXECUTE ON FUNCTION tax_code_last_use(uuid) FROM PUBLIC;
-CREATE FUNCTION tax_code_is_used(p_tax_code_id uuid) RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = nativeflows, pg_temp AS $$
-    SELECT EXISTS (SELECT 1 FROM nativeflows.tax_line l WHERE l.tax_code_id = p_tax_code_id)
+REVOKE EXECUTE ON FUNCTION tax_code_last_use(uuid, uuid) FROM PUBLIC;
+CREATE FUNCTION tax_code_is_used(p_tax_code_id uuid, p_company_id uuid) RETURNS boolean LANGUAGE sql STABLE SET search_path = nativeflows, pg_temp AS $$
+    SELECT EXISTS (SELECT 1 FROM nativeflows.tax_line l WHERE l.tax_code_id = p_tax_code_id AND (p_company_id IS NULL OR l.company_id = p_company_id))
         OR EXISTS (SELECT 1 FROM nativeflows.document_line_tax t JOIN nativeflows.document d ON d.company_id = t.company_id AND d.id = t.document_id
-                    WHERE t.tax_code_id = p_tax_code_id AND d.state NOT IN ('draft', 'canceled'))
+                    WHERE t.tax_code_id = p_tax_code_id AND d.state NOT IN ('draft', 'canceled') AND (p_company_id IS NULL OR t.company_id = p_company_id))
 $$;
-REVOKE EXECUTE ON FUNCTION tax_code_is_used(uuid) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION tax_code_is_used(uuid, uuid) FROM PUBLIC;
 -- A rule is never dated on or before the latest posted use of its determinant set (ADR-0041 rule 2 note). A company rule names a
 -- treatment and a status of its company, and is refused where its package has a rule with the same determinants not marked
 -- adjustable: early feedback only; the precedence of tax_treatment_derive holds whatever the load order (ADR-0080 rule 3 note).
-CREATE FUNCTION tax_treatment_rule_check_insert() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
+CREATE FUNCTION tax_treatment_rule_check_insert() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = nativeflows, pg_temp AS $$
 DECLARE
     v_package  text;
     v_used     date;
 BEGIN
+    PERFORM nativeflows.tax_history_check_scope(NEW.company_id);   -- definer rights: the row's own scope first (F4-2)
     v_used := nativeflows.tax_treatment_rule_key_last_use(NEW);
     IF v_used IS NOT NULL AND NEW.effective_from <= v_used THEN
         RAISE EXCEPTION 'tax_treatment_rule_invalid: a rule dated % is on or before %, the latest posted use of its determinants (a back-dated rule would change applied treatments)',
@@ -1446,17 +1465,18 @@ END
 $$;
 -- A rate's code has the rate's company (both null, or the same company): a company dates only its own codes' rates, and a
 -- package never dates a company code (ADR-0041 rule 4 note, 2026-11-21). A rate is never dated on or before the latest tax
--- date of a posted tax_line of its code (ADR-0041 rule 2 note of 2026-11-21, S2-4), read by tax_code_last_use with definer
--- rights, so the guard holds under any writing role (R7-N1).
-CREATE FUNCTION tax_rate_check_insert() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
+-- date of a posted tax_line of its code in the rate's company, or in every company for a package code (ADR-0041 rule 2 note of
+-- 2026-11-21, S2-4); a definer trigger, so the guard holds under any writing role (R7-N1, F4-2; tax history helpers above).
+CREATE FUNCTION tax_rate_check_insert() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = nativeflows, pg_temp AS $$
 DECLARE
     v_used  date;
 BEGIN
+    PERFORM nativeflows.tax_history_check_scope(NEW.company_id);   -- definer rights: the row's own scope first (F4-2)
     IF NOT EXISTS (SELECT 1 FROM nativeflows.tax_code c WHERE c.id = NEW.tax_code_id AND c.company_id IS NOT DISTINCT FROM NEW.company_id) THEN
         RAISE EXCEPTION 'tax_rate_row_invalid: a rate of company % may only date a code of the same company (a package code''s rate is the package''s)',
             coalesce(NEW.company_id::text, 'none (package)') USING ERRCODE = 'check_violation';
     END IF;
-    v_used := nativeflows.tax_code_last_use(NEW.tax_code_id);
+    v_used := nativeflows.tax_code_last_use(NEW.tax_code_id, NEW.company_id);
     IF v_used IS NOT NULL AND NEW.effective_from <= v_used THEN
         RAISE EXCEPTION 'tax_rate_row_invalid: a rate dated % is on or before %, the latest tax date of a posted tax line of its code (a back-dated rate would change an applied rate)',
             NEW.effective_from, v_used USING ERRCODE = 'check_violation';
@@ -1469,7 +1489,7 @@ CREATE TRIGGER trg_tax_rate_check_insert BEFORE INSERT ON tax_rate FOR EACH ROW 
 -- itself (a company row), are not import codes and have the row's direction; a company row does not shadow a package key
 -- unless the package marks it adjustable (early feedback; the precedence of tax_matrix_codes holds whatever the load order);
 -- no row is dated on or before the latest posted use of its key (ADR-0041 rules 2, 3, 4 and their notes).
-CREATE FUNCTION tax_matrix_check_insert() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
+CREATE FUNCTION tax_matrix_check_insert() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = nativeflows, pg_temp AS $$
 DECLARE
     v_package    text;
     v_treatment  text;
@@ -1477,6 +1497,7 @@ DECLARE
     v_used       date;
 BEGIN
     IF TG_TABLE_NAME = 'tax_matrix' THEN
+        PERFORM nativeflows.tax_history_check_scope(NULL);   -- definer rights: the row's own scope first (F4-2)
         v_package := NEW.localization_package;
         IF EXISTS (SELECT 1 FROM unnest(NEW.tax_code_ids) AS x(id) WHERE NOT EXISTS (SELECT 1 FROM nativeflows.tax_code c
                     WHERE c.id = x.id AND c.company_id IS NULL AND c.localization_package = v_package AND c.direction = NEW.direction)) THEN
@@ -1484,6 +1505,7 @@ BEGIN
         END IF;
         v_used := nativeflows.tax_matrix_key_last_use(v_package, NULL, NEW.direction, NEW.tax_treatment_code, NEW.item_tax_group_code);
     ELSE
+        PERFORM nativeflows.tax_history_check_scope(NEW.company_id);
         SELECT co.localization_package INTO v_package FROM nativeflows.company co WHERE co.id = NEW.company_id;
         SELECT g.code INTO v_treatment FROM nativeflows.tax_treatment g WHERE g.company_id = NEW.company_id AND g.id = NEW.tax_treatment_id;
         SELECT g.code INTO v_item FROM nativeflows.item_tax_group g WHERE g.company_id = NEW.company_id AND g.id = NEW.item_tax_group_id;
@@ -1510,10 +1532,12 @@ CREATE TRIGGER trg_tax_matrix_check_insert BEFORE INSERT ON tax_matrix FOR EACH 
 CREATE TRIGGER trg_company_tax_matrix_check_insert BEFORE INSERT ON company_tax_matrix FOR EACH ROW EXECUTE FUNCTION tax_matrix_check_insert();
 -- A package matrix row that a posted tax_line used (its key, with a tax date on or after the row's effective_from) is never
 -- deleted; an unused row may be, by the loader (ADR-0041 rule 2 note of 2026-11-21). Company matrix rows are never deleted.
-CREATE FUNCTION tax_matrix_check_delete() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
+CREATE FUNCTION tax_matrix_check_delete() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = nativeflows, pg_temp AS $$
 DECLARE
-    v_used  date := nativeflows.tax_matrix_key_last_use(OLD.localization_package, NULL, OLD.direction, OLD.tax_treatment_code, OLD.item_tax_group_code);
+    v_used  date;
 BEGIN
+    PERFORM nativeflows.tax_history_check_scope(NULL);   -- package rows only (F4-2)
+    v_used := nativeflows.tax_matrix_key_last_use(OLD.localization_package, NULL, OLD.direction, OLD.tax_treatment_code, OLD.item_tax_group_code);
     IF v_used IS NOT NULL AND v_used >= OLD.effective_from THEN
         RAISE EXCEPTION 'tax_matrix_row_used: the row dated % was used by a posted tax line dated %; it is never deleted', OLD.effective_from, v_used
             USING ERRCODE = 'restrict_violation';
@@ -1522,12 +1546,13 @@ BEGIN
 END
 $$;
 CREATE TRIGGER trg_tax_matrix_check_delete BEFORE DELETE ON tax_matrix FOR EACH ROW EXECUTE FUNCTION tax_matrix_check_delete();
--- A code that a posted tax row uses changes only its name and basis (ADR-0041 rule 2 note of 2026-11-21, R6-N5); the use is read
--- with definer rights (tax_code_is_used, R7-N1).
-CREATE FUNCTION tax_code_check_change() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
+-- A code that a posted tax row uses changes only its name and basis (ADR-0041 rule 2 note of 2026-11-21, R6-N5); a definer
+-- trigger reading the use in the code's company, or every company for a package code (tax history helpers above; F4-2).
+CREATE FUNCTION tax_code_check_change() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = nativeflows, pg_temp AS $$
 BEGIN
+    PERFORM nativeflows.tax_history_check_scope(OLD.company_id);   -- F4-2
     IF (to_jsonb(NEW) - '{name,basis,recorded_at}'::text[]) IS DISTINCT FROM (to_jsonb(OLD) - '{name,basis,recorded_at}'::text[])
-       AND nativeflows.tax_code_is_used(OLD.id) THEN
+       AND nativeflows.tax_code_is_used(OLD.id, OLD.company_id) THEN
         RAISE EXCEPTION 'tax_code_used: code % is used by posted tax rows; only its name and basis change (a change is a new code)', OLD.code
             USING ERRCODE = 'restrict_violation';
     END IF;
@@ -2207,7 +2232,8 @@ CREATE TABLE posting_period_area_state (
 -- ADR-0012 rule 7 and ADR-0043 rule 16 (chief architect, 2026-11-21; S2 adversarial review N5): a locked period and area leaves
 -- locked only to soft_locked (UnlockPostingPeriod; never straight to open), only while an approved period_unlock_request of that
 -- period and area exists (its document in state approved; the unlock closes it in the same transaction), and never for the
--- migration period (ADR-0044 rule 2). A locked row is never deleted, and no row changes its company, period or area. The
+-- migration period (ADR-0044 rule 2). A locked row, and any row of a period with a journal entry, is never deleted, and no row
+-- changes its company, period or area. The
 -- command holds the rest of rule 7: the unlocked period is the latest locked one in the area, a subledger area unlocks only
 -- while general is not locked, and the request used is the one the unlock closes (open entry of 2026-11-21 on the period lock).
 CREATE FUNCTION posting_period_area_state_check_change() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
@@ -2215,6 +2241,10 @@ BEGIN
     IF TG_OP = 'DELETE' THEN
         IF OLD.state = 'locked' THEN
             RAISE EXCEPTION 'posting_period_unlock_invalid: the % area of a locked period is never deleted', OLD.area USING ERRCODE = 'restrict_violation';
+        END IF;
+        IF EXISTS (SELECT 1 FROM nativeflows.journal_entry e WHERE e.company_id = OLD.company_id AND e.posting_period_id = OLD.posting_period_id) THEN
+            RAISE EXCEPTION 'posting_period_frozen: the % area of a period with a journal entry is never deleted (adversarial fourth pass)', OLD.area
+                USING ERRCODE = 'restrict_violation';
         END IF;
         RETURN OLD;
     END IF;
@@ -2246,12 +2276,19 @@ CREATE TRIGGER trg_posting_period_area_state_check_change BEFORE UPDATE OR DELET
 -- pass, T3-1): a period is in use once it has an area row that is not open or a journal entry posted in it. A period in use never
 -- changes its dates, fiscal year, kind or number and is never deleted, so a locked period cannot be reopened by moving its dates
 -- (shrink it, extend an open neighbour, post, set the dates back). Its fiscal year never changes its dates or code and is never
--- deleted. Other changes (recorded_at) pass. posting_period_in_use reads the area rows and journal entries of the period's
--- company, which the writing session sees (company tables). No side effects; STABLE.
-CREATE FUNCTION posting_period_in_use(p_company_id uuid, p_posting_period_id uuid) RETURNS boolean LANGUAGE sql STABLE SET search_path = nativeflows, pg_temp AS $$
-    SELECT EXISTS (SELECT 1 FROM nativeflows.posting_period_area_state s
+-- deleted. Other changes (recorded_at) pass. posting_period_in_use reads the area rows, journal entries and material documents of
+-- the period's company, which the writing session sees (company tables). Material documents count too (S2 schema review R8-N1):
+-- ADR-0020 writes a material document and its journal entry in one transaction, but a movement of zero value may carry no
+-- journal line, and a quantity dated in the period must freeze it as well; a material document counts when its posting date lies
+-- in the period's dates. PL/pgSQL, so the file loads before DS-22 defines material_document. No side effects; STABLE.
+CREATE FUNCTION posting_period_in_use(p_company_id uuid, p_posting_period_id uuid) RETURNS boolean LANGUAGE plpgsql STABLE SET search_path = nativeflows, pg_temp AS $$
+BEGIN
+    RETURN EXISTS (SELECT 1 FROM nativeflows.posting_period_area_state s
                     WHERE s.company_id = p_company_id AND s.posting_period_id = p_posting_period_id AND s.state <> 'open')
         OR EXISTS (SELECT 1 FROM nativeflows.journal_entry e WHERE e.company_id = p_company_id AND e.posting_period_id = p_posting_period_id)
+        OR EXISTS (SELECT 1 FROM nativeflows.material_document m JOIN nativeflows.posting_period p ON p.company_id = m.company_id AND p.id = p_posting_period_id
+                    WHERE m.company_id = p_company_id AND m.posting_date BETWEEN p.start_date AND p.end_date);
+END
 $$;
 CREATE FUNCTION posting_period_check_change() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 BEGIN
@@ -2271,6 +2308,44 @@ BEGIN
     RETURN CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
 END
 $$;
+-- ADR-0012 rules 1, 2, 4 and 6 with the rule 1 note of 2026-11-21 (adversarial fourth pass F4-1): a special period lies on its
+-- fiscal year's last day (start_date = end_date = the year's end_date), and a regular period lies inside its fiscal year, so no
+-- period can be inserted on a date of a locked month (the exclusion constraint already refuses a second regular period over it).
+-- Checked on insert and on every update of the dates, the fiscal year or the kind (posting_period_check_change refuses those
+-- anyway once the period is in use).
+CREATE FUNCTION posting_period_check_dates() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
+DECLARE
+    v_year  record;
+BEGIN
+    IF TG_OP = 'UPDATE' AND (NEW.start_date, NEW.end_date, NEW.fiscal_year_id, NEW.kind) IS NOT DISTINCT FROM (OLD.start_date, OLD.end_date, OLD.fiscal_year_id, OLD.kind) THEN
+        RETURN NEW;
+    END IF;
+    SELECT y.start_date, y.end_date INTO v_year FROM nativeflows.fiscal_year y WHERE y.company_id = NEW.company_id AND y.id = NEW.fiscal_year_id;
+    IF NEW.kind = 'special' AND NOT (NEW.start_date = v_year.end_date AND NEW.end_date = v_year.end_date) THEN
+        RAISE EXCEPTION 'posting_period_invalid: a special period lies on its fiscal year''s last day, %, not % (ADR-0012 rules 1-2)', v_year.end_date, NEW.start_date
+            USING ERRCODE = 'check_violation';
+    END IF;
+    IF NEW.kind = 'regular' AND NOT (NEW.start_date >= v_year.start_date AND NEW.end_date <= v_year.end_date) THEN
+        RAISE EXCEPTION 'posting_period_invalid: a regular period lies inside its fiscal year (% to %) (ADR-0012 rule 1)', v_year.start_date, v_year.end_date
+            USING ERRCODE = 'check_violation';
+    END IF;
+    RETURN NEW;
+END
+$$;
+CREATE TRIGGER trg_posting_period_check_dates BEFORE INSERT OR UPDATE ON posting_period FOR EACH ROW EXECUTE FUNCTION posting_period_check_dates();
+-- ADR-0012 rules 4 and 6 (F4-1): a special period has only the general area, and its row starts soft_locked (it may be opened
+-- later by OpenPostingPeriod, an update); a new row is never inserted as open or more permissive for a special period.
+CREATE FUNCTION posting_period_area_state_check_insert() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM nativeflows.posting_period p WHERE p.company_id = NEW.company_id AND p.id = NEW.posting_period_id AND p.kind = 'special')
+       AND (NEW.area <> 'general' OR NEW.state = 'open') THEN
+        RAISE EXCEPTION 'posting_period_invalid: a special period has only the general area, starting soft_locked (ADR-0012 rules 4, 6); not % %', NEW.area, NEW.state
+            USING ERRCODE = 'check_violation';
+    END IF;
+    RETURN NEW;
+END
+$$;
+CREATE TRIGGER trg_posting_period_area_state_check_insert BEFORE INSERT ON posting_period_area_state FOR EACH ROW EXECUTE FUNCTION posting_period_area_state_check_insert();
 CREATE TRIGGER trg_posting_period_check_change BEFORE UPDATE OR DELETE ON posting_period FOR EACH ROW EXECUTE FUNCTION posting_period_check_change();
 CREATE TRIGGER trg_fiscal_year_check_change BEFORE UPDATE OR DELETE ON fiscal_year FOR EACH ROW EXECUTE FUNCTION posting_period_check_change();
 

@@ -510,6 +510,10 @@ if "--load" in sys.argv:
     X("""insert into tax_line (id, company_id, document_id, line_number, journal_entry_id, tax_code_id, tax_rate_id, direction, rate_percent, transaction_currency,
          base_transaction_amount, tax_transaction_amount, base_company_amount, tax_company_amount, tax_date, declaration_date)
          values (%s,%s,%s,1,%s,%s,%s,'sale',8,'USD',100,8,100,8,'2026-11-10','2026-11-10')""", (new(), I["co"], hd, je, I["vat"], r8))
+    # a second posted line, on the company's own code x-own (its rate of 2026-01-01), for the company-scope trials H11 to H11c (F4-2)
+    X("""insert into tax_line (id, company_id, document_id, line_number, journal_entry_id, tax_code_id, tax_rate_id, direction, rate_percent, transaction_currency,
+         base_transaction_amount, tax_transaction_amount, base_company_amount, tax_company_amount, tax_date, declaration_date)
+         values (%s,%s,%s,2,%s,%s,null,'sale',7,'USD',100,7,100,7,'2026-11-10','2026-11-10')""", (new(), I["co"], hd, je, I["x_own"]))
     X("set session_replication_role = origin")
     pkg_rate = lambda day: (lambda cx: cx.execute("insert into tax_rate (id, tax_code_id, effective_from, rate_percent, basis) values (%s,%s,%s,5,%s)",
                                                   (new(), I["vat"], day, PKG)))
@@ -552,10 +556,8 @@ if "--load" in sys.argv:
     X(f"GRANT USAGE ON SCHEMA nativeflows, types TO {APP}")
     X(f"GRANT SELECT ON ALL TABLES IN SCHEMA nativeflows TO {APP}")
     X(f"GRANT INSERT ON tax_rate, tax_matrix, tax_treatment_rule TO {APP}")
-    X(f"""DO $$ DECLARE f regprocedure; BEGIN
-            FOR f IN SELECT p.oid::regprocedure FROM pg_proc p WHERE p.pronamespace = 'nativeflows'::regnamespace AND p.proname IN ('tax_matrix_key_last_use', 'tax_treatment_rule_key_last_use', 'tax_code_last_use', 'tax_code_is_used') LOOP
-                EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO {APP}', f);
-            END LOOP; END $$""")
+    # No EXECUTE is granted on the tax history helpers: they stay revoked from every application role (F4-2, R8-S1); the guards are
+    # definer trigger functions, which fire without EXECUTE.
 
     def as_app(fn):
         def run(cx):
@@ -574,15 +576,44 @@ if "--load" in sys.argv:
           as_app(lambda cx: rule(treatment="export", priority=10, day="2026-11-01", ship_to_country="XX", cx=cx)), "latest posted use")
     trial("H09d R7-N1: as that role, a package rate dated after the latest posted use is accepted (rolled back afterwards)",
           as_app(lambda cx: (pkg_rate("2026-11-12")(cx), cx.execute("select 1/0"))), "division by zero")
-    exe = X("""select p.proname, p.prosecdef, has_function_privilege('public', p.oid, 'EXECUTE'),
+    # Design changed by F4-2 and R8-S1 (the earlier H09e asserted definer rights on the helpers): the trigger functions carry definer
+    # rights, and the helpers run with their caller's rights, revoked from PUBLIC and granted to no application role.
+    HELPERS = ('tax_matrix_key_last_use', 'tax_treatment_rule_key_last_use', 'tax_code_last_use', 'tax_code_is_used')
+    GUARDS = ('tax_rate_check_insert', 'tax_matrix_check_insert', 'tax_matrix_check_delete', 'tax_treatment_rule_check_insert', 'tax_code_check_change')
+    exe = X("""select p.proname, p.prosecdef, has_function_privilege('public', p.oid, 'EXECUTE'), has_function_privilege(%s, p.oid, 'EXECUTE'),
                       'search_path=nativeflows, pg_temp' = any (coalesce(p.proconfig, '{}')) from pg_proc p
-               where p.pronamespace = 'nativeflows'::regnamespace and p.proname in ('tax_matrix_key_last_use', 'tax_treatment_rule_key_last_use', 'tax_code_last_use', 'tax_code_is_used')
-               order by 1""").fetchall()
-    check("H09e R7-N1: the functions computing the latest posted use run with definer rights, pin search_path and are not executable by PUBLIC",
-          len(exe) == 4 and all(sd and not pub and pinned for _, sd, pub, pinned in exe), exe)
+               where p.pronamespace = 'nativeflows'::regnamespace and p.proname = any (%s) order by 1""", (APP, list(HELPERS + GUARDS))).fetchall()
+    check("H09e R7-N1, F4-2: the five tax history trigger functions run with definer rights; the four helpers run with their caller's rights and no "
+          "application role (PUBLIC, the lab role) may execute them; all pin search_path",
+          len(exe) == 9 and all(pinned and (sd if n in GUARDS else (not sd and not pub and not app)) for n, sd, pub, app, pinned in exe), exe)
     X(f"GRANT UPDATE ON tax_code TO {APP}")
     trial("H09f R7-N1: as that role, a package code that a posted line uses never changes its calculation", as_app(lambda cx: cx.execute(
         "update tax_code set calculation = 'none' where id = %s", (I["vat"],))), "tax_code_used")
+    # F4-2: the company's own writes as an application role (no superuser, no BYPASSRLS) under its company's scope
+    def as_company(fn, company="co"):
+        def run(cx):
+            cx.execute(f"set local role {APP}")
+            cx.execute("select set_config('nativeflows.company_id', %s, true)", (str(I[company]),))
+            return fn(cx)
+        return run
+    own_rate = lambda day: (lambda cx: cx.execute(
+        "insert into tax_rate (id, company_id, source, tax_code_id, effective_from, rate_percent, basis, change_proposal_id) values (%s,%s,'company',%s,%s,6,%s,%s)",
+        (new(), I["co"], I["x_own"], day, B, I["cp"])))
+    trial("H11 F4-2: as that role under its company, a rate of the company's own code under the executing proposal is accepted (rolled back afterwards)",
+          as_company(lambda cx: (own_rate("2026-12-01")(cx), cx.execute("set constraints all immediate"), cx.execute("select 1/0"))), "division by zero")
+    trial("H11a F4-2: ... and one back-dated before the code's latest posted use (2026-11-10) is refused", as_company(own_rate("2026-11-01")), "latest tax date")
+    calls = {"tax_code_last_use": ("select tax_code_last_use(%s, null)", (I["vat"],)), "tax_code_is_used": ("select tax_code_is_used(%s, null)", (I["vat"],)),
+             "tax_matrix_key_last_use": ("select tax_matrix_key_last_use(null, %s, 'sale', 'domestic', 'standard')", (I["co"],)),
+             "tax_treatment_rule_key_last_use": ("select tax_treatment_rule_key_last_use(r) from tax_treatment_rule r where r.id = %s", (R_DOM,))}
+    for name_, (sql_, args_) in calls.items():
+        trial(f"H11b F4-2, R8-S1: a direct call of {name_} by that role is denied", as_company(lambda cx, s=sql_, a=args_: cx.execute(s, a).fetchall(), "co2"),
+              "permission denied")
+    leak = X("""select p.proname from pg_proc p where p.pronamespace = 'nativeflows'::regnamespace and has_function_privilege(%s, p.oid, 'EXECUTE')
+                and p.prorettype = 'date'::regtype and p.proname ~ '(last_use|tax_date)'""", (APP,)).fetchall()
+    trial("H11c R8-S1: a company-2 session cannot learn company 1's latest tax date through a guard either: a back-dated package rate is refused for its "
+          "scope before any date is read", as_company(pkg_rate("2024-01-01"), "co2"), "tax_history_scope")
+    trial("H11d R8-S1: ... nor through company 1's own code under company 1's proposal", as_company(own_rate("2026-11-01"), "co2"), "tax_history_scope")
+    check("H11e R8-S1: no function returning a date of posted tax use is executable by the application role", leak == [], leak)
     ix = X("""select pg_get_indexdef(i.indexrelid) from pg_index i join pg_class c on c.oid = i.indexrelid
               where i.indrelid = 'nativeflows.tax_line'::regclass and c.relname = 'ix_tax_line_direction_tax_code_id_tax_date'""").fetchone()
     check("H10 R7-N3: tax_line has an index on (direction, tax_code_id, tax_date) for the latest posted use of a matrix key or a code",
