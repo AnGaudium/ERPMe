@@ -21,7 +21,7 @@ Every journal line carries three currency types: transaction currency, company c
 5. Converting and rounding follow ADR-0006: only `convert_amount`, per line, with one rounding line per entry for differences in company or group currency.
 6. `company_currency` is fixed when the company is created and never changes once it has postings. The installation's `group_currency` is set before the first posting in the installation and never changes afterwards. Inventory value is always in company currency (07); which rate values an import goods receipt is an open question (DS-09, DS-11, DS-19).
 
-   Note (the author, 2026-11-21): the exchange-rate difference between goods receipt and invoice of an item kept in stock enters the item's actual cost as a `receipt_addition` in the posting period of the posting that clears it; on lines without stock it stays a realized exchange difference ([ADR-0047](0047-commercial-documents-and-pricing.md) rule 13 note; [ADR-0020](0020-inventory-and-costing-model.md) rule 12 note). Which rate values an import goods receipt stays open.
+   Note (the author, 2026-11-21): the exchange-rate difference between goods receipt and invoice is designed as SAP does ([ADR-0047](0047-commercial-documents-and-pricing.md) rule 13 note). Chief architect's translation (interim, 2026-11-21, until the step that builds it): on a line for an item kept in stock it enters the item's actual cost as a `receipt_addition` in the posting period of the posting that clears it; on lines without stock it stays a realized exchange difference ([ADR-0020](0020-inventory-and-costing-model.md) rule 12 note). Which rate values an import goods receipt stays open.
 
 **Currencies, sources and quotes**
 
