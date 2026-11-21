@@ -14,7 +14,7 @@ difference is a defect of the compiled spec.
    case under `## Conflicts` as `CONFLICT <rule id>: <how resolved>`. If the order does not decide it, the entry says
    `OPEN` and goes to `docs/open-questions.md`.
 3. **Proposed is not law.** A rule of a proposed ADR goes only under `## Proposed (not law)`, or carries `[proposed]`.
-4. **Generated numbers.** Never type a count of tables, rules, columns, settings, commands or queries. Write
+4. **Generated numbers.** Never type a count of tables, rules, catalog rows or settings (the lint recomputes these four; do not count anything else in words, list it). Write
    `<!-- count:tables -->N<!-- /count -->`; the lint recomputes it. Identifiers, thresholds and defaults taken from a rule
    are quoted from it, not counted.
 5. **Plain, short sentences** (AGENTS.md). One rule, one numbered statement, one predicate. IDs in backticks.
@@ -46,23 +46,28 @@ Build step(s): <n, …>    Generated from index: <git commit of docs/design/gene
 | 8 | `## UI annotations` | The annotations of ADR-0077 the module's declarations carry: floorplan per route, titles, facets, field annotations, work item kinds, tiles. Headless modules write `None (headless step)`. | 5% |
 | 9 | `## Conflicts` | Every `CONFLICT <rule id>: <resolution>` (rule of compiling 2), also those found by the extractor's conflict flag that proved harmless: `FALSE-POSITIVE <note id>`. | 3% |
 | 10 | `## Proposed (not law)` | Rules of proposed ADRs, or none. | as needed |
-| 11 | `## Trace` | Table `Source | Where`: one row per source rule and note ID of the module in the rule index, `Where` is one or more of the spec's R-numbers, a section name, or `not applicable: <reason>` (never empty; any other value is a lint warning) (only for non-normative notes such as thanks, review credits, history). No ID may be missing; none may be invented. | 10% |
+| 11 | `## Trace` | Table `Source | Where`: one row per source rule and note ID of the module in the rule index, `Where` is one or more of the spec's R-numbers, a section name, or `not applicable: <reason>` (never empty; any other value is a lint warning) (only for notes and sections, never for a rule; for non-normative text such as review credits or history). No ID may be missing; none may be invented. | 10% |
 
 Heading levels: `#` title, `##` sections above, `###` topics inside. Lint chunks by `## ` headings.
 
 ## Size budget
 
-- A **context pack** for the Haiku coder is at most **30,000 tokens** (ADR-0073 rule 6, interim). It holds the declaration,
-  the golden example, the signatures and the allowlist as well, so the module's share is **at most 16,000 tokens** of
-  compiled spec (about 56,000 bytes; the lint estimates tokens as bytes ÷ 3.5).
-- Hard limit per compiled-spec file: **16,000 tokens**. Soft target: 12,000. A larger module is split into **chunks**, each its
-  own file named `<module>-<n>.md`, cut at `###` topics, never inside a rule. Every chunk repeats sections 1 (short) and 11
-  (its own rows only) and carries its slice of 2–8. The module's `Conflicts` live in the chunk of the rule concerned.
-- The trace table is the largest fixed cost (about 25 bytes per source ID). A module with more than about 1,200 source IDs
-  needs chunking for that reason alone.
-- If the dossier of a module is under 16,000 tokens, the compiled spec is under it too; if it is over, the compiled spec
-  targets 55% of the dossier (the rest is history, review credits and DDL the compile drops). Measure the first compile; if
-  the ratio is above 70%, the module is a poor candidate and S4 reports it instead of compiling it.
+- **Where it is used.** ADR-0073 rule 6 builds the Haiku context pack (at most 30,000 tokens, interim) from the exact text of the
+  listed ADR rules and their notes. A compiled-spec chunk may stand in for those rules only after a note at ADR-0073 rule 6
+  says so (S4 proposes it, the chief architect decides). Until then the compiled spec is a reading and review aid and the
+  pack stays rule-cut. A work package that needs one command takes the chunk holding that command's rules plus section 2
+  rows of its tables; the pack builder cuts by R-number, so a chunk is also the unit of cutting.
+- The pack also holds the declaration, golden example, signatures and allowlist, so the spec share is **at most 16,000 tokens**
+  (about 56,000 bytes; the lint estimates tokens as bytes ÷ 3.5, unverified against a tokenizer).
+- Hard limit per file: **16,000 tokens**; soft target **12,000**. A larger module is split into chunks `<module>-<n>.md`, cut at
+  `###` topics, never inside a rule. Each chunk repeats section 1 (short) and carries its own rows of 2–8 and 11. A `Conflicts`
+  entry lives in the chunk of the rule concerned.
+- The trace table costs about 25 bytes per source ID (1,200 IDs ≈ 8,600 tokens), so it is a large fixed cost only for the biggest
+  modules; those chunk anyway.
+- Expected size: about 55% of the dossier's rule and note text (the pilot on `quality`: 56%). Above 70% the module is a poor
+  candidate and S4 reports it instead of compiling it. `MODULES.csv` gives `spec_chunks_est` for planning.
+- `cross` units (a rule naming more than three modules) are compiled in their primary module; the other modules cite them
+  as `<primary module> R-<n>` (rule 6).
 
 ## Acceptance of a compiled spec (mechanical first)
 

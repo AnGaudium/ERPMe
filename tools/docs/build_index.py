@@ -19,9 +19,11 @@ from collections import Counter, defaultdict
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import nfdocs  # noqa: E402
 
-INDEX_FIELDS = ["id", "kind", "adr", "status", "primary_module", "modules", "modules_all", "tables", "catalog_rows", "xrefs_rules",
-                "build_step", "relation", "conflict_flag", "conflict_phrases", "conflict_markers", "parent",
-                "source_file", "line_start", "line_end"]
+INDEX_FIELDS = ["id", "kind", "adr", "status", "primary_module", "modules", "modules_all", "tables", "catalog_rows",
+                "xrefs_rules", "build_step", "relation", "superseded_by", "conflict_flag", "conflict_phrases",
+                "conflict_markers", "parent", "source_file", "line_start", "line_end"]
+LIST_FIELDS = ("primary_module", "modules", "modules_all", "tables", "catalog_rows", "xrefs_rules", "superseded_by",
+               "conflict_phrases")
 
 
 def is_indexed(u):
@@ -48,19 +50,34 @@ def build(docs):
         adr_step[a["adr"]] = step
 
     primary, secondary = nfdocs.load_primary(modules, adrs=[a["adr"] for a in parsed])
-    mods_of = {}
+    overrides = nfdocs.load_overrides(modules, adrs={a["adr"] for a in parsed})
+    mods_of, prims_of = {}, {}
+
+    def unit_primaries(u):
+        """Primary modules of a unit: the override modules of its rule (rule-module-overrides.csv), else the ADR's
+        primary module. A note takes its owner rule's primaries; Decision text takes the ADR's."""
+        if u["id"] in prims_of:
+            return prims_of[u["id"]]
+        if u["kind"] == "note" and u["parent"] in by_id:
+            res = unit_primaries(by_id[u["parent"]])
+        elif u["kind"] == "rule" and ".L" not in u["id"]:
+            res = nfdocs.override_modules(overrides, u["adr"], u["rule_no"]) or [primary[u["adr"]]]
+        else:
+            res = [primary[u["adr"]]]
+        prims_of[u["id"]] = sorted(res)
+        return prims_of[u["id"]]
 
     def unit_modules(u):
-        """-> (modules column list, full list). Every unit is in its ADR's primary module, plus the owners of its
-        tables; a note also in its owner's modules. More than CROSS_LIMIT other modules -> primary plus `cross`."""
+        """-> (modules column list, full list). Every unit is in its primary modules, plus the owners of its tables;
+        a note also in its owner's modules. More than CROSS_LIMIT other modules -> primaries plus `cross`."""
         if u["id"] in mods_of:
             return mods_of[u["id"]]
-        prim = primary[u["adr"]]
-        full = {prim} | {owners[t] for t in u["_tables"] if owners.get(t)}
+        prims = set(unit_primaries(u))
+        full = prims | {owners[t] for t in u["_tables"] if owners.get(t)}
         if u["kind"] == "note" and u["parent"] in by_id:
             full |= set(unit_modules(by_id[u["parent"]])[1])
-        others = full - {prim}
-        col = [prim, "cross"] if len(others) > nfdocs.CROSS_LIMIT else sorted(full)
+        others = full - prims
+        col = sorted(prims) + ["cross"] if len(others) > nfdocs.CROSS_LIMIT else sorted(full)
         mods_of[u["id"]] = (sorted(col), sorted(full))
         return mods_of[u["id"]]
 
@@ -76,7 +93,8 @@ def build(docs):
             step = nfdocs.first_step(by_id[u["parent"]]["text"])
         rows.append({
             "id": u["id"], "kind": u["kind"], "adr": u["adr"], "status": u["adr_status"],
-            "primary_module": primary[u["adr"]], "modules": ";".join(mods), "modules_all": ";".join(full),
+            "primary_module": ";".join(unit_primaries(u)), "modules": ";".join(mods), "modules_all": ";".join(full),
+            "superseded_by": ";".join(u.get("superseded_by", [])),
             "tables": ";".join(u["_tables"]), "catalog_rows": ";".join(u["_rows"]),
             "xrefs_rules": ";".join(u["xrefs_rules"]), "build_step": step or adr_step.get(u["adr"], ""),
             "relation": u["relation"] or "", "conflict_flag": "1" if u["conflict"] else "",
@@ -103,9 +121,16 @@ def read_index(path):
     with open(path, encoding="utf-8", newline="") as fh:
         rows = list(csv.DictReader(fh))
     for r in rows:
-        for k in ("modules", "modules_all", "tables", "catalog_rows", "xrefs_rules", "conflict_phrases"):
-            r[k] = [x for x in r[k].split(";") if x]
+        for k in LIST_FIELDS:
+            r[k] = [x for x in r.get(k, "").split(";") if x]
     return rows
+
+
+def modules_without_primary(rows, owners):
+    """Modules that own tables but are primary for no rule (S3 review B3)."""
+    with_tables = {o for o in owners.values() if o}
+    prim = {m for r in rows if r["kind"] == "rule" for m in r["primary_module"].split(";")}
+    return sorted(with_tables - prim)
 
 
 def ambiguous_names(owners, cats, modules):
@@ -144,6 +169,10 @@ def report(rows, info):
     lines.append(f"unassigned units: {len(un)}" + (": " + ", ".join(un) if un else ""))
     lines.append(f"units in cross (besides their primary module): {sum(1 for r in rows if 'cross' in r['modules'].split(';'))}")
     lines.append(f"rules without a build step: {sum(1 for r in rows if r['kind'] == 'rule' and not r['build_step'])}")
+    lines.append("modules that own tables but are primary for no rule: " +
+                 (", ".join(modules_without_primary(rows, info["owners"])) or "none"))
+    lines.append(f"rules superseded by another unit: {sum(1 for r in rows if r['superseded_by'])}")
+    lines.append(f"rules with an override primary: {sum(1 for r in rows if r['kind'] == 'rule' and r['primary_module'] != info['primary'][r['adr']])}")
     unowned = sorted(t for t, o in info["owners"].items() if not o)
     lines.append(f"tables: {len(info['owners'])}; without owner: {len(unowned)}" + (": " + ", ".join(unowned) if unowned else ""))
     lines.append("catalogs skipped (first column not a unique key): " + (", ".join(info["skipped"]) or "none"))
@@ -167,6 +196,10 @@ def main(argv=None):
     ids = [r["id"] for r in rows]
     if len(ids) != len(set(ids)):
         print("FAIL: duplicate IDs", file=sys.stderr)
+        return 1
+    orphans = modules_without_primary(rows, info["owners"])
+    if orphans:
+        print("FAIL: modules that own tables but are primary for no rule: " + ", ".join(orphans), file=sys.stderr)
         return 1
     content = to_csv(rows)
     if args.check:

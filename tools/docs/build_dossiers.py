@@ -27,7 +27,10 @@ import nfdocs  # noqa: E402
 import build_index  # noqa: E402
 
 MODULE_FIELDS = ["module", "rules", "primary_rules", "notes", "sections", "tables", "catalog_rows", "bytes",
-                 "est_tokens", "conflict_flagged_notes", "supersedes_notes", "status_mix", "chunks_needed"]
+                 "est_tokens", "conflict_flagged_notes", "supersedes_notes", "status_mix", "chunks_needed",
+                 "spec_chunks_est"]
+SPEC_RATIO = 0.55          # compiled spec / dossier (template "Size budget"; pilot quality 56%)
+SPEC_SOFT_TOKENS = 12000   # compiled-spec soft target per chunk (template)
 SECTION_SUFFIX = re.compile(r"\.(E|U)\d*(\.N\d+)?$")
 
 
@@ -52,13 +55,18 @@ def render(module, rows, info, docs):
     body = ["## Rules and notes\n"]
     for r in units:
         mods = r["modules_all"].split(";")
+        prims = r["primary_module"].split(";")
         if module == "cross":
-            tag = f"{r['kind']}, primary {r['primary_module']}, modules: " + ", ".join(mods)
-        elif r["primary_module"] == module:
+            tag = f"{r['kind']}, primary {', '.join(prims)}, modules: " + ", ".join(mods)
+        elif module in prims:
             tag = f"{r['kind']}, primary" + (", shared with: " + ", ".join(m for m in mods if m != module)
                                              if len(mods) > 1 else "")
         else:
-            tag = f"{r['kind']}, shared, primary {r['primary_module']}"
+            tag = f"{r['kind']}, shared, primary {', '.join(prims)}"
+        if r["superseded_by"]:
+            tag += ", SUPERSEDED by " + r["superseded_by"].replace(";", ", ")
+        elif r["relation"] == "superseded-by" and r["kind"] == "rule":
+            tag += ", SUPERSEDED (its text says so)"
         if r["status"] != "accepted":
             tag += f", {r['status']}"
         if r["relation"] and r["kind"] == "note":
@@ -99,7 +107,7 @@ def render(module, rows, info, docs):
     status = Counter(r["status"] for r in units)
     stats = {
         "module": module, "rules": kinds["rule"],
-        "primary_rules": sum(1 for r in units if r["kind"] == "rule" and r["primary_module"] == module),
+        "primary_rules": sum(1 for r in units if r["kind"] == "rule" and module in r["primary_module"].split(";")),
         "notes": kinds["note"], "sections": kinds["section"], "tables": len(owned), "catalog_rows": len(cat_rows),
         "conflict_flagged_notes": sum(1 for r in units if r["kind"] == "note" and r["conflict_flag"]),
         "supersedes_notes": sum(1 for r in units if r["kind"] == "note" and r["relation"] == "supersedes"),
@@ -121,6 +129,8 @@ def render(module, rows, info, docs):
     stats["bytes"] = size
     stats["est_tokens"] = round(size / nfdocs.TOKEN_BYTES)
     stats["chunks_needed"] = max(1, math.ceil(stats["est_tokens"] / nfdocs.CHUNK_TOKENS))
+    # planning figure of the compiled spec: 55% of the dossier, cut at the 12,000-token soft target (template)
+    stats["spec_chunks_est"] = max(1, math.ceil(SPEC_RATIO * stats["est_tokens"] / SPEC_SOFT_TOKENS))
     return content, stats
 
 

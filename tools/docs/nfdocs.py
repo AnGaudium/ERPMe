@@ -54,7 +54,11 @@ WORKED_EXAMPLE_CODE = "W"                 # "### Worked example(s)" after the ru
 # Relation phrases for notes (case-insensitive). Conservative on purpose; see README "Heuristics".
 SUPERSEDED_BY_PHRASES = ["superseded by"]
 SUPERSEDES_PHRASES = ["supersedes", "overrides", "replaces", "is replaced by", "are replaced by", "no longer applies",
-                      "is withdrawn", "is dropped", "are dropped"]
+                      "is withdrawn", "is dropped", "are dropped",
+                      # added after the S3 review (ADR-0024.H.N1, ADR-0029.R14.N3, ADR-0042.R7.N1, ADR-0003.D1.N1, ...);
+                      # `re:` entries are regular expressions, kept narrow: a code term that becomes or moves
+                      "now reads", "now has", "is stale", r"re:`\s+becomes\s+`", r"re:`\s+moves?\s+to\b",
+                      r"re:\bmoves?\s+to\s+Phase\s+\d"]
 # Conflict flag phrases for notes (case-insensitive), from the S3 brief. SQL `ON CONFLICT` is not a hit.
 CONFLICT_PHRASES = ["conflict", "contradict", "no longer", "instead of", "replaces", "reversed", "overturn", "is wrong",
                     "corrected"]
@@ -74,6 +78,8 @@ STEP_RE = re.compile(r"\b(?:[Bb]uild )?[Ss]teps? (\d+[ab]?)\b")
 
 
 def _phrase_re(phrase):
+    if phrase.startswith("re:"):
+        return re.compile(phrase[3:], re.I)
     tail = "" if phrase in PREFIX_PHRASES else r"(?![\w])"
     return re.compile(r"(?<![\w])" + re.escape(phrase) + tail, re.I)
 
@@ -116,7 +122,10 @@ def note_head(line):
             if depth == 0:
                 break
         i += 1
-    if depth != 0 or not rest[i + 1:].startswith(":"):
+    tail = rest[i + 1:]
+    # 'Note (author's delegation, 2026-11-19) adds 3 definitions: ...' (ADR-0063 line 258): a short verb phrase
+    # between the parenthesis and the colon is accepted
+    if depth != 0 or not (tail.startswith(":") or re.match(r" [a-z][^:()]{0,40}:", tail)):
         return None
     author = rest[2:i]
     dm = DATE_RE.search(author)
@@ -216,6 +225,7 @@ def parse_adr(path, rel_path):
     for u in c.units:
         idx = sorted(u.pop("_lines"))
         u.pop("_notes")
+        u.pop("_col", None)
         if not idx:
             continue
         u["line_start"], u["line_end"] = idx[0] + 1, idx[-1] + 1
@@ -336,6 +346,7 @@ def parse_rules_zone(c, start, end, d0, h3_as_group=False):
             c.list_numbers.add(no)
             uid = f"{c.adr}.R{no}" if c.lists == 1 else f"{c.adr}.L{c.lists}.R{no}"
             owner = c.unit(uid, "rule", rule_no=no, group=group)
+            owner["_col"] = len(rm.group(0))   # content column: 3 for '1. ', 4 for '12. ' or '9a. '
             c.add(owner, i)
             i = parse_block(c, i + 1, end, owner, rules_allowed=True, h3_stop=h3_as_group)
             continue
@@ -349,10 +360,17 @@ def parse_rules_zone(c, start, end, d0, h3_as_group=False):
 
 def parse_block(c, start, end, owner, rules_allowed, h3_stop=False, stop_at_table_rule=False):
     """Assign lines start..end to owner and its notes; return where a new rule or group begins (rules_allowed), or end.
-    A note runs for its paragraph. After a blank line, a block indented deeper than the note (or at 4 or more, for a
-    note indented 4) continues the note; any other block returns to the owner."""
+    A note runs for its paragraph. After a blank line the next block is judged against the owner's content column
+    (3 under '1. ', 4 under '12. ', 0 for section text):
+    - indented deeper than the note, or at the note's indent when the note sits deeper than the content column:
+      the note continues;
+    - at the note's indent when the note sits at the content column: the note continues only when the note so far
+      holds a table or list or a line ending in ':' (the note introduces material); otherwise the block is the
+      owner's text again (S3 review S1: ADR-0047 lines 46-48, ADR-0077 line 210);
+    - shallower than the note: the owner's text."""
     lines = c.lines
-    note, note_indent, i = None, 0, start
+    col = owner.get("_col", 0)
+    note, note_indent, note_struct, i = None, 0, False, start
     while i < end:
         line = lines[i]
         if rules_allowed and (RULE_RE.match(line) or GROUP_RE.match(line) or (h3_stop and H3_RE.match(line))):
@@ -369,6 +387,7 @@ def parse_block(c, start, end, owner, rules_allowed, h3_stop=False, stop_at_tabl
             note = c.unit(f"{owner['id']}.N{owner['_notes']}", "note", parent=owner["id"], rule_no=owner.get("rule_no"),
                           group=owner.get("group"), section=owner.get("section"), note_author=nh[1], note_date=nh[2])
             note_indent = nh[0]
+            note_struct = line.rstrip().endswith(":")
             c.add(note, i)
             i += 1
             continue
@@ -377,15 +396,34 @@ def parse_block(c, start, end, owner, rules_allowed, h3_stop=False, stop_at_tabl
                 j = i
                 while j < end and not lines[j].strip():
                     j += 1
-                if j < end:
-                    ind = indent_of(lines[j])
-                    if note_head(lines[j]) or not (ind > note_indent or (note_indent == 4 and ind >= 4)):
-                        note = None
+                if j < end and not note_continues(lines[j], col, note_indent, note_struct):
+                    note = None
             i += 1
             continue
+        if note is not None:
+            note_struct = note_struct or is_struct(line) or line.rstrip().endswith(":")
         c.add(note if note is not None else owner, i)
         i += 1
     return end
+
+
+def is_struct(line):
+    """A table row or a list item."""
+    s = line.lstrip(" ")
+    return s.startswith(("|", "- ", "* ")) or re.match(r"\d+[a-z]?\. ", s) is not None
+
+
+def note_continues(nxt, col, note_indent, note_struct):
+    if note_head(nxt):
+        return False
+    ind = indent_of(nxt)
+    if ind > note_indent:
+        return True
+    if ind < note_indent:
+        return False
+    if note_indent > col:
+        return True
+    return note_struct
 
 
 # ------------------------------------------------------------------------------------------------ references
@@ -459,7 +497,71 @@ def extract(docs):
                              else None)
             u["conflict_phrases"] = []
         u["conflict"] = bool(u["conflict_phrases"])
+    link_supersession(units)
     return units, parsed, dangling
+
+
+SUPERSEDES_VERB_RE = re.compile(r"\b(?:supersedes|supersede|replaces|overrides)\b", re.I)
+SUPERSEDED_BY_RE = re.compile(r"\bsuperseded\b[^.;]{0,40}?\bby\b", re.I)
+
+
+def link_supersession(units):
+    """Inbound supersession (S3 review S3): a sentence of unit X that 'supersedes|replaces|overrides' and names rules
+    marks the rules named AFTER the verb `superseded_by` X (ADR-0027.R10 "supersedes ... ADR-0026 rule 14"); rules
+    named BEFORE the verb are its subject ("ADR-0029 rule 6 replaces ...") and supersede X's own rule. A sentence with
+    'superseded ... by' marks X's own rule `superseded_by` the rules named after 'by'. Only rule targets are linked;
+    a unit never supersedes itself or its own owner."""
+    by_id = {u["id"]: u for u in units}
+    for u in units:
+        u.setdefault("superseded_by", [])
+
+    def mark(target, by):
+        if target in by_id and by_id[target]["kind"] == "rule" and by not in by_id[target]["superseded_by"]:
+            by_id[target]["superseded_by"].append(by)
+
+    for u in units:
+        own_rule = u["id"] if u["kind"] == "rule" else u.get("parent")
+        for sent in re.split(r"(?<=[.;])\s+", u["text"]):
+            matches = [m for m in ADR_REF_RE.finditer(sent) if m.group(2) or m.group(3)]
+            if not matches:
+                continue
+
+            def rules_of(ms):
+                out = []
+                for m in ms:
+                    out += [r for r in find_refs(m.group(0))[1] if r not in (u["id"], own_rule)]
+                return out
+
+            def chain_after(pos):
+                """Rule references starting within 6 words after pos, chained by ',' or 'and'."""
+                picked, last = [], pos
+                for m in matches:
+                    if m.start() < pos:
+                        continue
+                    gap = sent[last:m.start()]
+                    if not picked and (len(gap.split()) > 6 or "(" in gap):
+                        break
+                    if picked and not re.fullmatch(r"\s*(?:,|and|, and)\s*", gap):
+                        break
+                    picked.append(m)
+                    last = m.end()
+                return rules_of(picked)
+
+            passive = SUPERSEDED_BY_RE.search(sent)
+            active = SUPERSEDES_VERB_RE.search(sent)
+            if passive:
+                for r in chain_after(passive.end()):
+                    mark(own_rule, r)
+            elif active:
+                for r in chain_after(active.end()):
+                    mark(r, u["id"])
+                subj = [m for m in matches if m.end() <= active.start()
+                        and len(sent[m.end():active.start()].split()) <= 2
+                        and not re.search(r"[()]", sent[m.end():active.start()])]
+                for r in rules_of(subj[-1:]):
+                    mark(own_rule, r)
+    for u in units:
+        u["superseded_by"] = sorted(u["superseded_by"], key=rule_sort_key)
 
 
 def conflict_markers(docs):
@@ -477,7 +579,7 @@ def conflict_markers(docs):
 
 UNIT_FIELDS = ["id", "kind", "adr", "rule_no", "group", "section", "parent", "text", "source_file", "line_start",
                "line_end", "adr_status", "note_author", "note_date", "relation", "conflict", "conflict_phrases",
-               "conflict_markers", "xrefs_adrs", "xrefs_rules", "xrefs_inv", "xrefs_ec", "xrefs_ds", "xrefs_oq",
+               "conflict_markers", "superseded_by", "xrefs_adrs", "xrefs_rules", "xrefs_inv", "xrefs_ec", "xrefs_ds", "xrefs_oq",
                "dangling"]
 
 
@@ -641,6 +743,42 @@ def load_primary(modules, path=PRIMARY_CSV, adrs=None):
     return primary, dict(secondary)
 
 
+OVERRIDES_CSV = os.path.join(HERE, "rule-module-overrides.csv")
+
+
+def load_overrides(modules, path=OVERRIDES_CSV, adrs=None):
+    """rule-module-overrides.csv (adr, rule_from, rule_to, module, role) -> {ADR id: [(from, to, module)]}. A rule
+    listed under an override is primary in each listed module and NOT primary in its ADR's default module. A rule
+    `9a` counts as 9. Raises ValueError on an unknown module or ADR, a role other than `primary`, or from > to."""
+    out, errors = defaultdict(list), []
+    with open(path, encoding="utf-8", newline="") as fh:
+        for row in csv.DictReader(fh):
+            adr, mod = row["adr"], row["module"]
+            try:
+                lo, hi = int(row["rule_from"]), int(row["rule_to"])
+            except ValueError:
+                errors.append(f"{adr}: rule range {row['rule_from']}-{row['rule_to']} is not numeric")
+                continue
+            if mod not in modules and mod not in NON_CODE_MODULES:
+                errors.append(f"{adr}: unknown module {mod}")
+            if adrs is not None and adr not in adrs:
+                errors.append(f"{adr}: no such ADR")
+            if row["role"] != "primary" or lo > hi:
+                errors.append(f"{adr}: bad row {row}")
+            out[adr].append((lo, hi, mod))
+    if errors:
+        raise ValueError("; ".join(errors))
+    return dict(out)
+
+
+def override_modules(overrides, adr, rule_no):
+    m = re.match(r"(\d+)", str(rule_no or ""))
+    if not m:
+        return []
+    n = int(m.group(1))
+    return sorted({mod for lo, hi, mod in overrides.get(adr, []) if lo <= n <= hi})
+
+
 def _list(v):
     return v if isinstance(v, list) else [x for x in (v or "").split(";") if x]
 
@@ -661,7 +799,7 @@ def module_scope(rows, owners, cats, module):
     for r in units:
         cr = _list(r["catalog_rows"])
         refs.update(cr)
-        if r.get("primary_module") == module:
+        if module in _list(r.get("primary_module")):
             for c in cr:
                 cat, key = c.split(":", 1)
                 row = cats.get(cat, {}).get(key, (None, {}))[1]
