@@ -118,6 +118,7 @@ ADR-0040,12,13,app,primary
 ADR-0040,12,13,registry,primary
 ADR-0041,15,15,ledger,primary
 ADR-0041,15,15,tax,primary
+ADR-0041,21,21,localization,primary
 ADR-0042,11,11,registry,primary
 ADR-0042,11,11,work,primary
 ADR-0043,9,9,policy,primary

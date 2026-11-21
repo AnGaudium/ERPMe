@@ -1315,8 +1315,8 @@ ADR-0041.R19,rule,ADR-0041,accepted,tax,tax,tax,,,ADR-0004.R5;ADR-0044.R13,7,,,,
 ADR-0041.R19.N1,note,ADR-0041,accepted,tax,tax,tax,,,ADR-0049.R5;ADR-0049.R21,7,amends,,,,,ADR-0041.R19,0252350ecb8d,docs/adr/0041-tax-engine.md,210,210
 ADR-0041.R20,rule,ADR-0041,accepted,tax,tax,tax,tax_matrix,,,7,,,,,,,5003a734d825,docs/adr/0041-tax-engine.md,214,227
 ADR-0041.R20.N1,note,ADR-0041,accepted,tax,tax,tax,,,ADR-0053.R2;ADR-0053.R3,7,amends,,1,no longer,,ADR-0041.R20,8d8c3c926550,docs/adr/0041-tax-engine.md,229,229
-ADR-0041.R21,rule,ADR-0041,accepted,tax,tax,tax,,,,7,,,,,,,8bac3d33fc9b,docs/adr/0041-tax-engine.md,233,242
-ADR-0041.R21.N1,note,ADR-0041,accepted,tax,tax,tax,,,ADR-0053.R13,7,amends,,,,,ADR-0041.R21,d817f96638cf,docs/adr/0041-tax-engine.md,244,244
+ADR-0041.R21,rule,ADR-0041,accepted,localization,localization,localization,,,,7,,,,,,,8bac3d33fc9b,docs/adr/0041-tax-engine.md,233,242
+ADR-0041.R21.N1,note,ADR-0041,accepted,localization,localization,localization,,,ADR-0053.R13,7,amends,,,,,ADR-0041.R21,d817f96638cf,docs/adr/0041-tax-engine.md,244,244
 ADR-0041.R22,rule,ADR-0041,accepted,tax,tax,tax,,transaction-keys:input_tax_non_deductible,,7,,,,,,,8b6e74866e3d,docs/adr/0041-tax-engine.md,245,245
 ADR-0041.R22.N1,note,ADR-0041,accepted,tax,tax,tax,,authorization-areas:master_data,,7,amends,,,,,ADR-0041.R22,9fb9df5a8d5c,docs/adr/0041-tax-engine.md,247,247
 ADR-0042.D0,section,ADR-0042,accepted,work,work,work,work_item,work-item-kinds:agent_task,ADR-0013.R12,5,,,,,,,862689d85f31,docs/adr/0042-work-queue.md,7,20
