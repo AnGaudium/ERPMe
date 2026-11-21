@@ -127,18 +127,17 @@ select src, cols, tgt, tcols, src_nn, tgt_nn from fk where src_nn is not null an
 
 def company_key_findings(X, allowlist):
     """The company-key rule of the ADR-0017 rule 19 note (2026-11-21), read from the catalog of the loaded schema: every
-    foreign key between two tables with company_id NOT NULL that is single-column, or that pairs company_id with another
-    column, and every single-column key to or from a table with a nullable company_id that `allowlist` (gen_overview's
-    COMPANY_KEY_ALLOWLIST) does not name. Returns (number of keys between company_id tables, findings)."""
+    foreign key between two tables with company_id NOT NULL that lacks company_id (single- or multi-column), or that pairs
+    company_id with another column, and every key without company_id to or from a table with a nullable company_id that
+    `allowlist` (gen_overview's COMPANY_KEY_ALLOWLIST) does not name. Returns (number of keys between company_id tables, findings)."""
     rows = X(COMPANY_KEY_SQL).fetchall()
     bad = []
     for src, cols, tgt, tcols, src_nn, tgt_nn in rows:
         if "company_id" in cols:
             if tcols[cols.index("company_id")] != "company_id":
                 bad.append(("mispaired", src, tuple(cols), tgt))
-        elif len(cols) == 1:
-            if src_nn and tgt_nn:
-                bad.append(("single-column", src, cols[0], tgt))
-            elif any(t not in allowlist for t, nn in ((src, src_nn), (tgt, tgt_nn)) if not nn):
-                bad.append(("not allowlisted", src, cols[0], tgt))
+        elif src_nn and tgt_nn:
+            bad.append(("no company_id", src, tuple(cols), tgt))
+        elif any(t not in allowlist for t, nn in ((src, src_nn), (tgt, tgt_nn)) if not nn):
+            bad.append(("not allowlisted", src, tuple(cols), tgt))
     return len(rows), bad

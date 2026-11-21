@@ -33,7 +33,7 @@ Keys and recorded_at (findings 1 and 2; check_keys_and_recorded_at): the script 
 is in KEY_ALLOWLIST, and on a design file whose recorded_at trigger section (the DO block of schema_phase_b.py) does not
 list exactly the file's tables, lists an append-only table without a guard trigger (outside PURE_LOGS), or leaves an
 in-place table with a BEFORE UPDATE guard that sorts after its set_recorded_at trigger. Company keys (check_company_keys):
-it fails on a single-column foreign key between two company tables (company_id NOT NULL on both), on a single-column key
+it fails on a foreign key between two company tables (company_id NOT NULL on both) without company_id, on a key
 to or from a table with a nullable company_id that COMPANY_KEY_ALLOWLIST does not list, and on a lab stub that a composite
 company key targets without UNIQUE (company_id, id).
 
@@ -168,8 +168,9 @@ def classify(stmts):
     return out
 
 
-# Company keys (ADR-0017 rule 19 note of 2026-11-21; open question R2-N9): a foreign key from a company table (company_id
-# NOT NULL) to a company table is composite, FOREIGN KEY (company_id, x) REFERENCES t (company_id, id). A single-column key
+# Company keys (ADR-0017 rule 19 note of 2026-11-21; open question R2-N9): every foreign key from a company table
+# (company_id NOT NULL) to a company table includes company_id on both sides, e.g. FOREIGN KEY (company_id, x) REFERENCES
+# t (company_id, id) or (company_id, bin_id, warehouse_id) REFERENCES bin (company_id, id, warehouse_id). A key
 # where either side has a nullable company_id (installation-or-company rows) stays single-column; that table must be listed
 # here with its reason, and an entry whose table no longer has a nullable company_id, or no such key, fails.
 COMPANY_KEY_ALLOWLIST = {
@@ -183,24 +184,29 @@ FK_ELEMENT_RE = re.compile(r"(?:CONSTRAINT \w+ )?FOREIGN KEY \(([^)]*)\) REFEREN
 FK_COLUMN_RE = re.compile(r"\bREFERENCES (\w+) \(([^)]*)\)")
 FK_ALTER_RE = re.compile(r"^ALTER TABLE (\w+)\s+ADD\s+(?:CONSTRAINT \w+\s+)?FOREIGN KEY\s*\(([^)]*)\)\s*REFERENCES (\w+)\s*\(([^)]*)\)", re.M)
 UQ_COMPANY_RE = re.compile(r"(?:CONSTRAINT \w+ )?UNIQUE \(company_id, id\)")
-UQ_ALTER_RE = re.compile(r"^ALTER TABLE (\w+)\s+ADD\s+(?:CONSTRAINT \w+\s+)?UNIQUE \(company_id, id\)", re.M)
+UQ_ALTER_RE = re.compile(r"^ALTER TABLE (\w+)\s+ADD\s+(?:CONSTRAINT \w+\s+)?UNIQUE\s*(?:NULLS NOT DISTINCT\s*)?\(([^)]*)\)", re.M)
+UNIQUE_ELEMENT_RE = re.compile(r"(?:CONSTRAINT \w+ )?UNIQUE (?:NULLS NOT DISTINCT )?\(([^)]*)\)")
+UQ_INDEX_RE = re.compile(r"^CREATE UNIQUE INDEX (?:IF NOT EXISTS )?\w+\s+ON (\w+)\s*\(([^)]*)\)\s*(WHERE)?", re.M)
 
 
 def company_scan(named_texts):
     """From [(file name, SQL text)]: tables {name: {"company": None | "null" | "not null", "uq": bool, "file": str,
-    "where": str}} and foreign keys [(where, file, table, [columns], target, [target columns])], read from CREATE TABLE
+    "where": str, "uniques": {frozenset of columns of each unique constraint or non-partial unique index}}} and foreign keys [(where, file, table, [columns], target, [target columns])], read from CREATE TABLE
     elements (column REFERENCES and table FOREIGN KEY) and ALTER TABLE ... ADD FOREIGN KEY."""
     split = lambda s: [x.strip() for x in s.split(",")]
-    tables, fks = {}, []
+    tables, fks, late = {}, [], []
     for fname, text in named_texts:
         masked = mask_sql(text)
         line = lambda pos: f"{fname}:{text.count(chr(10), 0, pos) + 1}"
         for name, _, _, spans in table_spans(text, masked):
-            info = {"company": None, "uq": False, "file": fname, "where": line(spans[0][0])}
+            info = {"company": None, "uq": False, "uniques": set(), "file": fname, "where": line(spans[0][0])}
             for s, e in spans:
                 c = " ".join(masked[s:e].split())
                 if UQ_COMPANY_RE.fullmatch(c):
                     info["uq"] = True
+                um = UNIQUE_ELEMENT_RE.match(c)
+                if um:
+                    info["uniques"].add(frozenset(split(um.group(1))))
                 fm = FK_ELEMENT_RE.match(c)
                 if fm:
                     fks.append((line(s), fname, name, split(fm.group(1)), fm.group(2), split(fm.group(3))))
@@ -212,11 +218,14 @@ def company_scan(named_texts):
                     if rm:
                         fks.append((line(s), fname, name, [col], rm.group(1), split(rm.group(2))))
             tables[name] = info
-        for m in UQ_ALTER_RE.finditer(masked):
-            if m.group(1) in tables:
-                tables[m.group(1)]["uq"] = True
+        late += [(m.group(1), frozenset(split(m.group(2)))) for m in UQ_ALTER_RE.finditer(masked)]
+        late += [(m.group(1), frozenset(split(m.group(2)))) for m in UQ_INDEX_RE.finditer(masked) if not m.group(3)]
         for m in FK_ALTER_RE.finditer(masked):
             fks.append((line(m.start()), fname, m.group(1), split(m.group(2)), m.group(3), split(m.group(4))))
+    for t, cols in late:                      # unique keys added after the CREATE TABLE, possibly in another file
+        if t in tables:
+            tables[t]["uniques"].add(cols)
+            tables[t]["uq"] |= cols == {"company_id", "id"}
     return tables, fks
 
 
@@ -238,31 +247,32 @@ def check_company_keys(docs):
                 errors.append(f"{where}: foreign key {src} ({', '.join(cols)}) -> {tgt} pairs company_id with "
                               f"{tcols[cols.index('company_id')]}")
             continue
-        if len(cols) != 1:
-            continue                                  # multi-column keys without company_id: outside the rule (the note)
         if company(src) == "not null" and company(tgt) == "not null":
-            errors.append(f"{where}: single-column foreign key between company tables, {src}.{cols[0]} -> {tgt}; write "
-                          f"FOREIGN KEY (company_id, {cols[0]}) REFERENCES {tgt} (company_id, id) (ADR-0017 rule 19 note; "
-                          "schema_phase_b.py rule 3)")
+            kind = "single-column" if len(cols) == 1 else "multi-column"
+            errors.append(f"{where}: {kind} foreign key between company tables without company_id, {src} ({', '.join(cols)}) -> "
+                          f"{tgt}; add company_id to both column lists (ADR-0017 rule 19 note; schema_phase_b.py rule 3)")
             continue
         single += 1
         nullable = [t for t in (src, tgt) if company(t) == "null"]
         missing = [t for t in nullable if t not in COMPANY_KEY_ALLOWLIST]
         used.update(t for t in nullable if t in COMPANY_KEY_ALLOWLIST)
         if missing:
-            errors.append(f"{where}: single-column foreign key {src}.{cols[0]} -> {tgt}, where {', '.join(missing)} has a "
+            errors.append(f"{where}: foreign key {src} ({', '.join(cols)}) -> {tgt}, where {', '.join(missing)} has a "
                           "nullable company_id and is not in COMPANY_KEY_ALLOWLIST")
     for t in sorted(set(COMPANY_KEY_ALLOWLIST) - used):
         errors.append(f"COMPANY_KEY_ALLOWLIST names {t}, which has no nullable company_id or no single-column key; remove it")
     stub_path = os.path.join(docs, STUBS)
     if os.path.exists(stub_path):
         stubs, _ = company_scan([(STUBS, read(stub_path))])
-        targets = {tgt for _, f, src, cols, tgt, _ in fks
-                   if "company_id" in cols and company(src) == "not null" and tables.get(tgt, {}).get("file") != f}
-        for t in sorted(targets & set(stubs)):
-            if not stubs[t]["uq"] or stubs[t]["company"] != "not null":
+        need = {}
+        for _, f, src, cols, tgt, tcols in fks:
+            if "company_id" in cols and company(src) == "not null" and tables.get(tgt, {}).get("file") != f:
+                need.setdefault(tgt, set()).add(frozenset(tcols))
+        for t in sorted(set(need) & set(stubs)):
+            missing = [sorted(w) for w in need[t] if w not in stubs[t]["uniques"]]
+            if missing or stubs[t]["company"] != "not null":
                 errors.append(f"{stubs[t]['where']}: lab stub {t} is the target of composite company keys but lacks "
-                              "company_id NOT NULL or UNIQUE (company_id, id)")
+                              f"company_id NOT NULL or the unique keys {missing}")
     return errors, {"company_keys": composite, "company_key_exceptions": single}
 
 
@@ -1061,17 +1071,21 @@ SELFTESTS = (
     ("a single-column company key written as a table element", "DS-05-platform.sql",
      "FOREIGN KEY (company_id, reversal_of_id) REFERENCES tax_line_adjustment (company_id, id)",
      "FOREIGN KEY (reversal_of_id) REFERENCES tax_line_adjustment (id)",
-     "single-column foreign key between company tables, tax_line_adjustment.reversal_of_id -> tax_line_adjustment"),
+     "single-column foreign key between company tables without company_id, tax_line_adjustment (reversal_of_id) -> tax_line_adjustment"),
     ("a single-column company key written on the column", "DS-06-universal-journal.sql",
      "    fixed_asset_id             uuid,   -- ADR-0025", "    fixed_asset_id             uuid REFERENCES fixed_asset (id),   -- ADR-0025",
-     "single-column foreign key between company tables, journal_line.fixed_asset_id -> fixed_asset"),
+     "single-column foreign key between company tables without company_id, journal_line (fixed_asset_id) -> fixed_asset"),
     ("a single-column company key written by ALTER TABLE", "DS-06-universal-journal.sql",
      "FOREIGN KEY (company_id, origin_journal_line_id) REFERENCES journal_line (company_id, id) DEFERRABLE",
      "FOREIGN KEY (origin_journal_line_id) REFERENCES journal_line (id) DEFERRABLE",
-     "single-column foreign key between company tables, open_item.origin_journal_line_id -> journal_line"),
+     "single-column foreign key between company tables without company_id, open_item (origin_journal_line_id) -> journal_line"),
     ("a single-column key to a nullable-company table outside the allowlist", "DS-06-universal-journal.sql",
      "    fixed_asset_id             uuid,   -- ADR-0025", "    fixed_asset_id             uuid REFERENCES setting_value (id),   -- ADR-0025",
      "setting_value has a nullable company_id and is not in COMPANY_KEY_ALLOWLIST"),
+    ("a multi-column key between company tables without company_id", "DS-05-platform.sql",
+     "FOREIGN KEY (company_id, policy_rule_id, policy_rule_version) REFERENCES policy_rule_version (company_id, policy_rule_id, version)",
+     "FOREIGN KEY (policy_rule_id, policy_rule_version) REFERENCES policy_rule_version (policy_rule_id, version)",
+     "multi-column foreign key between company tables without company_id, policy_decision (policy_rule_id, policy_rule_version)"),
 )
 
 

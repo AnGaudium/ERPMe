@@ -20,7 +20,10 @@ What it does to every CREATE TABLE of docs/design/*.sql (partitions inherit from
    `FOREIGN KEY (company_id, <column>) REFERENCES <table> (company_id, id)`, whatever its form: a column's REFERENCES
    (removed and appended as a table element, its ON DELETE / ON UPDATE / DEFERRABLE clauses kept), a table element
    FOREIGN KEY, or ALTER TABLE ... ADD FOREIGN KEY (both rewritten in place, clauses untouched). A target without
-   UNIQUE (company_id, id) first gets `CONSTRAINT uq_<table>_company_id_id UNIQUE (company_id, id)`; a lab stub of
+   UNIQUE (company_id, id) first gets `CONSTRAINT uq_<table>_company_id_id UNIQUE (company_id, id)`. A multi-column key
+   between company tables without company_id, e.g. (bin_id, warehouse_id) -> bin (id, warehouse_id), gets company_id
+   prepended on both sides, and its target gets `uq_<table>_company_id_<columns>` (`uq_<table>_company_key` where that
+   name would exceed 63 bytes) beside the existing unique key, which other keys may use; a lab stub of
    00_stubs.sql that is a target must already have it (the script stops otherwise). Keys to or from a table whose
    company_id is nullable or absent stay single-column (gen_overview.COMPANY_KEY_ALLOWLIST). The script stops on a key
    it cannot convert safely: a target column other than id, or ON DELETE / ON UPDATE SET NULL or SET DEFAULT without a
@@ -44,7 +47,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
 from gen_overview import KEY_ALLOWLIST, PURE_LOGS, RECORDED_AT_END as SECTION_END, RECORDED_AT_SECTION as SECTION_START  # noqa: E402
-from gen_overview import UQ_COMPANY_RE, classify, company_scan, mask_sql as mask, table_spans  # noqa: E402
+from gen_overview import UNIQUE_ELEMENT_RE, classify, company_scan, mask_sql as mask, table_spans  # noqa: E402
 
 REGISTRIES = {"setting_definition", "setting_preset", "setting_preset_item", "extension_point", "event_consumer",
               "public_mail_domain"}   # E2 (ADR-0006 rule 1 note)
@@ -53,8 +56,8 @@ STUBS = os.path.join(HERE, "00_stubs.sql")
 ACTIONS = (r"((?:\s+ON (?:DELETE|UPDATE) (?:NO ACTION|RESTRICT|CASCADE|SET NULL|SET DEFAULT)(?: \([^)]*\))?)*"
            r"(?:\s+(?:NOT )?DEFERRABLE)?(?:\s+INITIALLY (?:DEFERRED|IMMEDIATE))?)")
 INLINE_RE = re.compile(r"\s+REFERENCES (\w+) \(([^)]*)\)" + ACTIONS)
-ELEMENT_RE = re.compile(r"((?:CONSTRAINT \w+ )?FOREIGN KEY \()(\w+)\) REFERENCES (\w+) \(([^)]*)\)" + ACTIONS)
-ALTER_RE = re.compile(r"^ALTER TABLE (\w+)\s+ADD\s+(?:CONSTRAINT \w+\s+)?(FOREIGN KEY\s*\((\w+)\)\s*REFERENCES (\w+)\s*\(([^)]*)\))"
+ELEMENT_RE = re.compile(r"((?:CONSTRAINT \w+\s+)?FOREIGN KEY\s*\()([^)]*)\)\s*REFERENCES (\w+)\s*\(([^)]*)\)" + ACTIONS)
+ALTER_RE = re.compile(r"^ALTER TABLE (\w+)\s+ADD\s+(?:CONSTRAINT \w+\s+)?(FOREIGN KEY\s*\(([^)]*)\)\s*REFERENCES (\w+)\s*\(([^)]*)\))"
                       + ACTIONS, re.M)
 
 
@@ -63,19 +66,25 @@ def line_start(text, pos):
 
 
 def company_plan(files):
-    """(company status of every design table, the company tables that need UNIQUE (company_id, id)): every company table
-    that a single-column key from a company table targets and that lacks the key. Stops on a lab stub target without it."""
+    """(company status of every design table, {table: [unique column tuples to add]}): for every key from a company table
+    to a company table, the target needs a unique key on company_id plus the referenced columns ((company_id, id) for a
+    single-column key); those it lacks are added. Stops on a lab stub target without its key."""
     tables, fks = company_scan([(os.path.basename(p), open(p, encoding="utf-8").read()) for p in files])
     company = {t: v["company"] for t, v in tables.items()}
-    need = {tgt for _, _, src, cols, tgt, _ in fks
-            if len(cols) == 1 and company.get(src) == "not null" and company.get(tgt) == "not null" and not tables[tgt]["uq"]}
+    need, stub_need = {}, {}
+    for _, f, src, cols, tgt, tcols in fks:
+        if company.get(src) != "not null" or company.get(tgt) != "not null":
+            continue
+        want = tuple(tcols) if "company_id" in cols else ("company_id",) + tuple(tcols)
+        if frozenset(want) not in tables[tgt]["uniques"] and want not in need.get(tgt, []):
+            need.setdefault(tgt, []).append(want)
+        if tables[tgt]["file"] != f:      # a stub stands in for its table only in labs that load this file without the defining one
+            stub_need.setdefault(tgt, set()).add(frozenset(want))
     stubs, _ = company_scan([("00_stubs.sql", open(STUBS, encoding="utf-8").read())])
-    # a stub stands in for its table only in labs that load a referencing file without the defining one
-    targets = {tgt for _, f, src, cols, tgt, _ in fks if company.get(src) == "not null" and company.get(tgt) == "not null"
-               and (tgt in need or "company_id" in cols) and tables[tgt]["file"] != f}
-    for t in sorted(targets & set(stubs)):
-        if not stubs[t]["uq"]:
-            raise SystemExit(f"00_stubs.sql: stub {t} is a company-key target; give it company_id NOT NULL and UNIQUE (company_id, id)")
+    for t in sorted(set(stub_need) & set(stubs)):
+        missing = [sorted(w) for w in stub_need[t] if w not in stubs[t]["uniques"]]
+        if missing:
+            raise SystemExit(f"00_stubs.sql: stub {t} is a company-key target; it needs the unique keys {missing}")
     return company, need
 
 
@@ -85,7 +94,8 @@ def check_actions(where, actions):
                          "name the column, e.g. ON DELETE SET NULL (x_id)")
 
 
-def convert_file(path, append_only, company=None, need_uq=()):
+def convert_file(path, append_only, company=None, need_uq=None):
+    need_uq = need_uq or {}
     company = company or {}
     text = open(path, encoding="utf-8").read()
     name = os.path.basename(path)
@@ -176,12 +186,19 @@ def convert_file(path, append_only, company=None, need_uq=()):
                 edits.append((s + nm.end(), s + nm.end(), " DEFAULT now()"))
                 report.append(f"recorded_at {table}: default added")
         # --- company keys
-        if table in need_uq and not any(UQ_COMPANY_RE.fullmatch(c) for c in codes):
-            uq = f"uq_{table}_company_id_id"
+        have = {frozenset(x.strip() for x in m.group(1).split(","))
+                for m in (UNIQUE_ELEMENT_RE.match(c) for c in codes) if m}
+        names = set(re.findall(r"\bCONSTRAINT (\w+)", " ".join(codes)))
+        for j, want in enumerate(w for w in need_uq.get(table, []) if frozenset(w) not in have):
+            uq, cm = f"uq_{table}_{'_'.join(want)}", ""
             if len(uq.encode()) > 63:
-                raise SystemExit(f"{name} {table}: {uq} exceeds 63 bytes (ADR-0004 rule 6)")
-            appended.insert(0, (f"CONSTRAINT {uq} UNIQUE (company_id, id)",
-                                "   -- target of company keys (ADR-0017 rule 19 note, 2026-11-21)"))
+                uq = f"uq_{table}_company_key"
+                while uq in names:
+                    uq = uq.rstrip("0123456789") + str(int(uq[-1]) + 1 if uq[-1].isdigit() else 2)
+                cm = f"; {uq} named by hand: the convention name would exceed 63 bytes (ADR-0004 rule 6)"
+            names.add(uq)
+            appended.insert(j, (f"CONSTRAINT {uq} UNIQUE ({', '.join(want)})",
+                                f"   -- target of company keys (ADR-0017 rule 19 note, 2026-11-21){cm}"))
             report.append(f"company key target {table}: {uq} added")
         if company.get(table) == "not null":
             for col, k in cols.items():
@@ -199,12 +216,15 @@ def convert_file(path, append_only, company=None, need_uq=()):
                 s, e = spans[k]
                 em = ELEMENT_RE.match(masked[s:e])
                 if em and company.get(em.group(3)) == "not null":
-                    if em.group(4).strip() != "id":
-                        raise SystemExit(f"{name} {table}.{em.group(2)}: key to {em.group(3)} ({em.group(4)}), not id")
+                    fcols, tcols = [x.strip() for x in em.group(2).split(",")], [x.strip() for x in em.group(4).split(",")]
+                    if "company_id" in fcols:
+                        continue
+                    if len(fcols) == 1 and tcols != ["id"]:
+                        raise SystemExit(f"{name} {table}.{fcols[0]}: key to {em.group(3)} ({em.group(4)}), not id")
                     check_actions(f"{name} {table}.{em.group(2)}", em.group(5))
-                    edits.append((s, s + em.end(4) + 1,
-                                  f"{em.group(1)}company_id, {em.group(2)}) REFERENCES {em.group(3)} (company_id, id)"))
-                    report.append(f"company key {table}.{em.group(2)} -> {em.group(3)} (in place)")
+                    edits.append((s, s + em.end(4) + 1, f"{em.group(1)}company_id, {', '.join(fcols)}) REFERENCES {em.group(3)} "
+                                  f"(company_id, {', '.join(tcols)})"))
+                    report.append(f"company key {table}.{'+'.join(fcols)} -> {em.group(3)} (in place)")
         else:
             for col, k in cols.items():
                 s, e = spans[k]
@@ -227,13 +247,15 @@ def convert_file(path, append_only, company=None, need_uq=()):
                 edits.append((le, le, ","))
                 edits.append((eol, eol, "".join(parts)))
     for am in ALTER_RE.finditer(masked):
-        src, col, tgt = am.group(1), am.group(3), am.group(4)
-        if company.get(src) == "not null" and company.get(tgt) == "not null":
-            if am.group(5).strip() != "id":
-                raise SystemExit(f"{name} ALTER TABLE {src}.{col}: key to {tgt} ({am.group(5)}), not id")
-            check_actions(f"{name} {src}.{col}", am.group(6))
-            edits.append((am.start(2), am.end(2), f"FOREIGN KEY (company_id, {col}) REFERENCES {tgt} (company_id, id)"))
-            report.append(f"company key {src}.{col} -> {tgt} (ALTER TABLE, in place)")
+        src, tgt = am.group(1), am.group(4)
+        fcols, tcols = [x.strip() for x in am.group(3).split(",")], [x.strip() for x in am.group(5).split(",")]
+        if company.get(src) == "not null" and company.get(tgt) == "not null" and "company_id" not in fcols:
+            if len(fcols) == 1 and tcols != ["id"]:
+                raise SystemExit(f"{name} ALTER TABLE {src}.{fcols[0]}: key to {tgt} ({am.group(5)}), not id")
+            check_actions(f"{name} {src}.{'+'.join(fcols)}", am.group(6))
+            edits.append((am.start(2), am.end(2), f"FOREIGN KEY (company_id, {', '.join(fcols)}) REFERENCES {tgt} "
+                          f"(company_id, {', '.join(tcols)})"))
+            report.append(f"company key {src}.{'+'.join(fcols)} -> {tgt} (ALTER TABLE, in place)")
     edits.sort(key=lambda x: (x[0], x[1]), reverse=True)
     last = None
     for s, e, new in edits:

@@ -403,8 +403,8 @@ CREATE TABLE work_center (                                 -- ADR-0033 rule 11
     FOREIGN KEY (company_id, working_calendar_id) REFERENCES working_calendar (company_id, id),
     FOREIGN KEY (company_id, cost_center_id) REFERENCES cost_center (company_id, id),
     -- the bins lie in the work center's warehouse
-    CONSTRAINT fk_work_center_supply_bin FOREIGN KEY (supply_bin_id, production_warehouse_id) REFERENCES bin (id, warehouse_id),
-    CONSTRAINT fk_work_center_output_bin FOREIGN KEY (output_bin_id, production_warehouse_id) REFERENCES bin (id, warehouse_id),
+    CONSTRAINT fk_work_center_supply_bin FOREIGN KEY (company_id, supply_bin_id, production_warehouse_id) REFERENCES bin (company_id, id, warehouse_id),
+    CONSTRAINT fk_work_center_output_bin FOREIGN KEY (company_id, output_bin_id, production_warehouse_id) REFERENCES bin (company_id, id, warehouse_id),
     FOREIGN KEY (company_id, resource_group_id) REFERENCES resource_group (company_id, id)
 );
 CREATE INDEX ix_work_center_company_id_resource_group_id ON work_center (company_id, resource_group_id) WHERE resource_group_id IS NOT NULL;
@@ -1141,7 +1141,8 @@ CREATE TABLE production_order_output_serial (              -- assigned serials; 
     CONSTRAINT uq_production_order_output_serial_key UNIQUE (production_order_id, serial_number_id),
     CONSTRAINT fk_production_order_output_serial_output FOREIGN KEY (company_id, production_order_output_id, production_order_id) REFERENCES production_order_output (company_id, id, production_order_id),
     CONSTRAINT ck_production_order_output_serial_dates CHECK (freed_at IS NULL OR freed_at >= assigned_at),
-    FOREIGN KEY (company_id, serial_number_id) REFERENCES serial_number (company_id, id)   -- company key (ADR-0017 rule 19 note, 2026-11-21)
+    FOREIGN KEY (company_id, serial_number_id) REFERENCES serial_number (company_id, id),   -- company key (ADR-0017 rule 19 note, 2026-11-21)
+    CONSTRAINT uq_production_order_output_serial_company_key UNIQUE (company_id, production_order_id, serial_number_id)   -- target of company keys (ADR-0017 rule 19 note, 2026-11-21); uq_production_order_output_serial_company_key named by hand: the convention name would exceed 63 bytes (ADR-0004 rule 6)
 );
 -- A serial has at most one open assignment (rule 16).
 CREATE UNIQUE INDEX ux_production_order_output_serial_open ON production_order_output_serial (serial_number_id) WHERE freed_at IS NULL;
@@ -1197,11 +1198,11 @@ CREATE TABLE production_issue_line (
     -- the component line is of the same order, with the same item and issue warehouse
     CONSTRAINT fk_production_issue_line_component FOREIGN KEY (company_id, production_order_component_id, production_order_id, item_id, warehouse_id)
         REFERENCES production_order_component (company_id, id, production_order_id, component_item_id, issue_warehouse_id),
-    CONSTRAINT fk_production_issue_line_bin FOREIGN KEY (bin_id, warehouse_id) REFERENCES bin (id, warehouse_id),
+    CONSTRAINT fk_production_issue_line_bin FOREIGN KEY (company_id, bin_id, warehouse_id) REFERENCES bin (company_id, id, warehouse_id),
     -- INV-103: the order's cost object
     CONSTRAINT fk_production_issue_line_cost_object FOREIGN KEY (company_id, production_order_id, cost_object_id) REFERENCES production_order (company_id, id, cost_object_id),
     -- INV-105: an output serial assigned to the same order
-    CONSTRAINT fk_production_issue_line_output_serial FOREIGN KEY (production_order_id, output_serial_number_id) REFERENCES production_order_output_serial (production_order_id, serial_number_id),
+    CONSTRAINT fk_production_issue_line_output_serial FOREIGN KEY (company_id, production_order_id, output_serial_number_id) REFERENCES production_order_output_serial (company_id, production_order_id, serial_number_id),
     CONSTRAINT ck_production_issue_line_tracking CHECK (num_nonnulls(lot_id, serial_number_id) <= 1 AND (serial_number_id IS NULL OR inventory_quantity = 1)),
     -- the line unit block (ADR-0056 rule 9): a known source, identity only at 1/1, and the inventory quantity within two
     -- inventory units of the exact conversion: a gross-error check that per-line rounding, the clamped forward parts and the
@@ -1327,10 +1328,10 @@ CREATE TABLE production_receipt_line (
     CONSTRAINT fk_production_receipt_line_receipt FOREIGN KEY (company_id, production_receipt_id, production_order_id) REFERENCES production_receipt (company_id, id, production_order_id),
     CONSTRAINT fk_production_receipt_line_output FOREIGN KEY (company_id, production_order_output_id, production_order_id, item_id)
         REFERENCES production_order_output (company_id, id, production_order_id, output_item_id),
-    CONSTRAINT fk_production_receipt_line_bin FOREIGN KEY (bin_id, warehouse_id) REFERENCES bin (id, warehouse_id),
+    CONSTRAINT fk_production_receipt_line_bin FOREIGN KEY (company_id, bin_id, warehouse_id) REFERENCES bin (company_id, id, warehouse_id),
     CONSTRAINT fk_production_receipt_line_cost_object FOREIGN KEY (company_id, production_order_id, cost_object_id) REFERENCES production_order (company_id, id, cost_object_id),
     -- received serials are serials assigned to the same order (rule 16)
-    CONSTRAINT fk_production_receipt_line_serial FOREIGN KEY (production_order_id, serial_number_id) REFERENCES production_order_output_serial (production_order_id, serial_number_id),
+    CONSTRAINT fk_production_receipt_line_serial FOREIGN KEY (company_id, production_order_id, serial_number_id) REFERENCES production_order_output_serial (company_id, production_order_id, serial_number_id),
     CONSTRAINT ck_production_receipt_line_tracking CHECK (num_nonnulls(lot_id, serial_number_id) <= 1 AND (serial_number_id IS NULL OR inventory_quantity = 1)),
     -- the line unit block (ADR-0056 rule 9): a known source, identity only at 1/1, and the inventory quantity within two
     -- inventory units of the exact conversion: a gross-error check that per-line rounding, the clamped forward parts and the
@@ -1370,7 +1371,7 @@ CREATE TABLE operation_progress_component (
     CONSTRAINT fk_operation_progress_component_service_receipt FOREIGN KEY (company_id, service_receipt_id) REFERENCES document (company_id, id),
     CONSTRAINT fk_operation_progress_component_component FOREIGN KEY (company_id, production_order_component_id, production_order_id, item_id, warehouse_id)
         REFERENCES production_order_component (company_id, id, production_order_id, component_item_id, issue_warehouse_id),
-    CONSTRAINT fk_operation_progress_component_bin FOREIGN KEY (bin_id, warehouse_id) REFERENCES bin (id, warehouse_id),
+    CONSTRAINT fk_operation_progress_component_bin FOREIGN KEY (company_id, bin_id, warehouse_id) REFERENCES bin (company_id, id, warehouse_id),
     CONSTRAINT fk_operation_progress_component_cost_object FOREIGN KEY (company_id, production_order_id, cost_object_id) REFERENCES production_order (company_id, id, cost_object_id),
     CONSTRAINT ck_operation_progress_component_caller CHECK (num_nonnulls(operation_confirmation_id, production_receipt_id, service_receipt_id) = 1),
     -- the line unit block (ADR-0056 rule 9): a known source, identity only at 1/1, and the inventory quantity within two
@@ -1480,7 +1481,8 @@ CREATE TABLE costing_sheet_row (                           -- [production] ADR-0
             AND (surcharge_kind = 'per_activity_unit') = (activity_type_id IS NOT NULL)
             AND (usage = 'production') = (cost_component_detail_id IS NOT NULL) END),
     CONSTRAINT ck_costing_sheet_row_component CHECK ((cost_component_detail_id IS NULL) = (cost_component IS NULL)
-        AND (cost_component IS NULL OR cost_component IN ('labor', 'overhead', 'other')))
+        AND (cost_component IS NULL OR cost_component IN ('labor', 'overhead', 'other'))),
+    CONSTRAINT uq_costing_sheet_row_company_key UNIQUE (company_id, costing_sheet_id, row_number, surcharge_kind)   -- target of company keys (ADR-0017 rule 19 note, 2026-11-21); uq_costing_sheet_row_company_key named by hand: the convention name would exceed 63 bytes (ADR-0004 rule 6)
 );
 CREATE TABLE costing_sheet_base_member (                   -- [production] ADR-0072 rule 6; a posting component or a detail of a base row
     id                        uuid PRIMARY KEY,
@@ -1514,7 +1516,7 @@ CREATE TABLE costing_sheet_rate (                          -- [production] ADR-0
     recorded_at         timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, costing_sheet_id) REFERENCES costing_sheet (company_id, id),
-    CONSTRAINT fk_costing_sheet_rate_row FOREIGN KEY (costing_sheet_id, row_number, surcharge_kind) REFERENCES costing_sheet_row (costing_sheet_id, row_number, surcharge_kind),
+    CONSTRAINT fk_costing_sheet_rate_row FOREIGN KEY (company_id, costing_sheet_id, row_number, surcharge_kind) REFERENCES costing_sheet_row (company_id, costing_sheet_id, row_number, surcharge_kind),
     FOREIGN KEY (company_id, site_id) REFERENCES site (company_id, id),
     FOREIGN KEY (company_id, item_group_id) REFERENCES item_group (company_id, id),
     CONSTRAINT ck_costing_sheet_rate_value CHECK (CASE surcharge_kind
@@ -1742,7 +1744,8 @@ CREATE TABLE production_order_period_cost (                -- written only by th
     FOREIGN KEY (company_id, production_cost_settlement_id) REFERENCES production_cost_settlement (company_id, id),
     -- pool = opening + incurred; it goes to abnormal, residual, outputs, or stays as WIP (rules 8-11)
     CONSTRAINT ck_production_order_period_cost_balance CHECK (closing_amount = opening_amount + incurred_amount - abnormal_amount - residual_amount - to_output_amount),
-    FOREIGN KEY (company_id, posting_period_id) REFERENCES posting_period (company_id, id)   -- company key (S2 schema phase A)
+    FOREIGN KEY (company_id, posting_period_id) REFERENCES posting_period (company_id, id),   -- company key (S2 schema phase A)
+    CONSTRAINT uq_production_order_period_cost_company_key UNIQUE (company_id, production_order_id, posting_period_id, cost_component)   -- target of company keys (ADR-0017 rule 19 note, 2026-11-21); uq_production_order_period_cost_company_key named by hand: the convention name would exceed 63 bytes (ADR-0004 rule 6)
 );
 CREATE TABLE production_order_period_cost_detail (         -- [production] ADR-0072 rule 4; read model written by the job with its parent; sums exactly to it (INV-851)
     id                        uuid PRIMARY KEY,   -- uq_production_order_period_cost_detail_key named by hand: the convention name would exceed 63 bytes (ADR-0004 rule 6)
@@ -1759,8 +1762,7 @@ CREATE TABLE production_order_period_cost_detail (         -- [production] ADR-0
     closing_amount            types.amount NOT NULL,           -- split by available amount, largest remainder
     recorded_at               timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT uq_production_order_period_cost_detail_key UNIQUE (production_order_id, posting_period_id, cost_component_detail_id),
-    CONSTRAINT fk_production_order_period_cost_detail_parent FOREIGN KEY (production_order_id, posting_period_id, cost_component)
-        REFERENCES production_order_period_cost (production_order_id, posting_period_id, cost_component) ON DELETE CASCADE,
+    CONSTRAINT fk_production_order_period_cost_detail_parent FOREIGN KEY (company_id, production_order_id, posting_period_id, cost_component) REFERENCES production_order_period_cost (company_id, production_order_id, posting_period_id, cost_component) ON DELETE CASCADE,
     FOREIGN KEY (company_id, production_order_id) REFERENCES production_order (company_id, id),
     CONSTRAINT fk_production_order_period_cost_detail_detail FOREIGN KEY (company_id, cost_component_detail_id, cost_component)
         REFERENCES cost_component_detail (company_id, id, cost_component),

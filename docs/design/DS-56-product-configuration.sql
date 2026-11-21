@@ -58,7 +58,7 @@ CREATE TABLE configuration_rule (                           -- ADR-0046 rule 6
     recorded_at                       timestamptz NOT NULL DEFAULT now(),
     UNIQUE (configuration_model_revision_id, position) DEFERRABLE INITIALLY DEFERRED,
     FOREIGN KEY (company_id, configuration_model_revision_id, product_id) REFERENCES configuration_model_revision (company_id, id, product_id),
-    FOREIGN KEY (product_id, target_attribute_id) REFERENCES product_variant_attribute (product_id, variant_attribute_id),
+    FOREIGN KEY (company_id, product_id, target_attribute_id) REFERENCES product_variant_attribute (company_id, product_id, variant_attribute_id),
     CONSTRAINT ck_configuration_rule_target CHECK ((kind = 'forbid') = (target_attribute_id IS NULL))
 );
 CREATE TABLE configuration_table (                          -- ADR-0046 rule 7
@@ -83,7 +83,7 @@ CREATE TABLE configuration_table_column (
     CONSTRAINT uq_configuration_table_column_key UNIQUE (configuration_table_id, column_number),
     UNIQUE (configuration_table_id, variant_attribute_id),
     FOREIGN KEY (company_id, configuration_table_id, product_id) REFERENCES configuration_table (company_id, id, product_id),
-    FOREIGN KEY (product_id, variant_attribute_id) REFERENCES product_variant_attribute (product_id, variant_attribute_id)
+    FOREIGN KEY (company_id, product_id, variant_attribute_id) REFERENCES product_variant_attribute (company_id, product_id, variant_attribute_id)
 );
 CREATE TABLE configuration_table_row (
     id                      uuid PRIMARY KEY,
@@ -108,7 +108,7 @@ CREATE TABLE configuration_default (                        -- ADR-0046 rule 8
     recorded_at                       timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT uq_configuration_default_key UNIQUE (configuration_model_revision_id, position) DEFERRABLE INITIALLY DEFERRED,
     FOREIGN KEY (company_id, configuration_model_revision_id, product_id) REFERENCES configuration_model_revision (company_id, id, product_id),
-    FOREIGN KEY (product_id, target_attribute_id) REFERENCES product_variant_attribute (product_id, variant_attribute_id)
+    FOREIGN KEY (company_id, product_id, target_attribute_id) REFERENCES product_variant_attribute (company_id, product_id, variant_attribute_id)
 );
 
 -- ===== Configurations [master_data] (ADR-0046 rule 9) =====
@@ -137,9 +137,9 @@ CREATE TABLE product_configuration_value (
     recorded_at                 timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT uq_product_configuration_value_key UNIQUE (product_configuration_id, variant_attribute_id),
     FOREIGN KEY (company_id, product_configuration_id, product_id) REFERENCES product_configuration (company_id, id, product_id),
-    FOREIGN KEY (product_id, variant_attribute_id) REFERENCES product_variant_attribute (product_id, variant_attribute_id),
+    FOREIGN KEY (company_id, product_id, variant_attribute_id) REFERENCES product_variant_attribute (company_id, product_id, variant_attribute_id),
     CONSTRAINT fk_product_configuration_value_type FOREIGN KEY (company_id, variant_attribute_id, value_type) REFERENCES variant_attribute (company_id, id, value_type),
-    FOREIGN KEY (variant_attribute_id, variant_attribute_value_id) REFERENCES variant_attribute_value (variant_attribute_id, id),
+    FOREIGN KEY (company_id, variant_attribute_id, variant_attribute_value_id) REFERENCES variant_attribute_value (company_id, variant_attribute_id, id),
     CONSTRAINT ck_product_configuration_value_one CHECK ((value_type = 'list') = (variant_attribute_value_id IS NOT NULL)
                                                          AND (value_type = 'number') = (numeric_value IS NOT NULL))
 );
@@ -158,7 +158,7 @@ CREATE TABLE price_list_characteristic_rate (
     recorded_at           timestamptz NOT NULL DEFAULT now(),
     FOREIGN KEY (company_id, price_list_id) REFERENCES price_list (company_id, id),
     FOREIGN KEY (company_id, product_id) REFERENCES product (company_id, id),
-    FOREIGN KEY (product_id, variant_attribute_id) REFERENCES product_variant_attribute (product_id, variant_attribute_id),
+    FOREIGN KEY (company_id, product_id, variant_attribute_id) REFERENCES product_variant_attribute (company_id, product_id, variant_attribute_id),
     CONSTRAINT fk_price_list_characteristic_rate_type FOREIGN KEY (company_id, variant_attribute_id, value_type) REFERENCES variant_attribute (company_id, id, value_type),
     CONSTRAINT ck_price_list_characteristic_rate_dates CHECK (end_date IS NULL OR end_date >= start_date),
     CONSTRAINT ex_price_list_characteristic_rate_overlap EXCLUDE USING gist (

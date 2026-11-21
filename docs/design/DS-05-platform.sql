@@ -449,7 +449,8 @@ CREATE TABLE policy_rule_version (
     -- Rule 3: a rule that allows a non-human actor needs an owner and a maximum, and confirmation at post and issue.
     CONSTRAINT ck_policy_rule_version_loosening CHECK (effect <> 'allow' OR actor_kind IS NOT DISTINCT FROM 'human'
         OR (owner_user_id IS NOT NULL AND amount_company_max IS NOT NULL
-            AND (action NOT IN ('post', 'issue') OR is_confirmation_required)))
+            AND (action NOT IN ('post', 'issue') OR is_confirmation_required))),
+    CONSTRAINT uq_policy_rule_version_company_id_policy_rule_id_version UNIQUE (company_id, policy_rule_id, version)   -- target of company keys (ADR-0017 rule 19 note, 2026-11-21)
 );
 CREATE INDEX ix_policy_rule_version_evidence_setting_keys ON policy_rule_version USING gin (evidence_setting_keys) WHERE shadow_evidence_outdated_by IS NULL;
 
@@ -614,7 +615,7 @@ CREATE TABLE policy_decision (                             -- [policy] ADR-0043 
     UNIQUE (company_id, id, approval_pool_id),
     FOREIGN KEY (company_id, document_id, document_version_id) REFERENCES document_version (company_id, document_id, id),
     FOREIGN KEY (company_id, policy_rule_id) REFERENCES policy_rule (company_id, id),
-    FOREIGN KEY (policy_rule_id, policy_rule_version) REFERENCES policy_rule_version (policy_rule_id, version),
+    FOREIGN KEY (company_id, policy_rule_id, policy_rule_version) REFERENCES policy_rule_version (company_id, policy_rule_id, version),
     FOREIGN KEY (company_id, approval_procedure_id) REFERENCES approval_procedure (company_id, id),
     FOREIGN KEY (company_id, approval_pool_id) REFERENCES approval_pool (company_id, id),
     FOREIGN KEY (company_id, continues_policy_decision_id) REFERENCES policy_decision (company_id, id),

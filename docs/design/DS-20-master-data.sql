@@ -603,7 +603,7 @@ CREATE TABLE product_uom (                                 -- other units of one
     recorded_at           timestamptz NOT NULL DEFAULT now(),   -- the last write, retirement included (ADR-0007 rule 9)
     CONSTRAINT fk_product_uom_inventory_unit FOREIGN KEY (company_id, product_id, inventory_uom_id) REFERENCES product (company_id, id, inventory_uom_id) ON UPDATE CASCADE,
     FOREIGN KEY (company_id, item_id) REFERENCES item (company_id, id),
-    CONSTRAINT fk_product_uom_item_product FOREIGN KEY (item_id, product_id) REFERENCES item (id, product_id),
+    CONSTRAINT fk_product_uom_item_product FOREIGN KEY (company_id, item_id, product_id) REFERENCES item (company_id, id, product_id),
     CONSTRAINT ck_product_uom_not_inventory CHECK (uom_id <> inventory_uom_id),
     -- the shape of the packaging hierarchy; its consistency with the factors is a command check (uom_packaging_inconsistent)
     CONSTRAINT ck_product_uom_packaging CHECK ((contains_uom_id IS NULL) = (contains_quantity IS NULL)
@@ -668,7 +668,8 @@ CREATE TABLE variant_attribute_value (                    -- carries its attribu
     CONSTRAINT fk_variant_attribute_value_attribute FOREIGN KEY (company_id, variant_attribute_id, variant_mode, value_type)
         REFERENCES variant_attribute (company_id, id, variant_mode, value_type),
     CONSTRAINT ck_variant_attribute_value_custom CHECK (NOT is_custom OR variant_mode = 'line_option'),
-    CONSTRAINT ck_variant_attribute_value_number CHECK ((value_type = 'number') = (numeric_value IS NOT NULL) AND (value_type = 'list' OR variant_mode = 'variant'))
+    CONSTRAINT ck_variant_attribute_value_number CHECK ((value_type = 'number') = (numeric_value IS NOT NULL) AND (value_type = 'list' OR variant_mode = 'variant')),
+    CONSTRAINT uq_variant_attribute_value_company_id_variant_attribute_id_id UNIQUE (company_id, variant_attribute_id, id)   -- target of company keys (ADR-0017 rule 19 note, 2026-11-21)
 );
 CREATE TABLE product_variant_attribute (                  -- the attributes of a product, of either mode
     id                    uuid PRIMARY KEY,
@@ -681,7 +682,8 @@ CREATE TABLE product_variant_attribute (                  -- the attributes of a
     CONSTRAINT uq_product_variant_attribute_product_id_variant_attribute_id UNIQUE (product_id, variant_attribute_id),
     UNIQUE (product_id, position) DEFERRABLE INITIALLY DEFERRED,
     FOREIGN KEY (company_id, product_id) REFERENCES product (company_id, id),
-    FOREIGN KEY (company_id, variant_attribute_id) REFERENCES variant_attribute (company_id, id)
+    FOREIGN KEY (company_id, variant_attribute_id) REFERENCES variant_attribute (company_id, id),
+    CONSTRAINT uq_product_variant_attribute_company_key UNIQUE (company_id, product_id, variant_attribute_id)   -- target of company keys (ADR-0017 rule 19 note, 2026-11-21); uq_product_variant_attribute_company_key named by hand: the convention name would exceed 63 bytes (ADR-0004 rule 6)
 );
 CREATE TABLE product_attribute_value (                    -- values a product allows for an attribute, of either mode; none listed = every value (ADR-0045 rule 15)
     id                          uuid PRIMARY KEY,   -- uq_product_attribute_value_key named by hand: the convention name would exceed 63 bytes (ADR-0004 rule 6)
@@ -692,8 +694,8 @@ CREATE TABLE product_attribute_value (                    -- values a product al
     recorded_at                 timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT uq_product_attribute_value_key UNIQUE (product_id, variant_attribute_id, variant_attribute_value_id),
     FOREIGN KEY (company_id, product_id) REFERENCES product (company_id, id),
-    CONSTRAINT fk_product_attribute_value_attribute FOREIGN KEY (product_id, variant_attribute_id) REFERENCES product_variant_attribute (product_id, variant_attribute_id),
-    CONSTRAINT fk_product_attribute_value_value FOREIGN KEY (variant_attribute_id, variant_attribute_value_id) REFERENCES variant_attribute_value (variant_attribute_id, id)
+    CONSTRAINT fk_product_attribute_value_attribute FOREIGN KEY (company_id, product_id, variant_attribute_id) REFERENCES product_variant_attribute (company_id, product_id, variant_attribute_id),
+    CONSTRAINT fk_product_attribute_value_value FOREIGN KEY (company_id, variant_attribute_id, variant_attribute_value_id) REFERENCES variant_attribute_value (company_id, variant_attribute_id, id)
 );
 CREATE TABLE item (
     id                uuid PRIMARY KEY,
@@ -720,7 +722,8 @@ CREATE TABLE item (
     CONSTRAINT ck_item_weight_uom CHECK ((net_weight IS NULL AND gross_weight IS NULL) OR weight_uom_id IS NOT NULL),
     CONSTRAINT ck_item_dimensions_positive CHECK (coalesce(length, 1) > 0 AND coalesce(width, 1) > 0 AND coalesce(height, 1) > 0
                                                    AND coalesce(net_weight, 1) > 0 AND coalesce(gross_weight, 1) > 0),
-    CONSTRAINT ck_item_gross_weight CHECK (net_weight IS NULL OR gross_weight IS NULL OR gross_weight >= net_weight)
+    CONSTRAINT ck_item_gross_weight CHECK (net_weight IS NULL OR gross_weight IS NULL OR gross_weight >= net_weight),
+    CONSTRAINT uq_item_company_id_id_product_id UNIQUE (company_id, id, product_id)   -- target of company keys (ADR-0017 rule 19 note, 2026-11-21)
 );
 CREATE TABLE item_variant_value (                         -- one per variant-mode attribute of the item's product
     id                          uuid PRIMARY KEY,
@@ -733,8 +736,8 @@ CREATE TABLE item_variant_value (                         -- one per variant-mod
     recorded_at                 timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT uq_item_variant_value_item_id_variant_attribute_id UNIQUE (item_id, variant_attribute_id),
     FOREIGN KEY (company_id, item_id) REFERENCES item (company_id, id),
-    FOREIGN KEY (item_id, product_id) REFERENCES item (id, product_id),
-    CONSTRAINT fk_item_variant_value_product_attribute FOREIGN KEY (product_id, variant_attribute_id) REFERENCES product_variant_attribute (product_id, variant_attribute_id),
+    FOREIGN KEY (company_id, item_id, product_id) REFERENCES item (company_id, id, product_id),
+    CONSTRAINT fk_item_variant_value_product_attribute FOREIGN KEY (company_id, product_id, variant_attribute_id) REFERENCES product_variant_attribute (company_id, product_id, variant_attribute_id),
     CONSTRAINT fk_item_variant_value_value FOREIGN KEY (company_id, variant_attribute_id, variant_mode, variant_attribute_value_id)
         REFERENCES variant_attribute_value (company_id, variant_attribute_id, variant_mode, id)        -- line options never make items
 );
@@ -831,7 +834,8 @@ CREATE TABLE classification_value (
     UNIQUE (classification_scheme_id, id),
     FOREIGN KEY (company_id, classification_scheme_id) REFERENCES classification_scheme (company_id, id),
     CONSTRAINT uq_classification_value_company_id_id UNIQUE (company_id, id),   -- target of company keys (ADR-0017 rule 19 note, 2026-11-21)
-    FOREIGN KEY (company_id, parent_id) REFERENCES classification_value (company_id, id)   -- company key (ADR-0017 rule 19 note, 2026-11-21)
+    FOREIGN KEY (company_id, parent_id) REFERENCES classification_value (company_id, id),   -- company key (ADR-0017 rule 19 note, 2026-11-21)
+    CONSTRAINT uq_classification_value_company_id_classification_scheme_id_id UNIQUE (company_id, classification_scheme_id, id)   -- target of company keys (ADR-0017 rule 19 note, 2026-11-21)
 );
 CREATE TABLE product_classification (                      -- one value per scheme per product (ADR-0018 rule 15)
     id                        uuid PRIMARY KEY,
@@ -843,7 +847,7 @@ CREATE TABLE product_classification (                      -- one value per sche
     CONSTRAINT uq_product_classification_product_id_classification_scheme_id UNIQUE (product_id, classification_scheme_id),
     FOREIGN KEY (company_id, product_id) REFERENCES product (company_id, id),
     FOREIGN KEY (company_id, classification_scheme_id) REFERENCES classification_scheme (company_id, id),
-    FOREIGN KEY (classification_scheme_id, classification_value_id) REFERENCES classification_value (classification_scheme_id, id)
+    FOREIGN KEY (company_id, classification_scheme_id, classification_value_id) REFERENCES classification_value (company_id, classification_scheme_id, id)
 );
 
 -- ===== Warehouses and bins [master_data owns warehouses; inventory owns zones and bins] (ADR-0020, ADR-0023, ADR-0031, ADR-0037) =====
@@ -888,7 +892,8 @@ CREATE TABLE zone (
     id uuid PRIMARY KEY, company_id uuid NOT NULL, warehouse_id uuid NOT NULL,
     code text NOT NULL, name text NOT NULL, UNIQUE (warehouse_id, code), UNIQUE (id, warehouse_id),
     FOREIGN KEY (company_id, warehouse_id) REFERENCES warehouse (company_id, id),
-    recorded_at timestamptz NOT NULL DEFAULT now()
+    recorded_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_zone_company_id_id_warehouse_id UNIQUE (company_id, id, warehouse_id)   -- target of company keys (ADR-0017 rule 19 note, 2026-11-21)
 );
 CREATE TABLE bin (
     id                       uuid PRIMARY KEY,
@@ -913,11 +918,12 @@ CREATE TABLE bin (
     UNIQUE (company_id, barcode),
     UNIQUE (id, warehouse_id),
     FOREIGN KEY (company_id, warehouse_id) REFERENCES warehouse (company_id, id),
-    CONSTRAINT fk_bin_zone FOREIGN KEY (zone_id, warehouse_id) REFERENCES zone (id, warehouse_id)
+    CONSTRAINT fk_bin_zone FOREIGN KEY (company_id, zone_id, warehouse_id) REFERENCES zone (company_id, id, warehouse_id),
+    CONSTRAINT uq_bin_company_id_id_warehouse_id UNIQUE (company_id, id, warehouse_id)   -- target of company keys (ADR-0017 rule 19 note, 2026-11-21)
 );
-ALTER TABLE warehouse ADD CONSTRAINT fk_warehouse_default_bin FOREIGN KEY (default_bin_id, id) REFERENCES bin (id, warehouse_id) DEFERRABLE INITIALLY DEFERRED;
-ALTER TABLE warehouse ADD CONSTRAINT fk_warehouse_default_receiving_bin FOREIGN KEY (default_receiving_bin_id, id) REFERENCES bin (id, warehouse_id) DEFERRABLE INITIALLY DEFERRED;
-ALTER TABLE warehouse ADD CONSTRAINT fk_warehouse_default_shipping_bin FOREIGN KEY (default_shipping_bin_id, id) REFERENCES bin (id, warehouse_id) DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE warehouse ADD CONSTRAINT fk_warehouse_default_bin FOREIGN KEY (company_id, default_bin_id, id) REFERENCES bin (company_id, id, warehouse_id) DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE warehouse ADD CONSTRAINT fk_warehouse_default_receiving_bin FOREIGN KEY (company_id, default_receiving_bin_id, id) REFERENCES bin (company_id, id, warehouse_id) DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE warehouse ADD CONSTRAINT fk_warehouse_default_shipping_bin FOREIGN KEY (company_id, default_shipping_bin_id, id) REFERENCES bin (company_id, id, warehouse_id) DEFERRABLE INITIALLY DEFERRED;
 CREATE TABLE lot (                                         -- ADR-0020 rule 17 [inventory]
     id uuid PRIMARY KEY, company_id uuid NOT NULL, item_id uuid NOT NULL,
     code text NOT NULL, expiry_date date, manufacture_date date, UNIQUE (item_id, code),
