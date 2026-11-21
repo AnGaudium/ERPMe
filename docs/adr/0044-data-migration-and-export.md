@@ -61,15 +61,15 @@ The migration period is then locked.
 
    Note: phase 2 (master data) also loads money accounts, partner bank accounts, payment terms and cost centers, which later phases name: opening cash and bank balances post to money accounts' operational accounts, and open items carry payment terms (holistic review, 2026-11-15).
 
-   Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): phase 2 loads company units, unit aliases for every unit text of the old system, product and item units (classified exact or inexact at load, never imported) and barcodes before products' documents; sales history (phase 6) is in the inventory unit (rule 21).
+   Note ([ADR-0056](0056-multiple-units-of-measure.md), 2026-11-15): phase 2 loads company units, unit aliases for every unit text of the old system, product and item units (classified exact or inexact at load, never imported) and barcodes before products' documents; sales history (phase 6) is in the inventory unit (rule 21).
 
-   Note ([ADR-0061](0061-barcodes.md), proposed 2026-11-15): phase 2 loads the old system's barcodes. A code that is a valid GTIN loads as one; any other old code of 1 to 48 characters of `A-Z 0-9 - . / _`, starting with a letter or a digit, numeric ones included, loads with `is_legacy_barcode` on item barcodes, bins and handling units, so existing labels stay readable. Codes with other characters (a space, `+`, `$`, `%`) are listed for relabelling. Legacy codes are unique in the barcode registry, numeric ones also on their digits padded to 14, never parsed as GS1, and a numeric one that passes a GTIN check digit is listed with `legacy_code_gtin_like`. Lot and serial codes load as they are (rule 8).
+   Note ([ADR-0061](0061-barcodes.md), 2026-11-15): phase 2 loads the old system's barcodes. A code that is a valid GTIN loads as one; any other old code of 1 to 48 characters of `A-Z 0-9 - . / _`, starting with a letter or a digit, numeric ones included, loads with `is_legacy_barcode` on item barcodes, bins and handling units, so existing labels stay readable. Codes with other characters (a space, `+`, `$`, `%`) are listed for relabelling. Legacy codes are unique in the barcode registry, numeric ones also on their digits padded to 14, never parsed as GS1, and a numeric one that passes a GTIN check digit is listed with `legacy_code_gtin_like`. Lot and serial codes load as they are (rule 8).
 
-   Note ([ADR-0062](0062-product-engineering-workflow.md), proposed 2026-11-15): phase 2 also loads work centers and activity types, bills of materials (multi-level by a level or indent column), routings with setup and run times and activities, and production versions, after products and items; rows resolve components by exact code, barcode, supplier code with its supplier and manufacturer part number with its manufacturer, each to exactly one item, else `item_unresolved` ([ADR-0062](0062-product-engineering-workflow.md) rule 18).
+   Note ([ADR-0062](0062-product-engineering-workflow.md), 2026-11-15): phase 2 also loads work centers and activity types, bills of materials (multi-level by a level or indent column), routings with setup and run times and activities, and production versions, after products and items; rows resolve components by exact code, barcode, supplier code with its supplier and manufacturer part number with its manufacturer, each to exactly one item, else `item_unresolved` ([ADR-0062](0062-product-engineering-workflow.md) rule 18).
 
-   Note ([ADR-0063](0063-configurable-policy-settings.md), proposed 2026-11-15): company setup also presents the settings registry grouped by area with each setting's core default, bounds and direction; the company starts on the core defaults, and values set during setup follow the change path (rule 5).
+   Note ([ADR-0063](0063-configurable-policy-settings.md), 2026-11-15): company setup also presents the settings registry grouped by area with each setting's core default, bounds and direction; the company starts on the core defaults, and values set during setup follow the change path (rule 5).
 
-   Note ([ADR-0067](0067-quickflows-operating-presets.md), 2026-11-17 (proposed)): a company is in its setup phase until its first journal entry outside the migration fiscal year, which sets `company.first_operating_posting_at`; the opening documents of phases 3 to 5 do not end it. During the phase the implementer an owner acknowledged sets loosening settings without a second approver, and the setup flow fills the record defaults of an applied operating preset, such as `backflush_at_receipt` for bill-of-materials components loaded in phase 2 where the file states no consumption method ([ADR-0067](0067-quickflows-operating-presets.md) rules 7–9, 18).
+   Note ([ADR-0067](0067-quickflows-operating-presets.md), 2026-11-21): a company is in its setup phase until its first journal entry outside the migration fiscal year, which sets `company.first_operating_posting_at`; the opening documents of phases 3 to 5 do not end it. During the phase the implementer an owner acknowledged sets loosening settings without a second approver, and the setup flow fills the record defaults of an applied operating preset, such as `backflush_at_receipt` for bill-of-materials components loaded in phase 2 where the file states no consumption method ([ADR-0067](0067-quickflows-operating-presets.md) rules 7–9, 18).
 
 **Formats and identities**
 
@@ -88,7 +88,10 @@ The migration period is then locked.
 
      Abandoning keeps the key map.
 
-    Note ([ADR-0074](0074-core-data-structure-additions.md), proposed 2026-11-19): `import_key_map` is `external_id_map` (company, source system, table, external key, entity ID), with the functions `external_id_resolve` and `external_key_of`. A batch names its source system (a field of `CreateImportBatch` when DS-21 is written) and keeps its provisional map in the batch; `RunImport` writes the rows with the records (ADR-0074 rule 7).
+    Note ([ADR-0074](0074-core-data-structure-additions.md), 2026-11-21): `import_key_map` is `external_id_map` (company, source system, table, external key, entity ID), with the functions `external_id_resolve` and `external_key_of`. A batch names its source system (a field of `CreateImportBatch` when DS-21 is written) and keeps its provisional map in the batch; `RunImport` writes the rows with the records (ADR-0074 rule 7).
+
+    Note (S2 findings closure, 2026-11-21): a batch whose source system is `group` is refused with `external_id_source_reserved`, at `CreateImportBatch` and at the workbook header, because `group` is reserved for the group key ([ADR-0074](0074-core-data-structure-additions.md) rule 7 note of this date).
+
 6. Old accounts. `old_account_map` maps each old account to one operational account, or splits it by detail given in the file or by a fixed share (flagged). Every account of the old trial balance must be mapped before reconciliation can pass.
 
 **Opening documents** (internal, reversible while the migration is open, `is_approval_hold_allowed: false`; import chunks are consequence postings, ADR-0043 rule 5)
@@ -118,9 +121,9 @@ The migration period is then locked.
    - **Processor locations** are allowed (ADR-0037 rule 1).
    - **Checks.** INV-20 to INV-24 hold.
 
-   Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): opening stock lines carry the line unit block, with the snapshot resolved at load; quantities with more decimals than their unit holds are rejected and listed with the unit's decimals (rules 9, 21).
+   Note ([ADR-0056](0056-multiple-units-of-measure.md), 2026-11-15): opening stock lines carry the line unit block, with the snapshot resolved at load; quantities with more decimals than their unit holds are rejected and listed with the unit's decimals (rules 9, 21).
 
-    Note ([ADR-0075](0075-stock-documents.md), proposed 2026-11-19): the DDL is `opening_balance` and `opening_balance_line` (item, warehouse, bin, status, handling unit, lot or serial, the unit block and the spread `company_amount`); it posts only in the migration period (`migration_not_open`, INV-870), and the area's total divided by the quantity is the first `preliminary_price` with `price_source` `opening` (ADR-0075 rule 13; INV-872).
+    Note ([ADR-0075](0075-stock-documents.md), 2026-11-21): the DDL is `opening_balance` and `opening_balance_line` (item, warehouse, bin, status, handling unit, lot or serial, the unit block and the spread `company_amount`); it posts only in the migration period (`migration_not_open`, INV-870), and the area's total divided by the quantity is the first `preliminary_price` with `price_source` `opening` (ADR-0075 rule 13; INV-872).
 10. Year-to-date at a mid-year cut-over. Income and expense of the fiscal year before the cut-over are loaded as `opening_turnover` rows (account, debit and credit turnover in company currency). These are non-posting figures that statutory reports of that year read (DS-26); the year's profit to date is already in the post-closing balance of retained earnings. Flagged.
 
     Note: `opening_turnover` is owned by `ledger` and written by `CreateOpeningTurnover`. Its rows hold turnover before closing entries, and carry `start_date` and `end_date` instead of a fiscal year, because the first fiscal year after a mid-year cut-over is short. DDL in DS-06 ([ADR-0049](0049-statutory-reporting-and-printing.md) rule 14).
@@ -163,7 +166,7 @@ The migration period is then locked.
 
     The workflow is [ADR-0051](0051-agent-workflows.md) rules 26–28; draft batches are edited with `UpdateImportBatch`.
 
-    Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-19): the data migration agent moves to Phase 2. In Phase 1 the staged import uses stored mappings and deterministic fuzzy matching, which do the bulk of the mapping. The assistant's help is bounded: an `act` run is tainted and reads its request, the batch row as context subject and at most 100 selected import rows, so it may draft mappings for the selected rows only and proposes no merges against existing records. Every batch is still simulated and checked (ADR-0078 rule 2).
+    Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), 2026-11-21): the data migration agent moves to Phase 2. In Phase 1 the staged import uses stored mappings and deterministic fuzzy matching, which do the bulk of the mapping. The assistant's help is bounded: an `act` run is tainted and reads its request, the batch row as context subject and at most 100 selected import rows, so it may draft mappings for the selected rows only and proposes no merges against existing records. Every batch is still simulated and checked (ADR-0078 rule 2).
 16. Data:
     - **Location.** Pilot data never enters the repository or CI.
     - **Personal data.** Contacts in import files are personal and go to a local model when an agent reads them (spec 17).
@@ -183,7 +186,7 @@ The migration period is then locked.
       - erased values, which stay masked (ADR-0019 rule 10).
     - **Download.** The zip is an attachment that is not accounting evidence. Its bytes are deleted after 7 days, and a download needs the same permission and is audited.
 
-    Note ([ADR-0079](0079-personal-data-protection.md), proposed 2026-11-21): `ExportDataSubject` (`human_only`, leaf `data_protection` at `full`) writes one subject's catalog values, processing bases and processing log entries into a file deleted after 7 days, as this export does; both exports write a `personal_data_read_log` row (ADR-0079 rules 3, 12).
+    Note ([ADR-0079](0079-personal-data-protection.md), 2026-11-21): `ExportDataSubject` (`human_only`, leaf `data_protection` at `full`) writes one subject's catalog values, processing bases and processing log entries into a file deleted after 7 days, as this export does; both exports write a `personal_data_read_log` row (ADR-0079 rules 3, 12).
 18. Historical transactions before the cut-over are not migrated in Phase 1 (open question); the rehearsal month of go-live is replayed as ordinary documents on staging.
 
     Note: comparatives of statements for ranges before the cut-over come from `report_comparative_value`, entered at migration ([ADR-0049](0049-statutory-reporting-and-printing.md) rule 14).

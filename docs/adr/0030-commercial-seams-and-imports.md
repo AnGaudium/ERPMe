@@ -32,6 +32,8 @@ Accounting and business choices stay with the author, as flagged interims: close
    - **The receipt's period is `soft_locked` or `locked`:** closed mode. The document is dated on the invoice's posting date when that lies in the postable period, on the postable period's first day when the invoice is earlier, and on its last day when the invoice is later. For this interface, `consumer_split` (ADR-0021 rule 7) runs over every period from the receipt's period to the one before the postable period, treating soft-locked periods as locked. It reads their movements as posted at that time. A later costing rerun of a soft-locked period does not change a split already posted. These dates and this range replace, for interface-written documents, ADR-0021 rule 6's "first unlocked inventory period" and rule 7's "every locked period".
    - **Status.** Interim, flagged: the existing open question on earlier unlocked periods is extended to soft-locked periods.
 
+   Note (the author, 2026-11-21): a late purchase cost is booked in the current period ([ADR-0021](0021-landed-cost.md) rule 6 note of this date, which defines "the current period"). Chief architect's translation (interim, 2026-11-21, under the author's delegation of that day): this rule is superseded in part. A document written by `inventory.contract.adjust_receipt_value` is a `receipt_addition` in its own posting period, whatever the state of the receipt's period; `consumer_split` no longer runs, and no document is forced back into the receipt's period. Its date, replacing the dates above: the invoice's posting date when that date's inventory period is not locked and the date is not earlier than the latest receipt the document targets; that receipt's posting date when the invoice is earlier; the first day of the first inventory period after the invoice's date that is not locked when the invoice's period is locked. Rule 1's split into one document per receipt period is no longer needed; it stays until DS-22 designs the invoice (interim). The flagged status above is answered.
+
 **GR/IR** (F12)
 
 3. `journal_line` gets a nullable `purchase_order_line_id` (ADR-0014 rule 9: a new nullable column by ADR).
@@ -52,6 +54,8 @@ Accounting and business choices stay with the author, as flagged interims: close
    - **Status.** Interim, flagged: the regime might instead value an invoice-first receipt at the invoice price (open question). The company-currency difference between receipt and invoice rates stays with the existing FX open question.
 
    Matching is by unit positions per order line, each priced once at first posting; postings are differences of rounded cumulative values, so the balance is zero whenever received equals invoiced; returns and quantity credits take the latest positions, which equals the receipt's or invoice's price when the order price never changed; reversals are allowed only for the latest postings of a side ([ADR-0047](0047-commercial-documents-and-pricing.md) rule 13).
+
+   Note (the author, 2026-11-21): the exchange-rate difference between goods receipt and invoice is designed as SAP does. Chief architect's translation (interim, 2026-11-21, under the author's delegation of that day): on a line for an item kept in stock the company-currency difference between receipt and invoice rates enters the item's actual cost; on other lines it stays a realized exchange difference ([ADR-0047](0047-commercial-documents-and-pricing.md) rule 13 notes of this date).
 5. INV-37 has two parts:
    - every journal line on a `gr_ir` account whose document line refers to a purchase order line has `purchase_order_line_id`;
    - per purchase order line whose received quantity equals its invoiced quantity, net of returns and credit notes, the GR/IR balance in transaction currency is zero.
@@ -68,7 +72,7 @@ Accounting and business choices stay with the author, as flagged interims: close
 
    DS-22 composes it. It differs from partner exposure (ADR-0026), which is the ledger part alone.
 
-    Note ([ADR-0074](0074-core-data-structure-additions.md), proposed 2026-11-19): credit exposure is kept per payer (else bill-to party, else sold-to partner) and currency: open items, invoices in `issuing`, delivered-not-invoiced value and undelivered order value are summed under the payer their document resolves to (ADR-0074 rule 4).
+    Note ([ADR-0074](0074-core-data-structure-additions.md), 2026-11-21): credit exposure is kept per payer (else bill-to party, else sold-to partner) and currency: open items, invoices in `issuing`, delivered-not-invoiced value and undelivered order value are summed under the payer their document resolves to (ADR-0074 rule 4).
 7. Credit check points: Credit excess is a condition of the same evaluation, with a seeded rule requiring approval ([ADR-0043](0043-policy-and-approval.md) rules 4, 15).
    - **Where.** At order `Submit` (a policy point, ADR-0029 rule 6) and at `PostDelivery`, when goods leave. Interim, flagged, with EC-21's open question.
    - **How.** The handler locks classes 1–8 of ADR-0027 rule 10, then the partner row (class 9), then reads the exposure. It passes the result to the policy hook through `context.evaluate_policy(input)`, the dispatcher's one hook (ADR-0029 rule 6), called at that point so that inputs read under locks are current. Such commands are registered `is_policy_in_handler` (ADR-0008 rule 1). For them the dispatcher skips its own evaluation and asserts that the hook ran exactly once.
@@ -86,7 +90,7 @@ Accounting and business choices stay with the author, as flagged interims: close
    - **Phase 1** creates no non-owned stock. The columns cost nothing before step 3; adding them after go-live would migrate append-only tables. `owner_partner_id` is also reserved on production order components and outputs and on `demand_supply_line` ([ADR-0037](0037-subcontracting.md) rule 7).
    - **Accounting is the author's** (open question): goods sold but held, and whether delivery and invoice must share a date in Vietnam.
 
-   Note ([ADR-0068](0068-sites-and-core-logistics-payment-master-data.md), proposed 2026-11-17): the owner axis has no ownership-transfer default, so nothing reads a document's Incoterm here. When ownership of goods in transit from the shipping point is designed, the Incoterm is its input.
+   Note ([ADR-0068](0068-sites-and-core-logistics-payment-master-data.md), 2026-11-21): the owner axis has no ownership-transfer default, so nothing reads a document's Incoterm here. When ownership of goods in transit from the shipping point is designed, the Incoterm is its input.
 
 **Imports** (F14)
 
@@ -101,7 +105,7 @@ Accounting and business choices stay with the author, as flagged interims: close
      6. **Abandon.** `AbandonImportBatch` stops a batch. Documents already posted stay, and the close check keeps blocking until they are reversed, by ordinary commands or DS-21's bulk reversal.
    - **Glossary.** "Every data import is one command batch" becomes "every data import is posted through simulated command batches; large ones are staged in an `import_batch`".
 
-   Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): an imported row's unit text resolves through the partner item's text, `uom_alias`, then a unit code; an unresolved text fails the row with `unit_text_unresolved` and is never guessed (rules 19, 21).
+   Note ([ADR-0056](0056-multiple-units-of-measure.md), 2026-11-15): an imported row's unit text resolves through the partner item's text, `uom_alias`, then a unit code; an unresolved text fails the row with `unit_text_unresolved` and is never guessed (rules 19, 21).
 
 **Natural keys and agent drafts** (F18)
 

@@ -30,7 +30,7 @@ PLATFORM = os.environ.get("NATIVEFLOWS_PLATFORM_DDL", os.path.join(DESIGN, "DS-0
 DS22 = os.environ.get("NATIVEFLOWS_DS22", os.path.join(DESIGN, "DS-22-09-42-commercial-inventory.sql"))
 DS43 = os.environ.get("NATIVEFLOWS_DS43", os.path.join(DESIGN, "DS-43-54-planning-production.sql"))
 sys.path.insert(0, LAB)
-from lab import RESULTS, conn, new  # noqa: E402
+from lab import RESULTS, conn, erasure_marker, insert_aged, new, ins_system_account, ins_account, ins_fiscal_year, ins_posting_period, ins_area_state  # noqa: E402
 
 RLS_ROLE = "nativeflows_lab_rls"
 
@@ -70,7 +70,8 @@ TODAY = date(2026, 11, 15)
 # ======================================================================= A: load
 stubs = open(os.path.join(LAB, "00_stubs.sql"), encoding="utf-8").read()
 USER_STUB = "CREATE TABLE user_account (id uuid PRIMARY KEY);\n"                  # DS-15 (as t12)
-DOC_STUB = "CREATE TABLE document (id uuid PRIMARY KEY, company_id uuid NOT NULL, document_type text NOT NULL, state text NOT NULL DEFAULT 'draft');\n"
+DOC_STUB = ("CREATE TABLE document (id uuid PRIMARY KEY, company_id uuid NOT NULL, document_type text NOT NULL, state text NOT NULL DEFAULT 'draft',\n"
+            "  UNIQUE (company_id, id));\n")
 MOVED = [
     "CREATE TABLE material_document (id uuid PRIMARY KEY, document_id uuid NOT NULL UNIQUE REFERENCES document(id));\n",
     "CREATE TABLE material_document_line (id uuid PRIMARY KEY, material_document_id uuid NOT NULL REFERENCES material_document(id));\n",
@@ -78,11 +79,18 @@ MOVED = [
 for line in [USER_STUB, DOC_STUB] + MOVED:
     assert stubs.count(line) == 1, line
     stubs = stubs.replace(line, "")
-stubs += "CREATE EXTENSION IF NOT EXISTS pg_trgm;\n"     # DS-35 search keys (ADR-0022 rule 8)
-STUB_TABLES = set(re.findall(r"CREATE TABLE (\w+)", stubs)) | {"material_document", "material_document_line"}
 platform = open(PLATFORM, encoding="utf-8").read()
 FILES = ("DS-20-master-data.sql", "DS-06-universal-journal.sql", "DS-15-access.sql", "DS-35-crm.sql", "DS-56-product-configuration.sql")
 base = {f: open(os.path.join(DESIGN, f), encoding="utf-8").read() for f in FILES}
+# The stubs of the DS-05 tables (fiscal_year, posting_period, posting_period_area_state, close_task, tax_code) serve the labs
+# that load DS-06 without DS-05. Here the platform file defines them, so their stubs are dropped (each stub may span lines).
+DEFINED = set(re.findall(r"^CREATE TABLE (\w+)", platform + "".join(base.values()), flags=re.M))
+STUB_DEFS = {m.group(1): m.group(0) for m in re.finditer(r"^CREATE TABLE (\w+) \(.*?\);\n", stubs, flags=re.M | re.S)}
+DS05_STUBS = {t_: d_ for t_, d_ in STUB_DEFS.items() if t_ in DEFINED}
+for d_ in DS05_STUBS.values():
+    stubs = stubs.replace(d_, "")
+stubs += "CREATE EXTENSION IF NOT EXISTS pg_trgm;\n"     # DS-35 search keys (ADR-0022 rule 8)
+STUB_TABLES = set(re.findall(r"CREATE TABLE (\w+)", stubs)) | {"material_document", "material_document_line"}
 
 
 def order(text):
@@ -122,7 +130,7 @@ with tempfile.NamedTemporaryFile("w", suffix=".sql", delete=False, encoding="utf
 p = subprocess.run([sys.executable, os.path.join(LAB, "load_ds06.py"), tf.name], capture_output=True, text=True)
 os.unlink(tf.name)
 external = [l for l in p.stderr.splitlines() if l.startswith("-- external:")]
-ext = set(external[0].split(":", 1)[1].replace(" ", "").split(",")) if external else set()
+ext = set(external[0].split(":", 1)[1].replace(" ", "").split(",")) - {""} if external else set()   # empty once every reference is defined
 check("A01 load_ds06.py orders DS-20, DS-06, DS-15, DS-35, DS-56 and the platform file in one dependency order (no cycle)",
       p.returncode == 0, p.stderr[:200] if p.returncode else "")
 check("A01b the six files refer to no table outside themselves except the remaining lab stubs", ext <= STUB_TABLES, sorted(ext - STUB_TABLES))
@@ -136,9 +144,34 @@ X(p.stdout)
 check("A02 the stubs keep no document or user_account table of their own, and the loaded document is the platform one",
       X("select count(*) from information_schema.columns where table_schema='nativeflows' and table_name='document'").fetchone()[0] > 10)
 
-tables = re.findall(r"^CREATE TABLE (\w+)", platform, flags=re.M)
-INSTALLATION = {"event_subject", "event_consumer", "agent_type", "agent_type_version"}
-NULLABLE = {"outbox_event", "event_delivery", "audit_record", "audit_change", "audit_denial", "agent_budget_usage"}
+
+def stub_columns(text):
+    body = text.split("(", 1)[1]
+    out = {}
+    for part in re.split(r",\s*(?![^()]*\))", body):
+        m = re.match(r"\s*([a-z_][a-z0-9_]*)\s+(uuid|text\[\]|text|integer|bigint|boolean|date|timestamptz|jsonb)(?=\s|$)(.*)", part, flags=re.S)
+        if m and m.group(1) not in ("unique", "foreign", "primary", "constraint"):
+            out[m.group(1)] = (m.group(2), "NOT NULL" in m.group(3) or "PRIMARY KEY" in m.group(3))
+    return out
+
+
+TYPES = {"ARRAY": "text[]", "integer": "integer", "bigint": "bigint", "boolean": "boolean", "date": "date", "jsonb": "jsonb", "text": "text", "uuid": "uuid",
+         "timestamp with time zone": "timestamptz"}
+drift = []
+for t_, d_ in sorted(DS05_STUBS.items()):
+    real = {r_[0]: (TYPES.get(r_[1], r_[1]), r_[2] == "NO") for r_ in X(
+        "select column_name, data_type, is_nullable from information_schema.columns where table_schema='nativeflows' and table_name=%s", (t_,))}
+    if stub_columns(d_) != real:
+        drift.append(t_)
+check(f"A02b the {len(DS05_STUBS)} lab stubs of DS-05 tables have the design columns, types and NOT NULLs", len(DS05_STUBS) == 5 and drift == [],
+      sorted(DS05_STUBS) if drift == [] else drift)
+
+tables = re.findall(r"^CREATE TABLE (\w+) \(", platform, flags=re.M)   # default partitions (PARTITION OF) follow their parent; A09 checks them
+# tax_code moved from the installation tables to the shared reference catalogs with tax_rate, and tax_matrix joined the
+# installation tables (ADR-0041 rules 2-4 notes, S2 closure 2026-11-21): a design change, so A04 and A05 follow it.
+INSTALLATION = {"event_subject", "event_consumer", "agent_type", "agent_type_version", "regime_setting", "tax_matrix"}
+NULLABLE = {"outbox_event", "event_delivery", "audit_record", "audit_change", "audit_denial", "agent_budget_usage", "idempotency_record",
+            "tax_code", "tax_rate", "tax_treatment_rule"}
 
 
 def cols(t):
@@ -147,14 +180,15 @@ def cols(t):
 
 missing = [t for t in tables if t not in INSTALLATION and "company_id" not in cols(t)]
 check(f"A03 all {len(tables) - len(INSTALLATION)} company tables of the platform file carry company_id", missing == [], missing)
-check("A04 the four installation tables carry no company_id", [t for t in INSTALLATION if "company_id" in cols(t)] == [])
+check("A04 the six installation tables carry no company_id", [t for t in INSTALLATION if "company_id" in cols(t)] == [])
 bad_null = [t for t in tables if t not in INSTALLATION and (cols(t)["company_id"] == "YES") != (t in NULLABLE)]
-check("A05 company_id is nullable exactly on the six tables with installation-scoped rows", bad_null == [], bad_null)
+check(f"A05 company_id is nullable exactly on the {len(NULLABLE)} tables with installation-scoped or package rows", bad_null == [], bad_null)
 check("A06 every platform table has recorded_at", [t for t in tables if "recorded_at" not in cols(t)] == [])
 not_forced = [t for t in tables if t not in INSTALLATION and not X(
     "select relrowsecurity and relforcerowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace where nspname='nativeflows' and relname=%s", (t,)).fetchone()[0]]
 check("A07 every company table of the platform file has forced row-level security and a company policy",
-      not_forced == [] and X("select count(distinct tablename) from pg_policies where schemaname='nativeflows' and policyname='company_policy'").fetchone()[0] == len(tables) - len(INSTALLATION),
+      not_forced == [] and X("select count(distinct tablename) from pg_policies where schemaname='nativeflows' and policyname='company_policy' and tablename = any(%s)",
+                             (tables,)).fetchone()[0] == len(tables) - len(INSTALLATION),
       not_forced)
 names = re.findall(r"(?:CONSTRAINT|INDEX|TRIGGER|FUNCTION) (\w+)", platform)
 check("A08 every constraint, index, trigger and function name of the file is at most 63 bytes (ADR-0004 rule 6)",
@@ -165,7 +199,7 @@ check("A09 the four partitioned tables have a default partition",
 # ---------------------------------------------------------------- fixtures
 I = {k: new() for k in """co co2 uOwner uAcc uChief uSales uOther b1 p1 p2 e1 pba sa acBank acCash acRev acBank2 fy per tc
 rAcc rChief rOwner poolPo poolGen poolSales stStd stSen stGen stSales procStd procSen
-rule ruleV atype runR1 runR2 wiRun""".split()}
+rule ruleV atype runR1 runR2 wiRun tk""".split()}
 t = str(I["co"])[-8:]
 X("insert into currency (code, minor_unit) values ('VND',0),('USD',2) on conflict do nothing")
 for k in ("uOwner", "uAcc", "uChief", "uSales", "uOther"):
@@ -180,13 +214,16 @@ X("insert into partner (id, company_id, code, name, partner_kind, country) value
 X("insert into partner (id, company_id, code, name, partner_kind, country) values (%s,%s,'P2','Other co partner','organization','VN')", (I["p2"], I["co2"]))
 X("insert into partner_bank_account (id, company_id, partner_id, bank_name, account_number, holder_name) values (%s,%s,%s,'Bank (sample)','0001','Supplier')",
   (I["pba"], I["co"], I["p1"]))
-X("insert into system_account (id, code) values (%s,%s)", (I["sa"], "cash_in_bank" + t))
+ins_system_account(X, I["sa"], "cash_in_bank" + t)
 for k, code in (("acBank", "1121"), ("acCash", "1111"), ("acRev", "5111"), ("acBank2", "1122")):
-    X("insert into account (id, company_id, code, system_account_id, currency) values (%s,%s,%s,%s,'VND')", (I[k], I["co"], code, I["sa"]))
-X("insert into fiscal_year (id, company_id) values (%s,%s)", (I["fy"], I["co"]))
-X("insert into posting_period (id, company_id, fiscal_year_id, start_date, end_date) values (%s,%s,%s,'2026-11-01','2026-11-30')", (I["per"], I["co"], I["fy"]))
-X("insert into posting_period_area_state values (%s,'general','open')", (I["per"],))
-X("insert into tax_code (id) values (%s)", (I["tc"],))
+    ins_account(X, I[k], I["co"], code, I["sa"], "VND")
+ins_fiscal_year(X, I["fy"], I["co"], "2026", "2026-01-01", "2026-12-31")
+ins_posting_period(X, I["per"], I["co"], I["fy"], 11, "2026-11-01", "2026-11-30")
+ins_area_state(X, I["co"], I["per"], "general", "open")
+X("""insert into transaction_key (id, code, name, determinants, required_system_accounts, required_control_kind, has_regime_alternatives, added_in, meaning)
+     values (%s,%s,'Input tax','{tax_code}','{tax_receivable_input}',null,false,'0.1.0','lab fixture')""", (I["tk"], "input_tax" + t))
+X("""insert into tax_code (id, localization_package, code, name, tax_kind, direction, calculation, sequence, transaction_key_id, deductibility, basis)
+     values (%s,'l10n_xx',%s,'Input VAT 10%%','vat','purchase','percent',1,%s,'deductible','{"status": "unverified"}')""", (I["tc"], "VAT10_IN_" + t, I["tk"]))
 for k, code in (("rAcc", "accountant"), ("rChief", "chief_accountant"), ("rOwner", "owner")):
     X("""insert into role (id, company_id, code, name, template_code, basis, registry_version, expansion_hash) values (%s,%s,%s,%s,%s,'{"kind":"template"}','lab','x')""",
       (I[k], I["co"], code, code, code))
@@ -222,10 +259,14 @@ def doc(cx, did, dtype, state="draft", by="uAcc", co="co", partner=None, number=
 
 def version(cx, did, v, content, actor_kind="human", actor="uAcc", tainted=False, run=None, origin=None, derived=None, co="co", at=None, vid=None):
     vid = vid or new()
-    cx.execute("""insert into document_version (id, company_id, document_id, version, content, version_hash, actor_kind, actor_id, on_behalf_of_id,
-                  agent_run_id, origin_agent_run_id, is_tainted, derived_from_version_id, recorded_at) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
-               (vid, I[co], did, v, json.dumps(content), sha(content), actor_kind, I[actor] if actor in I else actor,
-                I[actor] if actor_kind == "human" else I["uChief"], run, origin, tainted, derived, at or NOW))
+    sql = """insert into document_version (id, company_id, document_id, version, content, version_hash, actor_kind, actor_id, on_behalf_of_id,
+             agent_run_id, origin_agent_run_id, is_tainted, derived_from_version_id, recorded_at) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"""
+    params = (vid, I[co], did, v, json.dumps(content), sha(content), actor_kind, I[actor] if actor in I else actor,
+              I[actor] if actor_kind == "human" else I["uChief"], run, origin, tainted, derived, at or NOW)
+    if at:      # recorded_at is the system's time (ADR-0007 rule 9); a fixture that names its time of writing keeps it (lab-only insert_aged)
+        insert_aged(cx.execute, "document_version", sql, params)
+    else:
+        cx.execute(sql, params)
     return vid
 
 
@@ -280,6 +321,23 @@ c.execute("ROLLBACK")
 c.close()
 check("A10 as a role without BYPASSRLS: no setting shows no document, the company setting shows its own only, installation shows none of the company rows",
       counts[0] == 0 and counts[1] >= 1 and counts[2] == 0 and counts[3] == 0, counts)
+
+# A11 (S2 adversarial review N1): the role reproduced there updated another company's partner rows, which had no policy. Every
+# company table of every design file now has the generated policies (t31 part Z checks the whole catalog).
+X(f"GRANT UPDATE ON partner TO {RLS_ROLE}")
+
+
+def other_company_partner_update(cx):
+    cx.execute(f"SET LOCAL ROLE {RLS_ROLE}")
+    cx.execute("select set_config('nativeflows.company_id', %s, true)", (str(I["co2"]),))
+    n = cx.execute("update partner set name = name where company_id = %s", (I["co"],)).rowcount
+    own = cx.execute("select count(*) from partner where company_id = %s", (I["co"],)).fetchone()[0]
+    if n or own:
+        raise RuntimeError(f"company 2 saw {own} and updated {n} partner rows of company 1")
+
+
+trial("A11 as a role without BYPASSRLS under company 2, company 1's partner rows are neither visible nor updated (DS-20 has the policies)",
+      other_company_partner_update, False)
 
 # ======================================================================= B: documents and versions
 D1 = doc(X0, new(), "purchase_order", partner=I["p1"])
@@ -502,7 +560,7 @@ trial("E12 executions are immutable", lambda cx: cx.execute("update change_propo
 R2 = run(X0, I["runR2"], wi=WIR, tainted_at=NOW)
 REQ = new()
 X("""insert into agent_run_step (id, company_id, agent_run_id, ordinal, step_code, kind, seat, provider, model, template_code, template_version, request_hash,
-     reserved_amount, request_body, recorded_at) values (%s,%s,%s,1,'bank_matching.read_description','llm_request','classification','anthropic','m','read_description','1.0.0',%s,0.02,'{}',now())""",
+     reserved_amount, request_body, recorded_at) values (%s,%s,%s,1,'bank_matching.read_description','llm_request','classification','anthropic','m','read_description','1.0.0',%s,0.02,'{"messages": [{"role": "user", "content": "Sample text"}]}',now())""",
   (REQ, I["co"], R2, "f" * 64))
 X("""insert into agent_run_step (id, company_id, agent_run_id, ordinal, step_code, kind, request_step_id, seat, provider, model, response_body, cost_amount, recorded_at)
      values (%s,%s,%s,2,'bank_matching.read_description','llm_response',%s,'classification','anthropic','m','{}',0.01,now())""", (new(), I["co"], R2, REQ))
@@ -521,8 +579,8 @@ trial("F03 a request body only on a request row", lambda cx: cx.execute(
     """insert into agent_run_step (id, company_id, agent_run_id, ordinal, step_code, kind, request_step_id, tool_name, request_body, recorded_at)
        values (%s,%s,%s,5,'x','tool_result',%s,'T','{}',now())""", (new(), I["co"], R2, TREQ)), True, "ck_agent_run_step_bodies")
 trial("F04 steps are append-only; erasure may blank bodies", lambda cx: cx.execute("update agent_run_step set step_code='y' where id=%s", (REQ,)), True, "append-only")
-trial("F05 ... with nativeflows.erasure_command_id the bodies are blanked", lambda cx: (
-    cx.execute("select set_config('nativeflows.erasure_command_id', %s, true)", (str(new()),)),
+trial("F05 ... with a valid erasure marker (an erasure command's idempotency record of this transaction) the bodies are blanked", lambda cx: (
+    erasure_marker(cx.execute, company_id=I["co"]),
     cx.execute("update agent_run_step set request_body=null, erased_at=now() where id=%s", (REQ,))), False)
 trial("F06 rule 17: a completed run cannot carry a stop outcome", lambda cx: run(cx, new(), state="completed", outcome="budget_exceeded", wi=WIR), True, "ck_agent_run_outcome")
 trial("F07 the third denial stops a run; a fourth is never counted", lambda cx: run(cx, new(), wi=WIR, denials=4), True, "ck_agent_run_denial_count")
@@ -532,11 +590,16 @@ trial("F10 INV-212: an ended run holds no reservation", lambda cx: run(cx, new()
 trial("F11 tainted_at is never cleared (ADR-0050 rule 25)", lambda cx: cx.execute("update agent_run set tainted_at=null, taint_source_kind=null where id=%s", (R2,)), True, "append-only")
 trial("F12 ... and set once from null", lambda cx: cx.execute("update agent_run set tainted_at=now(), taint_source_kind='untrusted_field' where id=%s", (I["runR1"],)), True, "append-only")
 trial("F13 a live run needs a work item (ADR-0042 rule 11)", lambda cx: run(cx, new(), wi=None), True, "ck_agent_run_work_item")
-BU = new()
-X("insert into agent_budget_usage (id, scope_kind, company_id, agent_type_code, business_date, limit_amount, recorded_at) values (%s,'company_agent_type',%s,'bank_matching',%s,5,now())",
+# ADR-0078 rule 7: two budget tiers. The company row holds the daily cap; the per-type row counts usage with the company cap
+# as its limit and no run limit, so it never binds before the company row (S2: F14 used to test a per-type limit of its own).
+BU, BUT = new(), new()
+X("insert into agent_budget_usage (id, scope_kind, company_id, business_date, limit_amount, recorded_at) values (%s,'company',%s,%s,5,now())",
   (BU, I["co"], TODAY))
-trial("F14 a reservation within the daily limit passes", lambda cx: cx.execute("update agent_budget_usage set reserved_amount = reserved_amount + 4 where id=%s", (BU,)), False)
-trial("F15 a reservation that would pass the limit reserves nothing (rule 23 guard)", lambda cx: cx.execute(
+X("insert into agent_budget_usage (id, scope_kind, company_id, agent_type_code, business_date, limit_amount, recorded_at) values (%s,'company_agent_type',%s,'bank_matching',%s,5,now())",
+  (BUT, I["co"], TODAY))
+trial("F14 a reservation within the company's daily cap passes on the company row and the per-type row, whose limit is the company cap (ADR-0078 rule 7)",
+      lambda cx: cx.execute("update agent_budget_usage set reserved_amount = reserved_amount + 4 where id in (%s, %s)", (BU, BUT)), False)
+trial("F15 a reservation that would pass the company's daily cap reserves nothing (rule 23 guard)", lambda cx: cx.execute(
     "update agent_budget_usage set reserved_amount = reserved_amount + 6 where id=%s", (BU,)), True, "ck_agent_budget_usage_guard")
 trial("F16 one usage row per scope and date, an installation row without company", lambda cx: [cx.execute(
     "insert into agent_budget_usage (id, scope_kind, business_date, limit_amount, recorded_at) values (%s,'installation',%s,200,now())", (new(), TODAY)) for _ in range(2)],
@@ -651,10 +714,12 @@ EV = new()
 X("""insert into outbox_event (id, company_id, event_type, schema_version, subject_table, subject_id, subject_sequence, payload, actor_kind, actor_id,
      business_date, command_type, causation_chain_id, causation_depth, recorded_at) values (%s,%s,'BankStatementImported',1,'bank_statement',%s,1,'{}','human',%s,%s,'ImportBankStatement',%s,0,now())""",
   (EV, I["co"], ST, I["uChief"], TODAY, new()))
-X("insert into event_subject values ('bank_statement',%s,1,now())", (ST,))
+X("insert into event_subject values (uuidv7(), 'bank_statement',%s,1,now())", (ST,))
 X("""insert into event_delivery (id, consumer, event_id, subject_table, subject_id, subject_sequence, company_id, next_attempt_at, recorded_at)
      values (%s,'cash_bank_matching',%s,'bank_statement',%s,1,%s,now(),now())""", (new(), EV, ST, I["co"]))
 check("H01 an event and its delivery are written (ADR-0013 rules 2, 6)", X("select count(*) from event_delivery where event_id=%s", (EV,)).fetchone()[0] == 1)
+trial("H01a events are never updated (ADR-0013 rule 2; S2 schema review N6)", lambda cx: cx.execute("update outbox_event set payload='{\"x\": 1}' where id=%s", (EV,)), True, "never updated")
+trial("H01b ... nor deleted row by row: retention drops whole partitions (ADR-0013 rule 15)", lambda cx: cx.execute("delete from outbox_event where id=%s", (EV,)), True, "never updated")
 trial("H02 one delivery per consumer and event", lambda cx: cx.execute(
     "insert into event_delivery (id, consumer, event_id, subject_table, subject_id, subject_sequence, company_id, next_attempt_at, recorded_at) values (%s,'cash_bank_matching',%s,'bank_statement',%s,1,%s,now(),now())",
     (new(), EV, ST, I["co"])), True, "uq_event_delivery_consumer_event_id")
@@ -665,11 +730,11 @@ trial("H04 a consumer name is snake_case of at most 48 characters", lambda cx: c
     "insert into event_consumer (consumer, kind, queue, recorded_at) values (%s,'transactional','events',now())", ("c" * 49,)), True, "ck_event_consumer_consumer")
 AUD = audit(X0, command="ApproveChangeProposal", effect="other", reason="looks right", actor_kind="human", actor=I["uOwner"])
 trial("H05 audit records are append-only (ADR-0038 rule 4)", lambda cx: cx.execute("update audit_record set reason='x' where id=%s", (AUD,)), True, "append-only")
-trial("H06 ... except that erasure masks reason under nativeflows.erasure_command_id", lambda cx: (
-    cx.execute("select set_config('nativeflows.erasure_command_id', %s, true)", (str(new()),)),
-    cx.execute("update audit_record set reason='[erased]', erased_at=now() where id=%s", (AUD,))), False)
+trial("H06 ... except that erasure masks reason under a valid erasure marker", lambda cx: (
+    erasure_marker(cx.execute, company_id=I["co"]),
+    cx.execute("update audit_record set reason='', erased_at=now() where id=%s", (AUD,))), False)   # an erasure result of ADR-0079 rule 6 (R2-N3)
 trial("H07 ... and erasure changes nothing else", lambda cx: (
-    cx.execute("select set_config('nativeflows.erasure_command_id', %s, true)", (str(new()),)),
+    erasure_marker(cx.execute, company_id=I["co"]),
     cx.execute("update audit_record set command_type='X' where id=%s", (AUD,))), True, "append-only")
 trial("H08 a draft-only command is never of a posting effect class (ADR-0050 rule 26)", lambda cx: audit(cx, effect="posting", draft_only=True), True, "ck_audit_record_draft_only")
 check("H09 audit records with installation scope have no company and live in the default partition",
@@ -717,9 +782,9 @@ with conn() as cx:
     cx.execute("insert into journal_entry (id, company_id, document_id, posting_date, document_date, posting_period_id, fiscal_year_id, line_count) values (%s,%s,%s,%s,%s,%s,%s,2)",
                (JE, I["co"], INV, TODAY, TODAY, I["per"], I["fy"]))
     for n, side, amt, acc in ((1, "debit", 200000, "acRev"), (2, "credit", -200000, "acBank2")):
-        cx.execute("""insert into journal_line (id, journal_entry_id, company_id, line_number, posting_period_id, account_id, system_account_id, side, transaction_currency,
-                      transaction_amount, company_currency, company_amount, tax_code_id) values (%s,%s,%s,%s,%s,%s,%s,%s,'VND',%s,'VND',%s,%s)""",
-                   (new(), JE, I["co"], n, I["per"], I[acc], I["sa"], side, amt, amt, I["tc"] if n == 1 else None))
+        cx.execute("""insert into journal_line (id, journal_entry_id, company_id, line_number, posting_period_id, posting_date, fiscal_year_id, account_id, system_account_id,
+                      side, transaction_currency, transaction_amount, company_currency, company_amount, tax_code_id) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'VND',%s,'VND',%s,%s)""",
+                   (new(), JE, I["co"], n, I["per"], TODAY, I["fy"], I[acc], I["sa"], side, amt, amt, I["tc"] if n == 1 else None))
 TL = new()
 X("""insert into tax_line (id, company_id, document_id, line_number, journal_entry_id, tax_code_id, direction, input_use, rate_percent, transaction_currency,
      base_transaction_amount, tax_transaction_amount, base_company_amount, tax_company_amount, tax_date, declaration_date, initial_deductibility, recorded_at)
@@ -762,6 +827,134 @@ trial("K06 a period unlock request names an area of the period (ADR-0043 rule 16
     doc(cx, (d := new()), "period_unlock_request"),
     cx.execute("insert into period_unlock_request (id, company_id, posting_period_id, area, reason, recorded_at) values (%s,%s,%s,'tax','late invoice',now())", (d, I["co"], I["per"]))),
       True, "ck_period_unlock_request_area")
+# Period lock (ADR-0012 rule 7; ADR-0043 rule 16; S2 adversarial review N5): a locked period leaves locked only to soft_locked,
+# with an approved period_unlock_request of the period and area, never for the migration period; a locked area is never deleted.
+PER10, FYM, PERM = new(), new(), new()
+ins_posting_period(X, PER10, I["co"], I["fy"], 10, "2026-10-01", "2026-10-31")
+for area in ("general", "inventory"):
+    ins_area_state(X, I["co"], PER10, area, "locked")
+ins_fiscal_year(X, FYM, I["co"], "M2025", "2025-12-31", "2025-12-31", is_migration=True)
+ins_posting_period(X, PERM, I["co"], FYM, 1, "2025-12-31", "2025-12-31")
+ins_area_state(X, I["co"], PERM, "general", "locked")
+
+
+def unlock_request(cx, period, area, state):
+    d = doc(cx, new(), "period_unlock_request")
+    cx.execute("insert into period_unlock_request (id, company_id, posting_period_id, area, reason, recorded_at) values (%s,%s,%s,%s,'late invoice',now())",
+               (d, I["co"], period, area))
+    if state != "draft":
+        cx.execute("update document set state = %s where id = %s", (state, d))
+
+
+def set_state(cx, period, area, state):
+    cx.execute("update posting_period_area_state set state = %s where posting_period_id = %s and area = %s", (state, period, area))
+
+
+trial("K07 N5: a locked period is not reopened by a plain UPDATE of its state to open", lambda cx: set_state(cx, PER10, "general", "open"), True,
+      "goes back only to soft_locked")
+trial("K08 N5: locked to soft_locked without an approved period_unlock_request is refused", lambda cx: set_state(cx, PER10, "general", "soft_locked"), True,
+      "needs an approved period_unlock_request")
+trial("K09 N5: ... a draft request does not count", lambda cx: (unlock_request(cx, PER10, "general", "draft"), set_state(cx, PER10, "general", "soft_locked")), True,
+      "needs an approved period_unlock_request")
+trial("K10 N5: ... nor an approved request of another area", lambda cx: (unlock_request(cx, PER10, "inventory", "approved"), set_state(cx, PER10, "general", "soft_locked")),
+      True, "needs an approved period_unlock_request")
+trial("K11 N5: with an approved request of the period and area the unlock to soft_locked is accepted (rolled back afterwards)", lambda cx: (
+    unlock_request(cx, PER10, "general", "approved"), set_state(cx, PER10, "general", "soft_locked"), cx.execute("select 1/0")), True, "division by zero")
+trial("K12 N5: the migration period never unlocks, even with an approved request (ADR-0044 rule 2)", lambda cx: (
+    unlock_request(cx, PERM, "general", "approved"), set_state(cx, PERM, "general", "soft_locked")), True, "migration period")
+trial("K13 N5: a locked area's row is never deleted (and so never recreated as open)", lambda cx: cx.execute(
+    "delete from posting_period_area_state where posting_period_id = %s and area = 'general'", (PER10,)), True, "never deleted")
+
+# T3-1 (S2 adversarial review, third pass): a locked period was reopened by moving its dates. A period with an area row that is not
+# open, or with a journal entry, never changes its dates, fiscal year, kind or number and is never deleted; its fiscal year never
+# changes its dates or code and is never deleted. PER10 (October) is locked; I["per"] (November) is open and has the entry JE.
+# The lab stub of material_document (moved, part A) lacks the design columns posting_period_in_use reads (R8-N1); add them here.
+X("ALTER TABLE material_document ADD COLUMN IF NOT EXISTS company_id uuid, ADD COLUMN IF NOT EXISTS posting_date date")
+PER12, FY27 = new(), new()
+ins_posting_period(X, PER12, I["co"], I["fy"], 12, "2026-12-01", "2026-12-31")     # no area row and no entry yet
+ins_fiscal_year(X, FY27, I["co"], "2027", "2027-01-01", "2027-12-31")              # no period yet
+period_dates = lambda cx, pid, s, e: cx.execute("update posting_period set start_date = %s, end_date = %s where id = %s", (s, e, pid))
+
+
+def reviewer_sequence(cx):
+    """The reviewer's reproduction: shrink the locked period, extend the open one, post inside the locked dates, set the dates back."""
+    period_dates(cx, PER10, "2026-10-01", "2026-10-10")
+    period_dates(cx, I["per"], "2026-10-11", "2026-11-30")
+    je = new()
+    cx.execute("insert into journal_entry (id, company_id, document_id, posting_date, document_date, posting_period_id, fiscal_year_id, line_count) values (%s,%s,%s,%s,%s,%s,%s,2)",
+               (je, I["co"], doc(cx, new(), "purchase_invoice", partner=I["p1"]), "2026-10-15", "2026-10-15", I["per"], I["fy"]))
+    for n, side, amt, acc in ((1, "debit", 1000, "acRev"), (2, "credit", -1000, "acBank2")):
+        cx.execute("""insert into journal_line (id, journal_entry_id, company_id, line_number, posting_period_id, posting_date, fiscal_year_id, account_id,
+                      system_account_id, side, transaction_currency, transaction_amount, company_currency, company_amount) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'VND',%s,'VND',%s)""",
+                   (new(), je, I["co"], n, I["per"], "2026-10-15", I["fy"], I[acc], I["sa"], side, amt, amt))
+    period_dates(cx, I["per"], "2026-11-01", "2026-11-30")
+    period_dates(cx, PER10, "2026-10-01", "2026-10-31")
+
+
+trial("K14 T3-1: the reviewer's sequence (shrink the locked October, extend November, post on 2026-10-15 in November, set the dates back) is "
+      "refused at its first step", reviewer_sequence, True, "posting_period_frozen")
+trial("K15 T3-1: an open period with a journal entry (November) never moves its dates", lambda cx: period_dates(cx, I["per"], "2026-11-01", "2026-11-25"),
+      True, "posting_period_frozen")
+trial("K16 T3-1: ... nor changes its number", lambda cx: cx.execute("update posting_period set number = 13 where id = %s", (I["per"],)),
+      True, "posting_period_frozen")
+trial("K17 T3-1: a locked period (October) is never deleted", lambda cx: cx.execute("delete from posting_period where id = %s", (PER10,)), True,
+      "posting_period_frozen")
+trial("K18 T3-1: the fiscal year of a locked period never moves its dates", lambda cx: cx.execute(
+    "update fiscal_year set end_date = '2026-12-30' where id = %s", (I["fy"],)), True, "posting_period_frozen")
+trial("K19 T3-1: ... nor changes its code", lambda cx: cx.execute("update fiscal_year set code = '2026b' where id = %s", (I["fy"],)), True,
+      "posting_period_frozen")
+trial("K19a T3-1: ... nor is it deleted", lambda cx: cx.execute("delete from fiscal_year where id = %s", (I["fy"],)), True, "posting_period_frozen")
+trial("K20 T3-1: the trigger lets a period with no area row that is not open and no entry (December) change its dates; the rest of ADR-0007 rule 20 is the command's (rolled back afterwards)",
+      lambda cx: (period_dates(cx, PER12, "2026-12-01", "2026-12-30"), cx.execute("select 1/0")), True, "division by zero")
+trial("K20a T3-1: ... and a fiscal year with no such period may change its dates and code (rolled back afterwards)", lambda cx: (cx.execute(
+    "update fiscal_year set end_date = '2027-12-30', code = '2027b' where id = %s", (FY27,)), cx.execute("select 1/0")), True, "division by zero")
+trial("K20b T3-1: a soft-locked area counts too: December, once soft-locked, never moves its dates", lambda cx: (
+    ins_area_state(cx.execute, I["co"], PER12, "general", "soft_locked"), period_dates(cx, PER12, "2026-12-01", "2026-12-30")), True, "posting_period_frozen")
+
+# F4-1 (adversarial fourth pass): a one-day special period inserted on a date of a locked month with open areas let an entry post
+# there. ADR-0012 rules 1, 2, 4, 6: a special period lies on its fiscal year's last day, has only the general area and starts
+# soft_locked; a regular period lies inside its fiscal year. October (PER10) is locked; the fiscal year ends 2026-12-31.
+
+
+def special_period(cx, day, areas=(("general", "soft_locked"),), number=13):
+    pid = new()
+    ins_posting_period(cx.execute, pid, I["co"], I["fy"], number, day, day, kind="special")
+    for area, state in areas:
+        ins_area_state(cx.execute, I["co"], pid, area, state)
+    return pid
+
+
+def f41_sequence(cx):
+    """The reviewer's reproduction: a special period on 2026-10-15 with four open areas, and an entry posted into it."""
+    pid = special_period(cx, "2026-10-15", areas=[(a, "open") for a in ("general", "inventory", "receivable", "payable")])
+    je = new()
+    cx.execute("insert into journal_entry (id, company_id, document_id, posting_date, document_date, posting_period_id, fiscal_year_id, line_count) values (%s,%s,%s,%s,%s,%s,%s,2)",
+               (je, I["co"], doc(cx, new(), "purchase_invoice", partner=I["p1"]), "2026-10-15", "2026-10-15", pid, I["fy"]))
+    for n, side, amt, acc in ((1, "debit", 1000, "acRev"), (2, "credit", -1000, "acBank2")):
+        cx.execute("""insert into journal_line (id, journal_entry_id, company_id, line_number, posting_period_id, posting_date, fiscal_year_id, account_id,
+                      system_account_id, side, transaction_currency, transaction_amount, company_currency, company_amount) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'VND',%s,'VND',%s)""",
+                   (new(), je, I["co"], n, pid, "2026-10-15", I["fy"], I[acc], I["sa"], side, amt, amt))
+
+
+trial("K21 F4-1: the reviewer's sequence (a special period on 2026-10-15 in locked October with four open areas, and an entry posted into it) is "
+      "refused at its first step", f41_sequence, True, "posting_period_invalid")
+trial("K22 F4-1: a special period on the fiscal year's last day (2026-12-31) with general soft_locked is accepted (rolled back afterwards)",
+      lambda cx: (special_period(cx, "2026-12-31"), cx.execute("select 1/0")), True, "division by zero")
+trial("K23 F4-1: a special period has only the general area", lambda cx: special_period(cx, "2026-12-31", areas=(("general", "soft_locked"), ("inventory", "soft_locked"))),
+      True, "only the general area")
+trial("K24 F4-1: a special period's area row does not start open", lambda cx: special_period(cx, "2026-12-31", areas=(("general", "open"),)), True,
+      "starting soft_locked")
+trial("K25 F4-1: a regular period lies inside its fiscal year (2027-02 in the fiscal year 2026 is refused)", lambda cx: ins_posting_period(
+    cx.execute, new(), I["co"], I["fy"], 14, "2027-02-01", "2027-02-28"), True, "inside its fiscal year")
+trial("K26 F4-1: an unused period cannot be moved outside its fiscal year either", lambda cx: period_dates(cx, PER12, "2027-01-01", "2027-01-31"), True,
+      "inside its fiscal year")
+trial("K27 fourth pass: an area row of a period with a journal entry (November, open) is never deleted", lambda cx: cx.execute(
+    "delete from posting_period_area_state where posting_period_id = %s and area = 'general'", (I["per"],)), True, "posting_period_frozen")
+trial("K27a ... an area row of a period without one may be (rolled back afterwards)", lambda cx: (ins_area_state(cx.execute, I["co"], PER12, "general", "open"),
+      cx.execute("delete from posting_period_area_state where posting_period_id = %s", (PER12,)), cx.execute("select 1/0")), True, "division by zero")
+trial("K28 R8-N1: a material document dated in a period (December, no area row, no entry) freezes the period's dates", lambda cx: (
+    cx.execute("insert into material_document (id, document_id, company_id, posting_date) values (%s,%s,%s,'2026-12-10')",
+               (new(), doc(cx, new(), "purchase_invoice", partner=I["p1"]), I["co"])), period_dates(cx, PER12, "2026-12-01", "2026-12-30")), True, "posting_period_frozen")
 
 # ======================================================================= L: final simulation review, 2026-11-15
 # The payment block on open_item_collection (ADR-0048 rule 17 note; ADR-0063 rule 27 note) and the settings auto-post evidence

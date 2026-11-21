@@ -82,6 +82,7 @@ item_manufacturer_part,normalized_manufacturer_name,"a manufacturer, a legal ent
 product,name,describes a product
 product,description,describes a product
 routing_operation,description,describes a routing operation
+account,*,covers: name; a code or configuration table that describes no person
 activity_type,*,covers: name; a code or configuration table that describes no person
 agent_type,*,covers: name; a code or configuration table that describes no person
 approval_pool,*,covers: name; a code or configuration table that describes no person
@@ -107,7 +108,8 @@ item_group,*,covers: name; a code or configuration table that describes no perso
 item_tax_group,*,covers: name; a code or configuration table that describes no person
 movement_type,*,covers: name; a code or configuration table that describes no person
 partner_group,*,covers: name; a code or configuration table that describes no person
-partner_tax_group,*,covers: name; a code or configuration table that describes no person
+partner_tax_status,*,covers: name; a code or configuration table that describes no person
+tax_treatment,*,covers: name; a code or configuration table that describes no person
 payment_method,*,covers: name; a code or configuration table that describes no person
 payment_term,*,covers: name; a code or configuration table that describes no person
 price_list,*,covers: name; a code or configuration table that describes no person
@@ -120,7 +122,10 @@ routing,*,covers: name; a code or configuration table that describes no person
 sampling_procedure,*,covers: name; a code or configuration table that describes no person
 stop_reason,*,covers: name; a code or configuration table that describes no person
 storage_condition,*,covers: name; a code or configuration table that describes no person
+system_account,*,covers: name; a code or configuration table that describes no person
+tax_code,*,covers: name; a code or configuration table that describes no person
 team,*,covers: name; a code or configuration table that describes no person
+transaction_key,*,covers: name; a code or configuration table that describes no person
 uom,*,covers: name; a code or configuration table that describes no person
 valuation_class,*,covers: name; a code or configuration table that describes no person
 variant_attribute,*,covers: name; a code or configuration table that describes no person

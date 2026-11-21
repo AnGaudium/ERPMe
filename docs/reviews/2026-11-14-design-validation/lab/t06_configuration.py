@@ -82,11 +82,11 @@ def write_revision(cx, rid, revision, start, rules, extra_rules=()):
         tid = new()
         cx.execute("insert into configuration_table (id, company_id, configuration_model_revision_id, product_id, code) values (%s,%s,%s,%s,%s)", (tid, I["co"], rid, I["prod"], code))
         for n, col in enumerate(cols, 1):
-            cx.execute("insert into configuration_table_column values (%s,%s,%s,%s,%s)", (I["co"], tid, I["prod"], n, A[col]))
+            cx.execute("insert into configuration_table_column values (uuidv7(), %s,%s,%s,%s,%s)", (I["co"], tid, I["prod"], n, A[col]))
         for n, cells in enumerate(rows, 1):
-            cx.execute("insert into configuration_table_row values (%s,%s,%s,%s,%s)", (I["co"], tid, I["prod"], n, json.dumps(cells)))
+            cx.execute("insert into configuration_table_row values (uuidv7(), %s,%s,%s,%s,%s)", (I["co"], tid, I["prod"], n, json.dumps(cells)))
     for pos, (tgt, v, cond_) in enumerate(DEFAULTS, 1):
-        cx.execute("insert into configuration_default values (%s,%s,%s,%s,%s,%s,%s)", (I["co"], rid, I["prod"], pos, A[tgt], json.dumps(v), json.dumps(cond_)))
+        cx.execute("insert into configuration_default values (uuidv7(), %s,%s,%s,%s,%s,%s,%s)", (I["co"], rid, I["prod"], pos, A[tgt], json.dumps(v), json.dumps(cond_)))
     cx.execute("update configuration_model_revision set state='released', content_hash=%s, released_at=now() where id=%s", ("0" * 64, rid))
 with c.transaction():
     write_revision(c, I["rev"], 1, "2026-01-01", RULES)
@@ -251,7 +251,7 @@ def save_configuration(cx, res):
         cx.execute("insert into product_configuration values (%s,%s,%s,%s,now())", (cid, I["co"], I["prod"], h))
         for k, v in res["values"].items():
             lst = CH[k][1] == "list"
-            cx.execute("insert into product_configuration_value values (%s,%s,%s,%s,%s,%s,%s)",
+            cx.execute("insert into product_configuration_value values (uuidv7(), %s,%s,%s,%s,%s,%s,%s)",
                        (I["co"], cid, I["prod"], A[k], CH[k][1], V[(k, v)] if lst else None, None if lst else v))
     return cid, True
 def stored_hash_ok(cx, cid):
@@ -473,7 +473,7 @@ check("C07 item codes come from the product counter", cx.execute("select last_it
 def bad_config(x, vt, vid, nv, attr="material"):
     cid = new()
     x.execute("insert into product_configuration values (%s,%s,%s,%s,now())", (cid, I["co"], I["prod"], "a" * 64))
-    x.execute("insert into product_configuration_value values (%s,%s,%s,%s,%s,%s,%s)", (I["co"], cid, I["prod"], A[attr], vt, vid, nv))
+    x.execute("insert into product_configuration_value values (uuidv7(), %s,%s,%s,%s,%s,%s,%s)", (I["co"], cid, I["prod"], A[attr], vt, vid, nv))
 trial("C08 a list characteristic cannot hold a number", lambda x: bad_config(x, "number", None, 5), "fk_product_configuration_value_type")
 trial("C09 a number characteristic stores a number, not a value row", lambda x: bad_config(x, "number", V[("material", "steel")], None, attr="width"), "ck_product_configuration_value_one")
 trial("C10 a number value row on a list characteristic is refused", lambda x: x.execute(
@@ -494,7 +494,7 @@ trial("C16 a released revision's table rows cannot change", lambda x: x.execute(
     "update configuration_table_row set cells='[\"*\",\"*\"]' where configuration_table_id in (select id from configuration_table where configuration_model_revision_id=%s)", (I["rev"],)), "revision_released")
 trial("C17 a configuration cannot be changed", lambda x: x.execute("update product_configuration set created_at=now() where id=%s", (idA,)), "configuration_immutable")
 trial("C18 a configuration gets no value from a later transaction", lambda x: x.execute(
-    "insert into product_configuration_value values (%s,%s,%s,%s,'list',%s,null)", (I["co"], idA, I["prod"], A["label"], V[("label", "text")])), "configuration_immutable")
+    "insert into product_configuration_value values (uuidv7(), %s,%s,%s,%s,'list',%s,null)", (I["co"], idA, I["prod"], A["label"], V[("label", "text")])), "configuration_immutable")
 def savepoint_save(x):
     """C20: a configuration saved inside a savepoint (a command batch) still takes its values."""
     with x.transaction():
@@ -570,3 +570,4 @@ check("K02 estimate of 1600 x 900 steel", kB, D("4394000.0"))
 check("K03 the two configurations' estimates differ, so their configured items start from different costs", kA != kB, True)
 cx.close()
 print(sum(1 for r in RESULTS if r[0]), "/", len(RESULTS), "passed")
+raise SystemExit(0 if all(r[0] for r in RESULTS) else 1)   # a failing check fails the lab

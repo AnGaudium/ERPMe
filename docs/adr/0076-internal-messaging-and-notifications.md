@@ -33,6 +33,8 @@ It is deliberately small: seven tables, plain text, one level of replies, no sea
    - **Subjects that go.** Deleting a draft document deletes its thread in the same transaction (its messages, mentions and notifications) and deletes its messages' attachment links, so no link names a deleted message (INV-83) and the orphan sweep releases the files (ADR-0038). A thread counts as a reference to a partner, product, item or project, so those are deactivated, never deleted, once they have one. No thread outlives its subject (INV-880). A partner that gains the `employee` role after its thread exists is an open question.
    - **Not a queue and not an audit trail.** A thread holds people's talk only: no system messages, field changes or state history (those are the audit rows and versions, ADR-0038, ADR-0009). Work that must be done is a work item linked to the record. ADR-0066 notes that a per-record chatter is no queue; this thread is not one.
 
+   Note (S2 open questions, 2026-11-21): a partner may gain the `employee` role after its record thread exists: the role is allowed and the thread is kept, but its posting is closed with a stated reason. The refusal of this rule applies at thread creation only.
+
 **Messages**
 
 4. `message` holds one post: the author (`author_user_account_id`, a person), `body` (plain text up to 8,000 characters; links render, nothing else is formatted), an optional `parent_message_id` for a reply (one level; a reply to a reply is `validation_failed`), and attachments through `attachment_link` with target table `message`.
@@ -62,6 +64,8 @@ It is deliberately small: seven tables, plain text, one level of replies, no sea
    - **Content.** A subject naming the kind and the document number or channel, the rendered lines, and one link that opens the inbox after a normal sign-in. Never message text, never partner names. It is not an approval link: approving stays on the web (spec 07).
    - **Off switch.** While `messaging.email_notifications` is false, every mail run drops the company's pending notifications, so turning it back on sends no backlog.
    - **Push** (browser or app) is after Phase 1.
+
+   Note (S2 open questions, 2026-11-21): one SMTP submission account in the deployment configuration (DS-18) carries every system e-mail: notifications, user invitations and credential resets (ADR-0054 rules 3, 4).
 8. **Reading and live updates.**
    - `ListConversation` returns the reader's channels, direct conversations and followed threads with unread counts (by sequence); `ListMessage` pages one conversation by sequence; `ListNotification` and `ListNotificationPreference` complete the queries. There is no message search in Phase 1.
    - **Live.** `MessageCreated` has the message as its subject, so one failing fan-out holds only that message's delivery (ADR-0013 rule 7), and `NotificationCreated` the notification. The live updates of ADR-0040 rule 13 resolve a message to its conversation and forward the header only to sessions whose user may read the conversation now (messaging's registered visibility function), and a `NotificationCreated` header only to its recipient's sessions; a tab may subscribe to a conversation it shows, never to the noun `message`. Headers carry IDs, never text.
@@ -131,7 +135,7 @@ The lesson: an ERP's own chat should cover talk about its records and tell peopl
 
 ## Documents updated
 
-- **ADRs** (notes tagged "ADR-0076, proposed 2026-11-19"): ADR-0013 rule 10; ADR-0027 rule 1; ADR-0038 rule 14; ADR-0040 rules 13 and 14; ADR-0042 rule 14; ADR-0052 rule 25; ADR-0055 rule 4 (`approval_stage_member.position`); ADR-0063 rule 29; [ADR-0050](0050-agent-runtime-and-query-layer.md) rule 30 (note of 2026-11-21: the four messaging queries are on no tool list).
+- **ADRs** (notes tagged "ADR-0076, 2026-11-21"): ADR-0013 rule 10; ADR-0027 rule 1; ADR-0038 rule 14; ADR-0040 rules 13 and 14; ADR-0042 rule 14; ADR-0052 rule 25; ADR-0055 rule 4 (`approval_stage_member.position`); ADR-0063 rule 29; [ADR-0050](0050-agent-runtime-and-query-layer.md) rule 30 (note of 2026-11-21: the four messaging queries are on no tool list).
 - **Catalogs:** authorization-areas.csv (2), role-template-levels.csv (16), settings.csv (3), invariants.csv (5), edge-cases.csv (10).
 - **Design:** DS-63-messaging.sql (new); DS-15-access.sql (`approval_stage_member.position`); spec 07's approval-channels line (the author's decision of 2026-11-19); DS-04 (eight errors); DS-16 and DS-17 (blocks and counts); backlog (DS-63); the glossary (new rows only); the generated overview.
 - **Lab:** `t30_messaging.py` and the lab README.

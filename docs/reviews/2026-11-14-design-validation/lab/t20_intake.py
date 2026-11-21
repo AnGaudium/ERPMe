@@ -33,7 +33,7 @@ from datetime import date, datetime, timezone
 HERE = os.path.dirname(os.path.abspath(__file__))
 LAB = os.environ.get("NATIVEFLOWS_LAB_DIR", HERE)
 sys.path.insert(0, LAB)
-from lab import RESULTS, conn, new  # noqa: E402
+from lab import RESULTS, conn, erasure_marker, new  # noqa: E402
 
 DOCS = os.path.expanduser(os.environ.get("NATIVEFLOWS_DOCS", "~/Projects/NativeFlows/docs"))
 
@@ -1044,11 +1044,13 @@ if "--load" in sys.argv:
     trial("X52 an assessment attachment needs its date", lambda cx: cx.execute(perm_sql, (new(), I["co"], "eu-west", "IE", I["att"], None, I["u2"], "2026-11-01", None)), True, "ck_data_processing_permission_assessment")
     trial("X53 the processing country is an ISO code from the registry", lambda cx: cx.execute(perm_sql, (new(), I["co"], "eu-west", "Ireland", None, None, I["u2"], "2026-11-01", None)), True, "ck_data_processing_permission_country")
     trial("X54 sensitive personal data is never permitted in Phase 1", lambda cx: cx.execute(perm_sql.replace("'personal','extraction", "'sensitive_personal','extraction"), (new(), I["co"], "sg", "SG", None, None, I["u2"], "2026-11-01", None)), True, "ck_data_processing_permission_data_class")
-    blank = """update extraction_field set value_raw='', value_normalized='', evidence='{"erased": true}' where id=%s"""
+    # evidence takes the blank marker {} of ADR-0079 rule 1 (catalog row extraction_field.evidence), the only JSON erasure
+    # result the guards accept since S2 schema review round 2 (R2-N3); ADR-0057's older {"erased": true} is not one
+    blank = """update extraction_field set value_raw='', value_normalized='', evidence='{}' where id=%s"""
     trial("X55 without the erasure setting a field's value and evidence cannot be blanked", lambda cx: cx.execute(blank, (FX,)), True, "append-only")
 
     def erase(cx):
-        cx.execute("select set_config('nativeflows.erasure_command_id', %s, true)", (str(new()),))
+        erasure_marker(cx.execute, company_id=I["co"])      # a valid marker (S2 schema review B1)
         cx.execute(blank, (FX,))
         cx.execute("update extraction_word set text='' where document_extraction_id=%s", (I["ex2"],))
     trial("X56 erasure blanks a field's value and evidence and the words' text, keeping the rows (rule 19)", erase, False)

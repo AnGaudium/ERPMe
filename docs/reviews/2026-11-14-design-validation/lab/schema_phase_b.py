@@ -1,0 +1,296 @@
+"""Lab: S2 schema phase B, the mechanical conversion of docs/design/*.sql (findings 1 and 2 of architecture-overview.md).
+Not product code. Idempotent: a second run changes nothing.
+
+    python3 schema_phase_b.py [--docs DIR] [--dry-run]
+
+What it does to every CREATE TABLE of docs/design/*.sql (partitions inherit from their parent and are skipped):
+
+1. recorded_at (ADR-0007 rule 9; the ADR-0007 rule 16 note): a table without the column gets
+   `recorded_at timestamptz NOT NULL DEFAULT now()`; an existing `recorded_at ... NOT NULL` without a default gains
+   `DEFAULT now()`.
+2. Keys (ADR-0006 rule 1 and its note of 2026-11-21): a table whose primary key is not the single column `id`
+   gets `id uuid PRIMARY KEY` as its first column, and the old key becomes the named unique constraint
+   `uq_<table>_<columns>` (`uq_<table>_key` where that name would exceed 63 bytes, ADR-0004 rule 6); a key column that was
+   nullable gains NOT NULL, as the primary key implied. Foreign keys that target the old key keep working against the
+   unique constraint. Exception class E1 (gen_overview.KEY_ALLOWLIST) keeps its natural key. E2 registries get a comment that the
+   loader computes the id as uuid5; E3 (one row per company) is the general case with the old key UNIQUE (company_id).
+   `id` has no default (ADR-0006 rule 2) except on DB_WRITTEN tables, whose rows database code inserts.
+3. Company keys (S06 of lab t16; S2 schema review finding S4; the ADR-0017 rule 19 note of 2026-11-21, R2-N9): every
+   single-column foreign key from a company table (`company_id ... NOT NULL`) to a company table becomes
+   `FOREIGN KEY (company_id, <column>) REFERENCES <table> (company_id, id)`, whatever its form: a column's REFERENCES
+   (removed and appended as a table element, its ON DELETE / ON UPDATE / DEFERRABLE clauses kept), a table element
+   FOREIGN KEY, or ALTER TABLE ... ADD FOREIGN KEY (both rewritten in place, clauses untouched). A target without
+   UNIQUE (company_id, id) first gets `CONSTRAINT uq_<table>_company_id_id UNIQUE (company_id, id)`. A multi-column key
+   between company tables without company_id, e.g. (bin_id, warehouse_id) -> bin (id, warehouse_id), gets company_id
+   prepended on both sides, and its target gets `uq_<table>_company_id_<columns>` (`uq_<table>_company_key` where that
+   name would exceed 63 bytes) beside the existing unique key, which other keys may use; a lab stub of
+   00_stubs.sql that is a target must already have it (the script stops otherwise). Keys to or from a table whose
+   company_id is nullable or absent stay single-column (gen_overview.COMPANY_KEY_ALLOWLIST). The script stops on a key
+   it cannot convert safely: a target column other than id, or ON DELETE / ON UPDATE SET NULL or SET DEFAULT without a
+   column list (it would null company_id).
+4. The generated sections (gen_overview.render_sections, S2 adversarial review S2, N1, N4): each file ends with a section
+   that defines set_recorded_at() and refuse_truncate() and runs one DO block, which attaches `trg_<table>_set_recorded_at`
+   to every table of the file (BEFORE INSERT OR UPDATE; BEFORE INSERT only on its append-only tables) and
+   `trg_<table>_refuse_truncate` (BEFORE TRUNCATE) to its append-only and delete-guarded tables without a TRUNCATE trigger of
+   their own; and a row-level security section with the company policies of every table with company_id (default
+   partitions included; gen_overview.RLS_ALLOWLIST aside), with shared_read_policy on the shared reference catalogs of
+   gen_overview.RLS_SHARED_READ and the policies on id for gen_overview.RLS_SELF (S2 closure, 2026-11-21). The phase A CREATE TRIGGER ... set_recorded_at statements and the
+   function definitions at the top of the files are removed. Append-only: tables whose guard trigger refuses every update
+   outside an erasure (ALWAYS_REFUSE, or platform_check_append_only / crm_check_append_only with no mutable column but
+   recorded_at and no set-once column), and the pure logs in gen_overview.PURE_LOGS.
+
+gen_overview.py --check verifies the result (check_keys_and_recorded_at); this script only writes.
+"""
+import argparse
+import glob
+import os
+import re
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+
+from gen_overview import KEY_ALLOWLIST, design_context, design_texts, generated_start, render_file  # noqa: E402
+from gen_overview import UNIQUE_ELEMENT_RE, company_scan, file_plan, mask_sql as mask, table_spans  # noqa: E402
+
+REGISTRIES = {"setting_definition", "setting_preset", "setting_preset_item", "extension_point", "event_consumer",
+              "public_mail_domain"}   # E2 (ADR-0006 rule 1 note)
+DB_WRITTEN = {"barcode": "barcode_register inserts the rows"}   # id DEFAULT uuidv7() (ADR-0006 rule 2)
+STUBS = os.path.join(HERE, "00_stubs.sql")
+ACTIONS = (r"((?:\s+ON (?:DELETE|UPDATE) (?:NO ACTION|RESTRICT|CASCADE|SET NULL|SET DEFAULT)(?: \([^)]*\))?)*"
+           r"(?:\s+(?:NOT )?DEFERRABLE)?(?:\s+INITIALLY (?:DEFERRED|IMMEDIATE))?)")
+INLINE_RE = re.compile(r"\s+REFERENCES (\w+) \(([^)]*)\)" + ACTIONS)
+ELEMENT_RE = re.compile(r"((?:CONSTRAINT \w+\s+)?FOREIGN KEY\s*\()([^)]*)\)\s*REFERENCES (\w+)\s*\(([^)]*)\)" + ACTIONS)
+ALTER_RE = re.compile(r"^ALTER TABLE (\w+)\s+ADD\s+(?:CONSTRAINT \w+\s+)?(FOREIGN KEY\s*\(([^)]*)\)\s*REFERENCES (\w+)\s*\(([^)]*)\))"
+                      + ACTIONS, re.M)
+
+
+def line_start(text, pos):
+    return text.rfind("\n", 0, pos) + 1
+
+
+def company_plan(files):
+    """(company status of every design table, {table: [unique column tuples to add]}): for every key from a company table
+    to a company table, the target needs a unique key on company_id plus the referenced columns ((company_id, id) for a
+    single-column key); those it lacks are added. Stops on a lab stub target without its key."""
+    tables, fks = company_scan([(os.path.basename(p), open(p, encoding="utf-8").read()) for p in files])
+    company = {t: v["company"] for t, v in tables.items()}
+    need, stub_need = {}, {}
+    for _, f, src, cols, tgt, tcols in fks:
+        if company.get(src) != "not null" or company.get(tgt) != "not null":
+            continue
+        want = tuple(tcols) if "company_id" in cols else ("company_id",) + tuple(tcols)
+        if frozenset(want) not in tables[tgt]["uniques"] and want not in need.get(tgt, []):
+            need.setdefault(tgt, []).append(want)
+        if tables[tgt]["file"] != f:      # a stub stands in for its table only in labs that load this file without the defining one
+            stub_need.setdefault(tgt, set()).add(frozenset(want))
+    stubs, _ = company_scan([("00_stubs.sql", open(STUBS, encoding="utf-8").read())])
+    for t in sorted(set(stub_need) & set(stubs)):
+        missing = [sorted(w) for w in stub_need[t] if w not in stubs[t]["uniques"]]
+        if missing:
+            raise SystemExit(f"00_stubs.sql: stub {t} is a company-key target; it needs the unique keys {missing}")
+    return company, need
+
+
+def check_actions(where, actions):
+    if re.search(r"SET (?:NULL|DEFAULT)(?! \()", actions):
+        raise SystemExit(f"{where}: ON ... SET NULL / SET DEFAULT on a key that becomes composite would null company_id; "
+                         "name the column, e.g. ON DELETE SET NULL (x_id)")
+
+
+def convert_file(path, ctx, company=None, need_uq=None):
+    need_uq = need_uq or {}
+    company = company or {}
+    text = open(path, encoding="utf-8").read()
+    name = os.path.basename(path)
+    # drop the phase A trigger statements and the function definitions; the end section replaces them
+    text = re.sub(r"^CREATE TRIGGER trg_\w+_set_recorded_at BEFORE UPDATE ON \w+\n\s+FOR EACH ROW EXECUTE FUNCTION set_recorded_at\(\);\n",
+                  "", text, flags=re.M)
+    text = text[:generated_start(text)].rstrip("\n") + "\n"
+    text = re.sub(r"^CREATE OR REPLACE FUNCTION set_recorded_at\(\) RETURNS trigger .*?\nEND \$\$;\n", "", text, flags=re.M | re.S)
+    masked = mask(text)
+    edits, report, tables = [], [], []
+    for table, open_i, close_i, spans in table_spans(text, masked):
+        tables.append(table)
+        codes = [" ".join(masked[s:e].split()) for s, e in spans]
+        cols = {}
+        for k, c in enumerate(codes):
+            if not re.match(r"(CONSTRAINT|UNIQUE|CHECK|EXCLUDE|PRIMARY|FOREIGN)\b", c):
+                cols[c.split()[0]] = k
+        first_s = spans[0][0]
+        if masked[line_start(masked, first_s):first_s].strip():
+            raise SystemExit(f"{name} {table}: first column not on its own line")
+        indent = masked[line_start(masked, first_s):first_s]
+        m0 = re.match(r"(\w+\s+)", masked[first_s:])
+        width = len(m0.group(1))
+        appended = []          # table-level elements added at the end: (code, comment)
+        # --- primary key
+        pk_cols, pk_where = None, None
+        for k, c in enumerate(codes):
+            tm = re.match(r"(?:CONSTRAINT \w+ )?PRIMARY KEY \(([^)]*)\)", c)
+            if tm:
+                pk_cols, pk_where = [x.strip() for x in tm.group(1).split(",")], ("table", k)
+            elif k in cols.values() and re.search(r"\bPRIMARY KEY\b", c):
+                pk_cols, pk_where = [c.split()[0]], ("inline", k)
+        if pk_cols != ["id"] and table not in KEY_ALLOWLIST:
+            if "id" in cols:
+                raise SystemExit(f"{name} {table}: has a column id that is not the primary key")
+            uq = f"uq_{table}_{'_'.join(pk_cols)}" if pk_cols else None
+            hand = False
+            if uq and len(uq.encode()) > 63:
+                uq, hand = f"uq_{table}_key", True
+            if pk_where and pk_where[0] == "inline":
+                s, e = spans[pk_where[1]]
+                pm = re.search(r"\bPRIMARY KEY\b", masked[s:e])
+                has_nn = "NOT NULL" in codes[pk_where[1]]
+                edits.append((s + pm.start(), s + pm.end(), ("" if has_nn else "NOT NULL ") + f"CONSTRAINT {uq} UNIQUE"))
+            elif pk_where:
+                s, e = spans[pk_where[1]]
+                pm = re.search(r"(?:CONSTRAINT \w+ )?PRIMARY KEY \(([^)]*)\)", masked[s:e], re.S)
+                edits.append((s + pm.start(), s + pm.end(), f"CONSTRAINT {uq} UNIQUE ({', '.join(pk_cols)})"))
+                for col in pk_cols:
+                    k = cols[col]
+                    if "NOT NULL" not in codes[k]:
+                        cs, ce = spans[k]
+                        tmatch = re.match(r"\w+\s+[\w.]+(?:\[\])?(?:\([^)]*\))?", masked[cs:ce])
+                        edits.append((cs + tmatch.end(), cs + tmatch.end(), " NOT NULL"))
+            comment = ""
+            if table in REGISTRIES:
+                key = ":".join(f"<{c}>" for c in pk_cols)
+                comment = (f"   -- uuid5(f244ce09-3c6c-4c82-af14-918bdeca6be3, '{table}:{key}'), computed by the loader "
+                           f"(registry E2, ADR-0006 rule 1 note)")
+            elif pk_cols == ["company_id"]:
+                comment = "   -- one row per company (E3, ADR-0006 rule 1 note)"
+            if hand:
+                comment += ("; " if comment else "   -- ") + f"{uq} named by hand: the convention name would exceed 63 bytes (ADR-0004 rule 6)"
+            default = " DEFAULT uuidv7()" if table in DB_WRITTEN else ""
+            if default:
+                comment = f"   -- {DB_WRITTEN[table]} (ADR-0006 rule 2)" + comment.replace("   --", ";", 1)
+            line = f"{indent}{'id'.ljust(width)}uuid PRIMARY KEY{default},{comment}\n"
+            edits.append((line_start(text, first_s), line_start(text, first_s), line))
+            report.append(f"key {table}: {pk_cols or 'none'} -> id; {uq or ''}")
+        # --- recorded_at
+        if "recorded_at" not in cols:
+            first_con = next((k for k, c in enumerate(codes) if k not in cols.values()), None)
+            new_col = f"{'recorded_at'.ljust(max(width, 12))}timestamptz NOT NULL DEFAULT now()"
+            if first_con is not None and not masked[line_start(masked, spans[first_con][0]):spans[first_con][0]].strip():
+                pos = line_start(text, spans[first_con][0])
+                edits.append((pos, pos, f"{indent}{new_col},\n"))
+            else:
+                appended.append((new_col, ""))
+            report.append(f"recorded_at {table}: added")
+        else:
+            k = cols["recorded_at"]
+            s, e = spans[k]
+            if "DEFAULT" not in codes[k]:
+                nm = re.search(r"NOT NULL", masked[s:e])
+                if not nm:
+                    raise SystemExit(f"{name} {table}: recorded_at is nullable")
+                edits.append((s + nm.end(), s + nm.end(), " DEFAULT now()"))
+                report.append(f"recorded_at {table}: default added")
+        # --- company keys
+        have = {frozenset(x.strip() for x in m.group(1).split(","))
+                for m in (UNIQUE_ELEMENT_RE.match(c) for c in codes) if m}
+        names = set(re.findall(r"\bCONSTRAINT (\w+)", " ".join(codes)))
+        for j, want in enumerate(w for w in need_uq.get(table, []) if frozenset(w) not in have):
+            uq, cm = f"uq_{table}_{'_'.join(want)}", ""
+            if len(uq.encode()) > 63:
+                uq = f"uq_{table}_company_key"
+                while uq in names:
+                    uq = uq.rstrip("0123456789") + str(int(uq[-1]) + 1 if uq[-1].isdigit() else 2)
+                cm = f"; {uq} named by hand: the convention name would exceed 63 bytes (ADR-0004 rule 6)"
+            names.add(uq)
+            appended.insert(j, (f"CONSTRAINT {uq} UNIQUE ({', '.join(want)})",
+                                f"   -- target of company keys (ADR-0017 rule 19 note, 2026-11-21){cm}"))
+            report.append(f"company key target {table}: {uq} added")
+        if company.get(table) == "not null":
+            for col, k in cols.items():
+                s, e = spans[k]
+                rm = INLINE_RE.search(masked[s:e])
+                if rm and company.get(rm.group(1)) == "not null":
+                    if rm.group(2).strip() != "id":
+                        raise SystemExit(f"{name} {table}.{col}: key to {rm.group(1)} ({rm.group(2)}), not id")
+                    check_actions(f"{name} {table}.{col}", rm.group(3))
+                    edits.append((s + rm.start(), s + rm.end(), ""))
+                    appended.append((f"FOREIGN KEY (company_id, {col}) REFERENCES {rm.group(1)} (company_id, id){' '.join(rm.group(3).split()) and ' ' + ' '.join(rm.group(3).split())}",
+                                     "   -- company key (ADR-0017 rule 19 note, 2026-11-21)"))
+                    report.append(f"company key {table}.{col} -> {rm.group(1)}")
+            for k, c in enumerate(codes):
+                s, e = spans[k]
+                em = ELEMENT_RE.match(masked[s:e])
+                if em and company.get(em.group(3)) == "not null":
+                    fcols, tcols = [x.strip() for x in em.group(2).split(",")], [x.strip() for x in em.group(4).split(",")]
+                    if "company_id" in fcols:
+                        continue
+                    if len(fcols) == 1 and tcols != ["id"]:
+                        raise SystemExit(f"{name} {table}.{fcols[0]}: key to {em.group(3)} ({em.group(4)}), not id")
+                    check_actions(f"{name} {table}.{em.group(2)}", em.group(5))
+                    edits.append((s, s + em.end(4) + 1, f"{em.group(1)}company_id, {', '.join(fcols)}) REFERENCES {em.group(3)} "
+                                  f"(company_id, {', '.join(tcols)})"))
+                    report.append(f"company key {table}.{'+'.join(fcols)} -> {em.group(3)} (in place)")
+        else:
+            for col, k in cols.items():
+                s, e = spans[k]
+                rm = INLINE_RE.search(masked[s:e])
+                if rm and company.get(rm.group(1)):
+                    report.append(f"company key {table}.{col} -> {rm.group(1)}: kept single-column (company_id nullable or absent)")
+        if appended:
+            ls, le = spans[-1]
+            after = masked[le:text.find("\n", le)]
+            if ")" in after:
+                raise SystemExit(f"{name} {table}: closing parenthesis on the last element's line")
+            eol = text.find("\n", le)
+            parts = []
+            for j, (code, cm) in enumerate(appended):
+                sep = "," if j < len(appended) - 1 else ""
+                parts.append(f"\n{indent}{code}{sep}{cm}")
+            if eol == le:
+                edits.append((le, le, "," + "".join(parts)))
+            else:
+                edits.append((le, le, ","))
+                edits.append((eol, eol, "".join(parts)))
+    for am in ALTER_RE.finditer(masked):
+        src, tgt = am.group(1), am.group(4)
+        fcols, tcols = [x.strip() for x in am.group(3).split(",")], [x.strip() for x in am.group(5).split(",")]
+        if company.get(src) == "not null" and company.get(tgt) == "not null" and "company_id" not in fcols:
+            if len(fcols) == 1 and tcols != ["id"]:
+                raise SystemExit(f"{name} ALTER TABLE {src}.{fcols[0]}: key to {tgt} ({am.group(5)}), not id")
+            check_actions(f"{name} {src}.{'+'.join(fcols)}", am.group(6))
+            edits.append((am.start(2), am.end(2), f"FOREIGN KEY (company_id, {', '.join(fcols)}) REFERENCES {tgt} "
+                          f"(company_id, {', '.join(tcols)})"))
+            report.append(f"company key {src}.{'+'.join(fcols)} -> {tgt} (ALTER TABLE, in place)")
+    edits.sort(key=lambda x: (x[0], x[1]), reverse=True)
+    last = None
+    for s, e, new in edits:
+        if last is not None and e > last:
+            raise SystemExit(f"{name}: overlapping edits at {s}")
+        text = text[:s] + new + text[e:]
+        last = s
+    # --- the generated end sections (gen_overview.render_sections)
+    text = render_file(name, text, ctx)
+    return text, report, tables, file_plan(name, text, ctx)
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--docs", default=os.path.join(HERE, "..", "..", ".."))
+    ap.add_argument("--dry-run", action="store_true")
+    a = ap.parse_args()
+    files = sorted(glob.glob(os.path.join(os.path.abspath(a.docs), "design", "*.sql")))
+    ctx = design_context(design_texts(os.path.join(os.path.abspath(a.docs), "design")))
+    company, need_uq = company_plan(files)
+    n = dict(tables=0, ao=0, trunc=0, rls=0, nullable=0, shared=0, selfs=0)
+    for p in files:
+        new, report, tables, (_, ao, trunc, rls, nullable, shared, selfs) = convert_file(p, ctx, company, need_uq)
+        for k, v in (("tables", tables), ("ao", ao), ("trunc", trunc), ("rls", rls), ("nullable", nullable), ("shared", shared), ("selfs", selfs)):
+            n[k] += len(v)
+        for r in report:
+            print(f"{os.path.basename(p)}: {r}")
+        if not a.dry_run:
+            open(p, "w", encoding="utf-8").write(new)
+    print(f"{n['tables']} tables: {n['tables'] - n['ao']} with set_recorded_at on insert and update, {n['ao']} append-only on insert "
+          f"only; {n['trunc']} generated TRUNCATE guards; row-level security on {n['rls']} tables and partitions "
+          f"({n['nullable']} with a nullable company_id, {n['shared']} of them shared reference catalogs; {n['selfs']} company table keyed on id)")
+
+if __name__ == "__main__":
+    main()

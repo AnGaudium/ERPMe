@@ -215,7 +215,7 @@ data_subject_request_content,outcome_note,requester,free_text,personal,may_conta
 data_subject_request_content,identity_proof_hash,requester,identity,personal,always,append_only,keep,data_subject_request,SHA-256 of the evidence checked; kept as proof the requester was verified (ADR-0052 rule 25; retention period is an open question)
 extraction_field,value_raw,other,free_text,personal,may_contain,append_only,blank,intake,extracted value; accounting fields of linked documents stay (ADR-0057 rule 19); blank gives the marker '' (rule 1)
 extraction_field,value_normalized,other,free_text,personal,may_contain,append_only,blank,intake,accounting fields of linked documents stay (ADR-0057 rule 19)
-extraction_field,evidence,other,snapshot,personal,may_contain,append_only,blank,intake,"jsonb; replaced by {""erased"": true}; blank gives the marker {} (rule 1)"
+extraction_field,evidence,other,snapshot,personal,may_contain,append_only,blank,intake,"jsonb; blank gives the marker {} (ADR-0079 rule 1; ADR-0057 rule 19 note, 2026-11-21)"
 extraction_word,text,other,free_text,personal,always,append_only,blank,intake,OCR word text; personal and untrusted with its extraction; blank gives the marker '' (rule 1)
 message,body,user,free_text,personal,always,expiring,blank,message,"cleared by retention, withdrawal or erasure; row stays (ADR-0076 rule 10); blank gives the marker '' (rule 1)"
 assist_request,request_text,user,free_text,personal,always,expiring,blank,analysis_text,DDL comment: personal; null once erased
@@ -262,6 +262,7 @@ company_setup_acknowledgement,reason,other,free_text,personal,may_contain,append
 credit_hold,release_reason,other,free_text,personal,may_contain,master,tokenize,accounting_document,ck_credit_hold_manual_release needs a non-empty reason on a manual release: tokenized (ADR-0079 rule 1)
 forecast_adjustment,reason,other,free_text,personal,may_contain,master,blank,master_data,blank gives the marker '' (rule 1)
 gr_ir_write_off,reason,other,free_text,personal,may_contain,frozen_document,tokenize,accounting_document,NOT NULL with a non-empty CHECK: tokenized
+document_tax_treatment,reason,other,free_text,personal,may_contain,frozen_document,tokenize,accounting_document,"a correction's stated treatment (ADR-0080 rule 4 note, 2026-11-21); a non-empty CHECK: tokenized"
 inspection_lot,deviation_reason,other,free_text,personal,may_contain,master,tokenize,master_data,"ck_inspection_lot_deviation needs a non-empty value when its condition holds, so NULL and the marker are both refused: tokenized (ADR-0079 rule 1)"
 nonconformance,cancel_reason,other,free_text,personal,may_contain,master,tokenize,master_data,"ck_nonconformance_closed needs a non-empty value when its condition holds, so NULL and the marker are both refused: tokenized (ADR-0079 rule 1)"
 setting_value,reason,other,free_text,personal,may_contain,append_only,tokenize,audit,NOT NULL with a non-empty CHECK: tokenized

@@ -3,19 +3,20 @@ from lab import *
 import datetime as dt
 c = conn(); c.autocommit = True
 X = c.execute
-ids = {k: new() for k in ["user","co","sa_rec","sa_rev","sa_inv","sa_cash","a_rec","a_rev","a_inv","a_cash","fy","p1","p0","partner","partner2","item","wh"]}
+ids = {k: new() for k in ["user","co","sa_rec","sa_rev","sa_inv","sa_cash","a_rec","a_rev","a_inv","a_cash","a_new","fy","p1","p0","partner","partner2","item","wh"]}
 X("insert into currency values ('VND',0),('USD',2)")
 X("insert into user_account values (%s)", (ids["user"],))
 X("insert into company (id,code,legal_name,company_currency,time_zone,localization_package,accounting_regime,valuation_area_level,fiscal_calendar_owner_id,default_language) values (%s,'C1','Co','VND','Asia/Ho_Chi_Minh','vn','tt99','warehouse',%s,'vi')", (ids["co"], ids["user"]))
 for k, code, kind in [("sa_rec","receivable_trade","receivable"),("sa_rev","revenue_goods","none"),("sa_inv","inventory_goods","inventory"),("sa_cash","cash","none")]:
-    X("insert into system_account values (%s,%s,%s)", (ids[k], code, kind))
-for a, s, code in [("a_rec","sa_rec","131"),("a_rev","sa_rev","511"),("a_inv","sa_inv","156"),("a_cash","sa_cash","111")]:
-    X("insert into account (id,company_id,code,system_account_id) values (%s,%s,%s,%s)", (ids[a], ids["co"], code, ids[s]))
-X("insert into fiscal_year values (%s,%s)", (ids["fy"], ids["co"]))
-X("insert into posting_period (id,company_id,fiscal_year_id,start_date,end_date) values (%s,%s,%s,'2027-01-01','2027-01-31'),(%s,%s,%s,'2026-12-01','2026-12-31')", (ids["p1"],ids["co"],ids["fy"],ids["p0"],ids["co"],ids["fy"]))
+    ins_system_account(X, ids[k], code, kind)
+for a, s, code in [("a_rec","sa_rec","131"),("a_rev","sa_rev","511"),("a_inv","sa_inv","156"),("a_cash","sa_cash","111"),("a_new","sa_cash","112")]:
+    ins_account(X, ids[a], ids["co"], code, ids[s])
+ins_fiscal_year(X, ids["fy"], ids["co"], "2027", "2026-12-01", "2027-12-31")   # one lab year holding both periods
+ins_posting_period(X, ids["p0"], ids["co"], ids["fy"], 1, "2026-12-01", "2026-12-31")
+ins_posting_period(X, ids["p1"], ids["co"], ids["fy"], 2, "2027-01-01", "2027-01-31")
 for p, st in [("p1","open"),("p0","locked")]:
     for area in ["general","inventory","receivable","payable"]:
-        X("insert into posting_period_area_state values (%s,%s,%s)", (ids[p], area, st))
+        ins_area_state(X, ids["co"], ids[p], area, st)
 for k, code in [("partner","CUS1"),("partner2","CUS2")]:
     X("insert into partner (id, company_id, code, name, partner_kind, country) values (%s,%s,%s,%s,'organization','VN')", (ids[k], ids["co"], code, code))
 # DS-20 master data for the item and warehouse the journal lines refer to (ADR-0045)
@@ -42,9 +43,11 @@ def entry(cx, d, n, period="p1", date="2027-01-15"):
     cx.execute("insert into journal_entry (id,company_id,document_id,posting_date,document_date,posting_period_id,fiscal_year_id,line_count) values (%s,%s,%s,%s,%s,%s,%s,%s) returning id",
                (e, ids["co"], d, date, date, ids[period], ids["fy"], n)); return e
 def line(cx, e, n, acct, side, amt, period="p1", **kw):
-    sa = {"a_rec":"sa_rec","a_rev":"sa_rev","a_inv":"sa_inv","a_cash":"sa_cash"}[acct]
+    sa = {"a_rec":"sa_rec","a_rev":"sa_rev","a_inv":"sa_inv","a_cash":"sa_cash","a_new":"sa_cash"}[acct]
     lid = kw.pop("id", None) or new()
-    cols = dict(id=lid, journal_entry_id=e, company_id=ids["co"], line_number=n, posting_period_id=ids[period], account_id=ids[acct], system_account_id=ids[sa],
+    pdate, fy = entry_dates(cx, e)
+    cols = dict(id=lid, journal_entry_id=e, company_id=ids["co"], line_number=n, posting_period_id=ids[period], posting_date=pdate, fiscal_year_id=fy,
+                account_id=ids[acct], system_account_id=ids[sa],
                 side=side, transaction_currency="VND", transaction_amount=amt, company_currency="VND", company_amount=amt)
     cols.update(kw)
     cx.execute("insert into journal_line (%s) values (%s)" % (",".join(cols), ",".join(["%s"]*len(cols))), list(cols.values())); return lid
@@ -111,4 +114,43 @@ def settled_with_rest(cx):
     oi = open_item(cx, doc(cx), new())
     cx.execute("update open_item set open_transaction_amount=0, is_settled=true where id=%s", (oi,))
 expect("T16 a settled item must have all open amounts zero", settled_with_rest, True, "ck_open_item_is_settled")
+def line_date_differs(cx):
+    d = doc(cx); e = entry(cx, d, 2)
+    line(cx, e, 1, "a_cash", "debit", 4, posting_date="2027-01-16"); line(cx, e, 2, "a_rev", "credit", -4)
+expect("T17 a line whose posting date differs from its entry's is rejected (ADR-0014 rule 5 note; INV-99)", line_date_differs, True, "posting date or fiscal year differs")
+def first_posting_refreshes_account(cx):
+    before, posted0 = cx.execute("select recorded_at, has_posting from account where id=%s", (ids["a_new"],)).fetchone()
+    d = doc(cx); e = entry(cx, d, 2); line(cx, e, 1, "a_new", "debit", 2); line(cx, e, 2, "a_rev", "credit", -2)
+    after, posted = cx.execute("select recorded_at, has_posting from account where id=%s", (ids["a_new"],)).fetchone()
+    assert not posted0 and posted and after > before, (posted0, posted, before, after)
+expect("T18 the first line on an account sets has_posting and refreshes recorded_at (ADR-0010 rule 12; ADR-0007 rule 9 note)", first_posting_refreshes_account, False)
+
+# ---- S2 schema review: S3 (applied_rate is append-only), S4 (company keys), N1 (period, fiscal year and date), N6
+c = conn(); c.autocommit = True
+co2, rate, rate2, tr, tr2, fy2, p2 = new(), new(), new(), new(), new(), new(), new()
+c.execute("insert into company (id,code,legal_name,company_currency,time_zone,localization_package,accounting_regime,valuation_area_level,fiscal_calendar_owner_id,default_language) values (%s,'C2','Co2','VND','Asia/Ho_Chi_Minh','vn','tt99','warehouse',%s,'vi')", (co2, ids["user"]))
+for rid, co in ((rate, ids["co"]), (rate2, co2)):
+    c.execute("insert into applied_rate (id, company_id, from_currency, to_currency, rate, origin, selection_date) values (%s,%s,'USD','VND',25000,'document','2027-01-15')", (rid, co))
+for tid, co in ((tr, ids["co"]), (tr2, co2)):
+    c.execute("insert into derivation_trace (id, company_id, rule_code, rule_version, inputs, steps, result, command_id) values (%s,%s,'lab','1','[]','[]','{}',%s)", (tid, co, new()))
+ins_fiscal_year(c.execute, fy2, ids["co"], "2028", "2028-01-01", "2028-12-31")
+ins_posting_period(c.execute, p2, ids["co"], fy2, 1, "2028-01-01", "2028-01-31")
+c.close()
+expect("T19 S3: an applied rate is never updated (ADR-0011 rule 3)", lambda cx: cx.execute("update applied_rate set rate=26000 where id=%s", (rate,)), True, "append-only")
+expect("T20 S3: an applied rate is never deleted", lambda cx: cx.execute("delete from applied_rate where id=%s", (rate,)), True, "append-only")
+def usd_line(cx, rate_id, trace_id=None):
+    d = doc(cx); e = entry(cx, d, 2)
+    kw = dict(company_applied_rate_id=rate_id)
+    if trace_id:
+        kw["derivation_trace_id"] = trace_id
+    line(cx, e, 1, "a_cash", "debit", 6, **kw); line(cx, e, 2, "a_rev", "credit", -6)
+expect("T21 S4: a line may name its own company's applied rate and derivation trace", lambda cx: usd_line(cx, rate, tr), False)
+expect("T22 S4: a line naming another company's applied rate is refused (company key)", lambda cx: usd_line(cx, rate2), True, "foreign key")
+expect("T23 S4: a line naming another company's derivation trace is refused (company key)", lambda cx: usd_line(cx, rate, tr2), True, "foreign key")
+expect("T24 N1: an entry whose period belongs to another fiscal year is refused",
+       lambda cx: cx.execute("insert into journal_entry (id,company_id,document_id,posting_date,document_date,posting_period_id,fiscal_year_id,line_count) values (%s,%s,%s,'2028-01-15','2028-01-15',%s,%s,2)",
+                             (new(), ids["co"], doc(cx), p2, ids["fy"])), True, "foreign key")
+expect("T25 N1: an entry whose posting date lies outside its period is refused", lambda cx: entry(cx, doc(cx), 2, date="2027-02-15"), True, "outside the entry's posting period")
+expect("T26 N6: a derivation trace is never updated (ADR-0027 rule 3)", lambda cx: cx.execute("update derivation_trace set result='{\"x\": 1}' where id=%s", (tr,)), True, "append-only")
 print(sum(1 for r in RESULTS if r[0]), "/", len(RESULTS), "passed")
+raise SystemExit(0 if all(r[0] for r in RESULTS) else 1)   # a failing check fails the lab

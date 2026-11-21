@@ -18,7 +18,7 @@ for s in stmts:
         tables[m.group(1)] = s
     else:
         others.append(s)
-deps = {t: {r for r in re.findall(r"REFERENCES (\w+)", s) if r in tables and r != t} for t, s in tables.items()}
+deps = {t: {r for r in re.findall(r"(?:REFERENCES|PARTITION OF) (\w+)", s) if r in tables and r != t} for t, s in tables.items()}
 order, seen = [], set()
 def visit(t, stack=()):
     if t in seen: return
@@ -31,3 +31,5 @@ print("-- external:", ", ".join(external), file=sys.stderr)
 print("-- order:", ", ".join(order), file=sys.stderr)
 out = [tables[t] for t in order] + others
 sys.stdout.write("".join(out))
+from lab import id_default_shim_sql  # noqa: E402  the lab-only id default of S2 schema phase B (lab.py, README)
+sys.stdout.write("\n" + id_default_shim_sql())

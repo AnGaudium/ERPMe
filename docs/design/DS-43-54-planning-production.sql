@@ -31,8 +31,9 @@
 -- batches (DS-21), work items for exceptions (DS-29), by_product prices (a price_list of kind by_product, DS-20).
 
 -- ===== Company rows that serialize changes [planning, production] =====
-CREATE TABLE planning_setting (                            -- one per company (ADR-0024 rule 7; ADR-0036 rules 4, 11)
-    company_id                 uuid PRIMARY KEY REFERENCES company (id),
+CREATE TABLE planning_setting (                            -- [planning] ADR-0024 rule 7; ADR-0036 rules 4, 11; one per company
+    id                         uuid PRIMARY KEY,   -- one row per company (E3, ADR-0006 rule 1 note)
+    company_id                 uuid NOT NULL CONSTRAINT uq_planning_setting_company_id UNIQUE REFERENCES company (id),
     planning_owner_id          uuid NOT NULL REFERENCES user_account (id),   -- accountable human for scheduled runs (spec 03 rule 3)
     planning_horizon_days      integer NOT NULL CONSTRAINT ck_planning_setting_horizon CHECK (planning_horizon_days > 0),
     forecast_consumption_days  integer NOT NULL DEFAULT 7 CONSTRAINT ck_planning_setting_consumption CHECK (forecast_consumption_days >= 0),   -- flagged default (rule 13)
@@ -40,9 +41,9 @@ CREATE TABLE planning_setting (                            -- one per company (A
     backtest_weeks             integer NOT NULL CONSTRAINT ck_planning_setting_backtest CHECK (backtest_weeks > 0),
     conversion_lead_days       integer NOT NULL DEFAULT 0 CONSTRAINT ck_planning_setting_conversion_lead CHECK (conversion_lead_days >= 0),   -- working days, flagged (ADR-0036 rule 4)
     capacity_bucket            text NOT NULL DEFAULT 'week' CONSTRAINT ck_planning_setting_capacity_bucket CHECK (capacity_bucket IN ('day', 'week')),
-    recorded_at                timestamptz NOT NULL
+    recorded_at                timestamptz NOT NULL DEFAULT now()
 );
-CREATE TABLE planning_run (                                -- RunPlanning, a long job (ADR-0024 rule 17)
+CREATE TABLE planning_run (                                -- [planning] ADR-0024 rule 17; RunPlanning, a long job
     id                    uuid PRIMARY KEY,
     company_id            uuid NOT NULL REFERENCES company (id),
     planning_date         date NOT NULL,                       -- explicit business date (ADR-0007 rule 17)
@@ -56,20 +57,22 @@ CREATE TABLE planning_run (                                -- RunPlanning, a lon
     output_hash           text CONSTRAINT ck_planning_run_output_hash CHECK (output_hash ~ '^[0-9a-f]{64}$'),
     started_at            timestamptz NOT NULL,                -- interim: not stated in ADR-0024 (the nightly report records run time, rule 25)
     completed_at          timestamptz,                         -- interim: not stated in ADR-0024
-    recorded_at           timestamptz NOT NULL,
+    recorded_at           timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, forecast_run_id) REFERENCES forecast_run (company_id, id),
     CONSTRAINT ck_planning_run_completed CHECK ((state = 'completed') = (completed_at IS NOT NULL AND input_hash IS NOT NULL AND output_hash IS NOT NULL AND output_counts IS NOT NULL))
 );
-CREATE TABLE planning_state (                              -- the company's planning state row; RunPlanning locks it, so a second run gets planning_run_in_progress (ADR-0024 rule 17)
-    company_id             uuid PRIMARY KEY REFERENCES company (id),
+CREATE TABLE planning_state (                              -- [planning] ADR-0024 rule 17; the company's planning state row; RunPlanning locks it, so a second run gets planning_run_in_progress (ADR-0024 rule 17)
+    id                     uuid PRIMARY KEY,   -- one row per company (E3, ADR-0006 rule 1 note)
+    company_id             uuid NOT NULL CONSTRAINT uq_planning_state_company_id UNIQUE REFERENCES company (id),
     last_planning_run_id   uuid,                               -- interim: not stated in ADR-0024 (the lock row needs no column; this one names the latest completed run)
-    recorded_at            timestamptz NOT NULL,
+    recorded_at            timestamptz NOT NULL DEFAULT now(),
     FOREIGN KEY (company_id, last_planning_run_id) REFERENCES planning_run (company_id, id)
 );
-CREATE TABLE production_structure (                        -- created with the company; releases, version and setting saves lock it at class 3 (ADR-0033 rule 8; ADR-0027 rule 10)
-    company_id   uuid PRIMARY KEY REFERENCES company (id),
-    recorded_at  timestamptz NOT NULL
+CREATE TABLE production_structure (                        -- [production] ADR-0033 rule 8; ADR-0027 rule 10; created with the company; releases, version and setting saves lock it at class 3 (ADR-0033 rule 8; ADR-0027 rule 10)
+    id           uuid PRIMARY KEY,   -- one row per company (E3, ADR-0006 rule 1 note)
+    company_id   uuid NOT NULL CONSTRAINT uq_production_structure_company_id UNIQUE REFERENCES company (id),
+    recorded_at  timestamptz NOT NULL DEFAULT now()
 );
 
 -- ===== Planning master data [planning] (ADR-0024 rules 1-3) =====
@@ -80,7 +83,7 @@ CREATE TABLE transfer_route (                              -- ADR-0024 rule 3; a
     destination_warehouse_id  uuid NOT NULL,
     lead_time_days            integer NOT NULL CONSTRAINT ck_transfer_route_lead_time CHECK (lead_time_days >= 0),   -- calendar days
     is_active                 boolean NOT NULL DEFAULT true,   -- interim: not stated in ADR-0024
-    recorded_at               timestamptz NOT NULL,
+    recorded_at               timestamptz NOT NULL DEFAULT now(),
     -- interim: not stated in ADR-0024 (one route per warehouse pair, so "the route" of a transfer source is unambiguous)
     UNIQUE (company_id, source_warehouse_id, destination_warehouse_id),
     UNIQUE (company_id, id),
@@ -110,7 +113,7 @@ CREATE TABLE item_warehouse_planning (                     -- an item without a 
     firm_horizon_days       integer NOT NULL DEFAULT 0 CONSTRAINT ck_item_warehouse_planning_firm_horizon CHECK (firm_horizon_days >= 0),   -- default 0: no fence (rule 19)
     receiving_days          integer NOT NULL DEFAULT 0 CONSTRAINT ck_item_warehouse_planning_receiving CHECK (receiving_days >= 0),
     planning_strategy       text NOT NULL DEFAULT 'make_to_stock' CONSTRAINT ck_item_warehouse_planning_strategy CHECK (planning_strategy IN ('make_to_stock', 'make_to_order')),
-    recorded_at             timestamptz NOT NULL,
+    recorded_at             timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, item_id, warehouse_id),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, item_id) REFERENCES item (company_id, id),
@@ -134,7 +137,7 @@ CREATE TABLE supplier_item (                               -- the only home of s
     supplier_partner_id       uuid NOT NULL,
     item_id                   uuid NOT NULL,                  -- also a service item of an external operation (ADR-0037 rule 3)
     order_uom_id              uuid NOT NULL REFERENCES uom (id),   -- the supplier's order unit: the inventory unit or an active product unit (ADR-0056 rule 14)
-    partner_item_id           uuid REFERENCES partner_item (id),   -- the supplier's own code (ADR-0019 rule 6)
+    partner_item_id           uuid,   -- the supplier's own code (ADR-0019 rule 6)
     supplier_processing_days  integer NOT NULL CONSTRAINT ck_supplier_item_processing CHECK (supplier_processing_days >= 0),   -- on the supplier's calendar
     transit_days              integer NOT NULL CONSTRAINT ck_supplier_item_transit CHECK (transit_days >= 0),                 -- calendar days
     minimum_order_quantity    types.quantity NOT NULL DEFAULT 0 CONSTRAINT ck_supplier_item_minimum CHECK (minimum_order_quantity >= 0),   -- in order_uom_id
@@ -142,16 +145,18 @@ CREATE TABLE supplier_item (                               -- the only home of s
     is_preferred              boolean NOT NULL DEFAULT false,  -- none or several valid preferred rows give planning_parameter_missing (a run check, not a key)
     start_date                date NOT NULL,
     end_date                  date,                            -- inclusive; null = open
-    recorded_at               timestamptz NOT NULL,
+    recorded_at               timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, supplier_partner_id) REFERENCES partner (company_id, id),
     FOREIGN KEY (company_id, item_id) REFERENCES item (company_id, id),
     CONSTRAINT ck_supplier_item_dates CHECK (end_date IS NULL OR end_date >= start_date),
     -- keyed by (company, supplier partner, item): one row valid on any date
     CONSTRAINT ex_supplier_item_overlap EXCLUDE USING gist (
-        company_id WITH =, supplier_partner_id WITH =, item_id WITH =, daterange(start_date, end_date, '[]') WITH &&)
+        company_id WITH =, supplier_partner_id WITH =, item_id WITH =, daterange(start_date, end_date, '[]') WITH &&),
+    FOREIGN KEY (company_id, partner_item_id) REFERENCES partner_item (company_id, id)   -- company key (ADR-0017 rule 19 note, 2026-11-21)
 );
 CREATE TABLE supplier_purchasing_term (                    -- one row per supplier partner (ADR-0024 rule 2)
+    id                     uuid PRIMARY KEY,
     company_id             uuid NOT NULL,
     supplier_partner_id    uuid NOT NULL,
     minimum_order_amount   types.amount CONSTRAINT ck_supplier_purchasing_term_minimum CHECK (minimum_order_amount >= 0),
@@ -161,14 +166,15 @@ CREATE TABLE supplier_purchasing_term (                    -- one row per suppli
     container_weight       types.quantity CONSTRAINT ck_supplier_purchasing_term_weight CHECK (container_weight > 0),
     weight_uom_id          uuid REFERENCES uom (id),        -- interim: not stated in ADR-0024 (the unit of container_weight)
     order_cycle_days       integer CONSTRAINT ck_supplier_purchasing_term_cycle CHECK (order_cycle_days > 0),
-    recorded_at            timestamptz NOT NULL,
-    PRIMARY KEY (company_id, supplier_partner_id),
+    recorded_at            timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_supplier_purchasing_term_company_id_supplier_partner_id UNIQUE (company_id, supplier_partner_id),
     FOREIGN KEY (company_id, supplier_partner_id) REFERENCES partner (company_id, id),
     CONSTRAINT ck_supplier_purchasing_term_currency CHECK ((minimum_order_amount IS NULL) = (currency IS NULL)),
     CONSTRAINT ck_supplier_purchasing_term_volume_uom CHECK ((container_volume IS NULL) = (volume_uom_id IS NULL)),
     CONSTRAINT ck_supplier_purchasing_term_weight_uom CHECK ((container_weight IS NULL) = (weight_uom_id IS NULL))
 );
 CREATE TABLE supplier_item_lead_time (                     -- measured, refreshed by the forecast job, never applied without approval (ADR-0024 rule 2)
+    id                        uuid PRIMARY KEY,   -- uq_supplier_item_lead_time_key named by hand: the convention name would exceed 63 bytes (ADR-0004 rule 6)
     company_id                uuid NOT NULL,
     supplier_partner_id       uuid NOT NULL,
     item_id                   uuid NOT NULL,
@@ -176,8 +182,8 @@ CREATE TABLE supplier_item_lead_time (                     -- measured, refreshe
     standard_deviation_days   numeric(12,4) NOT NULL CONSTRAINT ck_supplier_item_lead_time_deviation CHECK (standard_deviation_days >= 0),
     sample_count              integer NOT NULL CONSTRAINT ck_supplier_item_lead_time_samples CHECK (sample_count > 0),   -- interim: not stated in ADR-0024
     forecast_run_id           uuid,                            -- interim: not stated in ADR-0024 (the refreshing run)
-    recorded_at               timestamptz NOT NULL,
-    PRIMARY KEY (company_id, supplier_partner_id, item_id),
+    recorded_at               timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_supplier_item_lead_time_key UNIQUE (company_id, supplier_partner_id, item_id),
     FOREIGN KEY (company_id, supplier_partner_id) REFERENCES partner (company_id, id),
     FOREIGN KEY (company_id, item_id) REFERENCES item (company_id, id),
     FOREIGN KEY (company_id, forecast_run_id) REFERENCES forecast_run (company_id, id)
@@ -185,13 +191,14 @@ CREATE TABLE supplier_item_lead_time (                     -- measured, refreshe
 
 -- ===== Demand history and forecast [planning] (ADR-0024 rules 10-13) =====
 CREATE TABLE sales_history (                               -- weeks before the first posting, written by ImportSalesHistory (rule 10)
+    id            uuid PRIMARY KEY,
     company_id    uuid NOT NULL,
     item_id       uuid NOT NULL,
     warehouse_id  uuid NOT NULL,
     iso_week      text NOT NULL CONSTRAINT ck_sales_history_iso_week CHECK (iso_week ~ '^[0-9]{4}-W(0[1-9]|[1-4][0-9]|5[0-3])$'),
     quantity      types.quantity NOT NULL,                     -- inventory unit; issues minus returns may be negative
-    recorded_at   timestamptz NOT NULL,
-    PRIMARY KEY (company_id, item_id, warehouse_id, iso_week),
+    recorded_at   timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_sales_history_company_id_item_id_warehouse_id_iso_week UNIQUE (company_id, item_id, warehouse_id, iso_week),
     FOREIGN KEY (company_id, item_id) REFERENCES item (company_id, id),
     FOREIGN KEY (company_id, warehouse_id) REFERENCES warehouse (company_id, id)
 );
@@ -200,17 +207,18 @@ CREATE TABLE demand_event (                                -- e.g. tet; company 
     company_id   uuid NOT NULL REFERENCES company (id),
     code         text NOT NULL,
     name         text NOT NULL,
-    recorded_at  timestamptz NOT NULL,
+    recorded_at  timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, code),
     UNIQUE (company_id, id)
 );
 CREATE TABLE demand_event_window (                         -- the event's window of dates per year, so a moving holiday stays aligned
+    id               uuid PRIMARY KEY,
     company_id       uuid NOT NULL,
     demand_event_id  uuid NOT NULL,
     start_date       date NOT NULL,
     end_date         date NOT NULL,
-    recorded_at      timestamptz NOT NULL,
-    PRIMARY KEY (demand_event_id, start_date),
+    recorded_at      timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_demand_event_window_demand_event_id_start_date UNIQUE (demand_event_id, start_date),
     FOREIGN KEY (company_id, demand_event_id) REFERENCES demand_event (company_id, id),
     CONSTRAINT ck_demand_event_window_dates CHECK (end_date >= start_date),
     CONSTRAINT ex_demand_event_window_overlap EXCLUDE USING gist (demand_event_id WITH =, daterange(start_date, end_date, '[]') WITH &&)
@@ -224,10 +232,11 @@ CREATE TABLE forecast_run (                                -- RunForecast, a lon
     check_results         jsonb NOT NULL DEFAULT '[]',          -- e.g. forecast_history_insufficient per (item, warehouse); not hashed (rule 17)
     input_hash            text CONSTRAINT ck_forecast_run_input_hash CHECK (input_hash ~ '^[0-9a-f]{64}$'),
     output_hash           text CONSTRAINT ck_forecast_run_output_hash CHECK (output_hash ~ '^[0-9a-f]{64}$'),
-    recorded_at           timestamptz NOT NULL,
+    recorded_at           timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id)
 );
 CREATE TABLE forecast_line (                               -- statistical forecast per day after the weekday spread; never overwritten by adjustments (rules 10-12)
+    id               uuid PRIMARY KEY,   -- uq_forecast_line_key named by hand: the convention name would exceed 63 bytes (ADR-0004 rule 6)
     company_id       uuid NOT NULL,
     forecast_run_id  uuid NOT NULL,
     item_id          uuid NOT NULL,
@@ -240,8 +249,8 @@ CREATE TABLE forecast_line (                               -- statistical foreca
     forecast_tier    text NOT NULL CONSTRAINT ck_forecast_line_tier CHECK (forecast_tier IN ('short_mean', 'unindexed', 'indexed')),
     index_factor     numeric(12,6) NOT NULL DEFAULT 1 CONSTRAINT ck_forecast_line_index_factor CHECK (index_factor >= 0),   -- interim: not stated in ADR-0024 (seasonal or event index applied)
     demand_event_id  uuid,                                     -- interim: not stated in ADR-0024 (the event whose index replaced the seasonal one)
-    recorded_at      timestamptz NOT NULL,
-    PRIMARY KEY (forecast_run_id, item_id, warehouse_id, forecast_date),
+    recorded_at      timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_forecast_line_key UNIQUE (forecast_run_id, item_id, warehouse_id, forecast_date),
     FOREIGN KEY (company_id, forecast_run_id) REFERENCES forecast_run (company_id, id),
     FOREIGN KEY (company_id, item_id) REFERENCES item (company_id, id),
     FOREIGN KEY (company_id, warehouse_id) REFERENCES warehouse (company_id, id),
@@ -261,7 +270,7 @@ CREATE TABLE forecast_adjustment (                         -- CreateForecastAdju
     reason               text NOT NULL,
     change_proposal_id   uuid,                                 -- interim: not stated in ADR-0024 (the approved proposal, when an agent drafted it; no DDL yet)
     canceled_at          timestamptz,                          -- set by CancelForecastAdjustment; rows are never overwritten
-    recorded_at          timestamptz NOT NULL,
+    recorded_at          timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, item_id) REFERENCES item (company_id, id),
     FOREIGN KEY (company_id, warehouse_id) REFERENCES warehouse (company_id, id),
@@ -302,7 +311,7 @@ CREATE TABLE demand_supply_line (
     -- rows carry not_approved until their order is approved (released), like sales and purchase rows (ADR-0024 rule 8 note).
     hold_reasons                    text[] NOT NULL DEFAULT '{}' CONSTRAINT ck_demand_supply_line_hold_reasons
                                         CHECK (hold_reasons <@ ARRAY['not_approved', 'credit_hold']::text[]),
-    recorded_at                     timestamptz NOT NULL,
+    recorded_at                     timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, item_id) REFERENCES item (company_id, id),
     FOREIGN KEY (company_id, warehouse_id) REFERENCES warehouse (company_id, id),
@@ -344,7 +353,7 @@ CREATE TABLE activity_type (                               -- e.g. setup, machin
     time_uom_id  uuid NOT NULL REFERENCES uom (id),            -- a unit of kind time (command check)
     is_active    boolean NOT NULL DEFAULT true,
     time_log_basis text NOT NULL DEFAULT 'none' CONSTRAINT ck_activity_type_time_log_basis CHECK (time_log_basis IN ('none', 'labor', 'machine')),   -- how a confirmation proposes it from time logs (ADR-0071 rule 11)
-    recorded_at  timestamptz NOT NULL,
+    recorded_at  timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, code),
     UNIQUE (company_id, id)
 );
@@ -356,7 +365,7 @@ CREATE TABLE stop_reason (                                 -- [production] ADR-0
     loss_class   text NOT NULL CONSTRAINT ck_stop_reason_loss_class CHECK (loss_class IN ('availability', 'performance', 'quality')),   -- OEE loss class; OEE reporting is later
     is_planned   boolean NOT NULL DEFAULT false,            -- a planned stop (break, planned maintenance) that OEE leaves out of availability
     is_active    boolean NOT NULL DEFAULT true,
-    recorded_at  timestamptz NOT NULL,
+    recorded_at  timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, code),
     UNIQUE (company_id, id),
     CONSTRAINT ck_stop_reason_planned CHECK (NOT is_planned OR loss_class = 'availability')
@@ -367,7 +376,7 @@ CREATE TABLE resource_group (                              -- [production] ADR-0
     code         text NOT NULL,
     name         text NOT NULL,
     is_active    boolean NOT NULL DEFAULT true,             -- false: no new members; members stay until removed
-    recorded_at  timestamptz NOT NULL,
+    recorded_at  timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, code),
     UNIQUE (company_id, id)
 );
@@ -387,26 +396,27 @@ CREATE TABLE work_center (                                 -- ADR-0033 rule 11
     output_bin_id            uuid,
     resource_group_id        uuid,                              -- members: one site and equal activity type sets (command checks; INV-811); no site_id, the site is derived through production_warehouse_id (ADR-0068 rules 10, 12)
     is_active                boolean NOT NULL DEFAULT true,
-    recorded_at              timestamptz NOT NULL,
+    recorded_at              timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, code),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, production_warehouse_id) REFERENCES warehouse (company_id, id),
     FOREIGN KEY (company_id, working_calendar_id) REFERENCES working_calendar (company_id, id),
     FOREIGN KEY (company_id, cost_center_id) REFERENCES cost_center (company_id, id),
     -- the bins lie in the work center's warehouse
-    CONSTRAINT fk_work_center_supply_bin FOREIGN KEY (supply_bin_id, production_warehouse_id) REFERENCES bin (id, warehouse_id),
-    CONSTRAINT fk_work_center_output_bin FOREIGN KEY (output_bin_id, production_warehouse_id) REFERENCES bin (id, warehouse_id),
+    CONSTRAINT fk_work_center_supply_bin FOREIGN KEY (company_id, supply_bin_id, production_warehouse_id) REFERENCES bin (company_id, id, warehouse_id),
+    CONSTRAINT fk_work_center_output_bin FOREIGN KEY (company_id, output_bin_id, production_warehouse_id) REFERENCES bin (company_id, id, warehouse_id),
     FOREIGN KEY (company_id, resource_group_id) REFERENCES resource_group (company_id, id)
 );
 CREATE INDEX ix_work_center_company_id_resource_group_id ON work_center (company_id, resource_group_id) WHERE resource_group_id IS NOT NULL;
 CREATE TABLE work_center_activity (                        -- activity types a work center records, with defaults copied into new operations
+    id                uuid PRIMARY KEY,
     company_id        uuid NOT NULL,
     work_center_id    uuid NOT NULL,
     activity_type_id  uuid NOT NULL,
     quantity          types.quantity NOT NULL CONSTRAINT ck_work_center_activity_quantity CHECK (quantity >= 0),
     basis             text NOT NULL CONSTRAINT ck_work_center_activity_basis CHECK (basis IN ('per_order', 'per_base_quantity')),
-    recorded_at       timestamptz NOT NULL,
-    PRIMARY KEY (work_center_id, activity_type_id),
+    recorded_at       timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_work_center_activity_work_center_id_activity_type_id UNIQUE (work_center_id, activity_type_id),
     FOREIGN KEY (company_id, work_center_id) REFERENCES work_center (company_id, id),
     FOREIGN KEY (company_id, activity_type_id) REFERENCES activity_type (company_id, id)
 );
@@ -420,7 +430,7 @@ CREATE TABLE bill_of_materials (                           -- ADR-0033 rule 3; p
     alternative  text NOT NULL,
     name         text NOT NULL,
     is_active    boolean NOT NULL DEFAULT true,
-    recorded_at  timestamptz NOT NULL,
+    recorded_at  timestamptz NOT NULL DEFAULT now(),
     UNIQUE NULLS NOT DISTINCT (company_id, item_id, product_id, proposed_change_proposal_item_id, usage, alternative),
     UNIQUE (company_id, id),
     UNIQUE (company_id, id, usage),
@@ -442,7 +452,7 @@ CREATE TABLE bill_of_materials_revision (                  -- immutable once rel
     content_hash                   text CONSTRAINT ck_bill_of_materials_revision_hash CHECK (content_hash ~ '^[0-9a-f]{64}$'),
     released_at                    timestamptz,
     copy_from_revision_id          uuid,
-    recorded_at                    timestamptz NOT NULL,
+    recorded_at                    timestamptz NOT NULL DEFAULT now(),
     UNIQUE (bill_of_materials_id, revision),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, bill_of_materials_id) REFERENCES bill_of_materials (company_id, id),
@@ -475,7 +485,7 @@ CREATE TABLE bill_of_materials_component (                 -- ADR-0033 rule 6; s
     quantity_per_value              types.quantity,             -- linear: quantity + quantity_per_value * value
     sizing_attribute_id             uuid,                       -- interim: not stated in ADR-0046 (the numeric item-defining characteristic of linear sizing)
     sizing_value_type               text NOT NULL DEFAULT 'number' CONSTRAINT ck_bill_of_materials_component_sizing_type CHECK (sizing_value_type = 'number'),
-    recorded_at                     timestamptz NOT NULL,
+    recorded_at                     timestamptz NOT NULL DEFAULT now(),
     UNIQUE (bill_of_materials_revision_id, position),
     FOREIGN KEY (company_id, bill_of_materials_revision_id) REFERENCES bill_of_materials_revision (company_id, id),
     FOREIGN KEY (company_id, component_item_id) REFERENCES item (company_id, id),
@@ -504,7 +514,7 @@ CREATE TABLE bill_of_materials_output (                    -- co-products and by
     uom_factor_source               text NOT NULL,
     output_type                     text NOT NULL CONSTRAINT ck_bill_of_materials_output_type CHECK (output_type IN ('co_product', 'by_product')),
     cost_coefficient                numeric(18,6),              -- co-products; data only (rule 7)
-    recorded_at                     timestamptz NOT NULL,
+    recorded_at                     timestamptz NOT NULL DEFAULT now(),
     UNIQUE (bill_of_materials_revision_id, position),
     FOREIGN KEY (company_id, bill_of_materials_revision_id) REFERENCES bill_of_materials_revision (company_id, id),
     FOREIGN KEY (company_id, output_item_id) REFERENCES item (company_id, id),
@@ -518,7 +528,7 @@ CREATE TABLE routing (                                     -- may serve several 
     code         text NOT NULL,
     name         text NOT NULL,
     is_active    boolean NOT NULL DEFAULT true,
-    recorded_at  timestamptz NOT NULL,
+    recorded_at  timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, code),
     UNIQUE (company_id, id)
 );
@@ -533,7 +543,7 @@ CREATE TABLE routing_revision (                            -- rules 3 and 4 appl
     content_hash           text CONSTRAINT ck_routing_revision_hash CHECK (content_hash ~ '^[0-9a-f]{64}$'),
     released_at            timestamptz,
     copy_from_revision_id  uuid,
-    recorded_at            timestamptz NOT NULL,
+    recorded_at            timestamptz NOT NULL DEFAULT now(),
     UNIQUE (routing_id, revision),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, routing_id) REFERENCES routing (company_id, id),
@@ -565,7 +575,7 @@ CREATE TABLE routing_operation (                           -- one linear sequenc
     run_duration_per_value    numeric(12,4),
     sizing_attribute_id       uuid,
     sizing_value_type         text NOT NULL DEFAULT 'number' CONSTRAINT ck_routing_operation_sizing_type CHECK (sizing_value_type = 'number'),
-    recorded_at               timestamptz NOT NULL,
+    recorded_at               timestamptz NOT NULL DEFAULT now(),
     UNIQUE (routing_revision_id, operation_number),
     UNIQUE (company_id, id),
     UNIQUE (company_id, id, routing_revision_id),
@@ -582,14 +592,15 @@ CREATE TABLE routing_operation (                           -- one linear sequenc
     CONSTRAINT ck_routing_operation_stated CHECK ((is_setup_duration_stated OR setup_duration = 0) AND (is_run_duration_stated OR run_duration = 0))
 );
 CREATE TABLE routing_operation_activity (                  -- standard activity quantities, inside the revision and its hash (rule 10)
+    id                    uuid PRIMARY KEY,   -- uq_routing_operation_activity_key named by hand: the convention name would exceed 63 bytes (ADR-0004 rule 6)
     company_id            uuid NOT NULL,
     routing_operation_id  uuid NOT NULL,
     routing_revision_id   uuid NOT NULL,                       -- carried so the revision trigger needs one lookup
     activity_type_id      uuid NOT NULL,
     quantity              types.quantity NOT NULL CONSTRAINT ck_routing_operation_activity_quantity CHECK (quantity >= 0),
     basis                 text NOT NULL CONSTRAINT ck_routing_operation_activity_basis CHECK (basis IN ('per_order', 'per_base_quantity')),
-    recorded_at           timestamptz NOT NULL,
-    PRIMARY KEY (routing_operation_id, activity_type_id),
+    recorded_at           timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_routing_operation_activity_key UNIQUE (routing_operation_id, activity_type_id),
     FOREIGN KEY (company_id, routing_operation_id, routing_revision_id) REFERENCES routing_operation (company_id, id, routing_revision_id),
     FOREIGN KEY (company_id, activity_type_id) REFERENCES activity_type (company_id, id)
 );
@@ -616,7 +627,7 @@ CREATE TABLE production_version (                          -- the one explicit w
     production_lead_time_method       text NOT NULL DEFAULT 'routing' CONSTRAINT ck_production_version_lead_time_method CHECK (production_lead_time_method IN ('fixed', 'routing')),
     production_lead_time_days         integer CONSTRAINT ck_production_version_lead_time_days CHECK (production_lead_time_days >= 0),   -- working days of the warehouse calendar
     costing_sheet_id                  uuid,                    -- [production] ADR-0072 rule 9; overrides the site's costing sheet
-    recorded_at                       timestamptz NOT NULL,
+    recorded_at                       timestamptz NOT NULL DEFAULT now(),
     UNIQUE NULLS NOT DISTINCT (company_id, item_id, product_id, production_warehouse_id, code),
     UNIQUE (company_id, id),
     UNIQUE (company_id, id, production_warehouse_id),
@@ -632,21 +643,23 @@ CREATE TABLE production_version (                          -- the one explicit w
     CONSTRAINT ck_production_version_lead_time CHECK ((production_lead_time_method = 'fixed') = (production_lead_time_days IS NOT NULL))
 );
 CREATE TABLE item_production_setting (                     -- ADR-0033 rule 14
+    id                       uuid PRIMARY KEY,
     company_id               uuid NOT NULL,
     item_id                  uuid NOT NULL,
     production_warehouse_id  uuid NOT NULL,
     is_phantom               boolean NOT NULL DEFAULT false,
-    recorded_at              timestamptz NOT NULL,
-    PRIMARY KEY (item_id, production_warehouse_id),
+    recorded_at              timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_item_production_setting_item_id_production_warehouse_id UNIQUE (item_id, production_warehouse_id),
     FOREIGN KEY (company_id, item_id) REFERENCES item (company_id, id),
     FOREIGN KEY (company_id, production_warehouse_id) REFERENCES warehouse (company_id, id)
 );
 CREATE TABLE item_low_level_code (                         -- read model owned by production, recomputed at release (ADR-0033 rule 8)
+    id              uuid PRIMARY KEY,
     company_id      uuid NOT NULL,
     item_id         uuid,
     product_id      uuid,                                      -- holistic decision 6: a configurable product is a node; its configured items inherit its code (ADR-0033 rule 8 note)
     low_level_code  integer NOT NULL CONSTRAINT ck_item_low_level_code_value CHECK (low_level_code >= 0),   -- 0 for top items; items without a row plan as 0 (ADR-0036 rule 2)
-    recorded_at     timestamptz NOT NULL,
+    recorded_at     timestamptz NOT NULL DEFAULT now(),
     FOREIGN KEY (company_id, item_id) REFERENCES item (company_id, id),
     FOREIGN KEY (company_id, product_id) REFERENCES product (company_id, id),
     CONSTRAINT ck_item_low_level_code_node CHECK ((item_id IS NULL) <> (product_id IS NULL))
@@ -682,7 +695,7 @@ CREATE TABLE planned_order (
     planned_end_date           date,
     availability_date          date,                           -- planned end + the node's receiving_days
     planning_run_id            uuid NOT NULL,                  -- interim: not stated in ADR-0024 (the run that last created or updated it; listed with the run's results)
-    recorded_at                timestamptz NOT NULL,
+    recorded_at                timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     -- the business key; a canceled row never blocks a new proposal, which takes the next sequence (rule 18)
     UNIQUE NULLS NOT DISTINCT (company_id, item_id, warehouse_id, order_type, supplier_partner_id, transfer_route_id, need_date, for_demand_supply_line_id, sequence),
@@ -722,7 +735,7 @@ CREATE TABLE planned_order_component (                     -- dependent demand, 
     quantity           types.quantity NOT NULL CONSTRAINT ck_planned_order_component_quantity CHECK (quantity > 0),   -- rounded up once per line (ADR-0033 rule 6)
     requested_date     date NOT NULL,                          -- scheduled start of the consuming operation
     operation_number   integer CONSTRAINT ck_planned_order_component_operation CHECK (operation_number > 0),
-    recorded_at        timestamptz NOT NULL,
+    recorded_at        timestamptz NOT NULL DEFAULT now(),
     UNIQUE (planned_order_id, line_number),
     UNIQUE (company_id, id),
     UNIQUE (company_id, id, planned_order_id),
@@ -731,6 +744,7 @@ CREATE TABLE planned_order_component (                     -- dependent demand, 
     FOREIGN KEY (company_id, warehouse_id) REFERENCES warehouse (company_id, id)
 );
 CREATE TABLE planned_order_operation (                     -- the operation schedule of rule 3's function (ADR-0036 rule 4)
+    id                    uuid PRIMARY KEY,
     company_id            uuid NOT NULL,
     planned_order_id      uuid NOT NULL,
     operation_number      integer NOT NULL CONSTRAINT ck_planned_order_operation_number CHECK (operation_number > 0),
@@ -739,8 +753,8 @@ CREATE TABLE planned_order_operation (                     -- the operation sche
     scheduled_start_date  date NOT NULL,
     scheduled_end_date    date NOT NULL,
     load_hours            numeric(14,4) NOT NULL DEFAULT 0 CONSTRAINT ck_planned_order_operation_load CHECK (load_hours >= 0),   -- interim: not stated in ADR-0036 (setup + run hours for ListCapacityLoad)
-    recorded_at           timestamptz NOT NULL,
-    PRIMARY KEY (planned_order_id, operation_number),
+    recorded_at           timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_planned_order_operation_planned_order_id_operation_number UNIQUE (planned_order_id, operation_number),
     FOREIGN KEY (company_id, planned_order_id) REFERENCES planned_order (company_id, id),
     FOREIGN KEY (company_id, work_center_id) REFERENCES work_center (company_id, id),
     CONSTRAINT ck_planned_order_operation_dates CHECK (scheduled_end_date >= scheduled_start_date),
@@ -757,7 +771,7 @@ CREATE TABLE planned_order_pegging (                       -- a planned order's 
     planned_order_component_id   uuid,                         -- planned_order through a bill of materials edge: its component line
     forecast_date                date,                         -- interim: not stated in ADR-0024 (the forecast day a forecast peg covers)
     quantity                     types.quantity NOT NULL CONSTRAINT ck_planned_order_pegging_quantity CHECK (quantity > 0),
-    recorded_at                  timestamptz NOT NULL,
+    recorded_at                  timestamptz NOT NULL DEFAULT now(),
     FOREIGN KEY (company_id, planned_order_id) REFERENCES planned_order (company_id, id),
     FOREIGN KEY (company_id, demand_supply_line_id) REFERENCES demand_supply_line (company_id, id),
     FOREIGN KEY (company_id, target_planned_order_id) REFERENCES planned_order (company_id, id),
@@ -780,7 +794,7 @@ CREATE TABLE planning_action_message (                     -- on existing supply
     proposed_date          date,
     proposed_quantity      types.quantity CONSTRAINT ck_planning_action_message_proposed_quantity CHECK (proposed_quantity >= 0),
     projected_effect       jsonb NOT NULL,
-    recorded_at            timestamptz NOT NULL,
+    recorded_at            timestamptz NOT NULL DEFAULT now(),
     FOREIGN KEY (company_id, planning_run_id) REFERENCES planning_run (company_id, id),
     FOREIGN KEY (company_id, demand_supply_line_id) REFERENCES demand_supply_line (company_id, id),
     CONSTRAINT ck_planning_action_message_fields CHECK (CASE kind
@@ -815,7 +829,7 @@ CREATE TABLE planning_exception (                          -- one work item per 
     evidence               jsonb NOT NULL DEFAULT '{}',
     state                  text NOT NULL DEFAULT 'open' CONSTRAINT ck_planning_exception_state CHECK (state IN ('open', 'closed')),
     closed_at              timestamptz,
-    recorded_at            timestamptz NOT NULL,
+    recorded_at            timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, planning_run_id) REFERENCES planning_run (company_id, id),
     FOREIGN KEY (company_id, item_id) REFERENCES item (company_id, id),
@@ -843,10 +857,11 @@ CREATE TABLE replenishment_request (
     id                    uuid PRIMARY KEY,
     company_id            uuid NOT NULL REFERENCES company (id),
     requested_by_user_id  uuid NOT NULL REFERENCES user_account (id),   -- the converter
-    recorded_at           timestamptz NOT NULL,
+    recorded_at           timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id)
 );
 CREATE TABLE replenishment_request_line (
+    id                        uuid PRIMARY KEY,   -- uq_replenishment_request_line_key named by hand: the convention name would exceed 63 bytes (ADR-0004 rule 6)
     company_id                uuid NOT NULL,
     replenishment_request_id  uuid NOT NULL,
     line_number               integer NOT NULL CONSTRAINT ck_replenishment_request_line_number CHECK (line_number > 0),
@@ -865,8 +880,8 @@ CREATE TABLE replenishment_request_line (
     inventory_quantity        types.quantity NOT NULL CONSTRAINT ck_replenishment_request_line_inventory_quantity CHECK (inventory_quantity > 0),
     need_date                 date,
     release_date              date NOT NULL,
-    recorded_at               timestamptz NOT NULL,
-    PRIMARY KEY (replenishment_request_id, line_number),
+    recorded_at               timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_replenishment_request_line_key UNIQUE (replenishment_request_id, line_number),
     FOREIGN KEY (company_id, replenishment_request_id) REFERENCES replenishment_request (company_id, id),
     FOREIGN KEY (company_id, origin_planned_order_id) REFERENCES planned_order (company_id, id),
     FOREIGN KEY (company_id, item_id) REFERENCES item (company_id, id),
@@ -906,7 +921,7 @@ CREATE TABLE production_order (                            -- typed header of a 
     execution_state                 text NOT NULL DEFAULT 'not_started' CONSTRAINT ck_production_order_execution_state CHECK (execution_state IN ('not_started', 'in_progress', 'technically_complete')),
     is_content_edited               boolean NOT NULL DEFAULT false,   -- lines edited by hand: re-explosion scales instead (rule 2)
     custom_values jsonb NOT NULL DEFAULT '{}'::jsonb CONSTRAINT ck_production_order_custom_values CHECK (jsonb_typeof(custom_values) = 'object'),   -- ADR-0074 rules 8, 9
-    recorded_at                     timestamptz NOT NULL,
+    recorded_at                     timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     UNIQUE (company_id, id, cost_object_id),
     FOREIGN KEY (company_id, id) REFERENCES document (company_id, id),
@@ -937,7 +952,7 @@ CREATE TABLE production_order_component (                  -- rule 1; external-o
     phantom_path           uuid[] NOT NULL DEFAULT '{}',       -- the phantom bill of materials component lines it came through
     requested_date         date NOT NULL,
     owner_partner_id       uuid,                               -- B3, interim: reserved owner axis (ADR-0037 rule 7)
-    recorded_at            timestamptz NOT NULL,
+    recorded_at            timestamptz NOT NULL DEFAULT now(),
     UNIQUE (production_order_id, line_number),
     UNIQUE (company_id, id),
     -- posted lines keep item and warehouse (referenced_line_immutable, rule 8), so issue lines may key on them
@@ -959,7 +974,7 @@ CREATE TABLE production_order_output (                     -- main output (plann
     cost_coefficient     numeric(18,6),
     requested_date       date NOT NULL,                        -- the order's end
     owner_partner_id     uuid,                                 -- B3, interim (ADR-0037 rule 7)
-    recorded_at          timestamptz NOT NULL,
+    recorded_at          timestamptz NOT NULL DEFAULT now(),
     UNIQUE (production_order_id, line_number),
     UNIQUE (company_id, id),
     UNIQUE (company_id, id, production_order_id, output_item_id),
@@ -990,7 +1005,7 @@ CREATE TABLE production_order_operation (                  -- copied from the ro
     expected_quantity        types.quantity NOT NULL CONSTRAINT ck_production_order_operation_expected CHECK (expected_quantity >= 0),   -- for information
     scheduled_start_date     date NOT NULL,
     scheduled_end_date       date NOT NULL,
-    recorded_at              timestamptz NOT NULL,
+    recorded_at              timestamptz NOT NULL DEFAULT now(),
     UNIQUE (production_order_id, line_number),
     UNIQUE (production_order_id, operation_number),
     UNIQUE (company_id, id),
@@ -1006,13 +1021,14 @@ CREATE TABLE production_order_operation (                  -- copied from the ro
     CONSTRAINT ck_production_order_operation_dates CHECK (scheduled_end_date >= scheduled_start_date)
 );
 CREATE TABLE production_order_operation_activity (         -- activity standards copied with the operation (rule 1)
+    id                             uuid PRIMARY KEY,   -- uq_production_order_operation_activity_key named by hand: the convention name would exceed 63 bytes (ADR-0004 rule 6)
     company_id                     uuid NOT NULL,
     production_order_operation_id  uuid NOT NULL,
     activity_type_id               uuid NOT NULL,
     quantity                       types.quantity NOT NULL CONSTRAINT ck_production_order_operation_activity_quantity CHECK (quantity >= 0),
     basis                          text NOT NULL CONSTRAINT ck_production_order_operation_activity_basis CHECK (basis IN ('per_order', 'per_base_quantity')),
-    recorded_at                    timestamptz NOT NULL,
-    PRIMARY KEY (production_order_operation_id, activity_type_id),
+    recorded_at                    timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_production_order_operation_activity_key UNIQUE (production_order_operation_id, activity_type_id),
     FOREIGN KEY (company_id, production_order_operation_id) REFERENCES production_order_operation (company_id, id),
     FOREIGN KEY (company_id, activity_type_id) REFERENCES activity_type (company_id, id)
 );
@@ -1020,8 +1036,9 @@ CREATE TABLE production_order_operation_activity (         -- activity standards
 -- execution facts, not version content (ADR-0009 rule 9); waiting, ready and done are derived by
 -- production.derive_operation_state (rule 7), the other states are stored here.
 CREATE TABLE operation_execution (                         -- [production] ADR-0071 rules 6, 16; one row per internal operation of an approved order
+    id                             uuid PRIMARY KEY,
     company_id                     uuid NOT NULL,
-    production_order_operation_id  uuid PRIMARY KEY,
+    production_order_operation_id  uuid NOT NULL CONSTRAINT uq_operation_execution_production_order_operation_id UNIQUE,
     production_order_id            uuid NOT NULL,
     operation_control              text NOT NULL DEFAULT 'internal' CONSTRAINT ck_operation_execution_control CHECK (operation_control = 'internal'),   -- a WO is an internal operation
     work_center_id                 uuid NOT NULL,             -- the execution work center: the planned one until TransferOperation (rule 16)
@@ -1029,7 +1046,7 @@ CREATE TABLE operation_execution (                         -- [production] ADR-0
     block_stop_reason_id           uuid,
     block_note                     text,
     state_changed_at               timestamptz NOT NULL,      -- the instant of the last Start, Pause or Block
-    recorded_at                    timestamptz NOT NULL,
+    recorded_at                    timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, production_order_operation_id),
     UNIQUE (company_id, production_order_operation_id, production_order_id),
     UNIQUE (company_id, production_order_operation_id, work_center_id),   -- target of the confirmation's key (INV-843)
@@ -1050,7 +1067,7 @@ CREATE TABLE operation_assignment (                        -- [production] ADR-0
     team_id                        uuid,
     assigned_at                    timestamptz NOT NULL,
     ended_at                       timestamptz,
-    recorded_at                    timestamptz NOT NULL,
+    recorded_at                    timestamptz NOT NULL DEFAULT now(),
     FOREIGN KEY (company_id, production_order_operation_id) REFERENCES operation_execution (company_id, production_order_operation_id),
     FOREIGN KEY (company_id, employee_partner_id) REFERENCES partner (company_id, id),
     FOREIGN KEY (company_id, team_id) REFERENCES team (company_id, id),
@@ -1081,7 +1098,7 @@ CREATE TABLE operation_time_log (                          -- [production] ADR-0
     canceled_at                    timestamptz,
     cancel_reason                  text,
     note                           text,
-    recorded_at                    timestamptz NOT NULL,
+    recorded_at                    timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     UNIQUE (company_id, id, production_order_operation_id),
     CONSTRAINT fk_operation_time_log_execution FOREIGN KEY (company_id, production_order_operation_id, production_order_id)
@@ -1113,16 +1130,19 @@ CREATE INDEX ix_operation_time_log_operation_started ON operation_time_log (prod
 -- Later OEE reads per work center.
 CREATE INDEX ix_operation_time_log_work_center_started ON operation_time_log (company_id, work_center_id, started_at);
 CREATE TABLE production_order_output_serial (              -- assigned serials; not version content (rules 1, 16)
+    id                          uuid PRIMARY KEY,   -- uq_production_order_output_serial_key named by hand: the convention name would exceed 63 bytes (ADR-0004 rule 6)
     company_id                  uuid NOT NULL,
     production_order_id         uuid NOT NULL,
     production_order_output_id  uuid NOT NULL,
-    serial_number_id            uuid NOT NULL REFERENCES serial_number (id),
+    serial_number_id            uuid NOT NULL,
     assigned_at                 timestamptz NOT NULL,
     freed_at                    timestamptz,                   -- at technical completion or Cancel when not received
-    recorded_at                 timestamptz NOT NULL,
-    PRIMARY KEY (production_order_id, serial_number_id),
+    recorded_at                 timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_production_order_output_serial_key UNIQUE (production_order_id, serial_number_id),
     CONSTRAINT fk_production_order_output_serial_output FOREIGN KEY (company_id, production_order_output_id, production_order_id) REFERENCES production_order_output (company_id, id, production_order_id),
-    CONSTRAINT ck_production_order_output_serial_dates CHECK (freed_at IS NULL OR freed_at >= assigned_at)
+    CONSTRAINT ck_production_order_output_serial_dates CHECK (freed_at IS NULL OR freed_at >= assigned_at),
+    FOREIGN KEY (company_id, serial_number_id) REFERENCES serial_number (company_id, id),   -- company key (ADR-0017 rule 19 note, 2026-11-21)
+    CONSTRAINT uq_production_order_output_serial_company_key UNIQUE (company_id, production_order_id, serial_number_id)   -- target of company keys (ADR-0017 rule 19 note, 2026-11-21); uq_production_order_output_serial_company_key named by hand: the convention name would exceed 63 bytes (ADR-0004 rule 6)
 );
 -- A serial has at most one open assignment (rule 16).
 CREATE UNIQUE INDEX ux_production_order_output_serial_open ON production_order_output_serial (serial_number_id) WHERE freed_at IS NULL;
@@ -1139,7 +1159,7 @@ CREATE TABLE production_issue (
     company_id           uuid NOT NULL,
     production_order_id  uuid NOT NULL,
     posting_date         date NOT NULL,                        -- interim: not stated in ADR-0034 for the issue (as for the confirmation)
-    recorded_at          timestamptz NOT NULL,
+    recorded_at          timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     UNIQUE (company_id, id, production_order_id),
     FOREIGN KEY (company_id, id) REFERENCES document (company_id, id),
@@ -1160,8 +1180,8 @@ CREATE TABLE production_issue_line (
     uom_denominator                bigint NOT NULL,             -- inventory units, taken when the unit was set, never re-read (ADR-0056 rule 9)
     uom_factor_source              text NOT NULL,               -- identity, item, product or global (ADR-0056 rule 6)
     inventory_quantity             types.quantity NOT NULL CONSTRAINT ck_production_issue_line_inventory_quantity CHECK (inventory_quantity > 0),
-    lot_id                         uuid REFERENCES lot (id),
-    serial_number_id               uuid REFERENCES serial_number (id),
+    lot_id                         uuid,
+    serial_number_id               uuid,
     bin_id                         uuid NOT NULL,
     handling_unit_id               uuid,                       -- no DDL yet (DS-42)
     stock_status                   text NOT NULL DEFAULT 'available' CONSTRAINT ck_production_issue_line_status CHECK (stock_status IN ('available', 'quality_inspection')),   -- quality_inspection for rework
@@ -1171,18 +1191,18 @@ CREATE TABLE production_issue_line (
     scrap_reason_kind              text NOT NULL DEFAULT 'scrap' CONSTRAINT ck_production_issue_line_scrap_reason_kind CHECK (scrap_reason_kind = 'scrap'),
     FOREIGN KEY (company_id, scrap_reason_id, scrap_reason_kind) REFERENCES reason (company_id, id, kind),
     cost_object_id                 uuid NOT NULL,
-    material_document_line_id      uuid REFERENCES material_document_line (id),   -- interim: not stated in ADR-0034 (the posted movement)
-    recorded_at                    timestamptz NOT NULL,
+    material_document_line_id      uuid,   -- interim: not stated in ADR-0034 (the posted movement); company key in DS-22-09-42 (S2 schema review S4)
+    recorded_at                    timestamptz NOT NULL DEFAULT now(),
     UNIQUE (production_issue_id, line_number),
     CONSTRAINT fk_production_issue_line_issue FOREIGN KEY (company_id, production_issue_id, production_order_id) REFERENCES production_issue (company_id, id, production_order_id),
     -- the component line is of the same order, with the same item and issue warehouse
     CONSTRAINT fk_production_issue_line_component FOREIGN KEY (company_id, production_order_component_id, production_order_id, item_id, warehouse_id)
         REFERENCES production_order_component (company_id, id, production_order_id, component_item_id, issue_warehouse_id),
-    CONSTRAINT fk_production_issue_line_bin FOREIGN KEY (bin_id, warehouse_id) REFERENCES bin (id, warehouse_id),
+    CONSTRAINT fk_production_issue_line_bin FOREIGN KEY (company_id, bin_id, warehouse_id) REFERENCES bin (company_id, id, warehouse_id),
     -- INV-103: the order's cost object
     CONSTRAINT fk_production_issue_line_cost_object FOREIGN KEY (company_id, production_order_id, cost_object_id) REFERENCES production_order (company_id, id, cost_object_id),
     -- INV-105: an output serial assigned to the same order
-    CONSTRAINT fk_production_issue_line_output_serial FOREIGN KEY (production_order_id, output_serial_number_id) REFERENCES production_order_output_serial (production_order_id, serial_number_id),
+    CONSTRAINT fk_production_issue_line_output_serial FOREIGN KEY (company_id, production_order_id, output_serial_number_id) REFERENCES production_order_output_serial (company_id, production_order_id, serial_number_id),
     CONSTRAINT ck_production_issue_line_tracking CHECK (num_nonnulls(lot_id, serial_number_id) <= 1 AND (serial_number_id IS NULL OR inventory_quantity = 1)),
     -- the line unit block (ADR-0056 rule 9): a known source, identity only at 1/1, and the inventory quantity within two
     -- inventory units of the exact conversion: a gross-error check that per-line rounding, the clamped forward parts and the
@@ -1190,7 +1210,9 @@ CREATE TABLE production_issue_line (
     CONSTRAINT ck_production_issue_line_uom_factor CHECK (uom_numerator > 0 AND uom_denominator > 0 AND uom_factor_source IN ('identity', 'item', 'product', 'global')
         AND (uom_factor_source <> 'identity' OR (uom_numerator = 1 AND uom_denominator = 1))),
     CONSTRAINT ck_production_issue_line_uom_quantity CHECK (abs(inventory_quantity * uom_denominator - quantity * uom_numerator) <= 2 * uom_denominator
-        AND (uom_factor_source <> 'identity' OR inventory_quantity = quantity))
+        AND (uom_factor_source <> 'identity' OR inventory_quantity = quantity)),
+    FOREIGN KEY (company_id, lot_id) REFERENCES lot (company_id, id),   -- company key (ADR-0017 rule 19 note, 2026-11-21)
+    FOREIGN KEY (company_id, serial_number_id) REFERENCES serial_number (company_id, id)   -- company key (ADR-0017 rule 19 note, 2026-11-21)
 );
 CREATE TABLE operation_confirmation (                      -- an internal operation of the order (rule 12)
     id                             uuid PRIMARY KEY,
@@ -1205,13 +1227,13 @@ CREATE TABLE operation_confirmation (                      -- an internal operat
     scrap_reason_kind              text NOT NULL DEFAULT 'scrap' CONSTRAINT ck_operation_confirmation_scrap_reason_kind CHECK (scrap_reason_kind = 'scrap'),
     FOREIGN KEY (company_id, scrap_reason_id, scrap_reason_kind) REFERENCES reason (company_id, id, kind),
     is_final                       boolean NOT NULL DEFAULT false,
-    lot_id                         uuid REFERENCES lot (id),   -- names the output lot for an automatic receipt (rule 13)
+    lot_id                         uuid,   -- names the output lot for an automatic receipt (rule 13)
     employee_partner_id            uuid,                       -- interim: not stated in ADR-0034 ("optional people or teams": column names)
     team_id                        uuid,                       -- interim: not stated in ADR-0034
     posting_date                   date NOT NULL,
     entry_source                   text NOT NULL DEFAULT 'person' CONSTRAINT ck_operation_confirmation_entry_source CHECK (entry_source IN ('person', 'capture_agent', 'production_import')),   -- ADR-0064 rules 19, 25
     external_reference             text,                       -- the production import's row reference, unique per company (ADR-0064 rule 25)
-    recorded_at                    timestamptz NOT NULL,
+    recorded_at                    timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     UNIQUE (company_id, id, production_order_id),
     FOREIGN KEY (company_id, id) REFERENCES document (company_id, id),
@@ -1226,28 +1248,31 @@ CREATE TABLE operation_confirmation (                      -- an internal operat
     UNIQUE (company_id, id, production_order_operation_id),
     FOREIGN KEY (company_id, work_center_id) REFERENCES work_center (company_id, id),
     -- INV-843; it also refuses a transfer once a confirmation exists
-    CONSTRAINT fk_operation_confirmation_execution_work_center FOREIGN KEY (company_id, production_order_operation_id, work_center_id) REFERENCES operation_execution (company_id, production_order_operation_id, work_center_id)
+    CONSTRAINT fk_operation_confirmation_execution_work_center FOREIGN KEY (company_id, production_order_operation_id, work_center_id) REFERENCES operation_execution (company_id, production_order_operation_id, work_center_id),
+    FOREIGN KEY (company_id, lot_id) REFERENCES lot (company_id, id)   -- company key (ADR-0017 rule 19 note, 2026-11-21)
 );
 -- duplicate_external_document: one confirmation per company and import reference (ADR-0064 rule 25).
 CREATE UNIQUE INDEX ux_operation_confirmation_external_reference ON operation_confirmation (company_id, external_reference) WHERE external_reference IS NOT NULL;
 CREATE TABLE operation_confirmation_activity (             -- actual activity quantities, defaulting to the standards (rule 12)
+    id                         uuid PRIMARY KEY,   -- uq_operation_confirmation_activity_key named by hand: the convention name would exceed 63 bytes (ADR-0004 rule 6)
     company_id                 uuid NOT NULL,
     operation_confirmation_id  uuid NOT NULL,
     activity_type_id           uuid NOT NULL,
     quantity                   types.quantity NOT NULL CONSTRAINT ck_operation_confirmation_activity_quantity CHECK (quantity >= 0),
     proposed_quantity          types.quantity CONSTRAINT ck_operation_confirmation_activity_proposed CHECK (proposed_quantity >= 0),   -- from the linked time logs; null when the type's time_log_basis is none or no log applies (ADR-0071 rule 11)
-    recorded_at                timestamptz NOT NULL,
-    PRIMARY KEY (operation_confirmation_id, activity_type_id),
+    recorded_at                timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_operation_confirmation_activity_key UNIQUE (operation_confirmation_id, activity_type_id),
     FOREIGN KEY (company_id, operation_confirmation_id) REFERENCES operation_confirmation (company_id, id),
     FOREIGN KEY (company_id, activity_type_id) REFERENCES activity_type (company_id, id)
 );
 CREATE TABLE operation_confirmation_time_log (             -- [production] ADR-0071 rule 11; draft content of the confirmation; one posted, not reversed confirmation per log (INV-840)
+    id                             uuid PRIMARY KEY,   -- uq_operation_confirmation_time_log_key named by hand: the convention name would exceed 63 bytes (ADR-0004 rule 6)
     company_id                     uuid NOT NULL,
     operation_confirmation_id      uuid NOT NULL,
     operation_time_log_id          uuid NOT NULL,
     production_order_operation_id  uuid NOT NULL,             -- carried so both keys name the same operation
-    recorded_at                    timestamptz NOT NULL,
-    PRIMARY KEY (operation_confirmation_id, operation_time_log_id),
+    recorded_at                    timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_operation_confirmation_time_log_key UNIQUE (operation_confirmation_id, operation_time_log_id),
     CONSTRAINT fk_operation_confirmation_time_log_confirmation FOREIGN KEY (company_id, operation_confirmation_id, production_order_operation_id)
         REFERENCES operation_confirmation (company_id, id, production_order_operation_id),
     CONSTRAINT fk_operation_confirmation_time_log_log FOREIGN KEY (company_id, operation_time_log_id, production_order_operation_id)
@@ -1265,7 +1290,7 @@ CREATE TABLE production_receipt (                          -- rule 13
     scrap_reason_id            uuid,                           -- reason, kind scrap, as on confirmations; a receipt may hold only scrap and then posts no material document (ADR-0074 rules 13, 14)
     scrap_reason_kind          text NOT NULL DEFAULT 'scrap' CONSTRAINT ck_production_receipt_scrap_reason_kind CHECK (scrap_reason_kind = 'scrap'),
     FOREIGN KEY (company_id, scrap_reason_id, scrap_reason_kind) REFERENCES reason (company_id, id, kind),
-    recorded_at                timestamptz NOT NULL,
+    recorded_at                timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     UNIQUE (company_id, id, production_order_id),
     FOREIGN KEY (company_id, id) REFERENCES document (company_id, id),
@@ -1290,23 +1315,23 @@ CREATE TABLE production_receipt_line (
     uom_denominator             bigint NOT NULL,                -- inventory units, taken when the unit was set, never re-read (ADR-0056 rule 9)
     uom_factor_source           text NOT NULL,                  -- identity, item, product or global (ADR-0056 rule 6)
     inventory_quantity          types.quantity NOT NULL CONSTRAINT ck_production_receipt_line_inventory_quantity CHECK (inventory_quantity > 0),
-    lot_id                      uuid REFERENCES lot (id),      -- created at receipt when lot-tracked
+    lot_id                      uuid,      -- created at receipt when lot-tracked
     serial_number_id            uuid,
     bin_id                      uuid NOT NULL,
     handling_unit_id            uuid,
     stock_status                text NOT NULL DEFAULT 'available' CONSTRAINT ck_production_receipt_line_status CHECK (stock_status IN ('available', 'quality_inspection')),
     movement_type               text NOT NULL CONSTRAINT ck_production_receipt_line_movement CHECK (movement_type IN ('production_receipt', 'co_product_receipt', 'by_product_receipt', 'disassembly_receipt')),
     cost_object_id              uuid NOT NULL,
-    material_document_line_id   uuid REFERENCES material_document_line (id),   -- interim: not stated in ADR-0034
-    recorded_at                 timestamptz NOT NULL,
+    material_document_line_id   uuid,   -- interim: not stated in ADR-0034; company key in DS-22-09-42 (S2 schema review S4)
+    recorded_at                 timestamptz NOT NULL DEFAULT now(),
     UNIQUE (production_receipt_id, line_number),
     CONSTRAINT fk_production_receipt_line_receipt FOREIGN KEY (company_id, production_receipt_id, production_order_id) REFERENCES production_receipt (company_id, id, production_order_id),
     CONSTRAINT fk_production_receipt_line_output FOREIGN KEY (company_id, production_order_output_id, production_order_id, item_id)
         REFERENCES production_order_output (company_id, id, production_order_id, output_item_id),
-    CONSTRAINT fk_production_receipt_line_bin FOREIGN KEY (bin_id, warehouse_id) REFERENCES bin (id, warehouse_id),
+    CONSTRAINT fk_production_receipt_line_bin FOREIGN KEY (company_id, bin_id, warehouse_id) REFERENCES bin (company_id, id, warehouse_id),
     CONSTRAINT fk_production_receipt_line_cost_object FOREIGN KEY (company_id, production_order_id, cost_object_id) REFERENCES production_order (company_id, id, cost_object_id),
     -- received serials are serials assigned to the same order (rule 16)
-    CONSTRAINT fk_production_receipt_line_serial FOREIGN KEY (production_order_id, serial_number_id) REFERENCES production_order_output_serial (production_order_id, serial_number_id),
+    CONSTRAINT fk_production_receipt_line_serial FOREIGN KEY (company_id, production_order_id, serial_number_id) REFERENCES production_order_output_serial (company_id, production_order_id, serial_number_id),
     CONSTRAINT ck_production_receipt_line_tracking CHECK (num_nonnulls(lot_id, serial_number_id) <= 1 AND (serial_number_id IS NULL OR inventory_quantity = 1)),
     -- the line unit block (ADR-0056 rule 9): a known source, identity only at 1/1, and the inventory quantity within two
     -- inventory units of the exact conversion: a gross-error check that per-line rounding, the clamped forward parts and the
@@ -1314,7 +1339,8 @@ CREATE TABLE production_receipt_line (
     CONSTRAINT ck_production_receipt_line_uom_factor CHECK (uom_numerator > 0 AND uom_denominator > 0 AND uom_factor_source IN ('identity', 'item', 'product', 'global')
         AND (uom_factor_source <> 'identity' OR (uom_numerator = 1 AND uom_denominator = 1))),
     CONSTRAINT ck_production_receipt_line_uom_quantity CHECK (abs(inventory_quantity * uom_denominator - quantity * uom_numerator) <= 2 * uom_denominator
-        AND (uom_factor_source <> 'identity' OR inventory_quantity = quantity))
+        AND (uom_factor_source <> 'identity' OR inventory_quantity = quantity)),
+    FOREIGN KEY (company_id, lot_id) REFERENCES lot (company_id, id)   -- company key (ADR-0017 rule 19 note, 2026-11-21)
 );
 -- Backflushed and processor-consumed component lines, generated at Post by production.contract.record_operation_progress
 -- or the receipt's backflush, keyed by the calling posting document. One table (holistic decision 11) replaces
@@ -1335,17 +1361,17 @@ CREATE TABLE operation_progress_component (
     uom_denominator                bigint NOT NULL,             -- inventory units, taken when the unit was set, never re-read (ADR-0056 rule 9)
     uom_factor_source              text NOT NULL,               -- identity, item, product or global (ADR-0056 rule 6)
     inventory_quantity             types.quantity NOT NULL CONSTRAINT ck_operation_progress_component_inventory_quantity CHECK (inventory_quantity > 0),
-    lot_id                         uuid REFERENCES lot (id),   -- backflush never takes serials (serial_component_backflush)
+    lot_id                         uuid,   -- backflush never takes serials (serial_component_backflush)
     bin_id                         uuid NOT NULL,              -- the supply bin, or the processor's default bin
     cost_object_id                 uuid NOT NULL,
-    material_document_line_id      uuid NOT NULL REFERENCES material_document_line (id),   -- movement type production_issue
-    recorded_at                    timestamptz NOT NULL,
+    material_document_line_id      uuid NOT NULL,   -- movement type production_issue; company key in DS-22-09-42 (S2 schema review S4)
+    recorded_at                    timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT fk_operation_progress_component_confirmation FOREIGN KEY (company_id, operation_confirmation_id, production_order_id) REFERENCES operation_confirmation (company_id, id, production_order_id),
     CONSTRAINT fk_operation_progress_component_receipt FOREIGN KEY (company_id, production_receipt_id, production_order_id) REFERENCES production_receipt (company_id, id, production_order_id),
     CONSTRAINT fk_operation_progress_component_service_receipt FOREIGN KEY (company_id, service_receipt_id) REFERENCES document (company_id, id),
     CONSTRAINT fk_operation_progress_component_component FOREIGN KEY (company_id, production_order_component_id, production_order_id, item_id, warehouse_id)
         REFERENCES production_order_component (company_id, id, production_order_id, component_item_id, issue_warehouse_id),
-    CONSTRAINT fk_operation_progress_component_bin FOREIGN KEY (bin_id, warehouse_id) REFERENCES bin (id, warehouse_id),
+    CONSTRAINT fk_operation_progress_component_bin FOREIGN KEY (company_id, bin_id, warehouse_id) REFERENCES bin (company_id, id, warehouse_id),
     CONSTRAINT fk_operation_progress_component_cost_object FOREIGN KEY (company_id, production_order_id, cost_object_id) REFERENCES production_order (company_id, id, cost_object_id),
     CONSTRAINT ck_operation_progress_component_caller CHECK (num_nonnulls(operation_confirmation_id, production_receipt_id, service_receipt_id) = 1),
     -- the line unit block (ADR-0056 rule 9): a known source, identity only at 1/1, and the inventory quantity within two
@@ -1356,7 +1382,8 @@ CREATE TABLE operation_progress_component (
     CONSTRAINT ck_operation_progress_component_uom_quantity CHECK (abs(inventory_quantity * uom_denominator - quantity * uom_numerator) <= 2 * uom_denominator
         AND (uom_factor_source <> 'identity' OR inventory_quantity = quantity)),
     -- generated backflush lines are written in the inventory unit (ADR-0056 rule 9)
-    CONSTRAINT ck_operation_progress_component_uom_identity CHECK (uom_factor_source = 'identity')
+    CONSTRAINT ck_operation_progress_component_uom_identity CHECK (uom_factor_source = 'identity'),
+    FOREIGN KEY (company_id, lot_id) REFERENCES lot (company_id, id)   -- company key (ADR-0017 rule 19 note, 2026-11-21)
 );
 CREATE INDEX ix_operation_progress_component_component ON operation_progress_component (production_order_component_id);
 
@@ -1372,7 +1399,7 @@ CREATE TABLE cost_component_detail (                       -- [production] ADR-0
     sequence        integer NOT NULL DEFAULT 0,                -- report order; also the tie-break of the job's split (rule 4)
     is_default      boolean NOT NULL DEFAULT false,            -- CreateCompany seeds one per posting component (INV-850)
     is_active       boolean NOT NULL DEFAULT true,             -- at most 12 active per company (command check, cost_component_detail_limit)
-    recorded_at     timestamptz NOT NULL,
+    recorded_at     timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, code),
     UNIQUE (company_id, id),
     UNIQUE (company_id, id, cost_component),                   -- target of the keys that hold a detail to its posting component
@@ -1387,9 +1414,9 @@ CREATE TABLE cost_component_detail_mapping (               -- [production] ADR-0
     source_kind               text NOT NULL CONSTRAINT ck_cost_component_detail_mapping_kind CHECK (source_kind IN ('activity_type', 'item_group', 'valuation_class', 'account')),
     activity_type_id          uuid,
     item_group_id             uuid,
-    valuation_class_id        uuid REFERENCES valuation_class (id),
-    account_id                uuid REFERENCES account (id),    -- an operational account
-    recorded_at               timestamptz NOT NULL,
+    valuation_class_id        uuid,
+    account_id                uuid,    -- an operational account
+    recorded_at               timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     -- one source maps to at most one detail per posting component, so the mapping is a function (rule 3)
     CONSTRAINT uq_cost_component_detail_mapping_source UNIQUE NULLS NOT DISTINCT (company_id, cost_component, activity_type_id, item_group_id, valuation_class_id, account_id),
@@ -1401,7 +1428,9 @@ CREATE TABLE cost_component_detail_mapping (               -- [production] ADR-0
         WHEN 'activity_type' THEN activity_type_id IS NOT NULL
         WHEN 'item_group' THEN item_group_id IS NOT NULL
         WHEN 'valuation_class' THEN valuation_class_id IS NOT NULL
-        ELSE account_id IS NOT NULL END)
+        ELSE account_id IS NOT NULL END),
+    FOREIGN KEY (company_id, account_id) REFERENCES account (company_id, id),   -- company key (S2 schema phase A)
+    FOREIGN KEY (company_id, valuation_class_id) REFERENCES valuation_class (company_id, id)   -- company key (ADR-0017 rule 19 note, 2026-11-21)
 );
 -- Costing sheet (ADR-0072 rules 6-9): planned costing only; it values no stock and posts nothing.
 CREATE TABLE costing_sheet (                               -- [production] ADR-0072 rule 6; company data, master_data_change, change-tracked, proposal-bound
@@ -1410,11 +1439,12 @@ CREATE TABLE costing_sheet (                               -- [production] ADR-0
     code         text NOT NULL,
     name         text NOT NULL,
     is_active    boolean NOT NULL DEFAULT true,
-    recorded_at  timestamptz NOT NULL,
+    recorded_at  timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, code),
     UNIQUE (company_id, id)
 );
 CREATE TABLE costing_sheet_row (                           -- [production] ADR-0072 rule 6; ordered rows, written as one list by UpdateCostingSheet
+    id                        uuid PRIMARY KEY,
     company_id                uuid NOT NULL,
     costing_sheet_id          uuid NOT NULL,
     row_number                integer NOT NULL CONSTRAINT ck_costing_sheet_row_number CHECK (row_number > 0),
@@ -1430,8 +1460,8 @@ CREATE TABLE costing_sheet_row (                           -- [production] ADR-0
     cost_component            text,                            -- that detail's posting component, held by the key below; never material
     from_row_number           integer,                         -- subtotal rows: the range of earlier rows summed
     to_row_number             integer,
-    recorded_at               timestamptz NOT NULL,
-    PRIMARY KEY (costing_sheet_id, row_number),
+    recorded_at               timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_costing_sheet_row_costing_sheet_id_row_number UNIQUE (costing_sheet_id, row_number),
     UNIQUE (company_id, costing_sheet_id, row_number, row_kind),
     UNIQUE (costing_sheet_id, row_number, surcharge_kind),    -- target of costing_sheet_rate's key: a rate suits its row's kind
     FOREIGN KEY (company_id, costing_sheet_id) REFERENCES costing_sheet (company_id, id),
@@ -1451,16 +1481,18 @@ CREATE TABLE costing_sheet_row (                           -- [production] ADR-0
             AND (surcharge_kind = 'per_activity_unit') = (activity_type_id IS NOT NULL)
             AND (usage = 'production') = (cost_component_detail_id IS NOT NULL) END),
     CONSTRAINT ck_costing_sheet_row_component CHECK ((cost_component_detail_id IS NULL) = (cost_component IS NULL)
-        AND (cost_component IS NULL OR cost_component IN ('labor', 'overhead', 'other')))
+        AND (cost_component IS NULL OR cost_component IN ('labor', 'overhead', 'other'))),
+    CONSTRAINT uq_costing_sheet_row_company_key UNIQUE (company_id, costing_sheet_id, row_number, surcharge_kind)   -- target of company keys (ADR-0017 rule 19 note, 2026-11-21); uq_costing_sheet_row_company_key named by hand: the convention name would exceed 63 bytes (ADR-0004 rule 6)
 );
 CREATE TABLE costing_sheet_base_member (                   -- [production] ADR-0072 rule 6; a posting component or a detail of a base row
+    id                        uuid PRIMARY KEY,
     company_id                uuid NOT NULL,
     costing_sheet_id          uuid NOT NULL,
     row_number                integer NOT NULL,
     row_kind                  text NOT NULL DEFAULT 'base' CONSTRAINT ck_costing_sheet_base_member_row_kind CHECK (row_kind = 'base'),   -- held by the key below
     cost_component            text CONSTRAINT ck_costing_sheet_base_member_component CHECK (cost_component IN ('material', 'labor', 'overhead', 'other')),
     cost_component_detail_id  uuid,
-    recorded_at               timestamptz NOT NULL,
+    recorded_at               timestamptz NOT NULL DEFAULT now(),
     -- a member appears once per sheet; a detail and its own posting component in two base rows are refused by the command (costing_sheet_row_invalid)
     CONSTRAINT uq_costing_sheet_base_member UNIQUE NULLS NOT DISTINCT (costing_sheet_id, cost_component, cost_component_detail_id),
     CONSTRAINT fk_costing_sheet_base_member_row FOREIGN KEY (company_id, costing_sheet_id, row_number, row_kind)
@@ -1476,15 +1508,15 @@ CREATE TABLE costing_sheet_rate (                          -- [production] ADR-0
     surcharge_kind      text NOT NULL,                         -- the row's, held by the key below
     site_id             uuid,                                  -- conditions, each optional; precedence site, item group, valuation class
     item_group_id       uuid,
-    valuation_class_id  uuid REFERENCES valuation_class (id),
+    valuation_class_id  uuid,
     valid_from          date NOT NULL,
     valid_to            date,                                  -- inclusive; null = open
     rate_percent        types.percent,                         -- percent rows
     rate_amount         types.unit_price,                      -- per-unit rows: company currency per output or activity unit
-    recorded_at         timestamptz NOT NULL,
+    recorded_at         timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, costing_sheet_id) REFERENCES costing_sheet (company_id, id),
-    CONSTRAINT fk_costing_sheet_rate_row FOREIGN KEY (costing_sheet_id, row_number, surcharge_kind) REFERENCES costing_sheet_row (costing_sheet_id, row_number, surcharge_kind),
+    CONSTRAINT fk_costing_sheet_rate_row FOREIGN KEY (company_id, costing_sheet_id, row_number, surcharge_kind) REFERENCES costing_sheet_row (company_id, costing_sheet_id, row_number, surcharge_kind),
     FOREIGN KEY (company_id, site_id) REFERENCES site (company_id, id),
     FOREIGN KEY (company_id, item_group_id) REFERENCES item_group (company_id, id),
     CONSTRAINT ck_costing_sheet_rate_value CHECK (CASE surcharge_kind
@@ -1497,14 +1529,16 @@ CREATE TABLE costing_sheet_rate (                          -- [production] ADR-0
         (coalesce(site_id, '00000000-0000-0000-0000-000000000000'::uuid)) WITH =,
         (coalesce(item_group_id, '00000000-0000-0000-0000-000000000000'::uuid)) WITH =,
         (coalesce(valuation_class_id, '00000000-0000-0000-0000-000000000000'::uuid)) WITH =,
-        daterange(valid_from, valid_to, '[]') WITH &&)
+        daterange(valid_from, valid_to, '[]') WITH &&),
+    FOREIGN KEY (company_id, valuation_class_id) REFERENCES valuation_class (company_id, id)   -- company key (ADR-0017 rule 19 note, 2026-11-21)
 );
 CREATE TABLE site_costing_sheet (                          -- [production] ADR-0072 rule 9; master_data_change; production_version.costing_sheet_id overrides it
+    id                uuid PRIMARY KEY,
     company_id        uuid NOT NULL,
     site_id           uuid NOT NULL,
     costing_sheet_id  uuid NOT NULL,
-    recorded_at       timestamptz NOT NULL,
-    PRIMARY KEY (site_id),
+    recorded_at       timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_site_costing_sheet_site_id UNIQUE (site_id),
     FOREIGN KEY (company_id, site_id) REFERENCES site (company_id, id),
     FOREIGN KEY (company_id, costing_sheet_id) REFERENCES costing_sheet (company_id, id)
 );
@@ -1524,7 +1558,7 @@ CREATE TABLE cost_estimate (                               -- benchmark for targ
     company_amount                types.amount,               -- interim: not stated in ADR-0035 (total for the lot, company currency)
     unit_cost                      types.unit_price,           -- interim: not stated in ADR-0035 (company_amount / costing_lot_quantity; the preliminary price fallback, rule 4)
     released_at                    timestamptz,
-    recorded_at                    timestamptz NOT NULL,
+    recorded_at                    timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, production_version_id) REFERENCES production_version (company_id, id),
     FOREIGN KEY (company_id, item_id) REFERENCES item (company_id, id),
@@ -1538,6 +1572,7 @@ CREATE TABLE cost_estimate (                               -- benchmark for targ
 -- One released estimate per version and costing date (holistic review); the lookup of the estimate in force uses it too.
 CREATE UNIQUE INDEX ux_cost_estimate_released ON cost_estimate (company_id, production_version_id, costing_date) WHERE state = 'released';
 CREATE TABLE cost_estimate_line (                          -- rolled up level by level from released estimates of made components (rule 14)
+    id                 uuid PRIMARY KEY,
     company_id         uuid NOT NULL,
     cost_estimate_id   uuid NOT NULL,
     line_number        integer NOT NULL CONSTRAINT ck_cost_estimate_line_number CHECK (line_number > 0),
@@ -1551,8 +1586,8 @@ CREATE TABLE cost_estimate_line (                          -- rolled up level by
     price              types.unit_price NOT NULL,              -- surcharge lines: the rate (percent, or amount per unit)
     company_amount     types.amount NOT NULL,
     level              integer NOT NULL DEFAULT 0 CONSTRAINT ck_cost_estimate_line_level CHECK (level >= 0),
-    recorded_at        timestamptz NOT NULL,
-    PRIMARY KEY (cost_estimate_id, line_number),
+    recorded_at        timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_cost_estimate_line_cost_estimate_id_line_number UNIQUE (cost_estimate_id, line_number),
     FOREIGN KEY (company_id, cost_estimate_id) REFERENCES cost_estimate (company_id, id),
     FOREIGN KEY (company_id, component_item_id) REFERENCES item (company_id, id),
     FOREIGN KEY (company_id, activity_type_id) REFERENCES activity_type (company_id, id),
@@ -1567,6 +1602,7 @@ CREATE TABLE cost_estimate_line (                          -- rolled up level by
         AND (activity_type_id IS NULL OR cost_component IN ('labor', 'overhead')))
 );
 CREATE TABLE cost_estimate_sheet_row (                     -- [production] ADR-0072 rule 8; the production rows as costed; estimate content, frozen at release
+    id                        uuid PRIMARY KEY,
     company_id                uuid NOT NULL,
     cost_estimate_id          uuid NOT NULL,
     row_number                integer NOT NULL CONSTRAINT ck_cost_estimate_sheet_row_number CHECK (row_number > 0),
@@ -1579,8 +1615,8 @@ CREATE TABLE cost_estimate_sheet_row (                     -- [production] ADR-0
     company_amount            types.amount NOT NULL,           -- the row's value
     credited_cost_center_id   uuid,
     cost_component_detail_id  uuid,
-    recorded_at               timestamptz NOT NULL,
-    PRIMARY KEY (cost_estimate_id, row_number),
+    recorded_at               timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_cost_estimate_sheet_row_cost_estimate_id_row_number UNIQUE (cost_estimate_id, row_number),
     FOREIGN KEY (company_id, cost_estimate_id) REFERENCES cost_estimate (company_id, id),
     FOREIGN KEY (company_id, credited_cost_center_id) REFERENCES cost_center (company_id, id),
     FOREIGN KEY (company_id, cost_component_detail_id) REFERENCES cost_component_detail (company_id, id),
@@ -1590,6 +1626,7 @@ CREATE TABLE cost_estimate_sheet_row (                     -- [production] ADR-0
         ELSE num_nonnulls(surcharge_kind, base_amount, base_quantity, rate, credited_cost_center_id, cost_component_detail_id) = 0 END)
 );
 CREATE TABLE cost_estimate_gap (                           -- what a draft estimate could not price: listed, never zero, never released (ADR-0062 rule 12)
+    id                              uuid PRIMARY KEY,
     company_id                      uuid NOT NULL,
     cost_estimate_id                uuid NOT NULL,
     gap_number                      integer NOT NULL CONSTRAINT ck_cost_estimate_gap_number CHECK (gap_number > 0),
@@ -1604,8 +1641,8 @@ CREATE TABLE cost_estimate_gap (                           -- what a draft estim
     costing_sheet_id                uuid,                      -- [production] ADR-0072 rule 7; with the row whose rate is missing
     costing_sheet_row_number        integer,
     detail                          jsonb NOT NULL DEFAULT '{}',
-    recorded_at                     timestamptz NOT NULL,
-    PRIMARY KEY (cost_estimate_id, gap_number),
+    recorded_at                     timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_cost_estimate_gap_cost_estimate_id_gap_number UNIQUE (cost_estimate_id, gap_number),
     FOREIGN KEY (company_id, cost_estimate_id) REFERENCES cost_estimate (company_id, id),
     FOREIGN KEY (company_id, component_item_id) REFERENCES item (company_id, id),
     FOREIGN KEY (company_id, bill_of_materials_component_id) REFERENCES bill_of_materials_component (company_id, id),
@@ -1623,67 +1660,76 @@ CREATE TABLE cost_estimate_gap (                           -- what a draft estim
         ELSE true END)
 );
 CREATE TABLE activity_rate (                               -- planned rates (rule 14)
+    id                 uuid PRIMARY KEY,   -- uq_activity_rate_key named by hand: the convention name would exceed 63 bytes (ADR-0004 rule 6)
     company_id         uuid NOT NULL,
     work_center_id     uuid NOT NULL,
     activity_type_id   uuid NOT NULL,
-    posting_period_id  uuid NOT NULL REFERENCES posting_period (id),
+    posting_period_id  uuid NOT NULL,
     rate               types.unit_price NOT NULL CONSTRAINT ck_activity_rate_rate CHECK (rate >= 0),   -- company currency per activity unit
-    recorded_at        timestamptz NOT NULL,
-    PRIMARY KEY (work_center_id, activity_type_id, posting_period_id),
+    recorded_at        timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_activity_rate_key UNIQUE (work_center_id, activity_type_id, posting_period_id),
     FOREIGN KEY (company_id, work_center_id) REFERENCES work_center (company_id, id),
-    FOREIGN KEY (company_id, activity_type_id) REFERENCES activity_type (company_id, id)
+    FOREIGN KEY (company_id, activity_type_id) REFERENCES activity_type (company_id, id),
+    FOREIGN KEY (company_id, posting_period_id) REFERENCES posting_period (company_id, id)   -- company key (S2 schema phase A)
 );
 -- overhead_surcharge (the interim table of "a planned surcharge per cost center", ADR-0035 rule 14) is replaced by the
 -- costing sheet: a percent surcharge row crediting that cost center, on a stated base row, with dated rates (ADR-0072 rule 11).
 CREATE TABLE pool_allocation_rule (                        -- one rule per (cost center, group) (rules 7, 17)
+    id                uuid PRIMARY KEY,
     company_id        uuid NOT NULL,
     cost_center_id    uuid NOT NULL,
     pool_group        text NOT NULL CONSTRAINT ck_pool_allocation_rule_group CHECK (pool_group IN ('labor', 'overhead', 'other')),
     driver            text NOT NULL CONSTRAINT ck_pool_allocation_rule_driver CHECK (driver IN ('activity_type', 'output_quantity', 'standard_material_quantity', 'preliminary_material_amount')),
     activity_type_id  uuid,                                    -- recorded on the cost center's work centers
-    recorded_at       timestamptz NOT NULL,
-    PRIMARY KEY (cost_center_id, pool_group),
+    recorded_at       timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_pool_allocation_rule_cost_center_id_pool_group UNIQUE (cost_center_id, pool_group),
     FOREIGN KEY (company_id, cost_center_id) REFERENCES cost_center (company_id, id),
     FOREIGN KEY (company_id, activity_type_id) REFERENCES activity_type (company_id, id),
     CONSTRAINT ck_pool_allocation_rule_activity CHECK ((driver = 'activity_type') = (activity_type_id IS NOT NULL))
 );
 CREATE TABLE normal_capacity (                             -- per (cost center, driver, period) in the driver's unit (rule 7)
+    id                 uuid PRIMARY KEY,
     company_id         uuid NOT NULL,
     cost_center_id     uuid NOT NULL,
     driver             text NOT NULL CONSTRAINT ck_normal_capacity_driver CHECK (driver IN ('activity_type', 'output_quantity', 'standard_material_quantity', 'preliminary_material_amount')),
     activity_type_id   uuid,
-    posting_period_id  uuid NOT NULL REFERENCES posting_period (id),
+    posting_period_id  uuid NOT NULL,
     quantity           types.quantity NOT NULL CONSTRAINT ck_normal_capacity_quantity CHECK (quantity > 0),
-    recorded_at        timestamptz NOT NULL,
+    recorded_at        timestamptz NOT NULL DEFAULT now(),
     UNIQUE NULLS NOT DISTINCT (cost_center_id, driver, activity_type_id, posting_period_id),
     FOREIGN KEY (company_id, cost_center_id) REFERENCES cost_center (company_id, id),
     FOREIGN KEY (company_id, activity_type_id) REFERENCES activity_type (company_id, id),
-    CONSTRAINT ck_normal_capacity_activity CHECK ((driver = 'activity_type') = (activity_type_id IS NOT NULL))
+    CONSTRAINT ck_normal_capacity_activity CHECK ((driver = 'activity_type') = (activity_type_id IS NOT NULL)),
+    FOREIGN KEY (company_id, posting_period_id) REFERENCES posting_period (company_id, id)   -- company key (S2 schema phase A)
 );
 CREATE TABLE production_cost_settlement (                  -- one internal document per run of the period-end job (rule 5)
     id                 uuid PRIMARY KEY,
     company_id         uuid NOT NULL,
-    posting_period_id  uuid NOT NULL REFERENCES posting_period (id),
-    recorded_at        timestamptz NOT NULL,
+    posting_period_id  uuid NOT NULL,
+    recorded_at        timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
-    FOREIGN KEY (company_id, id) REFERENCES document (company_id, id)
+    FOREIGN KEY (company_id, id) REFERENCES document (company_id, id),
+    FOREIGN KEY (company_id, posting_period_id) REFERENCES posting_period (company_id, id)   -- company key (S2 schema phase A)
 );
 CREATE TABLE production_cost_settlement_line (             -- keyed by (cost object, cost component, step); reruns post differences per key (rule 5)
+    id                             uuid PRIMARY KEY,   -- uq_production_cost_settlement_line_key named by hand: the convention name would exceed 63 bytes (ADR-0004 rule 6)
     company_id                     uuid NOT NULL,
     production_cost_settlement_id  uuid NOT NULL,
-    cost_object_id                 uuid NOT NULL REFERENCES cost_object (id),
+    cost_object_id                 uuid NOT NULL,
     cost_component                 text NOT NULL CONSTRAINT ck_production_cost_settlement_line_component CHECK (cost_component IN ('material', 'labor', 'overhead', 'other')),
     step                           text NOT NULL CONSTRAINT ck_production_cost_settlement_line_step CHECK (step IN (     -- the posting order of rule 12
                                        'issue_revaluation', 'pool_allocation', 'unabsorbed_overhead', 'abnormal_cost', 'residual_cost', 'wip_transfer', 'receipt_revaluation')),
     company_amount                 types.amount NOT NULL,
-    recorded_at                    timestamptz NOT NULL,
-    PRIMARY KEY (production_cost_settlement_id, cost_object_id, cost_component, step),
-    FOREIGN KEY (company_id, production_cost_settlement_id) REFERENCES production_cost_settlement (company_id, id)
+    recorded_at                    timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_production_cost_settlement_line_key UNIQUE (production_cost_settlement_id, cost_object_id, cost_component, step),
+    FOREIGN KEY (company_id, production_cost_settlement_id) REFERENCES production_cost_settlement (company_id, id),
+    FOREIGN KEY (company_id, cost_object_id) REFERENCES cost_object (company_id, id)   -- company key (ADR-0017 rule 19 note, 2026-11-21)
 );
 CREATE TABLE production_order_period_cost (                -- written only by the job; row source of the cost sheet (rules 12, 16)
+    id                             uuid PRIMARY KEY,   -- uq_production_order_period_cost_key named by hand: the convention name would exceed 63 bytes (ADR-0004 rule 6)
     company_id                     uuid NOT NULL,
     production_order_id            uuid NOT NULL,
-    posting_period_id              uuid NOT NULL REFERENCES posting_period (id),
+    posting_period_id              uuid NOT NULL,
     cost_component                 text NOT NULL CONSTRAINT ck_production_order_period_cost_component CHECK (cost_component IN ('material', 'labor', 'overhead', 'other')),
     opening_amount                 types.amount NOT NULL,      -- company currency, as all amounts of this table
     incurred_amount                types.amount NOT NULL,
@@ -1692,14 +1738,17 @@ CREATE TABLE production_order_period_cost (                -- written only by th
     to_output_amount               types.amount NOT NULL,
     closing_amount                 types.amount NOT NULL,      -- the WIP that INV-106 compares with the balance
     production_cost_settlement_id  uuid NOT NULL,              -- interim: not stated in ADR-0035 (the run that wrote it)
-    recorded_at                    timestamptz NOT NULL,
-    PRIMARY KEY (production_order_id, posting_period_id, cost_component),
+    recorded_at                    timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_production_order_period_cost_key UNIQUE (production_order_id, posting_period_id, cost_component),
     FOREIGN KEY (company_id, production_order_id) REFERENCES production_order (company_id, id),
     FOREIGN KEY (company_id, production_cost_settlement_id) REFERENCES production_cost_settlement (company_id, id),
     -- pool = opening + incurred; it goes to abnormal, residual, outputs, or stays as WIP (rules 8-11)
-    CONSTRAINT ck_production_order_period_cost_balance CHECK (closing_amount = opening_amount + incurred_amount - abnormal_amount - residual_amount - to_output_amount)
+    CONSTRAINT ck_production_order_period_cost_balance CHECK (closing_amount = opening_amount + incurred_amount - abnormal_amount - residual_amount - to_output_amount),
+    FOREIGN KEY (company_id, posting_period_id) REFERENCES posting_period (company_id, id),   -- company key (S2 schema phase A)
+    CONSTRAINT uq_production_order_period_cost_company_key UNIQUE (company_id, production_order_id, posting_period_id, cost_component)   -- target of company keys (ADR-0017 rule 19 note, 2026-11-21); uq_production_order_period_cost_company_key named by hand: the convention name would exceed 63 bytes (ADR-0004 rule 6)
 );
 CREATE TABLE production_order_period_cost_detail (         -- [production] ADR-0072 rule 4; read model written by the job with its parent; sums exactly to it (INV-851)
+    id                        uuid PRIMARY KEY,   -- uq_production_order_period_cost_detail_key named by hand: the convention name would exceed 63 bytes (ADR-0004 rule 6)
     company_id                uuid NOT NULL,
     production_order_id       uuid NOT NULL,
     posting_period_id         uuid NOT NULL,
@@ -1711,10 +1760,9 @@ CREATE TABLE production_order_period_cost_detail (         -- [production] ADR-0
     residual_amount           types.amount NOT NULL DEFAULT 0, -- split by available amount, largest remainder
     to_output_amount          types.amount NOT NULL,           -- the rest per detail
     closing_amount            types.amount NOT NULL,           -- split by available amount, largest remainder
-    recorded_at               timestamptz NOT NULL,
-    PRIMARY KEY (production_order_id, posting_period_id, cost_component_detail_id),
-    CONSTRAINT fk_production_order_period_cost_detail_parent FOREIGN KEY (production_order_id, posting_period_id, cost_component)
-        REFERENCES production_order_period_cost (production_order_id, posting_period_id, cost_component) ON DELETE CASCADE,
+    recorded_at               timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_production_order_period_cost_detail_key UNIQUE (production_order_id, posting_period_id, cost_component_detail_id),
+    CONSTRAINT fk_production_order_period_cost_detail_parent FOREIGN KEY (company_id, production_order_id, posting_period_id, cost_component) REFERENCES production_order_period_cost (company_id, production_order_id, posting_period_id, cost_component) ON DELETE CASCADE,
     FOREIGN KEY (company_id, production_order_id) REFERENCES production_order (company_id, id),
     CONSTRAINT fk_production_order_period_cost_detail_detail FOREIGN KEY (company_id, cost_component_detail_id, cost_component)
         REFERENCES cost_component_detail (company_id, id, cost_component),
@@ -1727,7 +1775,7 @@ CREATE TABLE production_order_period_cost_detail (         -- [production] ADR-0
 -- order's period cost from the function behind GetProductionOrderVariance; read by query.production_variance_overview.
 
 -- ===== Revision immutability (ADR-0033 rules 3, 9; ADR-0035 rule 14) =====
-CREATE FUNCTION production_revision_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION production_revision_guard() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 BEGIN
     IF OLD.state = 'released' THEN RAISE EXCEPTION 'revision_released' USING ERRCODE = 'check_violation'; END IF;
     IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
@@ -1741,7 +1789,7 @@ CREATE TRIGGER trg_cost_estimate_guard BEFORE UPDATE OR DELETE ON cost_estimate
     FOR EACH ROW EXECUTE FUNCTION production_revision_guard();
 -- Content rows of a released parent never change: TG_ARGV[0] is the parent table, TG_ARGV[1] the parent key column.
 -- An update checks the parent the row leaves as well as the one it joins.
-CREATE FUNCTION production_revision_content_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION production_revision_content_guard() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 DECLARE v_state text;
 BEGIN
     IF TG_OP IN ('UPDATE', 'DELETE') THEN
@@ -1773,7 +1821,7 @@ CREATE TRIGGER trg_cost_estimate_sheet_row_guard BEFORE INSERT OR UPDATE OR DELE
 -- proposal item, a routing revision with an unstated setup or run time, and an estimate with a gap or without a
 -- production version are never released, whether updated from draft or inserted as released. The commands refuse
 -- first with the same codes.
-CREATE FUNCTION production_release_readiness_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION production_release_readiness_guard() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 BEGIN
     IF NEW.state = 'released' AND (TG_OP = 'INSERT' OR OLD.state = 'draft') THEN
         IF TG_TABLE_NAME = 'bill_of_materials_revision' THEN
@@ -1800,7 +1848,7 @@ CREATE TRIGGER trg_routing_revision_readiness BEFORE INSERT OR UPDATE ON routing
 CREATE TRIGGER trg_cost_estimate_readiness BEFORE INSERT OR UPDATE ON cost_estimate
     FOR EACH ROW EXECUTE FUNCTION production_release_readiness_guard();
 -- A header names a proposal item only while every revision of it is a draft (ADR-0062 rule 14).
-CREATE FUNCTION bill_of_materials_proposal_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION bill_of_materials_proposal_guard() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 BEGIN
     IF NEW.proposed_change_proposal_item_id IS NOT NULL
        AND EXISTS (SELECT 1 FROM bill_of_materials_revision r WHERE r.bill_of_materials_id = NEW.id AND r.state <> 'draft') THEN
@@ -1823,3 +1871,124 @@ ALTER TABLE production_order ADD CONSTRAINT fk_production_order_cost_object FORE
 --   service_receipt (DS-22, purchasing, ADR-0037 rule 5): typed header with yield_quantity, scrap_quantity, is_final and
 --     lot_id; its generated component lines live in operation_progress_component above.
 --   stock_reservation (DS-42): destination_bin_id and release_sequence passed by production (ADR-0034 rule 9).
+
+-- ===== recorded_at on insert and update; TRUNCATE refused (ADR-0007 rules 9, 16 and their notes) =====
+-- Every table of this file has recorded_at timestamptz NOT NULL DEFAULT now(). The DO block attaches the trigger
+-- trg_<table>_set_recorded_at (function set_recorded_at) to every table of v_tables: BEFORE INSERT OR UPDATE on tables
+-- updated in place, BEFORE INSERT on the append-only tables of v_append_only. recorded_at is so the instant of the last
+-- write, set by the system and never taken from a client (ADR-0007 rule 9 and its notes; S2 adversarial review S2).
+-- Append-only tables are those whose guard trigger refuses every update outside an erasure, and pure logs.
+-- Row guards without UPDATE OF on in-place tables sort before set_recorded_at, so they compare rows before it runs; a
+-- BEFORE INSERT trigger whose function reads NEW.recorded_at sorts after it, so it sees the system's value.
+-- TRUNCATE skips row triggers and row-level security, so every table with company_id, every append-only table and every
+-- table with a BEFORE DELETE guard, unless it has a TRUNCATE trigger of its own, is listed in v_refuse_truncate (default
+-- partitions with their parent) and gets trg_<table>_refuse_truncate (BEFORE TRUNCATE, function refuse_truncate; S2
+-- adversarial review N4; S2 schema review R6-N2). Retention drops partitions and never truncates (ADR-0017 rule 19 note).
+-- Lab gen_overview.py --check compares this section with what schema_phase_b.py writes from the table definitions and
+-- triggers of the design files. The functions are defined in every file because the labs load subsets.
+CREATE OR REPLACE FUNCTION set_recorded_at() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
+BEGIN
+    NEW.recorded_at := now();
+    RETURN NEW;
+END $$;
+CREATE OR REPLACE FUNCTION refuse_truncate() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
+BEGIN
+    RAISE EXCEPTION '% is never truncated (company, append-only or guarded rows)', TG_TABLE_NAME USING ERRCODE = 'restrict_violation';
+END $$;
+DO $$
+DECLARE
+    v_tables            text[] := ARRAY['planning_setting', 'planning_run', 'planning_state', 'production_structure', 'transfer_route',
+        'item_warehouse_planning', 'supplier_item', 'supplier_purchasing_term', 'supplier_item_lead_time', 'sales_history',
+        'demand_event', 'demand_event_window', 'forecast_run', 'forecast_line', 'forecast_adjustment',
+        'demand_supply_line', 'activity_type', 'stop_reason', 'resource_group', 'work_center', 'work_center_activity',
+        'bill_of_materials', 'bill_of_materials_revision', 'bill_of_materials_component', 'bill_of_materials_output',
+        'routing', 'routing_revision', 'routing_operation', 'routing_operation_activity', 'production_version',
+        'item_production_setting', 'item_low_level_code', 'planned_order', 'planned_order_component',
+        'planned_order_operation', 'planned_order_pegging', 'planning_action_message', 'planning_exception',
+        'replenishment_request', 'replenishment_request_line', 'production_order', 'production_order_component',
+        'production_order_output', 'production_order_operation', 'production_order_operation_activity',
+        'operation_execution', 'operation_assignment', 'operation_time_log', 'production_order_output_serial',
+        'production_issue', 'production_issue_line', 'operation_confirmation', 'operation_confirmation_activity',
+        'operation_confirmation_time_log', 'production_receipt', 'production_receipt_line', 'operation_progress_component',
+        'cost_component_detail', 'cost_component_detail_mapping', 'costing_sheet', 'costing_sheet_row',
+        'costing_sheet_base_member', 'costing_sheet_rate', 'site_costing_sheet', 'cost_estimate', 'cost_estimate_line',
+        'cost_estimate_sheet_row', 'cost_estimate_gap', 'activity_rate', 'pool_allocation_rule', 'normal_capacity',
+        'production_cost_settlement', 'production_cost_settlement_line', 'production_order_period_cost',
+        'production_order_period_cost_detail'];
+    v_append_only       text[] := ARRAY[]::text[];
+    v_refuse_truncate   text[] := ARRAY['planning_setting', 'planning_run', 'planning_state', 'production_structure', 'transfer_route',
+        'item_warehouse_planning', 'supplier_item', 'supplier_purchasing_term', 'supplier_item_lead_time', 'sales_history',
+        'demand_event', 'demand_event_window', 'forecast_run', 'forecast_line', 'forecast_adjustment',
+        'demand_supply_line', 'activity_type', 'stop_reason', 'resource_group', 'work_center', 'work_center_activity',
+        'bill_of_materials', 'bill_of_materials_revision', 'bill_of_materials_component', 'bill_of_materials_output',
+        'routing', 'routing_revision', 'routing_operation', 'routing_operation_activity', 'production_version',
+        'item_production_setting', 'item_low_level_code', 'planned_order', 'planned_order_component',
+        'planned_order_operation', 'planned_order_pegging', 'planning_action_message', 'planning_exception',
+        'replenishment_request', 'replenishment_request_line', 'production_order', 'production_order_component',
+        'production_order_output', 'production_order_operation', 'production_order_operation_activity',
+        'operation_execution', 'operation_assignment', 'operation_time_log', 'production_order_output_serial',
+        'production_issue', 'production_issue_line', 'operation_confirmation', 'operation_confirmation_activity',
+        'operation_confirmation_time_log', 'production_receipt', 'production_receipt_line', 'operation_progress_component',
+        'cost_component_detail', 'cost_component_detail_mapping', 'costing_sheet', 'costing_sheet_row',
+        'costing_sheet_base_member', 'costing_sheet_rate', 'site_costing_sheet', 'cost_estimate', 'cost_estimate_line',
+        'cost_estimate_sheet_row', 'cost_estimate_gap', 'activity_rate', 'pool_allocation_rule', 'normal_capacity',
+        'production_cost_settlement', 'production_cost_settlement_line', 'production_order_period_cost',
+        'production_order_period_cost_detail']::text[];
+    v_table             text;
+BEGIN
+    FOREACH v_table IN ARRAY v_tables LOOP
+        CONTINUE WHEN to_regclass(v_table) IS NULL;
+        EXECUTE format('CREATE OR REPLACE TRIGGER %I BEFORE ' || CASE WHEN v_table = ANY (v_append_only) THEN 'INSERT' ELSE 'INSERT OR UPDATE' END
+                       || ' ON %I FOR EACH ROW EXECUTE FUNCTION set_recorded_at()', 'trg_' || v_table || '_set_recorded_at', v_table);
+    END LOOP;
+    FOREACH v_table IN ARRAY v_refuse_truncate LOOP
+        CONTINUE WHEN to_regclass(v_table) IS NULL;
+        EXECUTE format('CREATE OR REPLACE TRIGGER %I BEFORE TRUNCATE ON %I FOR EACH STATEMENT EXECUTE FUNCTION refuse_truncate()',
+                       'trg_' || v_table || '_refuse_truncate', v_table);
+    END LOOP;
+END $$;
+-- ===== end of recorded_at and TRUNCATE =====
+
+-- ===== Row-level security, generated (ADR-0017 rule 19; the rls_v1 helper of ADR-0022 rule 8) =====
+-- Every table of this file with company_id gets ENABLE and FORCE ROW LEVEL SECURITY, the company policy company_policy
+-- (company_id compared as text with nativeflows.company_id, failing closed) and the read-only company_ids_policy for
+-- registered cross-company queries (ADR-0017 rule 19). Tables whose company_id is nullable (v_nullable) show their null
+-- rows only under the setting value installation. Default partitions are listed with their parent. Exceptions are in
+-- lab gen_overview.RLS_ALLOWLIST with their reasons; this file has none.
+-- Lab gen_overview.py --check compares this section with what schema_phase_b.py writes.
+DO $$
+DECLARE
+    v_tables    text[] := ARRAY['planning_setting', 'planning_run', 'planning_state', 'production_structure', 'transfer_route',
+        'item_warehouse_planning', 'supplier_item', 'supplier_purchasing_term', 'supplier_item_lead_time', 'sales_history',
+        'demand_event', 'demand_event_window', 'forecast_run', 'forecast_line', 'forecast_adjustment',
+        'demand_supply_line', 'activity_type', 'stop_reason', 'resource_group', 'work_center', 'work_center_activity',
+        'bill_of_materials', 'bill_of_materials_revision', 'bill_of_materials_component', 'bill_of_materials_output',
+        'routing', 'routing_revision', 'routing_operation', 'routing_operation_activity', 'production_version',
+        'item_production_setting', 'item_low_level_code', 'planned_order', 'planned_order_component',
+        'planned_order_operation', 'planned_order_pegging', 'planning_action_message', 'planning_exception',
+        'replenishment_request', 'replenishment_request_line', 'production_order', 'production_order_component',
+        'production_order_output', 'production_order_operation', 'production_order_operation_activity',
+        'operation_execution', 'operation_assignment', 'operation_time_log', 'production_order_output_serial',
+        'production_issue', 'production_issue_line', 'operation_confirmation', 'operation_confirmation_activity',
+        'operation_confirmation_time_log', 'production_receipt', 'production_receipt_line', 'operation_progress_component',
+        'cost_component_detail', 'cost_component_detail_mapping', 'costing_sheet', 'costing_sheet_row',
+        'costing_sheet_base_member', 'costing_sheet_rate', 'site_costing_sheet', 'cost_estimate', 'cost_estimate_line',
+        'cost_estimate_sheet_row', 'cost_estimate_gap', 'activity_rate', 'pool_allocation_rule', 'normal_capacity',
+        'production_cost_settlement', 'production_cost_settlement_line', 'production_order_period_cost',
+        'production_order_period_cost_detail'];
+    v_nullable  text[] := ARRAY[]::text[];
+    v_table     text;
+BEGIN
+    FOREACH v_table IN ARRAY v_tables LOOP
+        EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', v_table);
+        EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', v_table);
+        IF v_table = ANY (v_nullable) THEN
+            EXECUTE format('CREATE POLICY company_policy ON %I USING (company_id::text = current_setting(''nativeflows.company_id'', true)'
+                           ' OR (company_id IS NULL AND current_setting(''nativeflows.company_id'', true) = ''installation''))', v_table);
+        ELSE
+            EXECUTE format('CREATE POLICY company_policy ON %I USING (company_id::text = current_setting(''nativeflows.company_id'', true))', v_table);
+        END IF;
+        EXECUTE format('CREATE POLICY company_ids_policy ON %I FOR SELECT USING (company_id::text = ANY (string_to_array(current_setting(''nativeflows.company_ids'', true), '','')))', v_table);
+    END LOOP;
+END $$;
+-- ===== end of row-level security =====

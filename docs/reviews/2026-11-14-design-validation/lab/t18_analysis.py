@@ -43,7 +43,7 @@ from decimal import ROUND_HALF_UP, Decimal as D
 HERE = os.path.dirname(os.path.abspath(__file__))
 LAB = os.environ.get("NATIVEFLOWS_LAB_DIR", HERE)
 sys.path.insert(0, LAB)
-from lab import RESULTS, conn, expect, new  # noqa: E402
+from lab import RESULTS, conn, expect, new, ins_system_account, ins_account, ins_fiscal_year, ins_posting_period, ins_area_state  # noqa: E402
 
 DOCS = os.path.expanduser(os.environ.get("NATIVEFLOWS_DOCS", "~/Projects/NativeFlows/docs"))
 CAT = os.path.join(DOCS, "catalogs")
@@ -1893,19 +1893,24 @@ if "--load" in sys.argv:
     for code in ("cash_on_hand", "revenue_goods", "revenue_services", "revenue_deduction_return", "selling_expense", "cost_of_goods_sold",
                  "income_summary", "opening_balance_clearing"):
         SAX[code] = new()
-        X("insert into system_account (id, code, control_kind) values (%s,%s,'none')", (SAX[code], code + ":" + t))
+        ins_system_account(X, SAX[code], code + "__" + t)   # '__' separates the lab suffix: catalog codes are snake_case (ADR-0010 rule 2)
     ACC = {}
     for acode, sa in (("CASH", "cash_on_hand"), ("REV-G1", "revenue_goods"), ("REV-G2", "revenue_goods"), ("REV-S", "revenue_services"),
                       ("DED-R", "revenue_deduction_return"), ("SELL", "selling_expense"), ("COGS", "cost_of_goods_sold"), ("ISUM", "income_summary"),
                       ("OBC", "opening_balance_clearing")):
         ACC[acode] = (new(), sa)
-        X("insert into account (id, company_id, code, system_account_id) values (%s,%s,%s,%s)", (ACC[acode][0], I["co"], acode, SAX[sa]))
-    X("insert into fiscal_year (id, company_id) values (%s,%s), (%s,%s)", (I["fy"], I["co"], I["fym"], I["co"]))
-    for k, fy, kind, a, b in (("mig", "fym", "regular", "2026-09-30", "2026-09-30"), ("oct", "fy", "regular", "2026-10-01", "2026-10-31"),
-                              ("nov", "fy", "regular", "2026-11-01", "2026-11-30"), ("spc", "fy", "special", "2026-11-30", "2026-11-30")):
-        X("insert into posting_period (id, company_id, fiscal_year_id, kind, start_date, end_date) values (%s,%s,%s,%s,%s,%s)", (I[k], I["co"], I[fy], kind, a, b))
+        ins_account(X, ACC[acode][0], I["co"], acode, SAX[sa])
+    ins_fiscal_year(X, I["fym"], I["co"], "M2026", "2026-09-30", "2026-09-30", is_migration=True)
+    ins_fiscal_year(X, I["fy"], I["co"], "2026", "2026-10-01", "2026-11-30")   # a short lab year: October and November
+    for k, fy, n, kind, a, b in (("mig", "fym", 1, "regular", "2026-09-30", "2026-09-30"), ("oct", "fy", 1, "regular", "2026-10-01", "2026-10-31"),
+                                 ("nov", "fy", 2, "regular", "2026-11-01", "2026-11-30"), ("spc", "fy", 3, "special", "2026-11-30", "2026-11-30")):
+        ins_posting_period(X, I[k], I["co"], I[fy], n, a, b, kind)
+        if kind == "special":   # ADR-0012 rules 4, 6 (enforced since the adversarial fourth pass, F4-1): general only, created soft_locked,
+            ins_area_state(X, I["co"], I[k], "general", "soft_locked")   # then opened (OpenPostingPeriod) so the lab can post into it
+            X("update posting_period_area_state set state = 'open' where posting_period_id = %s", (I[k],))
+            continue
         for area in ("general", "inventory", "receivable", "payable"):
-            X("insert into posting_period_area_state (posting_period_id, area, state) values (%s,%s,'open')", (I[k], area))
+            ins_area_state(X, I["co"], I[k], area, "open")
     has_snap = "uom_numerator" in cols["sales_invoice_line"]
 
     def post(dtype, day, branch, partner, lines, currency="VND", invoice=None, period=None, closing=False, creator="user"):
@@ -1930,9 +1935,9 @@ if "--load" in sys.argv:
               " values (%s,%s,%s,%s,%s,%s,%s,%s,%s)", (e, I["co"], d, day, day, period, fy, len(lines), closing))
             for n, (acode, side, tamt, camt, item) in enumerate(lines, 1):
                 aid, sa = ACC[acode]
-                X("""insert into journal_line (id, journal_entry_id, company_id, line_number, posting_period_id, account_id, system_account_id, side, transaction_currency,
-                     transaction_amount, company_currency, company_amount, branch_id, partner_id, item_id) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'VND',%s,%s,%s,%s)""",
-                  (new(), e, I["co"], n, period, aid, SAX[sa], side, currency if acode in ("CASH", "REV-S") else "VND", tamt, camt, I[branch],
+                X("""insert into journal_line (id, journal_entry_id, company_id, line_number, posting_period_id, posting_date, fiscal_year_id, account_id, system_account_id, side,
+                     transaction_currency, transaction_amount, company_currency, company_amount, branch_id, partner_id, item_id) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'VND',%s,%s,%s,%s)""",
+                  (new(), e, I["co"], n, period, day, fy, aid, SAX[sa], side, currency if acode in ("CASH", "REV-S") else "VND", tamt, camt, I[branch],
                    I[partner] if partner else None, I[item] if item else None))
         return d
 
@@ -1973,7 +1978,7 @@ if "--load" in sys.argv:
              FROM nativeflows.posting_period p WHERE p.company_id::text = current_setting('nativeflows.company_id', true)""")
         X(f"""CREATE VIEW query.journal_line_overview WITH (security_barrier) AS
               SELECT jl.id, jl.company_id, je.document_id, d.document_type, d.number AS document_number, je.posting_date, jl.posting_period_id, pd.seq AS period_seq,
-                     split_part(sa.code, ':', 1) AS system_account_code, lsa.path AS system_account_path, jl.account_id, jl.partner_id, p.partner_group_id,
+                     split_part(sa.code, '__', 1) AS system_account_code, lsa.path AS system_account_path, jl.account_id, jl.partner_id, p.partner_group_id,
                      jl.salesperson_id, jl.item_id, it.product_id, pr.item_group_id, jl.warehouse_id, jl.branch_id, jl.cost_center_id, jl.project_id,
                      jl.transaction_currency, jl.side, jl.company_amount, jl.transaction_amount, 'journal_line'::text AS row_source,
                      je.is_closing_entry, (je.fiscal_year_id IN (SELECT id FROM query.lab_migration_fiscal_year)) AS is_migration_entry,
@@ -1981,18 +1986,18 @@ if "--load" in sys.argv:
                      {grant_sql('journal_line_overview', 'jl.branch_id', 'd.created_by_user_id')} AS is_in_scope
               FROM nativeflows.journal_line jl JOIN nativeflows.journal_entry je ON je.id = jl.journal_entry_id JOIN nativeflows.document d ON d.id = je.document_id
               JOIN query.posting_period_dimension pd ON pd.key = jl.posting_period_id::text
-              JOIN nativeflows.system_account sa ON sa.id = jl.system_account_id JOIN query.lab_system_account lsa ON lsa.code = split_part(sa.code, ':', 1)
+              JOIN nativeflows.system_account sa ON sa.id = jl.system_account_id JOIN query.lab_system_account lsa ON lsa.code = split_part(sa.code, '__', 1)
               LEFT JOIN nativeflows.partner p ON p.id = jl.partner_id LEFT JOIN nativeflows.item it ON it.id = jl.item_id LEFT JOIN nativeflows.product pr ON pr.id = it.product_id
               WHERE d.state IN ('posted', 'reversed') AND jl.company_id::text = current_setting('nativeflows.company_id', true)
               UNION ALL   -- opening_turnover rows (ADR-0049 rule 14; ADR-0060 rule 3): no document, owner or branch
               SELECT ot.id, ot.company_id, NULL::uuid, NULL::text, NULL::text, ot.end_date, NULL::uuid, NULL::bigint,
-                     split_part(sa.code, ':', 1), lsa.path, ot.account_id, NULL::uuid, NULL::uuid, NULL::uuid, NULL::uuid, NULL::uuid, NULL::uuid, NULL::uuid,
+                     split_part(sa.code, '__', 1), lsa.path, ot.account_id, NULL::uuid, NULL::uuid, NULL::uuid, NULL::uuid, NULL::uuid, NULL::uuid, NULL::uuid,
                      NULL::uuid, NULL::uuid, NULL::uuid, NULL::text, NULL::text, ot.company_debit_turnover - ot.company_credit_turnover,
                      ot.company_debit_turnover - ot.company_credit_turnover, 'opening_turnover'::text, false, false, false, NULL::uuid,
                      coalesce((SELECT g ->> 'owner' = 'company' AND NOT (g ? 'branches')
                                FROM (SELECT nullif(current_setting('nativeflows.read_grants', true), '')::jsonb -> 'journal_line_overview' AS g) s WHERE g IS NOT NULL), false)
               FROM nativeflows.opening_turnover ot JOIN nativeflows.account a ON a.id = ot.account_id JOIN nativeflows.system_account sa ON sa.id = a.system_account_id
-              JOIN query.lab_system_account lsa ON lsa.code = split_part(sa.code, ':', 1)
+              JOIN query.lab_system_account lsa ON lsa.code = split_part(sa.code, '__', 1)
               WHERE ot.company_id::text = current_setting('nativeflows.company_id', true)""")
         X(f"""CREATE VIEW query.sales_line_overview WITH (security_barrier) AS
               SELECT l.id, l.company_id, d.id AS document_id, d.document_type, si.posting_date, si.document_date, si.partner_id, p.partner_group_id,
@@ -2004,12 +2009,12 @@ if "--load" in sys.argv:
               WHERE d.state IN ('posted', 'reversed') AND l.company_id::text = current_setting('nativeflows.company_id', true)""")
         X(f"""CREATE VIEW query.system_account_turnover WITH (security_barrier) AS
               WITH t AS (SELECT jl.company_id, jl.posting_period_id, pd.end_date AS period_end, pd.seq AS period_seq, pd.fiscal_year_id,
-                                (pd.kind = 'special') AS is_special_period, split_part(sa.code, ':', 1) AS system_account_code,
+                                (pd.kind = 'special') AS is_special_period, split_part(sa.code, '__', 1) AS system_account_code,
                                 lsa.path AS system_account_path, jl.branch_id, jl.cost_center_id, jl.project_id, jl.transaction_currency,
                                 sum(jl.company_amount) AS company_net_turnover
                          FROM nativeflows.journal_line jl JOIN nativeflows.journal_entry je ON je.id = jl.journal_entry_id JOIN nativeflows.document d ON d.id = je.document_id
                          JOIN query.posting_period_dimension pd ON pd.key = jl.posting_period_id::text
-                         JOIN nativeflows.system_account sa ON sa.id = jl.system_account_id JOIN query.lab_system_account lsa ON lsa.code = split_part(sa.code, ':', 1)
+                         JOIN nativeflows.system_account sa ON sa.id = jl.system_account_id JOIN query.lab_system_account lsa ON lsa.code = split_part(sa.code, '__', 1)
                          WHERE d.state IN ('posted', 'reversed') AND jl.company_id::text = current_setting('nativeflows.company_id', true)
                          GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12)
               SELECT t.*, sum(company_net_turnover) OVER (PARTITION BY system_account_code, branch_id, cost_center_id, project_id, transaction_currency
@@ -2052,7 +2057,7 @@ if "--load" in sys.argv:
                     join account a on a.id = jl.account_id join system_account sa on sa.id = a.system_account_id join posting_period pp on pp.id = jl.posting_period_id
                     where jl.company_id = %s and je.posting_date between %s and %s and je.fiscal_year_id <> %s
                       and (not %s or not je.is_closing_entry) and (%s or pp.kind <> 'special')
-                      and ('/' || (select path from query.lab_system_account where code = split_part(sa.code, ':', 1)) || '/') like %s
+                      and ('/' || (select path from query.lab_system_account where code = split_part(sa.code, '__', 1)) || '/') like %s
                     group by a.code""", (I["co"], frm, to, I["fym"], closing_exclude, special, f"%/{subtree}/%")).fetchall()
         return rows if accounts_only else sum((r[1] for r in rows), D(0))
 

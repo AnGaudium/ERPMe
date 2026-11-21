@@ -46,7 +46,7 @@ The author's decision of 2026-11-17: a **business unit** splits activity into li
    - **Sales lines** have no line unit in Phase 1: the product and the header decide. A generic service product left without a unit lets the header decide.
    - **Explicit unit as input.** An explicit unit on a document line is an input to the derivation. It is applied to the profit-and-loss lines that the document line produces, and the balance-sheet lines of the same posting carry none. (review note, 2026-11-21)
 
-    Note ([ADR-0075](0075-stock-documents.md), proposed 2026-11-19): the headers of `stock_count`, `scrap`, `internal_consumption`, `other_receipt` and `other_issue` (ADR-0075) may name a business unit like the other document headers, set by a person or an agent; `stock_transfer` has none, because it posts no profit-and-loss line.
+    Note ([ADR-0075](0075-stock-documents.md), 2026-11-21): the headers of `stock_count`, `scrap`, `internal_consumption`, `other_receipt` and `other_issue` (ADR-0075) may name a business unit like the other document headers, set by a person or an agent; `stock_transfer` has none, because it posts no profit-and-loss line.
 
 **The derivation**
 
@@ -159,7 +159,7 @@ The author's decision of 2026-11-17: a **business unit** splits activity into li
 
 ## Documents updated
 
-- **ADRs** (notes tagged "ADR-0069, proposed 2026-11-17"): ADR-0014 rules 1, 9; ADR-0015 rule 3; ADR-0012 rule 18; ADR-0018 rule 3; ADR-0022 rule 2; ADR-0027 rule 4; ADR-0045 rule 9; ADR-0047 rule 2; ADR-0048 rule 15; ADR-0050 rule 53; ADR-0060 rule 34; ADR-0063 rules 1, 29.
+- **ADRs** (notes tagged "ADR-0069, 2026-11-21"): ADR-0014 rules 1, 9; ADR-0015 rule 3; ADR-0012 rule 18; ADR-0018 rule 3; ADR-0022 rule 2; ADR-0027 rule 4; ADR-0045 rule 9; ADR-0047 rule 2; ADR-0048 rule 15; ADR-0050 rule 53; ADR-0060 rule 34; ADR-0063 rules 1, 29.
 - **Catalogs:** [settings.csv](../catalogs/settings.csv), [analysis-dimensions.csv](../catalogs/analysis-dimensions.csv), [authorization-areas.csv](../catalogs/authorization-areas.csv), [invariants.csv](../catalogs/invariants.csv), [edge-cases.csv](../catalogs/edge-cases.csv).
 - **Design files:** DS-20, DS-06, DS-22-09-42, DS-05, DS-28 (rule 19); [DS-04-command-envelope.md](../design/DS-04-command-envelope.md) (errors, check result); DS-16, DS-17; the architecture overview and core; [backlog.md](../design/backlog.md) (the two seams).
 - **Glossary:** [00-reading-guide.md](../spec/00-reading-guide.md): business unit, business unit source.

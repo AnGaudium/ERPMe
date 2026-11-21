@@ -21,10 +21,11 @@
 
 -- ===== E-mail domains [crm] (ADR-0052 rule 5) =====
 CREATE TABLE public_mail_domain (                          -- global catalog: core rows plus the active package's rows
-    domain        text PRIMARY KEY CONSTRAINT ck_public_mail_domain_domain CHECK (domain ~ '^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$'),
+    id            uuid PRIMARY KEY,   -- uuid5(f244ce09-3c6c-4c82-af14-918bdeca6be3, 'public_mail_domain:<domain>'), computed by the loader (registry E2, ADR-0006 rule 1 note)
+    domain        text NOT NULL CONSTRAINT uq_public_mail_domain_domain UNIQUE CONSTRAINT ck_public_mail_domain_domain CHECK (domain ~ '^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$'),
     source        text NOT NULL CONSTRAINT ck_public_mail_domain_source CHECK (source IN ('core', 'package')),
     package_code  text,
-    recorded_at   timestamptz NOT NULL,
+    recorded_at   timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT ck_public_mail_domain_package CHECK ((source = 'package') = (package_code IS NOT NULL))
 );
 CREATE TABLE partner_email_domain (                        -- a public mail domain is refused by the command (public_mail_domain)
@@ -34,7 +35,7 @@ CREATE TABLE partner_email_domain (                        -- a public mail doma
     domain       text CONSTRAINT ck_partner_email_domain_domain CHECK (domain ~ '^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$'),
     is_active    boolean NOT NULL DEFAULT true,
     erased_at    timestamptz,                                -- an individual partner's domain is personal (rules 25, 29)
-    recorded_at  timestamptz NOT NULL,
+    recorded_at  timestamptz NOT NULL DEFAULT now(),
     UNIQUE (partner_id, domain),
     FOREIGN KEY (company_id, partner_id) REFERENCES partner (company_id, id),
     CONSTRAINT ck_partner_email_domain_erased CHECK ((domain IS NOT NULL OR erased_at IS NOT NULL) AND (erased_at IS NULL OR NOT is_active))
@@ -67,7 +68,7 @@ CREATE TABLE mailbox (
     consecutive_failure_count   integer NOT NULL DEFAULT 0 CONSTRAINT ck_mailbox_consecutive_failure_count CHECK (consecutive_failure_count >= 0),
     is_active                   boolean NOT NULL DEFAULT true,
     version                     integer NOT NULL DEFAULT 1,
-    recorded_at                 timestamptz NOT NULL,
+    recorded_at                 timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, code),
     UNIQUE (company_id, email_address),
     UNIQUE (company_id, id),
@@ -93,7 +94,7 @@ CREATE TABLE interaction (                                 -- append-only except
     assignee_user_id  uuid REFERENCES user_account (id),     -- tasks only
     erased_at         timestamptz,
     version           integer NOT NULL DEFAULT 1,
-    recorded_at       timestamptz NOT NULL,
+    recorded_at       timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     UNIQUE (company_id, id, partner_id),                     -- links carry the interaction's partner (rule 9)
     FOREIGN KEY (company_id, partner_id) REFERENCES partner (company_id, id),
@@ -110,11 +111,12 @@ CREATE TABLE interaction (                                 -- append-only except
 CREATE INDEX ix_interaction_company_id_partner_id_occurred_at ON interaction (company_id, partner_id, occurred_at DESC) WHERE partner_id IS NOT NULL;
 CREATE INDEX ix_interaction_company_id_occurred_at ON interaction (company_id, occurred_at) WHERE partner_id IS NULL;
 CREATE TABLE interaction_content (                         -- personal; untrusted when the interaction is
-    interaction_id  uuid PRIMARY KEY,
+    id              uuid PRIMARY KEY,
+    interaction_id  uuid NOT NULL CONSTRAINT uq_interaction_content_interaction_id UNIQUE,
     company_id      uuid NOT NULL,
     body_text       text,                                    -- plain text; HTML is converted by a sanitizer, never stored
     erased_at       timestamptz,
-    recorded_at     timestamptz NOT NULL,
+    recorded_at     timestamptz NOT NULL DEFAULT now(),
     FOREIGN KEY (company_id, interaction_id) REFERENCES interaction (company_id, id)
 );
 CREATE TABLE interaction_participant (
@@ -127,7 +129,7 @@ CREATE TABLE interaction_participant (
     contact_id       uuid,
     user_account_id  uuid REFERENCES user_account (id),
     erased_at        timestamptz,
-    recorded_at      timestamptz NOT NULL,
+    recorded_at      timestamptz NOT NULL DEFAULT now(),
     FOREIGN KEY (company_id, interaction_id) REFERENCES interaction (company_id, id),
     FOREIGN KEY (company_id, contact_id) REFERENCES contact (company_id, id),
     CONSTRAINT ck_interaction_participant_identity CHECK (erased_at IS NOT NULL OR num_nonnulls(email_address, contact_id, user_account_id) > 0)
@@ -160,7 +162,7 @@ CREATE TABLE inbound_message (                             -- append-only except
     is_canonical                     boolean GENERATED ALWAYS AS (duplicate_of_inbound_message_id IS NULL AND NOT is_own_message) STORED,
     duplicate_target_canonical       boolean GENERATED ALWAYS AS (CASE WHEN duplicate_of_inbound_message_id IS NOT NULL THEN true END) STORED,
     erased_at                        timestamptz,
-    recorded_at                      timestamptz NOT NULL,
+    recorded_at                      timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, mailbox_id, provider_message_key),
     UNIQUE (company_id, id),
     UNIQUE (company_id, id, interaction_id, message_id_hash, content_hash, is_canonical),
@@ -179,14 +181,15 @@ CREATE UNIQUE INDEX ux_inbound_message_natural_key ON inbound_message (company_i
 CREATE INDEX ix_inbound_message_interaction_id ON inbound_message (interaction_id);
 CREATE INDEX ix_inbound_message_company_id_sender_address ON inbound_message (company_id, sender_address) WHERE sender_address IS NOT NULL;
 CREATE TABLE interaction_match_candidate (                 -- evidence for a person, never a match; replaced on UnmatchInteraction (rule 15)
+    id              uuid PRIMARY KEY,
     company_id      uuid NOT NULL,
     interaction_id  uuid NOT NULL,
     partner_id      uuid NOT NULL,
     reason          text NOT NULL CONSTRAINT ck_interaction_match_candidate_reason CHECK (reason IN ('several_partners', 'contact_email_unauthenticated', 'domain_unauthenticated', 'tax_id_in_content', 'name_similarity')),
     score           numeric(5,4) CONSTRAINT ck_interaction_match_candidate_score CHECK (score IS NULL OR score BETWEEN 0 AND 1),
     rank            smallint NOT NULL CONSTRAINT ck_interaction_match_candidate_rank CHECK (rank BETWEEN 1 AND 10),
-    recorded_at     timestamptz NOT NULL,
-    PRIMARY KEY (interaction_id, partner_id),                -- one row per partner, with its best reason
+    recorded_at     timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_interaction_match_candidate_interaction_id_partner_id UNIQUE (interaction_id, partner_id),                -- one row per partner, with its best reason
     UNIQUE (interaction_id, rank),                           -- order: reason as listed, score descending, partner code
     FOREIGN KEY (company_id, interaction_id) REFERENCES interaction (company_id, id),
     FOREIGN KEY (company_id, partner_id) REFERENCES partner (company_id, id)
@@ -208,7 +211,7 @@ CREATE TABLE complaint (
     resolution_note        text,
     erased_at              timestamptz,
     version                integer NOT NULL DEFAULT 1,
-    recorded_at            timestamptz NOT NULL,
+    recorded_at            timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     UNIQUE (company_id, id, partner_id),                     -- links carry the complaint's partner (rule 9)
     FOREIGN KEY (company_id, partner_id) REFERENCES partner (company_id, id),
@@ -220,12 +223,13 @@ CREATE TABLE complaint (
 );
 CREATE INDEX ix_complaint_company_id_partner_id ON complaint (company_id, partner_id) WHERE state = 'open';
 CREATE TABLE complaint_document (                          -- links, never copies (rule 9); the document's partner is the command's check
+    id            uuid PRIMARY KEY,
     company_id    uuid NOT NULL,
     complaint_id  uuid NOT NULL,
     partner_id    uuid NOT NULL,                             -- the complaint's partner
     document_id   uuid NOT NULL,
-    recorded_at   timestamptz NOT NULL,
-    PRIMARY KEY (complaint_id, document_id),
+    recorded_at   timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_complaint_document_complaint_id_document_id UNIQUE (complaint_id, document_id),
     CONSTRAINT fk_complaint_document_complaint FOREIGN KEY (company_id, complaint_id, partner_id) REFERENCES complaint (company_id, id, partner_id),
     FOREIGN KEY (company_id, document_id) REFERENCES document (company_id, id)
 );
@@ -237,7 +241,7 @@ CREATE TABLE interaction_link (                            -- links, never copie
     partner_id      uuid NOT NULL,                           -- the interaction's partner; a complaint target must have it too
     document_id     uuid,
     complaint_id    uuid,
-    recorded_at     timestamptz NOT NULL,
+    recorded_at     timestamptz NOT NULL DEFAULT now(),
     UNIQUE NULLS NOT DISTINCT (interaction_id, document_id, complaint_id),
     -- the interaction is matched to this partner; UnmatchInteraction and MatchInteraction cannot move it under a link
     CONSTRAINT fk_interaction_link_interaction FOREIGN KEY (company_id, interaction_id, partner_id) REFERENCES interaction (company_id, id, partner_id),
@@ -258,7 +262,7 @@ CREATE TABLE processing_purpose (                          -- company data seede
                              CHECK (message_types <@ ARRAY['reply', 'document', 'payment_reminder', 'follow_up', 'marketing', 'general']::text[]),
     basis                jsonb NOT NULL,                     -- set by the command; {"source": "core_template"} for the core template (rule 22)
     is_active            boolean NOT NULL DEFAULT true,
-    recorded_at          timestamptz NOT NULL,
+    recorded_at          timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, code),
     UNIQUE (company_id, id)
 );
@@ -273,7 +277,7 @@ CREATE TABLE processing_basis (                            -- append-only; ended
     ended_at                 timestamptz,
     end_reason               text CONSTRAINT ck_processing_basis_end_reason CHECK (end_reason IN ('withdrawn', 'purpose_ended', 'erased')),
     evidence_interaction_id  uuid,
-    recorded_at              timestamptz NOT NULL,
+    recorded_at              timestamptz NOT NULL DEFAULT now(),
     FOREIGN KEY (company_id, contact_id) REFERENCES contact (company_id, id),
     FOREIGN KEY (company_id, partner_id) REFERENCES partner (company_id, id),
     FOREIGN KEY (company_id, processing_purpose_id) REFERENCES processing_purpose (company_id, id),
@@ -286,6 +290,7 @@ CREATE TABLE processing_basis (                            -- append-only; ended
 CREATE UNIQUE INDEX ux_processing_basis_current ON processing_basis (company_id, processing_purpose_id, lawful_basis, contact_id, partner_id) NULLS NOT DISTINCT
     WHERE ended_at IS NULL;
 CREATE TABLE data_subject_request_content (                -- personal text of a request, outside the header and the version (rule 24)
+    id                       uuid PRIMARY KEY,   -- uq_data_subject_request_content_key named by hand: the convention name would exceed 63 bytes (ADR-0004 rule 6)
     company_id               uuid NOT NULL,
     data_subject_request_id  uuid NOT NULL,
     content_hash             text NOT NULL CONSTRAINT ck_data_subject_request_content_hash CHECK (content_hash ~ '^[0-9a-f]{64}$'),
@@ -296,8 +301,8 @@ CREATE TABLE data_subject_request_content (                -- personal text of a
     outcome_note             text,
     identity_proof_hash      text CONSTRAINT ck_data_subject_request_content_proof CHECK (identity_proof_hash ~ '^[0-9a-f]{64}$'),   -- kept after erasure
     erased_at                timestamptz,
-    recorded_at              timestamptz NOT NULL,
-    PRIMARY KEY (company_id, data_subject_request_id, content_hash),
+    recorded_at              timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_data_subject_request_content_key UNIQUE (company_id, data_subject_request_id, content_hash),
     CONSTRAINT ck_data_subject_request_content_salt_kept CHECK (content_salt IS NOT NULL OR erased_at IS NOT NULL),
     FOREIGN KEY (company_id, data_subject_request_id) REFERENCES document (company_id, id)
 );
@@ -310,7 +315,7 @@ CREATE TABLE data_subject_request (                        -- typed header of a 
     origin_interaction_id  uuid,
     due_date               date NOT NULL,                    -- package rule, flagged; core default 30 calendar days (rule 24)
     content_hash           text NOT NULL,
-    recorded_at            timestamptz NOT NULL,
+    recorded_at            timestamptz NOT NULL DEFAULT now(),
     FOREIGN KEY (company_id, id) REFERENCES document (company_id, id),
     CONSTRAINT fk_data_subject_request_content FOREIGN KEY (company_id, id, content_hash)
         REFERENCES data_subject_request_content (company_id, data_subject_request_id, content_hash),
@@ -322,6 +327,7 @@ CREATE TABLE data_subject_request (                        -- typed header of a 
 
 -- ===== Outgoing messages [crm] (ADR-0052 rules 27-28) =====
 CREATE TABLE outbound_message_content (                    -- subject and body, outside the header and the version (rule 27)
+    id                   uuid PRIMARY KEY,   -- uq_outbound_message_content_key named by hand: the convention name would exceed 63 bytes (ADR-0004 rule 6)
     company_id           uuid NOT NULL,
     outbound_message_id  uuid NOT NULL,
     content_hash         text NOT NULL CONSTRAINT ck_outbound_message_content_hash CHECK (content_hash ~ '^[0-9a-f]{64}$'),
@@ -329,8 +335,8 @@ CREATE TABLE outbound_message_content (                    -- subject and body, 
     subject              text,
     body_text            text,
     erased_at            timestamptz,
-    recorded_at          timestamptz NOT NULL,
-    PRIMARY KEY (company_id, outbound_message_id, content_hash),
+    recorded_at          timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_outbound_message_content_key UNIQUE (company_id, outbound_message_id, content_hash),
     CONSTRAINT ck_outbound_message_content_salt_kept CHECK (content_salt IS NOT NULL OR erased_at IS NOT NULL),
     FOREIGN KEY (company_id, outbound_message_id) REFERENCES document (company_id, id)
 );
@@ -345,7 +351,7 @@ CREATE TABLE outbound_message (                            -- typed header of a 
     in_reply_to_interaction_id  uuid,
     message_id                  text NOT NULL,               -- <UUIDv7@mailbox domain>, made at Create and kept on every attempt
     message_id_hash             text NOT NULL CONSTRAINT ck_outbound_message_message_id_hash CHECK (message_id_hash ~ '^[0-9a-f]{64}$'),
-    recorded_at                 timestamptz NOT NULL,
+    recorded_at                 timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     UNIQUE (company_id, id, partner_id),
     UNIQUE (company_id, message_id_hash),
@@ -357,13 +363,14 @@ CREATE TABLE outbound_message (                            -- typed header of a 
     FOREIGN KEY (company_id, in_reply_to_interaction_id) REFERENCES interaction (company_id, id)
 );
 CREATE TABLE outbound_message_recipient (                  -- only contacts of the message's partner, held by the two composite keys
+    id                   uuid PRIMARY KEY,
     company_id           uuid NOT NULL,
     outbound_message_id  uuid NOT NULL,
     partner_id           uuid NOT NULL,
     contact_id           uuid NOT NULL,
     role                 text NOT NULL CONSTRAINT ck_outbound_message_recipient_role CHECK (role IN ('to', 'cc', 'bcc')),
-    recorded_at          timestamptz NOT NULL,
-    PRIMARY KEY (outbound_message_id, contact_id),
+    recorded_at          timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_outbound_message_recipient_outbound_message_id_contact_id UNIQUE (outbound_message_id, contact_id),
     CONSTRAINT fk_outbound_message_recipient_message FOREIGN KEY (company_id, outbound_message_id, partner_id)
         REFERENCES outbound_message (company_id, id, partner_id),
     CONSTRAINT fk_outbound_message_recipient_contact FOREIGN KEY (company_id, partner_id, contact_id)
@@ -382,7 +389,7 @@ CREATE TABLE outbound_message_delivery (                   -- late data of ADR-0
     interaction_id       uuid,                                -- the outbound interaction recorded when sent
     failure_reason       text,                                -- personal: server replies may name addresses; blanked by erasure
     erased_at            timestamptz,
-    recorded_at          timestamptz NOT NULL,
+    recorded_at          timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     UNIQUE (outbound_message_id, attempt_number),
     FOREIGN KEY (company_id, outbound_message_id) REFERENCES outbound_message (company_id, id),
@@ -399,14 +406,15 @@ CREATE TABLE outbound_message_delivery (                   -- late data of ADR-0
 CREATE UNIQUE INDEX ux_outbound_message_delivery_open ON outbound_message_delivery (outbound_message_id) WHERE outcome IS NULL;
 CREATE UNIQUE INDEX ux_outbound_message_delivery_sent ON outbound_message_delivery (outbound_message_id) WHERE outcome = 'sent';
 CREATE TABLE outbound_message_delivery_recipient (         -- the addresses used by one attempt, copied at send; personal
+    id                            uuid PRIMARY KEY,   -- uq_outbound_message_delivery_recipient_key named by hand: the convention name would exceed 63 bytes (ADR-0004 rule 6)
     company_id                    uuid NOT NULL,
     outbound_message_delivery_id  uuid NOT NULL,
     contact_id                    uuid NOT NULL,
     role                          text NOT NULL CONSTRAINT ck_outbound_message_delivery_recipient_role CHECK (role IN ('to', 'cc', 'bcc')),
     email_address                 text,
     erased_at                     timestamptz,
-    recorded_at                   timestamptz NOT NULL,
-    PRIMARY KEY (outbound_message_delivery_id, contact_id),
+    recorded_at                   timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_outbound_message_delivery_recipient_key UNIQUE (outbound_message_delivery_id, contact_id),
     FOREIGN KEY (company_id, outbound_message_delivery_id) REFERENCES outbound_message_delivery (company_id, id),
     FOREIGN KEY (company_id, contact_id) REFERENCES contact (company_id, id),
     CONSTRAINT ck_outbound_message_delivery_recipient_address CHECK (email_address IS NOT NULL OR erased_at IS NOT NULL)
@@ -426,7 +434,7 @@ CREATE TABLE interaction_summary (                         -- an agent's summary
     is_untrusted       boolean NOT NULL,
     edited_by_user_id  uuid REFERENCES user_account (id),
     erased_at          timestamptz,
-    recorded_at        timestamptz NOT NULL,
+    recorded_at        timestamptz NOT NULL DEFAULT now(),
     FOREIGN KEY (company_id, partner_id) REFERENCES partner (company_id, id),
     FOREIGN KEY (company_id, interaction_id) REFERENCES interaction (company_id, id)
 );
@@ -440,7 +448,7 @@ CREATE TABLE partner_insight (                             -- computed by RunPar
     method             text NOT NULL,
     computed_date      date NOT NULL,
     edited_by_user_id  uuid REFERENCES user_account (id),    -- set by UpdatePartnerInsight; the job keeps an edited value
-    recorded_at        timestamptz NOT NULL,
+    recorded_at        timestamptz NOT NULL DEFAULT now(),
     UNIQUE (partner_id, name),
     FOREIGN KEY (company_id, partner_id) REFERENCES partner (company_id, id)
 );
@@ -453,16 +461,17 @@ CREATE TABLE partner_tax_lookup (                          -- dated snapshot of 
     looked_up_at  timestamptz NOT NULL,
     result        jsonb,
     erased_at     timestamptz,
-    recorded_at   timestamptz NOT NULL,
+    recorded_at   timestamptz NOT NULL DEFAULT now(),
     FOREIGN KEY (company_id, partner_id) REFERENCES partner (company_id, id),
     CONSTRAINT ck_partner_tax_lookup_tax_id CHECK (tax_id IS NOT NULL OR erased_at IS NOT NULL)
 );
 CREATE TABLE partner_search_key (                          -- kept by crm's consumer of partner and contact events; deleted by erasure
-    partner_id         uuid PRIMARY KEY,
+    id                 uuid PRIMARY KEY,
+    partner_id         uuid NOT NULL CONSTRAINT uq_partner_search_key_partner_id UNIQUE,
     company_id         uuid NOT NULL,
     normalized_name    text NOT NULL,
     normalized_tax_id  text,
-    recorded_at        timestamptz NOT NULL,
+    recorded_at        timestamptz NOT NULL DEFAULT now(),
     FOREIGN KEY (company_id, partner_id) REFERENCES partner (company_id, id)
 );
 CREATE INDEX ix_partner_search_key_normalized_name ON partner_search_key USING gin (normalized_name gin_trgm_ops);
@@ -479,7 +488,7 @@ CREATE TABLE personal_data_processing_log (                -- IDs and field name
     recipient        text,                                   -- provider and model, or lookup provider
     agent_run_id     uuid,
     audit_record_id  uuid,
-    recorded_at      timestamptz NOT NULL,
+    recorded_at      timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT ck_personal_data_processing_log_subject CHECK ((subject_table IS NULL) = (subject_id IS NULL))
 );
 CREATE INDEX ix_personal_data_processing_log_subject_id ON personal_data_processing_log (subject_id) WHERE subject_id IS NOT NULL;
@@ -488,10 +497,11 @@ CREATE INDEX ix_personal_data_processing_log_subject_id ON personal_data_process
 -- Arguments: columns that may change; columns that may be set once from null; columns only the erasure command may
 -- change; optionally the column naming the row's document, for the content tables whose rows the generated Delete of a
 -- draft removes (rule 7): the dispatcher sets nativeflows.document_delete_id to that document's ID for Delete alone, and the
--- delete is allowed only while the document is a draft. Generated columns follow their sources and are skipped. The dispatcher sets nativeflows.erasure_command_id only for
--- EraseDataSubject (ADR-0038 rule 4); DS-36 adds the check that it names an idempotency record of that command in the
--- same transaction.
-CREATE FUNCTION crm_check_append_only() RETURNS trigger LANGUAGE plpgsql AS $$
+-- delete is allowed only while the document is a draft. Generated columns follow their sources and are skipped. Columns
+-- only the erasure command may change need a valid erasure marker: erasure_marker_valid() of DS-05-platform.sql (ADR-0038
+-- rule 4; ADR-0079 rule 7), and the new value must be an erasure result (erasure_column_change_allowed of DS-05; R2-N3).
+-- Both are called only when the marker is set, so a load without DS-05 keeps working and refuses every erasure.
+CREATE FUNCTION crm_check_append_only() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 DECLARE
     v_mutable       text[];
     v_set_once      text[];
@@ -515,7 +525,10 @@ BEGIN
     v_erasure_only := TG_ARGV[2]::text[];
     SELECT coalesce(array_agg(attname::text), '{}') INTO v_generated
         FROM pg_attribute WHERE attrelid = TG_RELID AND attgenerated <> '' AND NOT attisdropped;
-    v_is_erasing := coalesce(current_setting('nativeflows.erasure_command_id', true), '') <> '';
+    v_is_erasing := false;
+    IF coalesce(current_setting('nativeflows.erasure_command_id', true), '') <> '' THEN
+        v_is_erasing := erasure_marker_valid(to_jsonb(OLD));   -- the record of the row's company (S2 adversarial review S1)
+    END IF;
     v_old := to_jsonb(OLD);
     v_new := to_jsonb(NEW);
     FOR v_key IN SELECT jsonb_object_keys(v_new) LOOP
@@ -523,7 +536,9 @@ BEGIN
         CONTINUE WHEN v_key = ANY (v_generated);
         CONTINUE WHEN v_key = ANY (v_mutable);
         CONTINUE WHEN v_key = ANY (v_set_once) AND jsonb_typeof(v_old -> v_key) = 'null';
-        CONTINUE WHEN v_key = ANY (v_erasure_only) AND v_is_erasing;
+        IF v_is_erasing AND v_key = ANY (v_erasure_only) THEN       -- only an erasure result of ADR-0079 rule 6 (R2-N3)
+            CONTINUE WHEN erasure_column_change_allowed(v_key, v_old -> v_key, v_new -> v_key);
+        END IF;
         RAISE EXCEPTION '%.% is append-only (ADR-0052 rule 7)', TG_TABLE_NAME, v_key USING ERRCODE = 'check_violation';
     END LOOP;
     RETURN NEW;
@@ -549,10 +564,96 @@ CREATE TRIGGER trg_outbound_message_delivery_recipient_append_only BEFORE UPDATE
     EXECUTE FUNCTION crm_check_append_only('{recorded_at}', '{}', '{email_address,erased_at}');
 
 -- ===== Processing log guard [audit] (ADR-0052 rule 26) =====
-CREATE FUNCTION audit_refuse_change() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION audit_refuse_change() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 BEGIN
     RAISE EXCEPTION '% rows are never updated or deleted (ADR-0052 rule 26)', TG_TABLE_NAME USING ERRCODE = 'check_violation';
 END
 $$;
 CREATE TRIGGER trg_personal_data_processing_log_append_only BEFORE UPDATE OR DELETE ON personal_data_processing_log FOR EACH ROW
     EXECUTE FUNCTION audit_refuse_change();
+
+-- ===== recorded_at on insert and update; TRUNCATE refused (ADR-0007 rules 9, 16 and their notes) =====
+-- Every table of this file has recorded_at timestamptz NOT NULL DEFAULT now(). The DO block attaches the trigger
+-- trg_<table>_set_recorded_at (function set_recorded_at) to every table of v_tables: BEFORE INSERT OR UPDATE on tables
+-- updated in place, BEFORE INSERT on the append-only tables of v_append_only. recorded_at is so the instant of the last
+-- write, set by the system and never taken from a client (ADR-0007 rule 9 and its notes; S2 adversarial review S2).
+-- Append-only tables are those whose guard trigger refuses every update outside an erasure, and pure logs (here: audit_refuse_change, crm_check_append_only).
+-- Row guards without UPDATE OF on in-place tables sort before set_recorded_at, so they compare rows before it runs; a
+-- BEFORE INSERT trigger whose function reads NEW.recorded_at sorts after it, so it sees the system's value.
+-- TRUNCATE skips row triggers and row-level security, so every table with company_id, every append-only table and every
+-- table with a BEFORE DELETE guard, unless it has a TRUNCATE trigger of its own, is listed in v_refuse_truncate (default
+-- partitions with their parent) and gets trg_<table>_refuse_truncate (BEFORE TRUNCATE, function refuse_truncate; S2
+-- adversarial review N4; S2 schema review R6-N2). Retention drops partitions and never truncates (ADR-0017 rule 19 note).
+-- Lab gen_overview.py --check compares this section with what schema_phase_b.py writes from the table definitions and
+-- triggers of the design files. The functions are defined in every file because the labs load subsets.
+CREATE OR REPLACE FUNCTION set_recorded_at() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
+BEGIN
+    NEW.recorded_at := now();
+    RETURN NEW;
+END $$;
+CREATE OR REPLACE FUNCTION refuse_truncate() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
+BEGIN
+    RAISE EXCEPTION '% is never truncated (company, append-only or guarded rows)', TG_TABLE_NAME USING ERRCODE = 'restrict_violation';
+END $$;
+DO $$
+DECLARE
+    v_tables            text[] := ARRAY['public_mail_domain', 'partner_email_domain', 'mailbox', 'interaction', 'interaction_content',
+        'interaction_participant', 'inbound_message', 'interaction_match_candidate', 'complaint', 'complaint_document',
+        'interaction_link', 'processing_purpose', 'processing_basis', 'data_subject_request_content',
+        'data_subject_request', 'outbound_message_content', 'outbound_message', 'outbound_message_recipient',
+        'outbound_message_delivery', 'outbound_message_delivery_recipient', 'interaction_summary', 'partner_insight',
+        'partner_tax_lookup', 'partner_search_key', 'personal_data_processing_log'];
+    v_append_only       text[] := ARRAY['data_subject_request_content', 'inbound_message', 'interaction_content', 'outbound_message_content',
+        'outbound_message_delivery_recipient', 'personal_data_processing_log']::text[];
+    v_refuse_truncate   text[] := ARRAY['partner_email_domain', 'mailbox', 'interaction', 'interaction_content', 'interaction_participant',
+        'inbound_message', 'interaction_match_candidate', 'complaint', 'complaint_document', 'interaction_link',
+        'processing_purpose', 'processing_basis', 'data_subject_request_content', 'data_subject_request',
+        'outbound_message_content', 'outbound_message', 'outbound_message_recipient', 'outbound_message_delivery',
+        'outbound_message_delivery_recipient', 'interaction_summary', 'partner_insight', 'partner_tax_lookup',
+        'partner_search_key', 'personal_data_processing_log']::text[];
+    v_table             text;
+BEGIN
+    FOREACH v_table IN ARRAY v_tables LOOP
+        CONTINUE WHEN to_regclass(v_table) IS NULL;
+        EXECUTE format('CREATE OR REPLACE TRIGGER %I BEFORE ' || CASE WHEN v_table = ANY (v_append_only) THEN 'INSERT' ELSE 'INSERT OR UPDATE' END
+                       || ' ON %I FOR EACH ROW EXECUTE FUNCTION set_recorded_at()', 'trg_' || v_table || '_set_recorded_at', v_table);
+    END LOOP;
+    FOREACH v_table IN ARRAY v_refuse_truncate LOOP
+        CONTINUE WHEN to_regclass(v_table) IS NULL;
+        EXECUTE format('CREATE OR REPLACE TRIGGER %I BEFORE TRUNCATE ON %I FOR EACH STATEMENT EXECUTE FUNCTION refuse_truncate()',
+                       'trg_' || v_table || '_refuse_truncate', v_table);
+    END LOOP;
+END $$;
+-- ===== end of recorded_at and TRUNCATE =====
+
+-- ===== Row-level security, generated (ADR-0017 rule 19; the rls_v1 helper of ADR-0022 rule 8) =====
+-- Every table of this file with company_id gets ENABLE and FORCE ROW LEVEL SECURITY, the company policy company_policy
+-- (company_id compared as text with nativeflows.company_id, failing closed) and the read-only company_ids_policy for
+-- registered cross-company queries (ADR-0017 rule 19). Tables whose company_id is nullable (v_nullable) show their null
+-- rows only under the setting value installation. Default partitions are listed with their parent. Exceptions are in
+-- lab gen_overview.RLS_ALLOWLIST with their reasons; this file has none.
+-- Lab gen_overview.py --check compares this section with what schema_phase_b.py writes.
+DO $$
+DECLARE
+    v_tables    text[] := ARRAY['partner_email_domain', 'mailbox', 'interaction', 'interaction_content', 'interaction_participant',
+        'inbound_message', 'interaction_match_candidate', 'complaint', 'complaint_document', 'interaction_link',
+        'processing_purpose', 'processing_basis', 'data_subject_request_content', 'data_subject_request',
+        'outbound_message_content', 'outbound_message', 'outbound_message_recipient', 'outbound_message_delivery',
+        'outbound_message_delivery_recipient', 'interaction_summary', 'partner_insight', 'partner_tax_lookup',
+        'partner_search_key', 'personal_data_processing_log'];
+    v_nullable  text[] := ARRAY[]::text[];
+    v_table     text;
+BEGIN
+    FOREACH v_table IN ARRAY v_tables LOOP
+        EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', v_table);
+        EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', v_table);
+        IF v_table = ANY (v_nullable) THEN
+            EXECUTE format('CREATE POLICY company_policy ON %I USING (company_id::text = current_setting(''nativeflows.company_id'', true)'
+                           ' OR (company_id IS NULL AND current_setting(''nativeflows.company_id'', true) = ''installation''))', v_table);
+        ELSE
+            EXECUTE format('CREATE POLICY company_policy ON %I USING (company_id::text = current_setting(''nativeflows.company_id'', true))', v_table);
+        END IF;
+        EXECUTE format('CREATE POLICY company_ids_policy ON %I FOR SELECT USING (company_id::text = ANY (string_to_array(current_setting(''nativeflows.company_ids'', true), '','')))', v_table);
+    END LOOP;
+END $$;
+-- ===== end of row-level security =====

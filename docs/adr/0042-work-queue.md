@@ -49,7 +49,7 @@ Every exception, pending approval and other piece of business work is one `work_
 
    Note: `owner_role` stores the symbolic rule, a template code or `company_owner`, with its scope dimensions, never a role ID. Who holds it, and the fallback to `company_owner` when no active role has the template, are resolved when the item is read, by the registered visibility function ([ADR-0054](0054-users-roles-and-authorizations.md) rules 2, 11). So the holders of every active role with that template code own the item, and a role created later counts at once.
 
-   Note ([ADR-0066](0066-work-cases.md), 2026-11-16 (proposed)): `work_item` gains `work_case_id` (nullable), set once and kept by a re-raise; the item then belongs to that work case. A case only links: no rule of this ADR changes for an item in a case ([ADR-0066](0066-work-cases.md) rules 2, 10).
+   Note ([ADR-0066](0066-work-cases.md), 2026-11-21): `work_item` gains `work_case_id` (nullable), set once and kept by a re-raise; the item then belongs to that work case. A case only links: no rule of this ADR changes for an item in a case ([ADR-0066](0066-work-cases.md) rules 2, 10).
 3. `work_item_link` (`work_item_id`, `target_table`, `target_id`, `link_kind`: `evidence`, `draft`, `result`) holds the evidence and what was done about it, such as a derivation trace, a pegging row, a task, a delivery, or a draft the agent made.
    - **Notes.** `work_item_note` (author, text, `created_at`) is append-only. A note an agent writes from outside content is marked untrusted (ADR-0029 rule 10).
 4. Uniqueness. A unique partial index on (`company_id`, `kind`, `open_key`) where `state` is `open` or `claimed` allows one open item per exception.
@@ -66,7 +66,7 @@ Every exception, pending approval and other piece of business work is one `work_
 
    Note: the calling module computes user-kind owners and applies their fallback at raise. A role-kind owner is stored as the symbolic rule (rule 2 note) and resolved at read time, so layer-2 callers need no import to learn whether a role with the template exists.
 
-   Note ([ADR-0066](0066-work-cases.md), 2026-11-16 (proposed)): `raise_work_item` takes an optional `work_case_id`. Without one, it sets the case when the subject is an `artifact` target of exactly one open work case, or a `draft`-linked target of a work item of exactly one open case; both lookups read only `work`'s tables ([ADR-0066](0066-work-cases.md) rule 10).
+   Note ([ADR-0066](0066-work-cases.md), 2026-11-21): `raise_work_item` takes an optional `work_case_id`. Without one, it sets the case when the subject is an `artifact` target of exactly one open work case, or a `draft`-linked target of a work item of exactly one open case; both lookups read only `work`'s tables ([ADR-0066](0066-work-cases.md) rule 10).
 6. `work.contract.resolve_work_item(kind, open_key, resolution)` closes the open item when the exception ends: a planning run no longer raises it (ADR-0024 rule 21), or a held posting completes (ADR-0028 rule 7). It sets `state: done`, `resolution` and `resolved_at`, and drops any claim. Resolving a key with no open item does nothing.
 7. Owner rules:
    - **Kind rules:**
@@ -89,7 +89,7 @@ Every exception, pending approval and other piece of business work is one `work_
 
    Note (catalog review, 2026-11-15): `work_item.owner_role` stores the bare template code (e.g. `accountant`) or `company_owner` (DS-05-platform.sql); `role:<template>` is the notation of the kind catalog, resolved to that column when the item is raised.
 
-   Note ([ADR-0058](0058-configurable-workflows.md), proposed 2026-11-15): the kind rule `named_by_raiser`, for owner and due date: the raiser names a user, a role template, `document_owner` of its subject or a decision table output, and N business days. The kinds `automation_task` and `automation_notice` use it; `automation_rule_disabled`, `artifact_demoted`, `artifact_invalidated`, `artifact_reference_deprecated` and `artifact_function_changed` use it for the owner, falling back to `company_owner` when the named owner can no longer open the company. A raiser that names several owners raises one item per owner, with the owner in the open key (rules 8, 16; [ADR-0059](0059-ai-tuning-and-development-of-deterministic-functions.md) rules 4, 28).
+   Note ([ADR-0058](0058-configurable-workflows.md), 2026-11-15): the kind rule `named_by_raiser`, for owner and due date: the raiser names a user, a role template, `document_owner` of its subject or a decision table output, and N business days. The kinds `automation_task` and `automation_notice` use it; `automation_rule_disabled`, `artifact_demoted`, `artifact_invalidated`, `artifact_reference_deprecated` and `artifact_function_changed` use it for the owner, falling back to `company_owner` when the named owner can no longer open the company. A raiser that names several owners raises one item per owner, with the owner in the open key (rules 8, 16; [ADR-0059](0059-ai-tuning-and-development-of-deterministic-functions.md) rules 4, 28).
 8. Due rules give business dates through the company calendar (ADR-0024 rule 4; calendar days for layer-2 callers, rule 5):
    - `same_day`, or `days:<n>` business days after the raise;
    - `required_date` minus the lead time, for planning;
@@ -141,7 +141,7 @@ Every exception, pending approval and other piece of business work is one `work_
 
     The UI simulates each item, lists them with each plan's summary, and on one confirmation sends one execution per item. An item that fails a condition, or whose execution fails, stays in the queue for single review; the others are unaffected. `work.bulk_review_max_items` (company, default 50, bounds 1 to 500) caps one selection. Bulk review is a person's action in the UI, on no agent tool list and never an automation action. It reduces clicks without weakening spec 03's floor: a person still submits or approves each item.
 
-    Note ([ADR-0066](0066-work-cases.md), 2026-11-16 (proposed)): the case view offers the bulk review above for the pending commands of one work case, under the same conditions and the same cap `work.bulk_review_max_items`: one command, idempotency key, plan hash and approval record per item ([ADR-0066](0066-work-cases.md) rule 16).
+    Note ([ADR-0066](0066-work-cases.md), 2026-11-21): the case view offers the bulk review above for the pending commands of one work case, under the same conditions and the same cap `work.bulk_review_max_items`: one command, idempotency key, plan hash and approval record per item ([ADR-0066](0066-work-cases.md) rule 16).
 13. Queries:
     - `ListWorkItem`, filtered by kind, state, owner (me, my roles), subject, due and overdue, with the visibility of rule 10;
     - `GetWorkItem`, with links, notes and claim.
@@ -153,14 +153,14 @@ Every exception, pending approval and other piece of business work is one `work_
 
     The wake-up consumer is `agent_wake_up`; a kind that a command on an agent tool list can raise is declared by no agent type ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 16).
 
-    Note ([ADR-0076](0076-internal-messaging-and-notifications.md), proposed 2026-11-19): the transactional consumer `messaging_fanout` turns `WorkItemRaised` and `WorkItemAssigned` into a `work_item` notification: to the owning user; for an item owned by an approval stage, to at most 20 eligible members, the first 20 from the top of the stage's member list; an item owned by a role other than `company_owner` notifies nobody (ADR-0076 rule 6).
+    Note ([ADR-0076](0076-internal-messaging-and-notifications.md), 2026-11-21): the transactional consumer `messaging_fanout` turns `WorkItemRaised` and `WorkItemAssigned` into a `work_item` notification: to the owning user; for an item owned by an approval stage, to at most 20 eligible members, the first 20 from the top of the stage's member list; an item owned by a role other than `company_owner` notifies nobody (ADR-0076 rule 6).
 
 **Taint and agents**
 
 15. An item raised by a tainted event, or by a tainted run, has `is_tainted`. A run started from it is tainted from its start (ADR-0029 rule 10), and its drafts are tainted versions.
 16. Agents never `ResolveWorkItem` a kind that needs a person's judgement. Each kind declares `is_agent_resolvable`, default false.
 
-   Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-21): the work model is stated in one place in ADR-0078 rules 11 and 12. The work item is the unit of work for people, deterministic code and agents; an agent run is one attempt at it and never resolves it (`is_agent_resolvable` is false for every Phase 1 kind). The kind is the contract between a domain module and whoever does the work: the module names no agent type, and at most one agent type declares a given kind.
+   Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), 2026-11-21): the work model is stated in one place in ADR-0078 rules 11 and 12. The work item is the unit of work for people, deterministic code and agents; an agent run is one attempt at it and never resolves it (`is_agent_resolvable` is false for every Phase 1 kind). The kind is the contract between a domain module and whoever does the work: the module names no agent type, and at most one agent type declares a given kind.
 
 **What raises work items**
 
@@ -194,7 +194,7 @@ Every exception, pending approval and other piece of business work is one `work_
 
     Note (catalog review, 2026-11-15): the work item kind `inbound_message` is now `inbound_message_matched` ([ADR-0052](0052-minimal-crm.md) rule 15); `inbound_message` remains the name of its table there (rule 13).
 
-    Note ([ADR-0058](0058-configurable-workflows.md), proposed 2026-11-15): new kinds of module `automation`: `automation_task`, `automation_notice`, `automation_rule_disabled`, `automation_owner_scope_narrowed`, `artifact_invalidated`, `artifact_reference_deprecated`, `artifact_demoted` and `artifact_function_changed` (rule 28; [ADR-0059](0059-ai-tuning-and-development-of-deterministic-functions.md) rule 28).
+    Note ([ADR-0058](0058-configurable-workflows.md), 2026-11-15): new kinds of module `automation`: `automation_task`, `automation_notice`, `automation_rule_disabled`, `automation_owner_scope_narrowed`, `artifact_invalidated`, `artifact_reference_deprecated`, `artifact_demoted` and `artifact_function_changed` (rule 28; [ADR-0059](0059-ai-tuning-and-development-of-deterministic-functions.md) rule 28).
 19. Defects never enter the queue (ADR-0003 R7), and technical jobs are not work items (spec 07).
 
 **Build order**

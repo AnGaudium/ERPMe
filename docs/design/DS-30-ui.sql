@@ -31,7 +31,7 @@ CREATE TABLE assist_request (                              -- the subject of an 
     requested_at         timestamptz NOT NULL,
     answered_at          timestamptz,
     erased_at            timestamptz,                          -- request text blanked by retention or erasure
-    recorded_at          timestamptz NOT NULL,
+    recorded_at          timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     UNIQUE (company_id, requested_by_user_id, id),
     FOREIGN KEY (company_id, agent_run_id) REFERENCES agent_run (company_id, id),
@@ -60,7 +60,7 @@ CREATE TABLE list_variant (                                -- a saved view of on
     grouping             jsonb NOT NULL DEFAULT '[]',          -- result field names
     is_default           boolean NOT NULL DEFAULT false,       -- the owner's (personal) or the role's (shared) default for the query
     state                text NOT NULL DEFAULT 'active' CONSTRAINT ck_list_variant_state CHECK (state IN ('active', 'deleted')),
-    recorded_at          timestamptz NOT NULL,
+    recorded_at          timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, shared_role_id) REFERENCES role (company_id, id),
     CONSTRAINT ck_list_variant_shapes CHECK (jsonb_typeof(filters) = 'object' AND jsonb_typeof(columns) = 'array'
@@ -71,16 +71,72 @@ CREATE UNIQUE INDEX ux_list_variant_shared_name ON list_variant (company_id, que
 CREATE UNIQUE INDEX ux_list_variant_default_personal ON list_variant (company_id, query_name, owner_user_id) WHERE state = 'active' AND is_default AND shared_role_id IS NULL;
 CREATE UNIQUE INDEX ux_list_variant_default_shared ON list_variant (company_id, query_name, shared_role_id) WHERE state = 'active' AND is_default AND shared_role_id IS NOT NULL;
 
--- ===== Row-level security (ADR-0017 rule 19; the rls_v1 helper of ADR-0022 rule 8, as DS-05-platform.sql) =====
+-- ===== recorded_at on insert and update; TRUNCATE refused (ADR-0007 rules 9, 16 and their notes) =====
+-- Every table of this file has recorded_at timestamptz NOT NULL DEFAULT now(). The DO block attaches the trigger
+-- trg_<table>_set_recorded_at (function set_recorded_at) to every table of v_tables: BEFORE INSERT OR UPDATE on tables
+-- updated in place, BEFORE INSERT on the append-only tables of v_append_only. recorded_at is so the instant of the last
+-- write, set by the system and never taken from a client (ADR-0007 rule 9 and its notes; S2 adversarial review S2).
+-- Append-only tables are those whose guard trigger refuses every update outside an erasure, and pure logs.
+-- Row guards without UPDATE OF on in-place tables sort before set_recorded_at, so they compare rows before it runs; a
+-- BEFORE INSERT trigger whose function reads NEW.recorded_at sorts after it, so it sees the system's value.
+-- TRUNCATE skips row triggers and row-level security, so every table with company_id, every append-only table and every
+-- table with a BEFORE DELETE guard, unless it has a TRUNCATE trigger of its own, is listed in v_refuse_truncate (default
+-- partitions with their parent) and gets trg_<table>_refuse_truncate (BEFORE TRUNCATE, function refuse_truncate; S2
+-- adversarial review N4; S2 schema review R6-N2). Retention drops partitions and never truncates (ADR-0017 rule 19 note).
+-- Lab gen_overview.py --check compares this section with what schema_phase_b.py writes from the table definitions and
+-- triggers of the design files. The functions are defined in every file because the labs load subsets.
+CREATE OR REPLACE FUNCTION set_recorded_at() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
+BEGIN
+    NEW.recorded_at := now();
+    RETURN NEW;
+END $$;
+CREATE OR REPLACE FUNCTION refuse_truncate() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
+BEGIN
+    RAISE EXCEPTION '% is never truncated (company, append-only or guarded rows)', TG_TABLE_NAME USING ERRCODE = 'restrict_violation';
+END $$;
 DO $$
 DECLARE
-    v_table text;
+    v_tables            text[] := ARRAY['assist_request', 'list_variant'];
+    v_append_only       text[] := ARRAY[]::text[];
+    v_refuse_truncate   text[] := ARRAY['assist_request', 'list_variant']::text[];
+    v_table             text;
 BEGIN
-    FOREACH v_table IN ARRAY ARRAY['assist_request', 'list_variant'] LOOP
+    FOREACH v_table IN ARRAY v_tables LOOP
+        CONTINUE WHEN to_regclass(v_table) IS NULL;
+        EXECUTE format('CREATE OR REPLACE TRIGGER %I BEFORE ' || CASE WHEN v_table = ANY (v_append_only) THEN 'INSERT' ELSE 'INSERT OR UPDATE' END
+                       || ' ON %I FOR EACH ROW EXECUTE FUNCTION set_recorded_at()', 'trg_' || v_table || '_set_recorded_at', v_table);
+    END LOOP;
+    FOREACH v_table IN ARRAY v_refuse_truncate LOOP
+        CONTINUE WHEN to_regclass(v_table) IS NULL;
+        EXECUTE format('CREATE OR REPLACE TRIGGER %I BEFORE TRUNCATE ON %I FOR EACH STATEMENT EXECUTE FUNCTION refuse_truncate()',
+                       'trg_' || v_table || '_refuse_truncate', v_table);
+    END LOOP;
+END $$;
+-- ===== end of recorded_at and TRUNCATE =====
+
+-- ===== Row-level security, generated (ADR-0017 rule 19; the rls_v1 helper of ADR-0022 rule 8) =====
+-- Every table of this file with company_id gets ENABLE and FORCE ROW LEVEL SECURITY, the company policy company_policy
+-- (company_id compared as text with nativeflows.company_id, failing closed) and the read-only company_ids_policy for
+-- registered cross-company queries (ADR-0017 rule 19). Tables whose company_id is nullable (v_nullable) show their null
+-- rows only under the setting value installation. Default partitions are listed with their parent. Exceptions are in
+-- lab gen_overview.RLS_ALLOWLIST with their reasons; this file has none.
+-- Lab gen_overview.py --check compares this section with what schema_phase_b.py writes.
+DO $$
+DECLARE
+    v_tables    text[] := ARRAY['assist_request', 'list_variant'];
+    v_nullable  text[] := ARRAY[]::text[];
+    v_table     text;
+BEGIN
+    FOREACH v_table IN ARRAY v_tables LOOP
         EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', v_table);
         EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', v_table);
-        EXECUTE format('CREATE POLICY company_policy ON %I USING (company_id::text = current_setting(''nativeflows.company_id'', true))', v_table);
+        IF v_table = ANY (v_nullable) THEN
+            EXECUTE format('CREATE POLICY company_policy ON %I USING (company_id::text = current_setting(''nativeflows.company_id'', true)'
+                           ' OR (company_id IS NULL AND current_setting(''nativeflows.company_id'', true) = ''installation''))', v_table);
+        ELSE
+            EXECUTE format('CREATE POLICY company_policy ON %I USING (company_id::text = current_setting(''nativeflows.company_id'', true))', v_table);
+        END IF;
         EXECUTE format('CREATE POLICY company_ids_policy ON %I FOR SELECT USING (company_id::text = ANY (string_to_array(current_setting(''nativeflows.company_ids'', true), '','')))', v_table);
     END LOOP;
-END
-$$;
+END $$;
+-- ===== end of row-level security =====

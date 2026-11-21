@@ -30,7 +30,7 @@ No external semantic engine runs in the core, and agents still never export file
    - **`agents`** (layer 5) owns the `analysis` workflow (rules 20–25). It reaches `query` only through the dispatcher, as for every workflow; nothing in `agents` imports `query`.
    - **No external engine.** No semantic layer product (Cube, dbt Semantic Layer or the like) runs inside the core: it would duplicate record scope, owner scope, field classes and taint, which the views already enforce, and add a second security model. Exporting the catalog to such tools comes after Phase 1 (rule 38).
 
-   Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-19): the `analysis` agent is one of the six Phase 1 agent types, one declaration on the shared runtime and an internal type that draws on the reserve of ADR-0050 rule 22; the assistant routes questions that need figures to it, so there is one analysis path (ADR-0078 rules 1, 8).
+   Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), 2026-11-21): the `analysis` agent is one of the six Phase 1 agent types, one declaration on the shared runtime and an internal type that draws on the reserve of ADR-0050 rule 22; the assistant routes questions that need figures to it, so there is one analysis path (ADR-0078 rules 1, 8).
 2. The catalog lives in `backend/nativeflows/query/analysis/catalog.py` beside the view declarations (ADR-0050 rule 45). It declares four kinds of object:
    - **Facts:** a semantic view of schema `query`, its grain (what one row is), its time dimensions, its scope columns as the view declares them, and whether it is owner-scoped (ADR-0054 rule 15). A fact view pre-joins every dimension column it offers along a declared many-to-one path, so the compiler never joins facts to dimension tables, except for member labels (rule 12).
    - **Measures:** rule 4.
@@ -170,6 +170,8 @@ No external semantic engine runs in the core, and agents still never export file
     - **The same path.** The UI's analysis builder, saved analyses, MCP clients and agents send plans to the same validator. There is no second path.
 11. Settings (installation; companies may lower them, never raise them): `analysis_max_cells` (5,000), `analysis_agent_max_cells` (500), `analysis_max_range_months` (60), `analysis_max_estimated_rows` (5,000,000), `analysis_result_cache_seconds` (300), `analysis_question_retention_days` (400). The values are the agent's proposal, flagged for the author.
 
+    Note (S2 findings closure, 2026-11-21): the registry key of `analysis_question_retention_days` is `analysis.question_retention_days` (ADR-0063 rule 2 asks for dotted keys; installation and company, default 400, a company may only lower it; ADR-0063 rule 29 note of this date). The other settings of this rule are not retention settings and are not changed by this note.
+
 **Compile and execute**
 
 12. The compile-to-SQL contract (ADR-0050 rule 44):
@@ -258,7 +260,7 @@ No external semantic engine runs in the core, and agents still never export file
     - **Constants** of the version: at most 3 plan attempts (one plan and two repairs), at most 2 member lookups per attempt, at most 5 examples as context, defaults `limit` 20 and `top` 10.
     - **Who may start it:** holders of `start_agent:analysis` (leaf `agent_analysis`, rule 36).
 
-    Note ([ADR-0063](0063-configurable-policy-settings.md), proposed 2026-11-15): before the router step, names of the company's own personal records in the question are replaced by handles while `analysis.pseudonymize_known_subjects` reads true, the default (rule 17).
+    Note ([ADR-0063](0063-configurable-policy-settings.md), 2026-11-15): before the router step, names of the company's own personal records in the question are replaced by handles while `analysis.pseudonymize_known_subjects` reads true, the default (rule 17).
 21. Questions:
     - **`analysis_question`** (company data, owner `query`): the asker, the question text (at most 2,000 characters), its language, the run, the state (`open`, `answered`, `abstained`, `failed`), the outcome or, for a failed run, its stop reason, the plan and its hashes, the badge, the key facts, the narrative plan with the steps code dropped, the clarification options, the result as shown (rows, cells and member keys, never member labels, which are resolved again at display under the viewer's rights), `as_of`, and the asker's feedback (`helpful` or `wrong`, with a note).
     - **Label.** The question text, trigger questions, example questions and feedback notes are labelled `personal`: a question may name a person, as a bank description may (ADR-0050 rule 9). With the routing switch off, a question goes to the router and planner seats and every call is logged in the processing log (ADR-0050 rule 10). With the switch on, the gateway removes it, the router step is not sent, and the run ends `routing_blocked`; exact matches with verified examples and saved analyses (rule 22, D2), opening saved analyses and the builder still work, because they need no model. The alternative reading, `internal`, is the author's open question.
@@ -267,7 +269,7 @@ No external semantic engine runs in the core, and agents still never export file
     - **Failed runs.** A consumer of `AgentRunCompleted` in `query` sets a question whose run stopped (`budget_exceeded`, `time_exceeded`, `output_invalid`, `provider_unavailable`, `resume_diverged`, `crashed`, `denials_repeated`, or `canceled`) to `failed` with that reason. ADR-0050's `agent_run_stopped` item stays one per agent type, outcome and business date, never one per question.
     - **Who reads answers.** A question and its stored result are readable only by the asker and by holders of the capability `read_analysis_debug`. Whoever handles a dispute reruns the plan under their own rights; the stored cells were computed under the asker's scope and field classes.
 
-    Note ([ADR-0063](0063-configurable-policy-settings.md), proposed 2026-11-15): the label stays `personal`; under the per-request gate a question reaches the router and planner seats when a permission covers them (rules 15, 17).
+    Note ([ADR-0063](0063-configurable-policy-settings.md), 2026-11-15): the label stays `personal`; under the per-request gate a question reaches the router and planner seats when a permission covers them (rules 15, 17).
 22. Steps:
     - **D1 `load`:** the question; the catalog; the verified saved analyses and examples the asker may see: those with visibility `company`, and the asker's own private ones. Another user's private analysis is never matched, offered as a hint, or revealed by a badge.
     - **D2 `match_verified`:** a normalized question (Unicode case folding, whitespace collapsed, trailing punctuation dropped; letters with diacritics stay distinct, because in several languages they distinguish words) equal to a verified example's or a verified saved analysis version's trigger question gives that plan, with no model. Only exact equality is accepted: similar questions ("net revenue last month by customer" against "net revenue last month") differ in what they ask. A hit skips L1 and L2. D2 and L1 read only the set of D1.
@@ -319,7 +321,7 @@ No external semantic engine runs in the core, and agents still never export file
     - **What remains.** A true but unhelpful choice or order of claims; the key facts and the table beside them bound it.
     - **Free prose is a later option.** Prose written by the model and screened by a value-free check was tried and rejected for Phase 1 (review round 4): number words of other scripts and languages ("三百", "hai trăm", "deux cents"), exact quantities in words ("no customers", "a single customer"), order and direction synonyms ("dominates", "trails", "collapsed") and character tricks (zero-width and look-alike letters) passed, while only 12 of 22 ordinary sentences did. It may return after Phase 1, gated by an evaluation suite that reports the prose acceptance rate against a threshold (open question).
 
-    Note ([ADR-0063](0063-configurable-policy-settings.md), proposed 2026-11-15): the setting `analysis.narrative_mode` (`facts_only`, `claim_plan`, the default; `free_prose` outside the bounds in Phase 1) has an installation maximum that a company may only lower; prose unlocks per language and model version at 80% acceptance with no unbacked claim (rule 25).
+    Note ([ADR-0063](0063-configurable-policy-settings.md), 2026-11-15): the setting `analysis.narrative_mode` (`facts_only`, `claim_plan`, the default; `free_prose` outside the bounds in Phase 1) has an installation maximum that a company may only lower; prose unlocks per language and model version at 80% acceptance with no unbacked claim (rule 25).
 24. Abstention is a typed outcome of a completed run, tuned for precision: a wrong answer costs more than an abstention.
 
     | Outcome | When | What the person sees |
@@ -339,9 +341,9 @@ No external semantic engine runs in the core, and agents still never export file
     - **Promotion evidence, a stated exception like data migration's.** An analysis run drafts nothing a person later resolves, so there are no shadow cases of ADR-0051 rule 4. `CreateAgentPromotionEvidence` freezes instead: the version's CI evaluation report (rule 29) and, when the company has at least 30 verified examples, the shadow evaluation over them (at least 90% equal, no wrong answer on an example whose expected outcome is an abstention). With fewer than 30 examples the evidence is the synthetic CI report alone; this is flagged for the author (open question). The proposal to set `assisted` names that snapshot; a person other than the submitter approves it.
     - **Catalog changes.** The `analysis` agent type version declares the catalog hash it was evaluated with, so a catalog change is a new version that runs in shadow until promoted again (ADR-0050 rule 14).
 
-    Note ([ADR-0063](0063-configurable-policy-settings.md), proposed 2026-11-15): the 30 examples and the synthetic-only promotion are the settings `artifacts.analysis.min_verified_examples` and `artifacts.analysis.allow_synthetic_only_promotion` (default true) (rule 13).
+    Note ([ADR-0063](0063-configurable-policy-settings.md), 2026-11-15): the 30 examples and the synthetic-only promotion are the settings `artifacts.analysis.min_verified_examples` and `artifacts.analysis.allow_synthetic_only_promotion` (default true) (rule 13).
 
-    Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-21): in Phase 1 there is no `shadow` mode (`check` refuses it). Where this rule says "shadow", the daily `RunAnalysisEvaluation` on the company's verified examples is `analysis`'s evaluation in use, and a version, or a catalog change that makes a new version, without a passing evaluation runs as `off` (ADR-0078 rule 6).
+    Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), 2026-11-21): in Phase 1 there is no `shadow` mode (`check` refuses it). Where this rule says "shadow", the daily `RunAnalysisEvaluation` on the company's verified examples is `analysis`'s evaluation in use, and a version, or a catalog change that makes a new version, without a passing evaluation runs as `off` (ADR-0078 rule 6).
 
 **Saved analyses, KPIs and examples**
 
@@ -419,11 +421,11 @@ No external semantic engine runs in the core, and agents still never export file
     The profit-and-loss measures exclude closing and migration entries; the ledger turnover measures exclude migration entries, as ADR-0049 rule 6's turnover does. `sales_net_amount` and `purchase_net_amount` are the lines' posted net amounts in company currency, as their journal lines carry them; `net_revenue` is the ledger's figure, which also holds manual entries and deductions, so "sales" is an ambiguous term between them (rule 2). `sales_line_amount` and `purchase_line_amount` are in the document's currency.
 34. The 22 dimensions of Phase 1 (catalog `analysis-dimensions.csv`): `posting_date`, `document_date`, `due_date`, `posting_period`; `partner`, `partner_group`, `salesperson`; `item`, `product`, `item_group`; `warehouse`, `branch`; `system_account`, `account`, `cost_center`, `project`; `currency`, `document_type`, `movement_type` (kind `catalog`); `overdue_bucket` (`not_due`, `days_1_30`, `days_31_60`, `days_61_90`, `days_over_90`, from days overdue at the business date), `variance_category` (kind `enum`); `production_order`.
 
-    Note ([ADR-0068](0068-sites-and-core-logistics-payment-master-data.md), proposed 2026-11-17): two further dimensions: `site` (entity, the parent of `warehouse`; transit and goods-sent warehouses take the site of their valuation warehouse) and `payment_method` (entity, on sales and purchase lines).
+    Note ([ADR-0068](0068-sites-and-core-logistics-payment-master-data.md), 2026-11-21): two further dimensions: `site` (entity, the parent of `warehouse`; transit and goods-sent warehouses take the site of their valuation warehouse) and `payment_method` (entity, on sales and purchase lines).
 
     Note ([ADR-0068](0068-sites-and-core-logistics-payment-master-data.md), 2026-11-21): in rule 5's hierarchy list, `warehouse` → `site` replaces `warehouse` → `branch`, as `catalogs/analysis-dimensions.csv` has it; `site` has no parent in the catalog.
 
-    Note ([ADR-0069](0069-business-unit-dimension.md), proposed 2026-11-17): a further dimension, `business_unit` (entity, a tree over `parent_id`), offered by `journal_line_overview` and `system_account_turnover`. It groups by the posted value only. With ADR-0068's two, the catalog holds 25 dimensions.
+    Note ([ADR-0069](0069-business-unit-dimension.md), 2026-11-21): a further dimension, `business_unit` (entity, a tree over `parent_id`), offered by `journal_line_overview` and `system_account_turnover`. It groups by the posted value only. With ADR-0068's two, the catalog holds 25 dimensions.
 
 **Invariants, catalogs and lab**
 

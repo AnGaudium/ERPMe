@@ -34,7 +34,7 @@ Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), 2026-11-
 2. The client does no business arithmetic. Totals, taxes, prices, conversions and stock effects come from simulation; the client only formats them.
    - **Decimals.** They travel as canonical decimal strings (ADR-0006 rule 13) and are never parsed into floating-point numbers. A small self-written decimal-string module formats them by locale, at the scale of the field's currency or unit (`x-nativeflows-scale-from`, rule 4; ADR-0006 rule 14). It parses localized input back to the canonical form. Input with too many decimals is shown as the server's `too_many_decimal_places`, never rounded.
 
-   Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), proposed 2026-11-15): analysis charts and tables plot server cells only: totals, subtotals, other rows, shares, changes and contributions are cells of `EvaluateAnalysisPlan`; every figure of an answer is a key fact, and every sentence of its narrative, rendered by code with the formatter of this rule from fixed templates (rules 15, 23, 32).
+   Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), 2026-11-15): analysis charts and tables plot server cells only: totals, subtotals, other rows, shares, changes and contributions are cells of `EvaluateAnalysisPlan`; every figure of an answer is a key fact, and every sentence of its narrative, rendered by code with the formatter of this rule from fixed templates (rules 15, 23, 32).
 3. Times and dates:
    - **Business dates.** Shown as stored (`YYYY-MM-DD`, formatted by locale).
    - **Instants.** Shown in the user's time zone (ADR-0007 rule 14).
@@ -58,9 +58,9 @@ Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), 2026-11-
    - **Labels and help** come from i18n keys (rule 14), not from the schema.
    - **Not per screen.** Nothing is maintained per screen in the frontend. User-defined fields (after Phase 1) appear through the same schemas, so the renderer never hard-codes field lists.
 
-    Note ([ADR-0074](0074-core-data-structure-additions.md), proposed 2026-11-19): the annotation `x-nativeflows-custom-values` names the table whose company-defined fields the renderer reads through `ListCustomFieldDefinitions`; user-defined fields (without tables) appear in the same schemas as that rule says (ADR-0074 rules 8 to 11).
+    Note ([ADR-0074](0074-core-data-structure-additions.md), 2026-11-21): the annotation `x-nativeflows-custom-values` names the table whose company-defined fields the renderer reads through `ListCustomFieldDefinitions`; user-defined fields (without tables) appear in the same schemas as that rule says (ADR-0074 rules 8 to 11).
 
-   Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): the vocabulary is closed and grows to 24 keys: `widget` gains `State`; `hidden-when` and `read-only-when` may name the subject's `state`; `lookup` gains `depends_on`; `list-defaults` gains declared `variants`; `line-columns` gains `editor`; `scale-from` is required on money and quantity; new keys `importance`, `default-from`, `scan`, `ai-fillable`, `floorplan`, `title`, `header-facets`, `actions`, `links`, `search` and `assist`. Every key has one renderer, and a key outside the vocabulary fails `check` (ADR-0077 rules 8–12).
+   Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), 2026-11-21): the vocabulary is closed and grows to 24 keys: `widget` gains `State`; `hidden-when` and `read-only-when` may name the subject's `state`; `lookup` gains `depends_on`; `list-defaults` gains declared `variants`; `line-columns` gains `editor`; `scale-from` is required on money and quantity; new keys `importance`, `default-from`, `scan`, `ai-fillable`, `floorplan`, `title`, `header-facets`, `actions`, `links`, `search` and `assist`. Every key has one renderer, and a key outside the vocabulary fails `check` (ADR-0077 rules 8–12).
 5. CI checks the hints:
    - every hint names an existing field;
    - every `Ref` has a lookup query the registry knows;
@@ -87,17 +87,17 @@ Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), 2026-11-
 
    The export is `CreateListExport`, with at most `list_export_max_rows` rows ([ADR-0050](0050-agent-runtime-and-query-layer.md) rule 54).
 
-   Note ([ADR-0057](0057-document-intake-and-extraction.md), proposed 2026-11-15): the extraction verification screen is a hand-built screen: the page beside the fields with evidence boxes, risky fields first, keyboard first, machine-checked fields apart from human-confirmed ones, unaligned values greyed and duplicates and flags at the top ([ADR-0057](0057-document-intake-and-extraction.md) rule 22).
+   Note ([ADR-0057](0057-document-intake-and-extraction.md), 2026-11-15): the extraction verification screen is a hand-built screen: the page beside the fields with evidence boxes, risky fields first, keyboard first, machine-checked fields apart from human-confirmed ones, unaligned values greyed and duplicates and flags at the top ([ADR-0057](0057-document-intake-and-extraction.md) rule 22).
 
-   Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), proposed 2026-11-15): a further screen kind, the analysis view: the builder with measure, dimension and filter chips from `ListAnalysisCatalog`; the answer view (restatement, table or chart, key facts with clickable figures, narrative sentences rendered by code with member chips and citation markers, plan chips and SQL, scope and truncation notes, badge, `as_of`); saved analyses with KPI tiles. Saved analyses are analysis plans, not saved list filters, which stay after Phase 1; results are exported through `ListAnalysisResultRow` and `CreateListExport` (rules 17, 32).
+   Note ([ADR-0060](0060-agent-assisted-reporting-and-analysis.md), 2026-11-15): a further screen kind, the analysis view: the builder with measure, dimension and filter chips from `ListAnalysisCatalog`; the answer view (restatement, table or chart, key facts with clickable figures, narrative sentences rendered by code with member chips and citation markers, plan chips and SQL, scope and truncation notes, badge, `as_of`); saved analyses with KPI tiles. Saved analyses are analysis plans, not saved list filters, which stay after Phase 1; results are exported through `ListAnalysisResultRow` and `CreateListExport` (rules 17, 32).
 
-   Note ([ADR-0066](0066-work-cases.md), 2026-11-16 (proposed)): two further generated screen kinds. The case view shows a work case's timeline on the left, the selected artifact's record view or its command form with the plan panel on the right, and the case's pending commands above. The case list is a list over `ListWorkCase`. The company setting `work.landing_page` maps role templates to `work_queue` or `case_list` as their home. Cases serve unstructured and exception work; routine structured work keeps the screens above and the six hand-built screens, and nothing is computed in the client (rule 2) ([ADR-0066](0066-work-cases.md) rules 4, 21).
+   Note ([ADR-0066](0066-work-cases.md), 2026-11-21): two further generated screen kinds. The case view shows a work case's timeline on the left, the selected artifact's record view or its command form with the plan panel on the right, and the case's pending commands above. The case list is a list over `ListWorkCase`. The company setting `work.landing_page` maps role templates to `work_queue` or `case_list` as their home. Cases serve unstructured and exception work; routine structured work keeps the screens above and the six hand-built screens, and nothing is computed in the client (rule 2) ([ADR-0066](0066-work-cases.md) rules 4, 21).
 
-   Note ([ADR-0071](0071-work-orders-and-shop-floor-execution.md), proposed 2026-11-17): the WO tablet is a further hand-built PWA screen over `ListWorkCenterQueue` and `GetOperationWorkspace` (ADR-0071 rules 13, 14).
+   Note ([ADR-0071](0071-work-orders-and-shop-floor-execution.md), 2026-11-21): the WO tablet is a further hand-built PWA screen over `ListWorkCenterQueue` and `GetOperationWorkspace` (ADR-0071 rules 13, 14).
 
-   Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): the screen kinds map onto seven floorplans: list report, object page, create and edit form (with a wizard variant), worklist, overview, plan panel and approval view. A route renders exactly one of them, or a registered custom component (ADR-0077 rules 1–3, 22).
+   Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), 2026-11-21): the screen kinds map onto seven floorplans: list report, object page, create and edit form (with a wizard variant), worklist, overview, plan panel and approval view. A route renders exactly one of them, or a registered custom component (ADR-0077 rules 1–3, 22).
 
-   Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): user-saved list variants are in Phase 1: personal or shared with a role, storing filters, columns, sort and grouping server-side in `list_variant`; `ListListVariant`, `CreateListVariant`, `UpdateListVariant`, `DeleteListVariant`; sharing needs `share_list_variant` (ADR-0077 rule 10a). Column choice is saved in variants; the browser keeps only the viewer's last choice.
+   Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), 2026-11-21): user-saved list variants are in Phase 1: personal or shared with a role, storing filters, columns, sort and grouping server-side in `list_variant`; `ListListVariant`, `CreateListVariant`, `UpdateListVariant`, `DeleteListVariant`; sharing needs `share_list_variant` (ADR-0077 rule 10a). Column choice is saved in variants; the browser keeps only the viewer's last choice.
 
     Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), 2026-11-21): the data grid is the in-repo TanStack Table grid, not AG Grid (ADR-0077 rules 5, 20).
 7. Navigation:
@@ -111,7 +111,7 @@ Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), 2026-11-
 
      Command types and queries appear in their `snake_case` REST form (ADR-0004 rule 19). `run`, `query` and names starting with `_` are reserved: company codes cannot start with `_`, and no noun is called `run` or `query`. Filters never go into a URL (ADR-0008 rule 22).
 
-   Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): the command palette becomes the command bar: text that matches no name becomes an `assist_request` with purpose `resolve_command`, whose answer is a proposed invocation shown with its parameters and opened as a prefilled form; it runs simulate first and never executes by itself (ADR-0077 rule 18).
+   Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), 2026-11-21): the command palette becomes the command bar: text that matches no name becomes an `assist_request` with purpose `resolve_command`, whose answer is a proposed invocation shown with its parameters and opened as a prefilled form; it runs simulate first and never executes by itself (ADR-0077 rule 18).
 8. `ListAllowedCommand` (subject table and ID) is a computed query, an exception to ADR-0004 rule 21 as in ADR-0015 rule 14. It returns `allowed_command` rows: each command applicable to the subject, with `is_allowed` and, when false, the error code the command would return.
    - **Single source.** Applicability comes from registry declarations the dispatcher itself uses: each command's `subject_table` and `allowed_states` (notes on ADR-0008 rule 1 and on ADR-0009 rule 5, whose `invalid_state_transition` reads the same declaration).
    - **Checks evaluated:** the caller's permission, `human_only`, `segregation_of_duties` for `Approve` (ADR-0017 rule 16), and a pending change (ADR-0028).
@@ -143,7 +143,7 @@ Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), 2026-11-
      - **Response.** The response then carries `canonical_plan`, filtered by field class like the plan. `plan_hash_mismatch` carries the new canonical plan in `details`.
      - **Batches.** In a batch, each item carries its canonical plan when `include_plan` and `include_canonical_plan` are both set.
 
-   Note ([ADR-0067](0067-quickflows-operating-presets.md), 2026-11-17 (proposed)): under the company setting `ui.post_review` at `on_exceptions`, the Post button sends Review and, when the response's `review_reasons` is empty, Confirm at once with `is_review_skipped: true`; otherwise, or on `post_review_required`, the plan panel opens as above with the reasons listed. The client computes no reason itself (rule 2); the default `always` keeps this rule unchanged ([ADR-0067](0067-quickflows-operating-presets.md) rules 11–13).
+   Note ([ADR-0067](0067-quickflows-operating-presets.md), 2026-11-21): under the company setting `ui.post_review` at `on_exceptions`, the Post button sends Review and, when the response's `review_reasons` is empty, Confirm at once with `is_review_skipped: true`; otherwise, or on `post_review_required`, the plan panel opens as above with the reasons listed. The client computes no reason itself (rule 2); the default `always` keeps this rule unchanged ([ADR-0067](0067-quickflows-operating-presets.md) rules 11–13).
 10. Check results. Command responses gain `checks`: a list of `{code, message, rule, field, details}` from the check-result catalog (DS-04), in simulate and execute and per batch item.
     - **`message`** is English, as for errors.
     - **`details`** are filtered by field class.
@@ -200,10 +200,10 @@ Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), 2026-11-
 
     Note: the header also carries the subject document's `owner_employee_id` and `created_by_user_id` (IDs), and a header is forwarded only when the session's read owner scope reaches the document, checked against the same cached assignments and organization data ([ADR-0054](0054-users-roles-and-authorizations.md) rule 15).
 
-    Note ([ADR-0076](0076-internal-messaging-and-notifications.md), proposed 2026-11-19): a `MessageCreated` header (subject: the message) is resolved to its conversation and forwarded only to sessions whose user may read that conversation now, through messaging's registered visibility function, and a `NotificationCreated` header only to its recipient's sessions; no tab subscribes to the noun `message`; headers carry IDs, never text (ADR-0076 rule 8).
+    Note ([ADR-0076](0076-internal-messaging-and-notifications.md), 2026-11-21): a `MessageCreated` header (subject: the message) is resolved to its conversation and forwarded only to sessions whose user may read that conversation now, through messaging's registered visibility function, and a `NotificationCreated` header only to its recipient's sessions; no tab subscribes to the noun `message`; headers carry IDs, never text (ADR-0076 rule 8).
 14. Notifications to people beyond live screens (e-mail, push) are after Phase 1 (spec 07).
 
-    Note ([ADR-0076](0076-internal-messaging-and-notifications.md), proposed 2026-11-19): ADR-0076, in Phase 1 by the author's decision of 2026-11-19, adds an in-app inbox fed by messages and work items, and notification e-mail grouped per person every 5 minutes or in a daily digest, without message text (rules 6, 7). Push stays after Phase 1.
+    Note ([ADR-0076](0076-internal-messaging-and-notifications.md), 2026-11-21): ADR-0076, in Phase 1 by the author's decision of 2026-11-19, adds an in-app inbox fed by messages and work items, and notification e-mail grouped per person every 5 minutes or in a daily digest, without message text (rules 6, 7). Push stays after Phase 1.
 
 **Language, keyboard, display**
 
@@ -224,11 +224,11 @@ Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), 2026-11-
     - **Grids:** AG Grid's model, with the same `Alt` keys.
     - **Registration.** All shortcuts are registered in one map with translated labels, and every action works without a mouse.
 
-    Note ([ADR-0061](0061-barcodes.md), proposed 2026-11-15): a keyboard-wedge scan into a focused code field ends with the scanner's Enter suffix, which moves to the next field as above. Every code field on desktop screens accepts wedge scans and resolves them with `EvaluateBarcode` for the field's expected type; a scan is told from typing by the AIM prefix, the suffix and its speed (rule 22).
+    Note ([ADR-0061](0061-barcodes.md), 2026-11-15): a keyboard-wedge scan into a focused code field ends with the scanner's Enter suffix, which moves to the next field as above. Every code field on desktop screens accepts wedge scans and resolves them with `EvaluateBarcode` for the field's expected type; a scan is told from typing by the AIM prefix, the suffix and its speed (rule 22).
 
-    Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): each floorplan adds its own keys to this map (`/` search and `Space` select in lists, `Alt+1`–`Alt+9` sections on object pages, `j`/`k` and `c` in worklists, `Alt+Y`/`Alt+R` in the approval view, `Ctrl+/` the assist panel); `check` keeps the map free of conflicts (ADR-0077 rules 4, 19).
+    Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), 2026-11-21): each floorplan adds its own keys to this map (`/` search and `Space` select in lists, `Alt+1`–`Alt+9` sections on object pages, `j`/`k` and `c` in worklists, `Alt+Y`/`Alt+R` in the approval view, `Ctrl+/` the assist panel); `check` keeps the map free of conflicts (ADR-0077 rules 4, 19).
 
-    Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): grids keep this model in `line_grid`, the repository's TanStack Table grid, which replaces AG Grid (ADR-0077 rule 5).
+    Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), 2026-11-21): grids keep this model in `line_grid`, the repository's TanStack Table grid, which replaces AG Grid (ADR-0077 rule 5).
 17. Display and targets:
     - **Untrusted fields.** Shown as plain text in a marked "external content" style, never rendered as HTML, with links not clickable.
     - **Taint.** A badge on tainted versions and proposals, with the clearance record.
@@ -244,9 +244,11 @@ Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), 2026-11-
 
     Note (author's delegation, 2026-11-19): the size targets are set, interim: the initial route at most 250 KB of JavaScript gzipped, each further route chunk at most 150 KB gzipped, and the generated schema bundle loaded per area, not all at once. They are revisited when the Center framework is built. Accessibility and browser targets stay as written.
 
-    Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): the size targets apply to generated routes; the densities `compact` (desktop) and `touch` (PWA, coarse pointers) and the theme are design tokens; targets are at least 24 px at `compact` and 44 px at `touch`; axe-core runs on every floorplan in the generated tests (ADR-0077 rules 7, 19, 21) AG Grid leaves the stack: line entry uses `line_grid`, an editable grid on TanStack Table written in the repository, keyboard first, with barcode-capable cells and within the route budget (ADR-0077 rules 5, 20).
+    Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), 2026-11-21): the size targets apply to generated routes; the densities `compact` (desktop) and `touch` (PWA, coarse pointers) and the theme are design tokens; targets are at least 24 px at `compact` and 44 px at `touch`; axe-core runs on every floorplan in the generated tests (ADR-0077 rules 7, 19, 21) AG Grid leaves the stack: line entry uses `line_grid`, an editable grid on TanStack Table written in the repository, keyboard first, with barcode-capable cells and within the route budget (ADR-0077 rules 5, 20).
 
     Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), 2026-11-21): the data grid is the in-repo TanStack Table grid, not AG Grid (ADR-0077 rules 5, 20).
+
+    Note (S2 open questions, 2026-11-21): the targets are accepted, no longer open: WCAG 2.2 AA on desktop screens, the stated browsers, Chrome on Android 10 or later for the warehouse PWA, and touch targets of at least 24 by 24 CSS pixels on the PWA's key controls.
 
 **Structure, tests and scope**
 
@@ -276,9 +278,9 @@ Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), 2026-11-
     - **Production and planning screens** are generated over their queries (ADR-0034 rule 18; ADR-0024).
     - **Elsewhere:** shop-floor and warehouse flows (DS-31), print (DS-27), list export (DS-33).
 
-    Note ([ADR-0061](0061-barcodes.md), proposed 2026-11-15): DS-31 builds the PWA's scanning on ADR-0061: BarcodeDetector for EAN/UPC and ITF only, until the scanner check page proves on a device that it passes GS through, and a WebAssembly decoder for Code 128, GS1-128, DataMatrix and QR; wedge capture, the shipped scanner profiles and the check page. The WebAssembly modules load on first use and are measured apart from the JavaScript budget of rule 17 (rules 22, 23).
+    Note ([ADR-0061](0061-barcodes.md), 2026-11-15): DS-31 builds the PWA's scanning on ADR-0061: BarcodeDetector for EAN/UPC and ITF only, until the scanner check page proves on a device that it passes GS through, and a WebAssembly decoder for Code 128, GS1-128, DataMatrix and QR; wedge capture, the shipped scanner profiles and the check page. The WebAssembly modules load on first use and are measured apart from the JavaScript budget of rule 17 (rules 22, 23).
 
-    Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): the six step 9 entry screens are no longer hand-built: they are generated create and edit forms with the editable line grid, and their UX spec becomes annotation tuning; the MISA measure is unchanged. The extraction verification screen, the work-order tablet, the analysis view and the PWA scanning flows are registered custom components (ADR-0077 rules 5, 22).
+    Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), 2026-11-21): the six step 9 entry screens are no longer hand-built: they are generated create and edit forms with the editable line grid, and their UX spec becomes annotation tuning; the MISA measure is unchanged. The extraction verification screen, the work-order tablet, the analysis view and the PWA scanning flows are registered custom components (ADR-0077 rules 5, 22).
 
     Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), 2026-11-21): the data grid is the in-repo TanStack Table grid, not AG Grid (ADR-0077 rules 5, 20).
 

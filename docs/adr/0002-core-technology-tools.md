@@ -32,9 +32,9 @@ One developer, most code written by AI. Popular libraries help AI write correct 
 
 Note (author's delegation, 2026-11-19): Procrastinate is dropped (OPT-08, [ADR-0031](0031-design-simplifications.md) rule 15 note). System jobs, scheduled jobs and the PDF worker run on the outbox workers and queues of ADR-0013 and ADR-0022 rule 12. A spike at step 0 confirms it; if the spike needs more than one small module, Procrastinate stays.
 
-Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): AG Grid Community leaves the stack (the tool choice delegated by the author, 2026-11-19). Line entry uses `line_grid`, an editable grid component on TanStack Table written in the repository, keyboard first, with barcode-capable cells and within the 150 KB route budget. AG Grid comes back only through an ADR, if a measured need appears; performance rule 3's AG Grid lines no longer apply.
+Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), 2026-11-21): AG Grid Community leaves the stack (the tool choice delegated by the author, 2026-11-19). Line entry uses `line_grid`, an editable grid component on TanStack Table written in the repository, keyboard first, with barcode-capable cells and within the 150 KB route budget. AG Grid comes back only through an ADR, if a measured need appears; performance rule 3's AG Grid lines no longer apply.
 
-Note ([ADR-0061](0061-barcodes.md), proposed 2026-11-15): the PDF worker draws barcodes as SVG with Zint's command-line program (GS1 mode, SVG to standard output), run in the worker's sandbox, so no Python binding is needed; libzint is BSD-3-Clause and the command-line program GPL-3.0, both compatible with the core's AGPL-3.0 (spec 18), to verify at build. GS1 data is parsed and built by the core's own `nativeflows.gs1`, whose Application Identifier table is generated from the GS1 Barcode Syntax Dictionary (rules 1, 21).
+Note ([ADR-0061](0061-barcodes.md), 2026-11-15): the PDF worker draws barcodes as SVG with Zint's command-line program (GS1 mode, SVG to standard output), run in the worker's sandbox, so no Python binding is needed; libzint is BSD-3-Clause and the command-line program GPL-3.0, both compatible with the core's AGPL-3.0 (spec 18), to verify at build. GS1 data is parsed and built by the core's own `nativeflows.gs1`, whose Application Identifier table is generated from the GS1 Barcode Syntax Dictionary (rules 1, 21).
 
 **Testing:** pytest on real PostgreSQL via testcontainers, never SQLite; Hypothesis stateful testing generates random business sequences and checks invariants after each step; golden scenarios read from hand-built spreadsheets; concurrency tests for stock posting.
 
@@ -53,7 +53,7 @@ Note ([ADR-0061](0061-barcodes.md), proposed 2026-11-15): the PDF worker draws b
 
 Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), 2026-11-21): the data grid is the in-repo TanStack Table grid, not AG Grid (ADR-0077 rules 5, 20).
 
-Note ([ADR-0061](0061-barcodes.md), proposed 2026-11-15): the fallback is a WebAssembly decoder based on ZXing-C++ (Apache-2.0), which reports the symbology identifier and FNC1; it reads Code 128, GS1-128, DataMatrix and QR, while BarcodeDetector reads only EAN/UPC and ITF until a device proves it passes GS through. The PWA also runs the GS1 Syntax Engine (Apache-2.0) in WebAssembly for instant feedback; both load on first use. Apache-2.0 code may be used in the AGPL-3.0 core (spec 18) (rules 1, 22).
+Note ([ADR-0061](0061-barcodes.md), 2026-11-15): the fallback is a WebAssembly decoder based on ZXing-C++ (Apache-2.0), which reports the symbology identifier and FNC1; it reads Code 128, GS1-128, DataMatrix and QR, while BarcodeDetector reads only EAN/UPC and ITF until a device proves it passes GS through. The PWA also runs the GS1 Syntax Engine (Apache-2.0) in WebAssembly for instant feedback; both load on first use. Apache-2.0 code may be used in the AGPL-3.0 core (spec 18) (rules 1, 22).
 
 **Infrastructure and docs:** Docker Compose, Caddy, pgBackRest, GitHub Actions; MkDocs Material; the repo has CLAUDE.md and coding-agent skills from the start.
 
@@ -69,6 +69,8 @@ Note ([ADR-0061](0061-barcodes.md), proposed 2026-11-15): the fallback is a WebA
    - Autovacuum tuned per hot table, with lower thresholds than default.
    - Block long-running transactions, which stop vacuum from cleaning: time limits on agents' read-only queries and on idle-in-transaction sessions.
    - Monitor dead tuples and autovacuum lag on the operations dashboard.
+
+   Note (S2 findings closure, 2026-11-21; finding 4): the first bullet's last sentence is superseded by [ADR-0006](0006-id-and-numeric-model.md) rules 22–23: the ledger tables keep a single-column `id uuid` key and are not partitioned in Phase 1; a later partitioning scheme is decided by ADR.
 3. **The frontend is split by screen** with Vite dynamic imports. AG Grid loads only on desktop data-entry screens, and only the AG Grid modules in use are registered. The phone warehouse app never loads AG Grid. On desktop, AG Grid is prefetched when the browser is idle after login so the first open does not wait.
 
 Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), 2026-11-21): the data grid is the in-repo TanStack Table grid, not AG Grid (ADR-0077 rules 5, 20).
@@ -82,6 +84,8 @@ Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), 2026-11-
 - Procrastinate does not meet measured throughput: consider a dedicated queue.
 - The journal grows to where reports are measurably slow: partition by fiscal year.
 - WeasyPrint cannot render complex print templates: consider headless Chromium in the PDF worker.
+
+Note (S2 findings closure, 2026-11-21; finding 4): "partition by fiscal year" is replaced by [ADR-0006](0006-id-and-numeric-model.md) rule 23: the scheme is decided by ADR at that point.
 
 ## Documents updated
 

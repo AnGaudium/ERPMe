@@ -228,8 +228,15 @@ def run(docs, pkg, regime, quiet=False):
         if len(tcodes) != len(tcodes_rows): fail('tax codes: duplicate code')
         trates = load(os.path.join(tdir, 'tax_rates.csv'))
         tmatrix = load(os.path.join(tdir, 'tax_matrix.csv'))
+        # ADR-0080 rules 1-2: the matrix's first axis is the tax treatment (column tax_treatment, list tax_treatments.csv).
+        # Alias: a package not yet reworked (DS-19) keeps the old column partner_tax_group and file partner_tax_groups.csv,
+        # read here as the treatment until its rework (open question, Vietnam rework).
+        for m in tmatrix:
+            m.setdefault('tax_treatment', m.get('partner_tax_group', ''))
+            m['partner_tax_group'] = m['tax_treatment']
         itg = load(os.path.join(tdir, 'item_tax_groups.csv'))
-        ptg = load(os.path.join(tdir, 'partner_tax_groups.csv'))
+        _tt = os.path.join(tdir, 'tax_treatments.csv')
+        ptg = load(_tt if os.path.exists(_tt) else os.path.join(tdir, 'partner_tax_groups.csv'))
         datere = _re.compile(r'^\d{4}-\d{2}-\d{2}$')
         for name, rows, key in (('tax code', tcodes_rows, 'code'), ('rate', trates, 'tax_code'), ('matrix', tmatrix, 'item_tax_group'),
                                 ('item tax group', itg, 'code'), ('partner tax group', ptg, 'code')):

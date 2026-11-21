@@ -26,7 +26,7 @@ CREATE TABLE document_reader (                             -- installation data;
     package_code   text,                                   -- the localization package that registered it; null for core and module readers
     purposes       text[] NOT NULL,                        -- the purposes it reads (rule 2)
     content_hash   text NOT NULL CONSTRAINT ck_document_reader_content_hash CHECK (content_hash ~ '^[0-9a-f]{64}$'),
-    recorded_at    timestamptz NOT NULL,
+    recorded_at    timestamptz NOT NULL DEFAULT now(),
     UNIQUE (code, version),
     CONSTRAINT ck_document_reader_purposes CHECK (cardinality(purposes) > 0
         AND purposes <@ ARRAY['supplier_invoice', 'contact_card', 'inquiry_lines', 'product_source', 'shop_floor_report', 'delivery_note', 'certificate_of_analysis']::text[])
@@ -61,7 +61,7 @@ CREATE TABLE document_extraction (                         -- one per attachment
                                  AND NOT jsonb_path_exists(rule_overrides, '$[*] ? (@.type() != "object" || !(exists(@.rule)) || !(exists(@.reason))
                                      || @.rule.type() != "string" || @.reason.type() != "string" || @.rule == "shape" || @.reason like_regex "^\\s*$")')),
     canceled_reason          text,                         -- a person's reason, or rendering_of_parsed_xml from the system (rule 25)
-    recorded_at              timestamptz NOT NULL,
+    recorded_at              timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT uq_document_extraction_attachment_purpose UNIQUE (company_id, attachment_id, purpose),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, attachment_id) REFERENCES attachment (company_id, id),
@@ -76,6 +76,7 @@ CREATE TABLE document_extraction (                         -- one per attachment
 );
 -- OCR and text-layer words with normalized boxes and reading-order lines (rule 9); personal and untrusted with their extraction.
 CREATE TABLE extraction_word (
+    id                       uuid PRIMARY KEY,   -- uq_extraction_word_key named by hand: the convention name would exceed 63 bytes (ADR-0004 rule 6)
     company_id               uuid NOT NULL,
     document_extraction_id   uuid NOT NULL,
     layer                    text NOT NULL CONSTRAINT ck_extraction_word_layer CHECK (layer IN ('ocr', 'text_layer')),
@@ -90,8 +91,8 @@ CREATE TABLE extraction_word (
     y1                       numeric(7,6) NOT NULL,
     confidence_raw           numeric(5,4) CONSTRAINT ck_extraction_word_confidence CHECK (confidence_raw BETWEEN 0 AND 1),   -- the engine's score
     is_on_render             boolean,                      -- text layer only: an OCR word of equal text overlaps it (rule 18)
-    recorded_at              timestamptz NOT NULL,
-    PRIMARY KEY (document_extraction_id, layer, page_number, word_number),
+    recorded_at              timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_extraction_word_key UNIQUE (document_extraction_id, layer, page_number, word_number),
     FOREIGN KEY (company_id, document_extraction_id) REFERENCES document_extraction (company_id, id),
     -- boxes in 0..1 from the page's top left, so they survive any rendering
     CONSTRAINT ck_extraction_word_box CHECK (0 <= x0 AND x0 < x1 AND x1 <= 1 AND 0 <= y0 AND y0 < y1 AND y1 <= 1),
@@ -116,7 +117,7 @@ CREATE TABLE extraction_field (                            -- append-only; a cor
     confidence_calibrated    numeric(5,4) CONSTRAINT ck_extraction_field_confidence_calibrated CHECK (confidence_calibrated BETWEEN 0 AND 1),   -- from the company's golden set (rule 13)
     data_label               text NOT NULL CONSTRAINT ck_extraction_field_data_label CHECK (data_label IN ('internal', 'personal', 'sensitive_personal')),
     supersedes_field_id      uuid,                         -- the row this one replaces
-    recorded_at              timestamptz NOT NULL,
+    recorded_at              timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     UNIQUE (company_id, id, document_extraction_id),
     UNIQUE (company_id, id, document_extraction_id, field_path, value_type),
@@ -141,6 +142,7 @@ CREATE UNIQUE INDEX ux_extraction_field_supersedes ON extraction_field (supersed
 -- Rule runs (rule 14): one row per run, field and rule; append-only; every run evaluates every current field, and trust reads only the
 -- extraction's highest run number. Confirmations start no run.
 CREATE TABLE extraction_rule_run (
+    id                       uuid PRIMARY KEY,   -- uq_extraction_rule_run_key named by hand: the convention name would exceed 63 bytes (ADR-0004 rule 6)
     company_id               uuid NOT NULL,
     document_extraction_id   uuid NOT NULL,
     run_number               integer NOT NULL CONSTRAINT ck_extraction_rule_run_number CHECK (run_number > 0),   -- increasing per extraction
@@ -149,30 +151,32 @@ CREATE TABLE extraction_rule_run (
     passed                   boolean NOT NULL,             -- strictly true or false
     detail                   jsonb NOT NULL DEFAULT '{}',
     trigger_kind             text NOT NULL CONSTRAINT ck_extraction_rule_run_trigger CHECK (trigger_kind IN ('ladder', 'vision', 'correction')),   -- written in the same transaction as that write (rule 14)
-    recorded_at              timestamptz NOT NULL,
-    PRIMARY KEY (document_extraction_id, run_number, extraction_field_id, rule),
+    recorded_at              timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_extraction_rule_run_key UNIQUE (document_extraction_id, run_number, extraction_field_id, rule),
     FOREIGN KEY (company_id, extraction_field_id, document_extraction_id) REFERENCES extraction_field (company_id, id, document_extraction_id)
 );
 CREATE INDEX ix_extraction_rule_run_field ON extraction_rule_run (extraction_field_id, run_number);
 -- A person's confirmation of a field row (rule 23); one per row; append-only.
 CREATE TABLE extraction_confirmation (
+    id                       uuid PRIMARY KEY,
     company_id               uuid NOT NULL,
     document_extraction_id   uuid NOT NULL,
-    extraction_field_id      uuid PRIMARY KEY,
+    extraction_field_id      uuid NOT NULL CONSTRAINT uq_extraction_confirmation_extraction_field_id UNIQUE,
     confirmed_by_user_id     uuid NOT NULL REFERENCES user_account (id),
     confirmed_at             timestamptz NOT NULL,
-    recorded_at              timestamptz NOT NULL,
+    recorded_at              timestamptz NOT NULL DEFAULT now(),
     FOREIGN KEY (company_id, extraction_field_id, document_extraction_id) REFERENCES extraction_field (company_id, id, document_extraction_id)
 );
 -- The subjects an extraction led to (rule 19): the e-invoice record, proposals, the created contact and partner, documents.
 CREATE TABLE extraction_result_link (
+    id                       uuid PRIMARY KEY,   -- uq_extraction_result_link_key named by hand: the convention name would exceed 63 bytes (ADR-0004 rule 6)
     company_id               uuid NOT NULL,
     document_extraction_id   uuid NOT NULL,
     target_table             text NOT NULL CONSTRAINT ck_extraction_result_link_target CHECK (target_table IN ('e_invoice_record', 'change_proposal', 'contact', 'partner',
                                  'quotation', 'purchase_invoice', 'bill_of_materials_revision', 'inspection_result')),   -- inspection_result: ADR-0070 rule 11
     target_id                uuid NOT NULL,                -- polymorphic, checked by the command that links it
-    recorded_at              timestamptz NOT NULL,
-    PRIMARY KEY (document_extraction_id, target_table, target_id),
+    recorded_at              timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_extraction_result_link_key UNIQUE (document_extraction_id, target_table, target_id),
     FOREIGN KEY (company_id, document_extraction_id) REFERENCES document_extraction (company_id, id)
 );
 CREATE INDEX ix_extraction_result_link_target ON extraction_result_link (company_id, target_table, target_id);
@@ -215,7 +219,7 @@ CREATE TABLE extraction_mapping_rule (                     -- company data, chan
     normalized_source_text   text NOT NULL,                -- NFKC, case folded, whitespace collapsed
     target                   text NOT NULL,                -- a field path, or a unit code for unit_text
     is_active                boolean NOT NULL DEFAULT true,
-    recorded_at              timestamptz NOT NULL,
+    recorded_at              timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, partner_id) REFERENCES partner (company_id, id),
     CONSTRAINT ck_extraction_mapping_rule_normalized CHECK (length(normalized_source_text) > 0 AND normalized_source_text = lower(normalized_source_text))
@@ -247,7 +251,7 @@ CREATE TABLE data_processing_permission (                  -- company data, chan
     suspension_reason        text CONSTRAINT ck_data_processing_permission_suspension_reason CHECK (suspension_reason IN ('provider_region_changed', 'provider_terms_changed')),
     effective_from           date NOT NULL,
     effective_to             date,                         -- inclusive; null = open
-    recorded_at              timestamptz NOT NULL,
+    recorded_at              timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, assessment_attachment_id) REFERENCES attachment (company_id, id),
     CONSTRAINT ck_data_processing_permission_assessment CHECK ((assessment_attachment_id IS NULL) = (assessed_on IS NULL)),
@@ -267,7 +271,7 @@ ALTER TABLE bill_of_materials ADD CONSTRAINT fk_bill_of_materials_proposed_item 
 ALTER TABLE bill_of_materials_component ADD CONSTRAINT fk_bill_of_materials_component_proposed_item FOREIGN KEY (company_id, proposed_change_proposal_item_id) REFERENCES change_proposal_item (company_id, id);
 
 -- ===== Guards =====
-CREATE FUNCTION document_reader_reject_change() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION document_reader_reject_change() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 BEGIN
     RAISE EXCEPTION 'document_reader rows are never updated or deleted' USING ERRCODE = 'restrict_violation';
 END
@@ -288,7 +292,7 @@ CREATE TRIGGER trg_extraction_result_link_append_only BEFORE UPDATE OR DELETE ON
     EXECUTE FUNCTION platform_check_append_only('{}', '{}', '{}');
 -- Appends to an extraction (rules 7, 8, 12, 23): nothing is appended to a verified or canceled extraction; a vision row
 -- supersedes only a row not found or illegible; a confirmation names a current row that is not an unaligned vision value.
-CREATE FUNCTION extraction_check_append() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION extraction_check_append() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 DECLARE
     v_state   text;
     v_status  text;
@@ -321,7 +325,7 @@ CREATE TRIGGER trg_extraction_confirmation_append BEFORE INSERT ON extraction_co
 -- | verified | canceled; needs_review -> verified | canceled; verified and canceled are final. Identity columns never change;
 -- the flags and the signature state change only while the record is pending (the recording command, rule 4); an extracted
 -- record never rests on a vision reader.
-CREATE FUNCTION document_extraction_check_change() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION document_extraction_check_change() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 BEGIN
     IF TG_OP = 'DELETE' THEN
         RAISE EXCEPTION 'document_extraction rows are never deleted' USING ERRCODE = 'restrict_violation';
@@ -354,17 +358,76 @@ $$;
 CREATE TRIGGER trg_document_extraction_change BEFORE INSERT OR UPDATE OR DELETE ON document_extraction
     FOR EACH ROW EXECUTE FUNCTION document_extraction_check_change();
 
--- ===== Row-level security (ADR-0017 rule 19; ADR-0022 rule 8) =====
+-- ===== recorded_at on insert and update; TRUNCATE refused (ADR-0007 rules 9, 16 and their notes) =====
+-- Every table of this file has recorded_at timestamptz NOT NULL DEFAULT now(). The DO block attaches the trigger
+-- trg_<table>_set_recorded_at (function set_recorded_at) to every table of v_tables: BEFORE INSERT OR UPDATE on tables
+-- updated in place, BEFORE INSERT on the append-only tables of v_append_only. recorded_at is so the instant of the last
+-- write, set by the system and never taken from a client (ADR-0007 rule 9 and its notes; S2 adversarial review S2).
+-- Append-only tables are those whose guard trigger refuses every update outside an erasure, and pure logs (here: document_reader_reject_change, platform_check_append_only).
+-- Row guards without UPDATE OF on in-place tables sort before set_recorded_at, so they compare rows before it runs; a
+-- BEFORE INSERT trigger whose function reads NEW.recorded_at sorts after it, so it sees the system's value.
+-- TRUNCATE skips row triggers and row-level security, so every table with company_id, every append-only table and every
+-- table with a BEFORE DELETE guard, unless it has a TRUNCATE trigger of its own, is listed in v_refuse_truncate (default
+-- partitions with their parent) and gets trg_<table>_refuse_truncate (BEFORE TRUNCATE, function refuse_truncate; S2
+-- adversarial review N4; S2 schema review R6-N2). Retention drops partitions and never truncates (ADR-0017 rule 19 note).
+-- Lab gen_overview.py --check compares this section with what schema_phase_b.py writes from the table definitions and
+-- triggers of the design files. The functions are defined in every file because the labs load subsets.
+CREATE OR REPLACE FUNCTION set_recorded_at() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
+BEGIN
+    NEW.recorded_at := now();
+    RETURN NEW;
+END $$;
+CREATE OR REPLACE FUNCTION refuse_truncate() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
+BEGIN
+    RAISE EXCEPTION '% is never truncated (company, append-only or guarded rows)', TG_TABLE_NAME USING ERRCODE = 'restrict_violation';
+END $$;
 DO $$
 DECLARE
-    v_table text;
+    v_tables            text[] := ARRAY['document_reader', 'document_extraction', 'extraction_word', 'extraction_field', 'extraction_rule_run',
+        'extraction_confirmation', 'extraction_result_link', 'extraction_mapping_rule', 'data_processing_permission'];
+    v_append_only       text[] := ARRAY['document_reader', 'extraction_confirmation', 'extraction_field', 'extraction_result_link', 'extraction_rule_run',
+        'extraction_word']::text[];
+    v_refuse_truncate   text[] := ARRAY['document_reader', 'document_extraction', 'extraction_word', 'extraction_field', 'extraction_rule_run',
+        'extraction_confirmation', 'extraction_result_link', 'extraction_mapping_rule', 'data_processing_permission']::text[];
+    v_table             text;
 BEGIN
-    FOREACH v_table IN ARRAY ARRAY['document_extraction', 'extraction_word', 'extraction_field', 'extraction_rule_run', 'extraction_confirmation',
-                                   'extraction_result_link', 'extraction_mapping_rule', 'data_processing_permission'] LOOP
+    FOREACH v_table IN ARRAY v_tables LOOP
+        CONTINUE WHEN to_regclass(v_table) IS NULL;
+        EXECUTE format('CREATE OR REPLACE TRIGGER %I BEFORE ' || CASE WHEN v_table = ANY (v_append_only) THEN 'INSERT' ELSE 'INSERT OR UPDATE' END
+                       || ' ON %I FOR EACH ROW EXECUTE FUNCTION set_recorded_at()', 'trg_' || v_table || '_set_recorded_at', v_table);
+    END LOOP;
+    FOREACH v_table IN ARRAY v_refuse_truncate LOOP
+        CONTINUE WHEN to_regclass(v_table) IS NULL;
+        EXECUTE format('CREATE OR REPLACE TRIGGER %I BEFORE TRUNCATE ON %I FOR EACH STATEMENT EXECUTE FUNCTION refuse_truncate()',
+                       'trg_' || v_table || '_refuse_truncate', v_table);
+    END LOOP;
+END $$;
+-- ===== end of recorded_at and TRUNCATE =====
+
+-- ===== Row-level security, generated (ADR-0017 rule 19; the rls_v1 helper of ADR-0022 rule 8) =====
+-- Every table of this file with company_id gets ENABLE and FORCE ROW LEVEL SECURITY, the company policy company_policy
+-- (company_id compared as text with nativeflows.company_id, failing closed) and the read-only company_ids_policy for
+-- registered cross-company queries (ADR-0017 rule 19). Tables whose company_id is nullable (v_nullable) show their null
+-- rows only under the setting value installation. Default partitions are listed with their parent. Exceptions are in
+-- lab gen_overview.RLS_ALLOWLIST with their reasons; this file has none.
+-- Lab gen_overview.py --check compares this section with what schema_phase_b.py writes.
+DO $$
+DECLARE
+    v_tables    text[] := ARRAY['document_extraction', 'extraction_word', 'extraction_field', 'extraction_rule_run', 'extraction_confirmation',
+        'extraction_result_link', 'extraction_mapping_rule', 'data_processing_permission'];
+    v_nullable  text[] := ARRAY[]::text[];
+    v_table     text;
+BEGIN
+    FOREACH v_table IN ARRAY v_tables LOOP
         EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', v_table);
         EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', v_table);
-        EXECUTE format('CREATE POLICY company_policy ON %I USING (company_id::text = current_setting(''nativeflows.company_id'', true))', v_table);
+        IF v_table = ANY (v_nullable) THEN
+            EXECUTE format('CREATE POLICY company_policy ON %I USING (company_id::text = current_setting(''nativeflows.company_id'', true)'
+                           ' OR (company_id IS NULL AND current_setting(''nativeflows.company_id'', true) = ''installation''))', v_table);
+        ELSE
+            EXECUTE format('CREATE POLICY company_policy ON %I USING (company_id::text = current_setting(''nativeflows.company_id'', true))', v_table);
+        END IF;
         EXECUTE format('CREATE POLICY company_ids_policy ON %I FOR SELECT USING (company_id::text = ANY (string_to_array(current_setting(''nativeflows.company_ids'', true), '','')))', v_table);
     END LOOP;
-END
-$$;
+END $$;
+-- ===== end of row-level security =====

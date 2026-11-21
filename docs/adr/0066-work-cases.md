@@ -69,9 +69,9 @@ A case never widens an agent's read scope.
 
    The kind `quote_request` mirrors the quotation agent's trigger (ADR-0051 rule 14). The kind `customer_onboarding` mirrors the onboarding agent's trigger (ADR-0051 rule 11).
 
-   Note ([ADR-0070](0070-quality-management-core.md), proposed 2026-11-17): a fifth kind, `nonconformance` (`quality`, trigger `nonconformance_open`, origins `nonconformance` and `inspection_lot`, `role:quality_inspector`, `days:5`, `person`). Containment and corrective actions are `nonconformance_action` items in the case (ADR-0070 rule 16).
+   Note ([ADR-0070](0070-quality-management-core.md), 2026-11-21): a fifth kind, `nonconformance` (`quality`, trigger `nonconformance_open`, origins `nonconformance` and `inspection_lot`, `role:quality_inspector`, `days:5`, `person`). Containment and corrective actions are `nonconformance_action` items in the case (ADR-0070 rule 16).
 
-   Note ([ADR-0071](0071-work-orders-and-shop-floor-execution.md), proposed 2026-11-17): a sixth kind, `production_disruption` (`production`, trigger `operation_blocked`, origins `production_order_operation` and `production_order`, `role:shop_floor_lead`, `days:1`, `person`) (ADR-0071 rule 18).
+   Note ([ADR-0071](0071-work-orders-and-shop-floor-execution.md), 2026-11-21): a sixth kind, `production_disruption` (`production`, trigger `operation_blocked`, origins `production_order_operation` and `production_order`, `role:shop_floor_lead`, `days:1`, `person`) (ADR-0071 rule 18).
 4. Company configuration (ADR-0063 rule 1; [settings.csv](../catalogs/settings.csv)):
    - **`work_case.<kind>.mode`** (company, enum, default `off`):
      - `off`: the kind opens no case;
@@ -182,7 +182,7 @@ A case never widens an agent's read scope.
 
     `work.landing_page.<role_template>` chooses a role's home (rule 4). Lists, record views, command forms, the keyboard model and the six hand-built screens are unchanged.
 
-    Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), proposed 2026-11-19): the case view is the worklist floorplan with its right pane showing an object page, edit form or approval view; the Centers ADR builds on the worklist and overview floorplans (ADR-0077 rules 1–3).
+    Note ([ADR-0077](0077-ui-floorplans-annotations-and-embedded-agent.md), 2026-11-21): the case view is the worklist floorplan with its right pane showing an object page, edit form or approval view; the Centers ADR builds on the worklist and overview floorplans (ADR-0077 rules 1–3).
 
 **Checks**
 
@@ -198,7 +198,7 @@ A case never widens an agent's read scope.
   - extractions with evidence (ADR-0057);
   - command batches (ADR-0008 rule 20);
   - bulk review (ADR-0042 rule 12 note);
-  - the auto-post gateway (ADR-0065, proposed).
+  - the auto-post gateway (ADR-0065, accepted 2026-11-21).
 - **The gap.** A work item is one exception, and it closes when the exception ends. A customer e-mail that becomes a quotation passes through `inbound_message_matched`, an agent run, a draft, possibly `approval_pending`, and `follow_up_due`, and no record says these belong together. People handling exception work need one place per intent.
 - **Practice** confirms the narrow form:
   - SAP S/4HANA Situation Handling keeps a situation with an anchor object, related objects and actions above the business documents, and opening a related app leaves the situation unchanged.
@@ -229,6 +229,8 @@ A case never widens an agent's read scope.
 - **For auditors:** every action in a case is an ordinary audited command. The case adds no record that a posting depends on.
 - **For the build:** the tables, commands and queries land with the step-5 work-queue screens, after the `work` core is built with the first agent (ADR-0042 rule 20). The case view and case list are generated screens. Nothing in steps 0 to 4 depends on this ADR. The work is small-model friendly: CRUD with links, one consumer and SQL views.
 - **CRM-only deployments (a consequence, not a rule):** a deployment that runs only `crm` and master data would use the case list and case view as its main surface, since its work is mostly external exceptions. This ADR adds nothing that stands in the way. The separability question itself, including the ledger account references on partner profiles, stays open for the author (architecture overview B17).
+
+  Note (S2 closure, 2026-11-21): the separability question was decided on 2026-11-17: CRM runs on its own as a deployment profile of the one product ([ADR-0052](0052-minimal-crm.md) rule 1 note).
 - **Revisit when:**
   - a company asks for internal case kinds (shortage, count difference, variance, close issue, engineering change);
   - an agent needs to read a whole case, which would widen ADR-0050 rule 27 and needs the author;
@@ -236,7 +238,7 @@ A case never widens an agent's read scope.
 
 ## Documents updated
 
-- **ADRs** (notes tagged "ADR-0066, 2026-11-16 (proposed)"):
+- **ADRs** (notes tagged "ADR-0066, 2026-11-21"):
   - [ADR-0013](0013-outbox-and-events.md) rule 11;
   - [ADR-0022](0022-repository-and-engineering-conventions.md) rule 2;
   - [ADR-0029](0029-proposals-and-agent-safety.md) rule 8;

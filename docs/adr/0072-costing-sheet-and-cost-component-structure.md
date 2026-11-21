@@ -60,6 +60,8 @@ The author's decision of 2026-11-18: ADR-0035 keeps actual costing as it is (the
    - **The split.** Opening = the detail's closing of the order's previous period with costs (none: the default detail takes the parent's opening). Incurred and abnormal: each line by rule 3. Residual and closing: the parent's amounts split in proportion to each detail's available amount (opening + incurred − abnormal) by largest remainder, ties by `sequence`, then `code`; when the component's available amount is 0, both go to the default detail. To-output: the rest per detail. Every column sums exactly to the parent (INV-851), and each row balances like its parent.
    - **Why not a key on `production_order_period_cost`.** The solve, the WIP methods and INV-106 work per posting component (ADR-0035 rules 6, 9). A detailed key would multiply nodes, settlement lines and rerun differences for a reporting need.
    - **Why not a pure report-time mapping.** The WIP carried between periods needs the previous period's split, a mapping change would restate closed periods, and the analysis layer reads one stored figure (ADR-0060 rule 19; ADR-0035 rule 15 note). The same function still maps journal and document lines at report time for drill-down (rule 5).
+
+   Note (chief architect, 2026-11-21, under the author's delegation of that day; the author's instruction that costing follows SAP): the actual cost component split through stock (SAP carries the standard cost estimate's split through actual costing across levels, from a period start; point A4 of the verification section of [reviews/2026-11-21-costing-sap-comparison.md](../reviews/2026-11-21-costing-sap-comparison.md)) is a seam in Phase 1, not built. The split stops at the order, as stored above. The later feature carries values per posting component through the stock nodes of [ADR-0020](0020-inventory-and-costing-model.md) rule 12's solve as extra right-hand sides of the same system, stores them as a read model per item, valuation area, period and component, and starts at a period start with an opening split taken from purchase (all `material`) or from the released estimate's components; nothing posted changes, so Phase 1 needs no column for it (ADR-0020 rule 12 note of this date).
 5. Reports:
    - **`GetCostEstimate`** shows lines by detail and the costed sheet rows (rule 8).
    - **The order cost report** (DS-26) and **`GetProductionOrderVariance`** take an optional grouping `cost_component_detail`: target per detail from the estimate's lines, scaled as ADR-0035 rule 15 says; actual from `production_order_period_cost_detail`. The variance categories are unchanged.
@@ -184,6 +186,8 @@ The author's decision of 2026-11-18: ADR-0035 keeps actual costing as it is (the
     - every surcharge row names its credited cost center and detail, the two keys an absorption posting needs;
     - such a posting would debit the order and credit the pool with the planned absorption, leaving the pool's rest as the variance; that needs a new settlement step, a transaction key, a method value and the author's choice. Nothing in this ADR posts.
 
+    Note (chief architect, 2026-11-21, under the author's delegation of that day; the author's instruction that costing follows SAP): the choice is made. As in SAP, valuation at a standard price is a price-control option beside periodic actual costing (the default, D6), the later ADR decides between SAP's two configurations, standard price with variance postings and no actual costing, or standard price with actual costing, and actual overhead is applied by costing sheet with the over- or under-absorption left as a variance on the pool. This seam is where an ADR after step 5 designs both ([ADR-0035](0035-production-costing.md) rule 16 note; [open-questions.md](../open-questions.md), DS-53 entries). The phase is stated by that ADR: after step 5 and after Phase 1 unless the author moves it, since ADR-0018 rule 3 and spec 09 keep standard price out of Phase 1; until then those hold.
+
 ## Context
 
 - **The ask.** The author asked for planned costing that a manufacturer can explain: how overhead enters a cost estimate, on what base and at what rate, and costs that read in more than four buckets, without touching actual costing.
@@ -220,7 +224,7 @@ The author's decision of 2026-11-18: ADR-0035 keeps actual costing as it is (the
 
 ## Documents updated
 
-- **ADRs** (notes tagged "ADR-0072, proposed 2026-11-18"): ADR-0033 rule 13; ADR-0035 rules 14, 15, 17; ADR-0046 rule 14; ADR-0062 rule 12; ADR-0063 rule 29; ADR-0064 rule 1.
+- **ADRs** (notes tagged "ADR-0072, 2026-11-21"): ADR-0033 rule 13; ADR-0035 rules 14, 15, 17; ADR-0046 rule 14; ADR-0062 rule 12; ADR-0063 rule 29; ADR-0064 rule 1.
 - **Catalogs:** settings.csv (1), authorization-areas.csv (1), role-template-levels.csv (2), invariants.csv (5), edge-cases.csv (8); the catalogs README.
 - **Design:** DS-43-54-planning-production.sql; DS-04 (errors); DS-16 (invariant block and count); DS-17 (event type, edge case block and count); the glossary (new rows only); backlog; the generated overview.
 - **Lab:** `t26_costing_sheet.py` and the lab README (finding L-32); fixtures of `t16_planning_production_ddl.py` and `t21_product_engineering.py` seed the default details that estimate lines now name; `t24_settings.py` C12 reads "adds 1 definition" in the singular too.

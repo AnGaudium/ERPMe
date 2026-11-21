@@ -32,6 +32,8 @@ On 2026-11-14 the author decided that every capability a customer cannot operate
    - actual cost settled to stock and to cost of goods sold through the existing exact solver (ADR-0025 rule 6).
 
    The cost estimate is a benchmark for variances; stock stays valued at periodic actual cost (ADR-0020 rule 12). Whether standard cost becomes a valuation method stays the author's (spec 09 costing row, spec 08). Methods, normal capacity, overhead allocation and WIP valuation are accounting choices. DS-53 proposes them as flagged interims for the author (ADR-0005 item 1). Note: "best practice and Vietnamese rules together" reads "best practice; regimes configure" ([ADR-0053](0053-core-neutrality.md) rule 13).
+
+   Note (chief architect, 2026-11-21, under the author's delegation of that day; the author's instruction that costing follows SAP): the method question of this rule is decided. As in SAP, valuation at a standard price becomes a price-control option beside periodic actual costing, which stays the default (D6); the later ADR decides between SAP's two configurations, standard price with variance postings and no actual costing, or standard price with actual costing, and its granularity is the one the [ADR-0018](0018-product-and-item-model.md) rule 3 note states; the released cost estimate gives the standard price. It is designed by an ADR after step 5, on the seam of [ADR-0072](0072-costing-sheet-and-cost-component-structure.md) rule 21; that ADR states its phase: after Phase 1 unless the author moves it, since [ADR-0018](0018-product-and-item-model.md) rule 3 and spec 09 keep standard price out of Phase 1. Until then stock stays at periodic actual cost ([decisions.md](../decisions.md), note of 2026-11-21; [open-questions.md](../open-questions.md), DS-53 entries). Whether TT99 permits it is the Vietnam package's rule and stays with the Vietnam work.
 4. **ADR-0025 is superseded in part.** Production no longer waits for Phase 2 or for "design when built". Superseded:
    - the opening sentence;
    - rule 2's "kinds and lifecycle are designed in Phase 2";
@@ -53,7 +55,7 @@ On 2026-11-14 the author decided that every capability a customer cannot operate
 
    The production agent is design item DS-57, designed before the production core step ([ADR-0051](0051-agent-workflows.md) rule 29).
 
-   Note ([ADR-0070](0070-quality-management-core.md), proposed 2026-11-17): the author's decision of 2026-11-17 widens DS-52's "quality inspection on output" into a quality core in Phase 1. Design item DS-58 covers inspection plans, inspection lots at five points, results, usage decisions and nonconformances (ADR-0070).
+   Note ([ADR-0070](0070-quality-management-core.md), 2026-11-21): the author's decision of 2026-11-17 widens DS-52's "quality inspection on output" into a quality core in Phase 1. Design item DS-58 covers inspection plans, inspection lots at five points, results, usage decisions and nonconformances (ADR-0070).
 6. **Synthetic data.** DS-17 adds a fictional Vietnamese manufacturing company with multi-level bills of materials, production, subcontracting and production cost closing. It is due at the gate of the production core step. The production design items add their edge cases.
 7. **Author-owned documents.** The roadmap, build order, MVP scope, vision, specs and runbook are the author's documents. This ADR proposes their changes as an open question, with draft wording:
    - **Spec 09 (MVP scope):** production rows move to Phase 1, including MRP, routings, operations, shop floor and quality. "MVP is Phases 1 and 2" becomes "MVP is Phase 1".
@@ -81,9 +83,11 @@ On 2026-11-14 the author decided that every capability a customer cannot operate
 
    Note (author's delegation, 2026-11-19): the author's answer: there is no deadline and no customer commitment. The build carries no calendar dates; the build order and the gates are the only schedule, and no dated plan is set. The production core is a Phase 1 step numbered 4b: it starts after step 4's gate and may run beside step 5, and its gate check is the independent naive recomputation, not a manual spreadsheet. Spec 10 and spec 11 record step 4b without dates. Where subcontracting is built and the rest of the wording above stay open.
 
-   Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), proposed 2026-11-21): the list of agents done before platform completion keeps the planning agent, which ADR-0078 puts in Phase 1 after the manual path of planning with multi-level MRP is built and has passed its gate (after step 5; ADR-0024 rule 26, this rule). The runbook does not place that work yet (open question) (ADR-0078 rule 1). The three production agent types move to Phase 2 (ADR-0078 rule 2).
+   Note ([ADR-0078](0078-agent-simplification-for-phase-1.md), 2026-11-21): the list of agents done before platform completion keeps the planning agent, which ADR-0078 puts in Phase 1 after the manual path of planning with multi-level MRP is built and has passed its gate (after step 5; ADR-0024 rule 26, this rule). The runbook does not place that work yet (open question) (ADR-0078 rule 1). The three production agent types move to Phase 2 (ADR-0078 rule 2).
 
    Note (author's delegation, 2026-11-21; decided by the chief architect): the planning slice with multi-level MRP is the build step 5b ([runbook](../runbook/steps-5-9.md), [spec 11](../spec/11-build-order.md)), after the gates of steps 5 and 4b. The planning agent starts after the step 5b gate ([ADR-0078](0078-agent-simplification-for-phase-1.md) rule 1); this replaces "the runbook does not place that work yet" in the note above.
+
+   Note (S2 open questions, 2026-11-21): the open points of this rule's note are answered: standard cost is decided by the chief architect under the author's delegation of 2026-11-21 (rule 3 note; [open-questions.md](../open-questions.md), DS-53 entries); subcontracting ([ADR-0037](0037-subcontracting.md), DS-55) is built in step 5b, after the gates of steps 4b and 5; the phase labels and the production-in-Phase-1 statement of spec 01, 05, 08, the README and the risks file now follow this rule's draft wording (spec 00 rule 2 needed no change).
 
 8. **Questions this decision answers:**
    - planning's phase (DS-43): Phase 1;
@@ -96,7 +100,7 @@ On 2026-11-14 the author decided that every capability a customer cannot operate
    - payroll;
    - multi-level approval.
 
-   Note: the author asked (2026-11-15) for approval pools with several stages; they are designed in [ADR-0055](0055-approval-pools-and-stages.md) (proposed).
+   Note: the author asked (2026-11-15) for approval pools with several stages; they are designed in [ADR-0055](0055-approval-pools-and-stages.md) (accepted 2026-11-15).
 
    Note: [ADR-0055](0055-approval-pools-and-stages.md) was accepted on 2026-11-15 (holistic review 2026-11-15, item P27).
 

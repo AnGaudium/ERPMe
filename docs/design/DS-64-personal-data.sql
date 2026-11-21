@@ -11,7 +11,12 @@
 -- A data subject request (DS-35, module crm) is named through document (company_id, id) only: audit is layer 2 and refers to
 -- no crm table (ADR-0022 rule 2); the command checks that the document is a data subject request.
 -- Append-only tables use audit_refuse_change() of DS-35-crm.sql (owner audit). The erasure exception on posted documents,
--- versions, the journal and append-only rows (ADR-0079 rule 7) is written with the ledger and document DDL in session S2.
+-- versions and the journal (ADR-0079 rule 7) is erasure_update_allowed() of DS-05-platform.sql: the refusing triggers of
+-- document, document_version, payment, payment_line, tax_line, change proposals, period unlock requests, journal_entry,
+-- journal_line, approval, artifact_transition, automation_execution, setting_value, taint_clearance and work_item_note pass
+-- their catalog columns to it (lab t31 checks the lists against the catalog). The append-only guards of their own
+-- (analysis_example, company_setup_acknowledgement, document_extraction, posting_intent, saved_analysis_version) and the
+-- generated header and line triggers of DS-22 follow when those functions are next written (lab t31 lists them).
 -- The erasure journal outside the database holds one line per data_erasure_entry with every column of the entry (id, subject,
 -- target table, row key, column names, action, cause, request, command, time; no values), appended by the journal consumer of
 -- the IDs-only event DataErasureRecorded that audit.contract emits with each insert (ADR-0079 rule 7); ReapplyErasures, a step
@@ -36,6 +41,8 @@ CREATE TABLE data_subject_state (                          -- [audit] ADR-0079 r
     UNIQUE (subject_table, subject_id),
     FOREIGN KEY (company_id, data_subject_request_id) REFERENCES document (company_id, id),
     CONSTRAINT ck_data_subject_state_company CHECK (company_id IS NOT NULL OR subject_table = 'user_account'),
+    -- a state that names its request carries the request's company, a user account's too, so the composite key holds (S2 closure)
+    CONSTRAINT ck_data_subject_state_request_company CHECK (data_subject_request_id IS NULL OR company_id IS NOT NULL),
     CONSTRAINT ck_data_subject_state_destroyed CHECK ((state = 'destroyed') = (destroyed_at IS NOT NULL)),
     CONSTRAINT ck_data_subject_state_released CHECK ((state = 'released') = (released_at IS NOT NULL)),
     CONSTRAINT ck_data_subject_state_dates CHECK ((destroyed_at IS NULL OR destroyed_at >= blocked_at) AND (released_at IS NULL OR released_at >= blocked_at))
@@ -44,7 +51,7 @@ CREATE INDEX ix_data_subject_state_company_id_state ON data_subject_state (compa
 CREATE INDEX ix_data_subject_state_destroy_due_date ON data_subject_state (destroy_due_date) WHERE state = 'blocked' AND destroy_due_date IS NOT NULL;
 
 -- ===== Retention rules [audit] (ADR-0079 rule 9) =====
-CREATE TABLE retention_rule (                              -- [audit] ADR-0079 rule 9; seeded per company from the package's rules; the core seeds none
+CREATE TABLE retention_rule (                              -- [audit] ADR-0079 rule 9 and its note of 2026-11-21; set per company, defaults from the package; the core seeds none
     id                       uuid PRIMARY KEY,
     company_id               uuid NOT NULL REFERENCES company (id),
     retention_class          text NOT NULL CONSTRAINT ck_retention_rule_retention_class CHECK (retention_class IN ('master_data', 'accounting_document', 'crm_interaction',
@@ -52,15 +59,16 @@ CREATE TABLE retention_rule (                              -- [audit] ADR-0079 r
     start_event              text NOT NULL CONSTRAINT ck_retention_rule_start_event CHECK (start_event IN ('record_created', 'relationship_ended', 'last_document_posted', 'fiscal_year_closed')),
     block_after_months       integer CONSTRAINT ck_retention_rule_block_after_months CHECK (block_after_months >= 0),   -- null: the class is never blocked by the job
     destroy_after_months     integer CONSTRAINT ck_retention_rule_destroy_after_months CHECK (destroy_after_months >= 0),   -- null: nothing of the class is destroyed by the job
-    source                   text NOT NULL CONSTRAINT ck_retention_rule_source CHECK (source IN ('package', 'company')),   -- company: the company adjusted the package's periods
-    package_rule_ref         text NOT NULL,                       -- the package rule's key, flagged as ADR-0016 rule 12 says; kept when the company adjusts
-    is_verified              boolean NOT NULL DEFAULT false,      -- no destruction without a verified rule (rule 9; INV-894)
-    is_adjustable            boolean NOT NULL DEFAULT false,      -- the package allows the company to change the periods
+    source                   text NOT NULL CONSTRAINT ck_retention_rule_source CHECK (source IN ('package', 'company')),   -- company: the company's own rule, written or adjusted by it (rule 9 note)
+    package_rule_ref         text,                                -- the package rule's key, flagged as ADR-0016 rule 12 says; null only for a company rule with no package default
+    is_verified              boolean NOT NULL DEFAULT false,      -- no destruction without a verified rule (rule 9; INV-894); a package rule: the package's flag; a company rule: always true
+    is_adjustable            boolean NOT NULL DEFAULT false,      -- the package's mark; informative only since the rule 9 note of 2026-11-21 (no gate)
     recorded_at              timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     UNIQUE (company_id, retention_class),
     CONSTRAINT ck_retention_rule_order CHECK (block_after_months IS NULL OR destroy_after_months IS NULL OR destroy_after_months >= block_after_months),
-    CONSTRAINT ck_retention_rule_adjusted CHECK (source = 'package' OR is_adjustable)
+    CONSTRAINT ck_retention_rule_package_rule_ref CHECK (source = 'company' OR package_rule_ref IS NOT NULL),   -- a package rule names its package rule
+    CONSTRAINT ck_retention_rule_company_verified CHECK (source = 'package' OR is_verified)   -- the person who records a company rule confirms it (rule 9 note)
 );
 
 -- ===== Erasure entries [audit] (ADR-0079 rule 7) =====
@@ -82,6 +90,9 @@ CREATE TABLE data_erasure_entry (                          -- [audit] ADR-0079 r
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, data_subject_request_id) REFERENCES document (company_id, id),
     CONSTRAINT ck_data_erasure_entry_company CHECK (company_id IS NOT NULL OR subject_table = 'user_account'),
+    -- the request key is composite, so it is enforced only with company_id set: an installation row of a user account's
+    -- erasure names no request; the request is reached through command_id and the company rows of the same command (S2 closure)
+    CONSTRAINT ck_data_erasure_entry_request_company CHECK (data_subject_request_id IS NULL OR company_id IS NOT NULL),
     CONSTRAINT ck_data_erasure_entry_row_key CHECK (target_row_key IS NULL OR cardinality(target_row_key) > 1)
 );
 CREATE INDEX ix_data_erasure_entry_subject_id ON data_erasure_entry (subject_table, subject_id);
@@ -145,13 +156,63 @@ CREATE TRIGGER trg_data_erasure_entry_append_only BEFORE UPDATE OR DELETE ON dat
 CREATE TRIGGER trg_personal_data_read_log_append_only BEFORE UPDATE OR DELETE ON personal_data_read_log FOR EACH ROW
     EXECUTE FUNCTION audit_refuse_change();
 
--- ===== Row-level security (ADR-0017 rule 19; the rls_v1 helper of ADR-0022 rule 8, as DS-05-platform.sql) =====
+-- ===== recorded_at on insert and update; TRUNCATE refused (ADR-0007 rules 9, 16 and their notes) =====
+-- Every table of this file has recorded_at timestamptz NOT NULL DEFAULT now(). The DO block attaches the trigger
+-- trg_<table>_set_recorded_at (function set_recorded_at) to every table of v_tables: BEFORE INSERT OR UPDATE on tables
+-- updated in place, BEFORE INSERT on the append-only tables of v_append_only. recorded_at is so the instant of the last
+-- write, set by the system and never taken from a client (ADR-0007 rule 9 and its notes; S2 adversarial review S2).
+-- Append-only tables are those whose guard trigger refuses every update outside an erasure, and pure logs (here: audit_refuse_change).
+-- Row guards without UPDATE OF on in-place tables sort before set_recorded_at, so they compare rows before it runs; a
+-- BEFORE INSERT trigger whose function reads NEW.recorded_at sorts after it, so it sees the system's value.
+-- TRUNCATE skips row triggers and row-level security, so every table with company_id, every append-only table and every
+-- table with a BEFORE DELETE guard, unless it has a TRUNCATE trigger of its own, is listed in v_refuse_truncate (default
+-- partitions with their parent) and gets trg_<table>_refuse_truncate (BEFORE TRUNCATE, function refuse_truncate; S2
+-- adversarial review N4; S2 schema review R6-N2). Retention drops partitions and never truncates (ADR-0017 rule 19 note).
+-- Lab gen_overview.py --check compares this section with what schema_phase_b.py writes from the table definitions and
+-- triggers of the design files. The functions are defined in every file because the labs load subsets.
+CREATE OR REPLACE FUNCTION set_recorded_at() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
+BEGIN
+    NEW.recorded_at := now();
+    RETURN NEW;
+END $$;
+CREATE OR REPLACE FUNCTION refuse_truncate() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
+BEGIN
+    RAISE EXCEPTION '% is never truncated (company, append-only or guarded rows)', TG_TABLE_NAME USING ERRCODE = 'restrict_violation';
+END $$;
 DO $$
 DECLARE
-    v_table     text;
-    v_nullable  text[] := ARRAY['data_subject_state', 'data_erasure_entry'];
+    v_tables            text[] := ARRAY['data_subject_state', 'retention_rule', 'data_erasure_entry', 'personal_data_read_log', 'personal_data_breach'];
+    v_append_only       text[] := ARRAY['data_erasure_entry', 'personal_data_read_log']::text[];
+    v_refuse_truncate   text[] := ARRAY['data_subject_state', 'retention_rule', 'data_erasure_entry', 'personal_data_read_log', 'personal_data_breach']::text[];
+    v_table             text;
 BEGIN
-    FOREACH v_table IN ARRAY ARRAY['data_subject_state', 'retention_rule', 'data_erasure_entry', 'personal_data_read_log', 'personal_data_breach'] LOOP
+    FOREACH v_table IN ARRAY v_tables LOOP
+        CONTINUE WHEN to_regclass(v_table) IS NULL;
+        EXECUTE format('CREATE OR REPLACE TRIGGER %I BEFORE ' || CASE WHEN v_table = ANY (v_append_only) THEN 'INSERT' ELSE 'INSERT OR UPDATE' END
+                       || ' ON %I FOR EACH ROW EXECUTE FUNCTION set_recorded_at()', 'trg_' || v_table || '_set_recorded_at', v_table);
+    END LOOP;
+    FOREACH v_table IN ARRAY v_refuse_truncate LOOP
+        CONTINUE WHEN to_regclass(v_table) IS NULL;
+        EXECUTE format('CREATE OR REPLACE TRIGGER %I BEFORE TRUNCATE ON %I FOR EACH STATEMENT EXECUTE FUNCTION refuse_truncate()',
+                       'trg_' || v_table || '_refuse_truncate', v_table);
+    END LOOP;
+END $$;
+-- ===== end of recorded_at and TRUNCATE =====
+
+-- ===== Row-level security, generated (ADR-0017 rule 19; the rls_v1 helper of ADR-0022 rule 8) =====
+-- Every table of this file with company_id gets ENABLE and FORCE ROW LEVEL SECURITY, the company policy company_policy
+-- (company_id compared as text with nativeflows.company_id, failing closed) and the read-only company_ids_policy for
+-- registered cross-company queries (ADR-0017 rule 19). Tables whose company_id is nullable (v_nullable) show their null
+-- rows only under the setting value installation. Default partitions are listed with their parent. Exceptions are in
+-- lab gen_overview.RLS_ALLOWLIST with their reasons; this file has none.
+-- Lab gen_overview.py --check compares this section with what schema_phase_b.py writes.
+DO $$
+DECLARE
+    v_tables    text[] := ARRAY['data_subject_state', 'retention_rule', 'data_erasure_entry', 'personal_data_read_log', 'personal_data_breach'];
+    v_nullable  text[] := ARRAY['data_subject_state', 'data_erasure_entry']::text[];
+    v_table     text;
+BEGIN
+    FOREACH v_table IN ARRAY v_tables LOOP
         EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', v_table);
         EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', v_table);
         IF v_table = ANY (v_nullable) THEN
@@ -162,5 +223,5 @@ BEGIN
         END IF;
         EXECUTE format('CREATE POLICY company_ids_policy ON %I FOR SELECT USING (company_id::text = ANY (string_to_array(current_setting(''nativeflows.company_ids'', true), '','')))', v_table);
     END LOOP;
-END
-$$;
+END $$;
+-- ===== end of row-level security =====

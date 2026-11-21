@@ -262,3 +262,4 @@ check("K02 counted below book: cash shortage", cash_count(15200000, 15180000), (
 check("K03 equal: no adjustment document", cash_count(1000, 1000), (None, D(0)))
 
 print(sum(1 for r in RESULTS if r[0]), "/", len(RESULTS), "passed")
+raise SystemExit(0 if all(r[0] for r in RESULTS) else 1)   # a failing check fails the lab

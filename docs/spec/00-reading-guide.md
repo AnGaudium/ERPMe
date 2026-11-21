@@ -149,7 +149,7 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Item group | item\_group | Company grouping of items for revenue, cost of goods sold and consumption accounts |
 | Partner group | partner\_group | Company grouping of partners that gives new partners their default reconciliation accounts |
 | Valuation class | valuation\_class | Attribute of a stock item; company data seeded from the regime template; drives inventory account determination |
-| Valuation area | valuation\_area\_level, valuation\_warehouse\_id | The company, or a physical warehouse with its attached transit and goods-sent warehouses, per the company's costing policy (`valuation_area_level`), not changeable by command once stock is posted; a line records it as `valuation_warehouse_id` (null at company level) |
+| Valuation area | valuation\_area\_level, valuation\_site\_id, valuation\_warehouse\_id | The company, a site, or a physical warehouse, each with its attached transit and goods-sent warehouses, per the company's costing policy (`valuation_area_level`: `company`, `site` or `warehouse`), not changeable by command once stock is posted; a line records it as `valuation_site_id` or `valuation_warehouse_id`, both null at company level ([ADR-0068](../adr/0068-sites-and-core-logistics-payment-master-data.md) rules 7, 8) |
 | Site | site, site\_id | A physical and operational unit between company and warehouse (SAP plant, Dynamics 365 site): a factory, distribution centre, store or office. Every physical warehouse belongs to one, and the site of a production warehouse is the plant. Independent of the branch ([ADR-0068](../adr/0068-sites-and-core-logistics-payment-master-data.md) rules 1–4, 10) |
 | Payment method | payment\_method | How a partner pays or is paid (cash, bank transfer, card, e-wallet, cheque, direct debit, cash on delivery, offset, other): a default on partner profiles and a header field of commercial documents and payments; it suggests and never posts ([ADR-0068](../adr/0068-sites-and-core-logistics-payment-master-data.md) rules 15, 17) |
 | Payment method money account | payment\_method\_money\_account | The default money account of a payment method per branch and currency, owned by `cash` so the commercial master data stays free of it ([ADR-0068](../adr/0068-sites-and-core-logistics-payment-master-data.md) rule 16) |
@@ -158,7 +158,7 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Resource group | resource\_group | Work centers of one site that record the same activity types and can stand in for each other; load is shown per group, and an operation may move between members ([ADR-0068](../adr/0068-sites-and-core-logistics-payment-master-data.md) rules 12–14) |
 | Movement type | movement\_type | Core catalog [movement-types.csv](../catalogs/movement-types.csv): direction, value source, costing role and offset transaction key of a stock movement ([ADR-0020](../adr/0020-inventory-and-costing-model.md)) |
 | Value source | value\_source: document, preliminary\_price, issuing\_value, regime | How a movement type finds the value of a line; for returns and count differences a required regime setting |
-| Costing role | costing\_role: receipt, revalued\_issue, transfer, regime | How a movement type takes part in period-end costing: enters the receipts, is revalued to the actual average, or moves value between areas |
+| Costing role | costing\_role: receipt, revalued\_issue, issue\_return, transfer, regime, production\_input, production\_output | How a movement type takes part in period-end costing: enters the receipts, is revalued to the actual average, returns a named issue at its cost outside the average, moves value between areas, or feeds or leaves a production order ([ADR-0020](../adr/0020-inventory-and-costing-model.md) rules 4, 12; [ADR-0035](../adr/0035-production-costing.md) rule 19) |
 | Preliminary price | preliminary\_price | Deterministic price per item, valuation area and period that issues use until period-end costing; error `preliminary_price_missing` when none can be found |
 | Warehouse kind | kind: physical, transit, goods\_sent | Goods on the way and goods sent but still owned are warehouses of their own kinds, attached to a physical warehouse's valuation area; the kind picks the inventory key |
 | Material document line | material\_document\_line | One stock movement: item, warehouse, movement type, quantity in the inventory unit, lot or serial, value |
@@ -267,7 +267,7 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Shared user | — | A user account with current or future role assignments in more than one company; only an operator changes its e-mail or credentials |
 | User invitation | user\_invitation | A company's request to link an existing login, pending until that user confirms it or it expires (30 days by default); a new login's invitation is confirmed at creation |
 | Permission hold | role\_permission\_hold | A permission an upgrade would have added to a role but held back because it would break segregation mode block or the small-company bound; a person confirms or ignores it |
-| Delegation | delegation | A dated lending of a user's approval authority or role assignments to another user, never to an agent |
+| Delegation | delegation | A dated lending of a user's approval authority to another user, never to an agent |
 | Segregation rule | segregation\_rule (catalog), company\_segregation\_rule | A pair of conflicting permission sets, checked on every change of rights and on related documents |
 | Small-company mode | permissions.small\_company\_mode, segregation\_exception | Company mode for at most two posting or approving users: segregation refusals become recorded exceptions, reviewed by the owner each period (flagged) |
 | Policy, approval | policy, approval | An approval row binds to a document version and its `version_hash`; a new version voids it ([ADR-0009](../adr/0009-document-lifecycle.md) rule 11) |
@@ -349,9 +349,15 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Issue multiple | bill\_of\_materials\_component.issue\_multiple | Rounds a component's order-line requirement up to whole cans, rolls or reels |
 | Classification scheme | classification\_scheme, classification\_value, product\_classification | Company-defined grouping of products for analysis; `product_line` is seeded and protected; one value per scheme per product |
 | Product category | product\_category | Built-in hierarchy of products that proposes defaults when a product is created |
-| Item tax group, partner tax group | item\_tax\_group, partner\_tax\_group | The two axes of the dated tax matrix (with direction) that proposes and checks a line's tax codes (DS-23) |
+| Item tax group | item\_tax\_group | The product axis of the dated tax matrix (with direction and tax treatment) that proposes and checks a line's tax codes (DS-23) |
+| Tax treatment | tax\_treatment | What a transaction is for tax (e.g. domestic, export of goods, sale into a zone, cross-border service, reverse charge): the transaction axis of the tax matrix, a package template list the company may extend, stored with its source on the document header and each line ([ADR-0080](../adr/0080-tax-treatment-determination.md)) |
+| Partner tax status | partner\_tax\_status | What a party is for tax (e.g. registered, not registered, foreign, exempt entity); an input of the tax treatment rules, not a matrix key; replaces the partner tax group ([ADR-0080](../adr/0080-tax-treatment-determination.md) rule 1) |
+| Tax treatment rule | tax\_treatment\_rule | Dated rule deriving the tax treatment from direction, document type, ship-from and ship-to countries, zone flag, partner tax status and goods or service; the most filled determinants win, then the priority ([ADR-0080](../adr/0080-tax-treatment-determination.md) rule 3) |
+| Tax zone flag | is\_tax\_zone | On a partner address or a site: inside a zone the tax rules treat apart, such as an export-processing zone ([ADR-0080](../adr/0080-tax-treatment-determination.md) rule 3) |
 | Tax code | tax\_code | Package rule naming one tax treatment: core kind (vat, sales\_tax, excise, customs\_duty, other) with an optional package kind, direction, calculation, transaction key, deductibility, import treatment; rates dated per code ([ADR-0041](../adr/0041-tax-engine.md)) |
-| Tax matrix | tax\_matrix | Dated map from direction, partner tax group and item tax group to tax codes, as a fiscal position does |
+| Tax rate | tax\_rate | A tax code's rate from an effective date, one row per code and date; a change is a new dated row; package rows, or a company's rates of its own `x-` codes ([ADR-0041](../adr/0041-tax-engine.md) rules 2, 4 notes) |
+| Tax matrix | tax\_matrix | Dated map from direction, tax treatment and item tax group to tax codes ([ADR-0080](../adr/0080-tax-treatment-determination.md) rule 2); a company's own rows for keys with its own groups or keys the package marks adjustable are `company_tax_matrix` ([ADR-0041](../adr/0041-tax-engine.md) rules 3, 4 notes) |
+| Effective item tax group | tax\_effective\_item\_tax\_group | The item tax group a product's lines use: the product's own, else the nearest product category's up the parent chain, else the company setting `tax.default_item_tax_group`; recorded on each tax row with its level ([ADR-0041](../adr/0041-tax-engine.md) rule 7 note) |
 | Document line tax | document\_line\_tax | Base, rate and tax per document line and code, part of the document's content and frozen with it |
 | Tax line | tax\_line | Immutable tax subledger row written at posting, tied to the journal tax line |
 | Tax line adjustment | tax\_line\_adjustment | Append-only later change of a tax line: condition met, condition failed, apportionment, period move, reversal of an adjustment ([ADR-0053](../adr/0053-core-neutrality.md) rule 3) |
@@ -594,7 +600,6 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Role level | role\_level | A role's level and approval flag on one node of the authorization area tree, inherited downward ([ADR-0054](../adr/0054-users-roles-and-authorizations.md) rule 8) |
 | Role permission | role\_permission | The stored expansion of a role's levels minus its holds in force, which the dispatcher reads ([ADR-0054](../adr/0054-users-roles-and-authorizations.md) rule 9) |
 | Role assignment scope | role\_assignment\_scope | The record scope of a role assignment, one branch or warehouse per row; none means the whole company ([ADR-0017](../adr/0017-permission-envelope.md) rule 9) |
-| Delegation role assignment | delegation\_role\_assignment | A role assignment of the delegator lent by a delegation of kind `role_assignments` ([ADR-0054](../adr/0054-users-roles-and-authorizations.md) rule 21) |
 | Segregation review | segregation\_review | The owner's confirmed review of one posting period's segregation exceptions in the small-company mode (`ConfirmSegregationReview`, [ADR-0054](../adr/0054-users-roles-and-authorizations.md) rule 20) |
 | Company currency activation | company\_currency\_activation | A currency a company has activated for use ([ADR-0011](../adr/0011-multi-currency.md) rule 7) |
 | Working calendar holiday | working\_calendar\_holiday | A non-working date of a working calendar, copied from a package template entry or added by the company ([ADR-0045](../adr/0045-master-data-and-price-lists.md) rule 10) |
@@ -681,12 +686,12 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Reject | Reject a document version | Rejected |
 | Post | Make a document part of the books or the stock records | Posted |
 | Reverse | Post a reversal document for a posted document | Reversed |
-| Cancel | End an open document that is not posted, or an open warehouse task, reservation, work item, delegation or invitation | Canceled |
+| Cancel | End an open document that is not posted, or an open warehouse task, reservation, work item, delegation or invitation; or an unconfirmed WO time log (`CancelOperationTimeLog`) | Canceled |
 | Clear | Remove a flag deliberately with a reason, e.g. a document version's taint (`ClearTaint`) or a sign-in lockout (`ClearUserAccountLockout`) | Cleared |
 | Resume | Continue a stopped job from where it stopped, e.g. an import batch (`ResumeImport`) | Resumed |
 | Abandon | Stop a job for good; what it already posted stays until reversed, e.g. an import batch | Abandoned |
 | Issue | Request legal issuance of a document; it posts when the issue is accepted (e.g. `IssueSalesInvoice`) | IssueRequested |
-| Record | Store an outcome reported by an outside system or by a worker that ran outside the transaction, e.g. an e-invoice outcome or a rendered file ([ADR-0049](../adr/0049-statutory-reporting-and-printing.md) rule 20) | Recorded |
+| Record | Store an outcome reported by an outside system or by a worker that ran outside the transaction, e.g. an e-invoice outcome or a rendered file ([ADR-0049](../adr/0049-statutory-reporting-and-printing.md) rule 20); or a measured inspection result (`RecordInspectionResult`, [ADR-0070](../adr/0070-quality-management-core.md) rule 10) | Recorded |
 | Recall | Take back a request sent to an outside system before it took effect | Recalled |
 | Complete | Finish a held step by a human, e.g. a posting after acceptance; or end the logistics of a production order (technical completion); or finish a migration; or finish an agent run with its outcome (`CompleteAgentRun`) | Completed |
 | Reopen | Return a document to draft after an outside step failed; or return a technically complete production order to in progress; or return a closed complaint to open | Reopened |
@@ -710,7 +715,7 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Match | Link bank lines or documents, or an interaction and its partner; open items are settled against each other by an `open_item_matching` document | Matched |
 | Unmatch | Undo a match: unlink bank lines or documents, or an interaction and its partner | Unmatched |
 | Ignore | Set an imported line aside with a reason, so that no rule or person matches it ([ADR-0048](../adr/0048-cash-bank-receivables-payables.md) rule 8); or keep withheld a permission an upgrade held back (`IgnoreRolePermissionHold`) | Ignored |
-| Transfer | Move records to another account or owner, e.g. a partner's open items | Transferred |
+| Transfer | Move records to another account or owner, e.g. a partner's open items; or move a WO to another work center of its resource group (`TransferOperation`) | Transferred |
 | Allocate | Distribute an amount or quantity over targets | Allocated |
 | Import | Read an external file into the system | Imported |
 | Set | Replace a record's whole list of values in one command, e.g. a price list's entries (`SetPriceListEntries`) | Set |
@@ -720,8 +725,8 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Bind | Replace a draft's reference to a proposal item by the item its execution created (`BindProposedItems`) | Bound |
 | End | End or narrow a dated permission or setting (`EndDataProcessingPermission`) | Ended |
 | Run | Start a deterministic system job, e.g. period-end actual costing | Completed (`<job noun>Completed`) |
-| Assign | Set the owner of a work item or a warehouse task; or attach output serials to a production order | Assigned |
-| Start | A person begins work on an assigned warehouse task; or start a migration's loading or reconciliation; or start an agent run (`StartAgentRun`) | Started |
+| Assign | Set the owner of a work item or a warehouse task; or attach output serials to a production order; or set the people and teams of a WO (`AssignOperation`) | Assigned |
+| Start | A person begins work on an assigned warehouse task; or start a migration's loading or reconciliation; or start an agent run (`StartAgentRun`); or begin or resume work on a WO (`StartOperation`) | Started |
 | Pause | Stop work on a WO for now, closing its open clock records (`PauseOperation`) | Paused |
 | Block | Declare that a WO cannot go on, with a stop reason (`BlockOperation`) | Blocked |
 | Close | End further activity on an approved record that has had some, e.g. an order, or a change proposal once executed; or end a processing basis when consent is withdrawn or its purpose ends | Closed |
@@ -729,7 +734,7 @@ This glossary is authoritative. DS-01 extends it in place, in this file; there i
 | Open | Let a restricted posting period accept postings from everyone with permission again (soft-locked to open) | Opened |
 | Lock | Stop all postings in a posting period (soft-locked to locked) | Locked |
 | Unlock | Take a locked posting period back to soft-locked, with approval | Unlocked |
-| Confirm | A human confirms a fact the system cannot check, e.g. a manual close task or that they are the person a company invited (`ConfirmUserInvitation`), or accepts a result the system produced, e.g. auto-posts (`ConfirmAutoPost`) or a permission an upgrade held back (`ConfirmRolePermissionHold`) | Confirmed |
+| Confirm | A human confirms a fact the system cannot check, e.g. a manual close task or that they are the person a company invited (`ConfirmUserInvitation`), or accepts a result the system produced, e.g. auto-posts (`ConfirmAutoPost`) or a permission an upgrade held back (`ConfirmRolePermissionHold`); or accepts an agent's draft time log (`ConfirmOperationTimeLog`) | Confirmed |
 | Skip | Leave out an optional step with a reason, e.g. an optional close task | Skipped |
 | Retry | Try a held step again, e.g. a held event delivery | Retried |
 | Replay | Deliver retained events again to a consumer that has not handled them | Replayed |

@@ -40,7 +40,7 @@ Agents read the structures through deterministic queries. They draft revisions f
      - deactivation of a bill of materials or routing.
    - **Release proposals.** The proposal's target record for a release is the draft revision. Its `expected_version` is the draft's `content_hash` (rule 3), so the approved content is exactly what is released.
 
-   Note ([ADR-0062](0062-product-engineering-workflow.md), proposed 2026-11-15): the draft commands (`CreateBillOfMaterials`, `CreateBillOfMaterialsRevision`, `UpdateBillOfMaterialsRevision` and the same for routings) are also registered `is_draft_only`, so a tainted run may draft structures; a header has no effect without a released revision and a production version. A release proposal is created only for a draft without proposal-item references, after binding, so its `expected_version` is the bound draft's content hash (`bill_of_materials_item_pending`; [ADR-0062](0062-product-engineering-workflow.md) rules 10, 13, 14).
+   Note ([ADR-0062](0062-product-engineering-workflow.md), 2026-11-15): the draft commands (`CreateBillOfMaterials`, `CreateBillOfMaterialsRevision`, `UpdateBillOfMaterialsRevision` and the same for routings) are also registered `is_draft_only`, so a tainted run may draft structures; a header has no effect without a released revision and a production version. A release proposal is created only for a draft without proposal-item references, after binding, so its `expected_version` is the bound draft's content hash (`bill_of_materials_item_pending`; [ADR-0062](0062-product-engineering-workflow.md) rules 10, 13, 14).
 
 **Bills of materials**
 
@@ -91,15 +91,15 @@ Agents read the structures through deterministic queries. They draft revisions f
 
    Components of a product-level bill of materials carry a `selection_condition` and `fixed` or `linear` sizing over item-defining characteristics, applied before the requirement formula ([ADR-0046](0046-product-configuration.md) rules 12–13).
 
-   Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): the component's factor is a snapshot (`uom_numerator`, `uom_denominator`, `uom_factor_source`) without a default; "the quantity in the component's inventory unit" is the exact rational `quantity × uom_numerator / uom_denominator`, not a stored column. An optional `issue_multiple`, in the line's unit, rounds each order-line requirement up to whole multiples before the inventory unit's decimals. Q = G / (1 − assembly scrap) is stored rounded up to the main output's inventory unit, and requirements are computed from the stored Q. `quantity_per_value` stays `types.quantity`; a finer rate uses a smaller unit (rules 8, 17).
+   Note ([ADR-0056](0056-multiple-units-of-measure.md), 2026-11-15): the component's factor is a snapshot (`uom_numerator`, `uom_denominator`, `uom_factor_source`) without a default; "the quantity in the component's inventory unit" is the exact rational `quantity × uom_numerator / uom_denominator`, not a stored column. An optional `issue_multiple`, in the line's unit, rounds each order-line requirement up to whole multiples before the inventory unit's decimals. Q = G / (1 − assembly scrap) is stored rounded up to the main output's inventory unit, and requirements are computed from the stored Q. `quantity_per_value` stays `types.quantity`; a finer rate uses a smaller unit (rules 8, 17).
 
-   Note ([ADR-0062](0062-product-engineering-workflow.md), proposed 2026-11-15): while every revision is a draft, a component (and the bill of materials' main output) may name the `CreateProduct` or `CreateItem` item of a change proposal by its stable ID (`proposed_change_proposal_item_id`) instead of an item; such a component's line is in the proposed inventory unit with the identity snapshot. `BindProposedItems` replaces the reference by the created item when the proposal is executed and recomputes the snapshot. Co-products and by-products are existing items ([ADR-0062](0062-product-engineering-workflow.md) rules 10, 14).
+   Note ([ADR-0062](0062-product-engineering-workflow.md), 2026-11-15): while every revision is a draft, a component (and the bill of materials' main output) may name the `CreateProduct` or `CreateItem` item of a change proposal by its stable ID (`proposed_change_proposal_item_id`) instead of an item; such a component's line is in the proposed inventory unit with the identity snapshot. `BindProposedItems` replaces the reference by the created item when the proposal is executed and recomputes the snapshot. Co-products and by-products are existing items ([ADR-0062](0062-product-engineering-workflow.md) rules 10, 14).
 7. `bill_of_materials_output` rows of a revision list outputs besides the main one:
    - **Fields.** `output_item_id`, `quantity` per base quantity with its unit, `output_type` (`co_product` or `by_product`) and `cost_coefficient` (co-products).
    - **Coefficients are data only.** `cost_coefficient` and `main_output_cost_coefficient` hold equivalence coefficients. Whether the coefficient method applies, and how by-products are valued, are the author's through DS-53. VAS 02 para 09 values by-products at net realisable value (unverified, ADR-0016).
    - **What is rejected.** An item may not be both a component and an output of one revision (`item_both_component_and_output`; rework orders are the exception, [ADR-0034](0034-production-orders-and-shop-floor.md) rule 2); recycling loops are not modeled in Phase 1. A phantom's bill of materials may not have outputs (`phantom_with_outputs`). This is checked when `is_phantom` is set (rule 14), and at release and production version save for an item that is a phantom in the version's warehouse.
 
-   Note ([ADR-0056](0056-multiple-units-of-measure.md), proposed 2026-11-15): outputs carry the same snapshot as components, without a default factor; planned co-product and by-product quantities round half up, each in its own inventory unit (rules 8, 17).
+   Note ([ADR-0056](0056-multiple-units-of-measure.md), 2026-11-15): outputs carry the same snapshot as components, without a default factor; planned co-product and by-product quantities round half up, each in its own inventory unit (rules 8, 17).
 8. Releasing a revision checks, deterministically:
    - **Items.** Components and outputs are active items of `stock` products, distinct from the main output.
    - **Units and quantities.** Units are convertible; quantities and the base quantity are positive; scrap percentages are in [0, 100).
@@ -114,7 +114,7 @@ Agents read the structures through deterministic queries. They draft revisions f
 
    Note: a configurable product with a product-level bill of materials ([ADR-0046](0046-product-configuration.md) rule 12) is a node of the cycle graph, with edges to its components and outputs. A configured item has no structure of its own, so it counts as its product: an edge into a configured item is an edge into the product node, and a configured item's `item_low_level_code` is its product's. INV-100 covers product nodes (holistic review 2026-11-15, item P6).
 
-   Note ([ADR-0062](0062-product-engineering-workflow.md), proposed 2026-11-15): releasing also checks that no component or main output refers to a proposal item (`bill_of_materials_item_pending`) and, for a routing revision, that every operation's setup and run times were stated (`routing_duration_unstated`); the database refuses both too, also for a revision inserted as released, and refuses a proposal reference on a header with a released revision ([ADR-0062](0062-product-engineering-workflow.md) rules 10, 14).
+   Note ([ADR-0062](0062-product-engineering-workflow.md), 2026-11-15): releasing also checks that no component or main output refers to a proposal item (`bill_of_materials_item_pending`) and, for a routing revision, that every operation's setup and run times were stated (`routing_duration_unstated`); the database refuses both too, also for a revision inserted as released, and refuses a proposal reference on a header with a released revision ([ADR-0062](0062-product-engineering-workflow.md) rules 10, 14).
 
 **Routings**
 
@@ -138,9 +138,9 @@ Agents read the structures through deterministic queries. They draft revisions f
     - **Later.** Parallel and alternative sequences and overlapping operations come after Phase 1. A routing without operations is allowed: the item is then made in one step.
     - **Phantoms.** A phantom's components take the operation number of the phantom's line in the parent.
 
-    Note ([ADR-0062](0062-product-engineering-workflow.md), proposed 2026-11-15): `is_setup_duration_stated` and `is_run_duration_stated` (default true) mark a time no source stated; it is then 0, nothing reads it as real, and release refuses it. Agent workflows never write a time that is not in a source ([ADR-0062](0062-product-engineering-workflow.md) rule 10).
+    Note ([ADR-0062](0062-product-engineering-workflow.md), 2026-11-15): `is_setup_duration_stated` and `is_run_duration_stated` (default true) mark a time no source stated; it is then 0, nothing reads it as real, and release refuses it. Agent workflows never write a time that is not in a source ([ADR-0062](0062-product-engineering-workflow.md) rule 10).
 
-    Note ([ADR-0071](0071-work-orders-and-shop-floor-execution.md), proposed 2026-11-17): the attachments of a routing operation are the WO's instructions on the tablet, found through the order's snapshot revision and operation number (ADR-0071 rule 14).
+    Note ([ADR-0071](0071-work-orders-and-shop-floor-execution.md), 2026-11-21): the attachments of a routing operation are the WO's instructions on the tablet, found through the order's snapshot revision and operation number (ADR-0071 rule 14).
 
 **Work centers and calendars**
 
@@ -159,12 +159,12 @@ Agents read the structures through deterministic queries. They draft revisions f
 
     Note (catalog review, 2026-11-15): a work center's `code` is unique per company; its `name` is not (DS-43-54-planning-production.sql). "Unique per company" above applies to the code.
 
-    Note ([ADR-0068](0068-sites-and-core-logistics-payment-master-data.md), proposed 2026-11-17): the plant is the site of the production warehouse. This supersedes the Decision's "the production warehouse in place of a plant". `work_center` gets no `site_id`, because the site is derived through `production_warehouse_id`. It gains a nullable `resource_group_id`, and a site's calendar is the record default for its new work centers.
+    Note ([ADR-0068](0068-sites-and-core-logistics-payment-master-data.md), 2026-11-21): the plant is the site of the production warehouse. This supersedes the Decision's "the production warehouse in place of a plant". `work_center` gets no `site_id`, because the site is derived through `production_warehouse_id`. It gains a nullable `resource_group_id`, and a site's calendar is the record default for its new work centers.
 12. `activity_type` is company data, for example `setup`, `machine` and `labor`, with a time unit (ADR-0018 rule 8, kind `time`). `work_center_activity` rows list which activity types a work center records, with a default `quantity` and `basis` copied into new routing operations. Planned and actual activity rates are DS-53's.
 
-    Note ([ADR-0068](0068-sites-and-core-logistics-payment-master-data.md), proposed 2026-11-17): the members of a resource group record equal sets of activity types (`resource_group_activity_mismatch`). To change a member's activity types, remove it from the group first.
+    Note ([ADR-0068](0068-sites-and-core-logistics-payment-master-data.md), 2026-11-21): the members of a resource group record equal sets of activity types (`resource_group_activity_mismatch`). To change a member's activity types, remove it from the group first.
 
-    Note ([ADR-0071](0071-work-orders-and-shop-floor-execution.md), proposed 2026-11-17): `activity_type.time_log_basis` (`none`, `labor`, `machine`; default `none`) says how a confirmation proposes the activity from time logs; `stop_reason` is new company data under the same leaf (ADR-0071 rules 10, 11).
+    Note ([ADR-0071](0071-work-orders-and-shop-floor-execution.md), 2026-11-21): `activity_type.time_log_basis` (`none`, `labor`, `machine`; default `none`) says how a confirmation proposes the activity from time logs; `stop_reason` is new company data under the same leaf (ADR-0071 rules 10, 11).
 
 **Production versions and settings**
 
@@ -182,7 +182,7 @@ Agents read the structures through deterministic queries. They draft revisions f
 
     A version may name a configurable product (`product_id`, exclusive with `item_id`); it applies to every configured item of the product, after any item-level version ([ADR-0046](0046-product-configuration.md) rule 12).
 
-    Note ([ADR-0072](0072-costing-sheet-and-cost-component-structure.md), proposed 2026-11-18): a version gains `costing_sheet_id`, an optional override of its site's costing sheet (ADR-0072 rule 9).
+    Note ([ADR-0072](0072-costing-sheet-and-cost-component-structure.md), 2026-11-21): a version gains `costing_sheet_id`, an optional override of its site's costing sheet (ADR-0072 rule 9).
 14. `item_production_setting` (company, item, production warehouse) holds `is_phantom`.
     - **Explosion.** A phantom is never planned or made on its own. It is exploded through its production version in that warehouse, selected with the exploded quantity and the `explosion_date`, routing ignored. A missing version gives `production_version_missing`.
     - **Planning.** Planning reads the setting through `production.contract` and skips phantoms. A phantom needs no `item_warehouse_planning` row.
@@ -207,7 +207,7 @@ Agents read the structures through deterministic queries. They draft revisions f
 
     The master-data workflow is a later agent ([ADR-0051](0051-agent-workflows.md) rule 29).
 
-    Note ([ADR-0062](0062-product-engineering-workflow.md), proposed 2026-11-15): the master-data workflow is the agent type `product_engineering` ([ADR-0062](0062-product-engineering-workflow.md)); `GetProductReadinessCheck` adds the category's readiness requirements to `GetBillOfMaterialsRevisionCheck`.
+    Note ([ADR-0062](0062-product-engineering-workflow.md), 2026-11-15): the master-data workflow is the agent type `product_engineering` ([ADR-0062](0062-product-engineering-workflow.md)); `GetProductReadinessCheck` adds the category's readiness requirements to `GetBillOfMaterialsRevisionCheck`.
 
 **Reserved checks and later features**
 

@@ -11,17 +11,20 @@
 -- without company_id and without row-level security; application roles get SELECT only on them, so no command or trigger
 -- path can rewrite a definition. setting_value holds company rows and, with company_id null, the
 -- installation values; the last section writes out its row-level security with the installation exception of rls_v1
--- (ADR-0022 rule 8; ADR-0017 rule 19), and that of company_setup_acknowledgement (ADR-0067 rule 8).
+-- (ADR-0022 rule 8; ADR-0017 rule 19), and those of company_setup_acknowledgement (ADR-0067 rule 8) and module_activation.
 -- Referenced tables defined elsewhere: company (DS-20); user_account (DS-15); change_proposal (DS-05).
 -- Functions of DS-05-platform.sql used here: platform_reject_change.
 -- Owner module (ADR-0022 rule 2): registry owns every table here; agents and configuration read them through its contract.
 -- Rules that need the registry or other tables (a loosening's direction, the scope reference naming a company record,
 -- a period start, the outdated evidence) are enforced by commands and named in ADR-0063; the rules a row can hold are
 -- checks here.
+-- Every table follows the recorded_at convention of the ADR-0007 rule 16 note (DS-06-universal-journal.sql header); the last
+-- section of this file attaches the trigger.
 
 -- ===== Setting definitions [registry] (ADR-0063 rule 1) =====
 CREATE TABLE setting_definition (                          -- installation data; one row per registered key, written at startup
-    setting_key       text PRIMARY KEY CONSTRAINT ck_setting_definition_key CHECK (setting_key ~ '^([a-z][a-z0-9_]*|<[a-z][a-z0-9_]*>)(\.([a-z0-9_]+|<[a-z][a-z0-9_]*>))+$'),
+    id                uuid PRIMARY KEY,   -- uuid5(f244ce09-3c6c-4c82-af14-918bdeca6be3, 'setting_definition:<setting_key>'), computed by the loader (registry E2, ADR-0006 rule 1 note)
+    setting_key       text NOT NULL CONSTRAINT uq_setting_definition_setting_key UNIQUE CONSTRAINT ck_setting_definition_key CHECK (setting_key ~ '^([a-z][a-z0-9_]*|<[a-z][a-z0-9_]*>)(\.([a-z0-9_]+|<[a-z][a-z0-9_]*>))+$'),
     area              text NOT NULL CONSTRAINT ck_setting_definition_area CHECK (area ~ '^[a-z][a-z0-9_]*$'),
     scopes            text[] NOT NULL CONSTRAINT ck_setting_definition_scopes CHECK (cardinality(scopes) >= 1 AND scopes <@ ARRAY[
                           'installation', 'regime', 'company', 'product_category', 'money_account', 'scanner_profile', 'agent_type', 'rule_version']),
@@ -42,7 +45,7 @@ CREATE TABLE setting_definition (                          -- installation data;
     outdates          text NOT NULL CONSTRAINT ck_setting_definition_outdates CHECK (outdates IN ('auto_post', 'promotion', 'none')),
     source            text NOT NULL,
     registry_version  text NOT NULL CONSTRAINT ck_setting_definition_registry_version CHECK (registry_version ~ '^[0-9]+\.[0-9]+\.[0-9]+$'),
-    recorded_at       timestamptz NOT NULL,
+    recorded_at       timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT ck_setting_definition_default CHECK ((default_kind = 'value') = (core_default IS NOT NULL)),
     CONSTRAINT ck_setting_definition_numeric CHECK ((value_type IN ('integer', 'decimal', 'percent', 'amount')) = (min_value IS NOT NULL)
         AND (max_value IS NULL OR min_value <= max_value)),
@@ -83,13 +86,15 @@ CREATE TABLE setting_definition (                          -- installation data;
 -- company-scope key stored in setting_value, with outdates none and a value within its bounds, and that standard covers the
 -- other presets' keys, is checked by the registry at startup (INV-802); the rows hold the shape.
 CREATE TABLE setting_preset (                              -- installation data; one row per preset version, written at startup
+    id                   uuid PRIMARY KEY,   -- uuid5(f244ce09-3c6c-4c82-af14-918bdeca6be3, 'setting_preset:<preset_code>:<preset_version>'), computed by the loader (registry E2, ADR-0006 rule 1 note)
     preset_code          text NOT NULL CONSTRAINT ck_setting_preset_code CHECK (preset_code ~ '^[a-z][a-z0-9_]*$'),
     preset_version       integer NOT NULL CONSTRAINT ck_setting_preset_version CHECK (preset_version >= 1),
     registry_version     text NOT NULL CONSTRAINT ck_setting_preset_registry_version CHECK (registry_version ~ '^[0-9]+\.[0-9]+\.[0-9]+$'),
-    recorded_at          timestamptz NOT NULL,
-    PRIMARY KEY (preset_code, preset_version)
+    recorded_at          timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_setting_preset_preset_code_preset_version UNIQUE (preset_code, preset_version)
 );
 CREATE TABLE setting_preset_item (                         -- installation data; one row per preset version, kind and key
+    id                   uuid PRIMARY KEY,   -- uuid5(f244ce09-3c6c-4c82-af14-918bdeca6be3, 'setting_preset_item:<preset_code>:<preset_version>:<item_kind>:<item_key>'), computed by the loader (registry E2, ADR-0006 rule 1 note); uq_setting_preset_item_key named by hand: the convention name would exceed 63 bytes (ADR-0004 rule 6)
     preset_code          text NOT NULL,
     preset_version       integer NOT NULL,
     item_kind            text NOT NULL CONSTRAINT ck_setting_preset_item_kind CHECK (item_kind IN (
@@ -100,8 +105,8 @@ CREATE TABLE setting_preset_item (                         -- installation data;
     parameter_value_type text CONSTRAINT ck_setting_preset_item_parameter_type CHECK (parameter_value_type IN ('integer', 'decimal', 'percent', 'amount')),
     parameter_min        numeric,                              -- a parameter's bounds, within the bounds of every key it fills
     parameter_max        numeric,
-    recorded_at          timestamptz NOT NULL,
-    PRIMARY KEY (preset_code, preset_version, item_kind, item_key),
+    recorded_at          timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_setting_preset_item_key UNIQUE (preset_code, preset_version, item_kind, item_key),
     FOREIGN KEY (preset_code, preset_version) REFERENCES setting_preset (preset_code, preset_version),
     CONSTRAINT ck_setting_preset_item_parameter CHECK ((item_kind = 'parameter') = (parameter_value_type IS NOT NULL AND parameter_min IS NOT NULL)
         AND (parameter_max IS NULL OR parameter_min <= parameter_max)),
@@ -124,7 +129,7 @@ CREATE TABLE company_setup_acknowledgement (               -- company data
     acknowledged_at      timestamptz NOT NULL,
     revoked_at           timestamptz,
     revoked_by_user_id   uuid REFERENCES user_account (id),
-    recorded_at          timestamptz NOT NULL,
+    recorded_at          timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     CONSTRAINT ck_company_setup_acknowledgement_revoked CHECK ((revoked_at IS NULL) = (revoked_by_user_id IS NULL)
         AND (revoked_at IS NULL OR revoked_at >= acknowledged_at))
@@ -144,7 +149,10 @@ CREATE TRIGGER trg_company_setup_acknowledgement_guard BEFORE UPDATE OR DELETE O
 
 -- ===== Setting values [registry] (ADR-0063 rules 2-4) =====
 -- Append-only: a change is a new row, effective from its date; the value in force for a key, scope, scope reference and
--- placeholder values is the row with the latest effective_from on or before the date, the latest recorded among equals.
+-- placeholder values is the row with the latest effective_from on or before the date, the latest written among equals: the
+-- greatest id, a UUIDv7 from context.new_id, which increases within a writer and across the changes of one key, because the
+-- trigger below serializes them per company and key. recorded_at is never the tie-breaker: rows of one transaction share it
+-- (ADR-0007 rule 10; chief architect, 2026-11-21, S2 closure).
 -- The row copies the definition's type, bounds, allowed values and direction; the trigger setting_value_check_insert below
 -- ties every copy to setting_definition, checks the scope and the placeholder keys, refuses a value looser than the
 -- installation value in force, derives the replaced value itself (filling it when absent, refusing a different one) and
@@ -178,13 +186,16 @@ CREATE TABLE setting_value (                               -- company data (inst
     preset_code           text,                                 -- the operating preset whose application wrote the row (ADR-0067 rule 4); never read to decide anything
     preset_version        integer,
     registry_version      text NOT NULL CONSTRAINT ck_setting_value_registry_version CHECK (registry_version ~ '^[0-9]+\.[0-9]+\.[0-9]+$'),
-    recorded_at           timestamptz NOT NULL,
+    recorded_at           timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, change_proposal_id) REFERENCES change_proposal (company_id, id),
     FOREIGN KEY (company_id, setup_acknowledgement_id) REFERENCES company_setup_acknowledgement (company_id, id),
     FOREIGN KEY (preset_code, preset_version) REFERENCES setting_preset (preset_code, preset_version),
     CONSTRAINT ck_setting_value_preset CHECK ((preset_code IS NULL) = (preset_version IS NULL)),
     CONSTRAINT ck_setting_value_installation CHECK ((scope_kind = 'installation') = (company_id IS NULL)),
+    -- the proposal and acknowledgement keys are composite and unchecked while company_id is null; an installation value is
+    -- approved by the operators' deployment change, never by a company's proposal or acknowledgement (S2 closure)
+    CONSTRAINT ck_setting_value_company_keys CHECK (company_id IS NOT NULL OR (change_proposal_id IS NULL AND setup_acknowledgement_id IS NULL)),
     CONSTRAINT ck_setting_value_scope_ref CHECK ((scope_kind IN ('installation', 'company')) = (scope_ref = '')),
     -- a loosening is executed from an approved proposal (an installation value: from the operators' approved change), approved
     -- by someone other than its submitter (rule 3), or, before go-live, set under the owner's setup acknowledgement with no
@@ -207,11 +218,12 @@ CREATE TABLE setting_value (                               -- company data (inst
         WHEN value_type IN ('code_list', 'field_list') THEN jsonb_typeof(value) = 'array'
         ELSE jsonb_typeof(value) = 'object' END)
 );
-CREATE INDEX ix_setting_value_lookup ON setting_value (company_id, setting_key, scope_kind, scope_ref, placeholder_values, effective_from DESC, recorded_at DESC);
+CREATE INDEX ix_setting_value_lookup ON setting_value (company_id, setting_key, scope_kind, scope_ref, placeholder_values, effective_from DESC, id DESC);
 
 -- ===== Extension points [registry] (ADR-0063 rule 19) =====
 CREATE TABLE extension_point (                             -- installation data; declared by a module, written at startup; no runtime in Phase 1
-    code                       text PRIMARY KEY CONSTRAINT ck_extension_point_code CHECK (code ~ '^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$'),
+    id                         uuid PRIMARY KEY,   -- uuid5(f244ce09-3c6c-4c82-af14-918bdeca6be3, 'extension_point:<code>'), computed by the loader (registry E2, ADR-0006 rule 1 note)
+    code                       text NOT NULL CONSTRAINT uq_extension_point_code UNIQUE CONSTRAINT ck_extension_point_code CHECK (code ~ '^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$'),
     module                     text NOT NULL CONSTRAINT ck_extension_point_module CHECK (module ~ '^[a-z][a-z0-9_]*$'),
     -- never an approval, posting, rights or settings decision (hard lock of rule 19)
     decision_kind              text NOT NULL CONSTRAINT ck_extension_point_decision_kind CHECK (decision_kind IN ('score', 'classification', 'derivation', 'validation')),
@@ -223,15 +235,31 @@ CREATE TABLE extension_point (                             -- installation data;
     deadline_ms_ceiling        integer NOT NULL CONSTRAINT ck_extension_point_deadline CHECK (deadline_ms_ceiling BETWEEN 5 AND 250),
     is_gate_feeding            boolean NOT NULL DEFAULT false,   -- whether the output may feed a gate
     registry_version           text NOT NULL CONSTRAINT ck_extension_point_registry_version CHECK (registry_version ~ '^[0-9]+\.[0-9]+\.[0-9]+$'),
-    recorded_at                timestamptz NOT NULL
+    recorded_at                timestamptz NOT NULL DEFAULT now()
+);
+
+-- ===== Module activation [registry] (ADR-0022 rule 2 note; ADR-0052 note, CRM-only deployment profile) =====
+-- Which modules of the one product run for a company. A deployment profile, such as CRM-only, is a set of these rows that
+-- CreateCompany writes from the chosen operating preset (ADR-0067); a module with no row, or with is_active false, is not
+-- activated for the company. Written by ActivateModule and DeactivateModule (registry, human_only, change-tracked,
+-- ADR-0038 rule 3); the command refuses to deactivate a module that has postings or open documents (module_in_use) and
+-- checks the module code against the registry. Commands read it to decide what applies, e.g. the partner commands require
+-- the profile accounts while ledger is activated (ADR-0015 rule 11 note; INV-38).
+CREATE TABLE module_activation (                           -- company data, updated in place
+    id           uuid PRIMARY KEY,
+    company_id   uuid NOT NULL REFERENCES company (id),
+    module       text NOT NULL CONSTRAINT ck_module_activation_module CHECK (module ~ '^[a-z][a-z0-9_]*$'),   -- a module of ADR-0022 rule 2
+    is_active    boolean NOT NULL,
+    recorded_at  timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (company_id, module)
 );
 
 -- ===== Guards =====
--- Values are a history: never updated or deleted (rule 2).
+-- Values are a history: never updated or deleted (rule 2); an erasure may tokenize reason (ADR-0079 rule 7).
 CREATE TRIGGER trg_setting_value_immutable BEFORE UPDATE OR DELETE ON setting_value
-    FOR EACH ROW EXECUTE FUNCTION platform_reject_change();
+    FOR EACH ROW EXECUTE FUNCTION platform_reject_change('{reason}');
 -- Whether value a is looser than value b under a direction (rule 3). Lists compare as sets.
-CREATE FUNCTION setting_is_looser(p_direction text, p_order text[], a jsonb, b jsonb) RETURNS boolean LANGUAGE sql IMMUTABLE AS $$
+CREATE FUNCTION setting_is_looser(p_direction text, p_order text[], a jsonb, b jsonb) RETURNS boolean LANGUAGE sql IMMUTABLE SET search_path = nativeflows, pg_temp AS $$
     SELECT CASE p_direction
         WHEN 'higher_tighter' THEN (a #>> '{}')::numeric < (b #>> '{}')::numeric
         WHEN 'lower_tighter' THEN (a #>> '{}')::numeric > (b #>> '{}')::numeric
@@ -256,7 +284,7 @@ CREATE FUNCTION setting_installation_value(p_key text, p_placeholder_values json
     LANGUAGE sql STABLE SECURITY DEFINER SET search_path = nativeflows, pg_temp AS $$
     SELECT v.setting_key, v.value, v.effective_from FROM nativeflows.setting_value v
      WHERE v.company_id IS NULL AND v.setting_key = p_key AND v.placeholder_values = p_placeholder_values AND v.effective_from <= p_date
-     ORDER BY v.effective_from DESC, v.recorded_at DESC LIMIT 1
+     ORDER BY v.effective_from DESC, v.id DESC LIMIT 1
 $$;
 -- Ties a value to its definition and derives its change kind (rules 2-4): type, bounds, allowed values and direction equal
 -- the definition's (copied when left null); the scope is one the definition declares; a value looser than the installation
@@ -306,15 +334,26 @@ BEGIN
             RAISE EXCEPTION 'setting_out_of_bounds: % is looser than the installation value % of %', NEW.value, v_max, NEW.setting_key USING ERRCODE = 'check_violation';
         END IF;
     END IF;
+    -- the tie-breaker among rows of one effective date is the id (rule 2's order; ADR-0007 rule 10): a new row's id must exceed
+    -- every id already written for the same key, scope and date, so "the latest written" is the greatest id by construction.
+    -- The refusal is serialization_failure (SQLSTATE 40001), so the ADR-0008 retry runs again with a fresh, greater id: two
+    -- writers of one key and date, or an import in another id order, are retried, not failed (S2 schema review R6-N4).
+    IF EXISTS (SELECT 1 FROM nativeflows.setting_value v
+                WHERE v.company_id IS NOT DISTINCT FROM NEW.company_id AND v.setting_key = NEW.setting_key AND v.scope_kind = NEW.scope_kind
+                  AND v.scope_ref = NEW.scope_ref AND v.placeholder_values = NEW.placeholder_values
+                  AND v.effective_from = NEW.effective_from AND v.id >= NEW.id) THEN
+        RAISE EXCEPTION 'setting_value id % does not follow the ids already written for % on %', NEW.id, NEW.setting_key, NEW.effective_from USING ERRCODE = 'serialization_failure';
+
+    END IF;
     SELECT v.value, true INTO v_in, v_found FROM nativeflows.setting_value v
      WHERE v.company_id IS NOT DISTINCT FROM NEW.company_id AND v.setting_key = NEW.setting_key AND v.scope_kind = NEW.scope_kind
        AND v.scope_ref = NEW.scope_ref AND v.placeholder_values = NEW.placeholder_values AND v.effective_from <= NEW.effective_from
-     ORDER BY v.effective_from DESC, v.recorded_at DESC LIMIT 1;
+     ORDER BY v.effective_from DESC, v.id DESC LIMIT 1;
     IF NOT coalesce(v_found, false) AND NEW.scope_kind NOT IN ('company', 'installation') THEN
         SELECT v.value, true INTO v_in, v_found FROM nativeflows.setting_value v
          WHERE v.company_id = NEW.company_id AND v.setting_key = NEW.setting_key AND v.scope_kind = 'company'
            AND v.placeholder_values = NEW.placeholder_values AND v.effective_from <= NEW.effective_from
-         ORDER BY v.effective_from DESC, v.recorded_at DESC LIMIT 1;
+         ORDER BY v.effective_from DESC, v.id DESC LIMIT 1;
     END IF;
     IF NOT coalesce(v_found, false) THEN
         v_in := d.core_default;
@@ -358,16 +397,73 @@ $$;
 CREATE TRIGGER trg_setting_value_check_insert BEFORE INSERT ON setting_value
     FOR EACH ROW EXECUTE FUNCTION setting_value_check_insert();
 
--- ===== Row-level security (ADR-0017 rule 19; ADR-0022 rule 8) =====
--- rls_v1: the company policy, compared as text and failing closed; null-company (installation) rows only under the setting
--- value installation; and the read-only company_ids policy for registered cross-company queries. Company sessions read
--- installation maxima only through setting_installation_value (ADR-0063 rule 1).
-ALTER TABLE setting_value ENABLE ROW LEVEL SECURITY;
-ALTER TABLE setting_value FORCE ROW LEVEL SECURITY;
-CREATE POLICY company_policy ON setting_value USING (company_id::text = current_setting('nativeflows.company_id', true)
-    OR (company_id IS NULL AND current_setting('nativeflows.company_id', true) = 'installation'));
-CREATE POLICY company_ids_policy ON setting_value FOR SELECT USING (company_id::text = ANY (string_to_array(current_setting('nativeflows.company_ids', true), ',')));
-ALTER TABLE company_setup_acknowledgement ENABLE ROW LEVEL SECURITY;
-ALTER TABLE company_setup_acknowledgement FORCE ROW LEVEL SECURITY;
-CREATE POLICY company_policy ON company_setup_acknowledgement USING (company_id::text = current_setting('nativeflows.company_id', true));
-CREATE POLICY company_ids_policy ON company_setup_acknowledgement FOR SELECT USING (company_id::text = ANY (string_to_array(current_setting('nativeflows.company_ids', true), ',')));
+-- ===== recorded_at on insert and update; TRUNCATE refused (ADR-0007 rules 9, 16 and their notes) =====
+-- Every table of this file has recorded_at timestamptz NOT NULL DEFAULT now(). The DO block attaches the trigger
+-- trg_<table>_set_recorded_at (function set_recorded_at) to every table of v_tables: BEFORE INSERT OR UPDATE on tables
+-- updated in place, BEFORE INSERT on the append-only tables of v_append_only. recorded_at is so the instant of the last
+-- write, set by the system and never taken from a client (ADR-0007 rule 9 and its notes; S2 adversarial review S2).
+-- Append-only tables are those whose guard trigger refuses every update outside an erasure, and pure logs (here: platform_reject_change).
+-- Row guards without UPDATE OF on in-place tables sort before set_recorded_at, so they compare rows before it runs; a
+-- BEFORE INSERT trigger whose function reads NEW.recorded_at sorts after it, so it sees the system's value.
+-- TRUNCATE skips row triggers and row-level security, so every table with company_id, every append-only table and every
+-- table with a BEFORE DELETE guard, unless it has a TRUNCATE trigger of its own, is listed in v_refuse_truncate (default
+-- partitions with their parent) and gets trg_<table>_refuse_truncate (BEFORE TRUNCATE, function refuse_truncate; S2
+-- adversarial review N4; S2 schema review R6-N2). Retention drops partitions and never truncates (ADR-0017 rule 19 note).
+-- Lab gen_overview.py --check compares this section with what schema_phase_b.py writes from the table definitions and
+-- triggers of the design files. The functions are defined in every file because the labs load subsets.
+CREATE OR REPLACE FUNCTION set_recorded_at() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
+BEGIN
+    NEW.recorded_at := now();
+    RETURN NEW;
+END $$;
+CREATE OR REPLACE FUNCTION refuse_truncate() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
+BEGIN
+    RAISE EXCEPTION '% is never truncated (company, append-only or guarded rows)', TG_TABLE_NAME USING ERRCODE = 'restrict_violation';
+END $$;
+DO $$
+DECLARE
+    v_tables            text[] := ARRAY['setting_definition', 'setting_preset', 'setting_preset_item', 'company_setup_acknowledgement', 'setting_value',
+        'extension_point', 'module_activation'];
+    v_append_only       text[] := ARRAY['setting_value']::text[];
+    v_refuse_truncate   text[] := ARRAY['company_setup_acknowledgement', 'setting_value', 'module_activation']::text[];
+    v_table             text;
+BEGIN
+    FOREACH v_table IN ARRAY v_tables LOOP
+        CONTINUE WHEN to_regclass(v_table) IS NULL;
+        EXECUTE format('CREATE OR REPLACE TRIGGER %I BEFORE ' || CASE WHEN v_table = ANY (v_append_only) THEN 'INSERT' ELSE 'INSERT OR UPDATE' END
+                       || ' ON %I FOR EACH ROW EXECUTE FUNCTION set_recorded_at()', 'trg_' || v_table || '_set_recorded_at', v_table);
+    END LOOP;
+    FOREACH v_table IN ARRAY v_refuse_truncate LOOP
+        CONTINUE WHEN to_regclass(v_table) IS NULL;
+        EXECUTE format('CREATE OR REPLACE TRIGGER %I BEFORE TRUNCATE ON %I FOR EACH STATEMENT EXECUTE FUNCTION refuse_truncate()',
+                       'trg_' || v_table || '_refuse_truncate', v_table);
+    END LOOP;
+END $$;
+-- ===== end of recorded_at and TRUNCATE =====
+
+-- ===== Row-level security, generated (ADR-0017 rule 19; the rls_v1 helper of ADR-0022 rule 8) =====
+-- Every table of this file with company_id gets ENABLE and FORCE ROW LEVEL SECURITY, the company policy company_policy
+-- (company_id compared as text with nativeflows.company_id, failing closed) and the read-only company_ids_policy for
+-- registered cross-company queries (ADR-0017 rule 19). Tables whose company_id is nullable (v_nullable) show their null
+-- rows only under the setting value installation. Default partitions are listed with their parent. Exceptions are in
+-- lab gen_overview.RLS_ALLOWLIST with their reasons; this file has none.
+-- Lab gen_overview.py --check compares this section with what schema_phase_b.py writes.
+DO $$
+DECLARE
+    v_tables    text[] := ARRAY['company_setup_acknowledgement', 'setting_value', 'module_activation'];
+    v_nullable  text[] := ARRAY['setting_value']::text[];
+    v_table     text;
+BEGIN
+    FOREACH v_table IN ARRAY v_tables LOOP
+        EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', v_table);
+        EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', v_table);
+        IF v_table = ANY (v_nullable) THEN
+            EXECUTE format('CREATE POLICY company_policy ON %I USING (company_id::text = current_setting(''nativeflows.company_id'', true)'
+                           ' OR (company_id IS NULL AND current_setting(''nativeflows.company_id'', true) = ''installation''))', v_table);
+        ELSE
+            EXECUTE format('CREATE POLICY company_policy ON %I USING (company_id::text = current_setting(''nativeflows.company_id'', true))', v_table);
+        END IF;
+        EXECUTE format('CREATE POLICY company_ids_policy ON %I FOR SELECT USING (company_id::text = ANY (string_to_array(current_setting(''nativeflows.company_ids'', true), '','')))', v_table);
+    END LOOP;
+END $$;
+-- ===== end of row-level security =====

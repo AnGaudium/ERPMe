@@ -40,7 +40,7 @@ CREATE TABLE automation_rule (                             -- company data; the 
     shadow_version_id   uuid,                              -- at most one version in shadow
     disabled_at         timestamptz,                       -- rules 9, 16, 25
     disabled_reason     text CONSTRAINT ck_automation_rule_disabled_reason CHECK (disabled_reason IN ('circuit_breaker', 'owner_inactive', 'upgrade_invalid', 'person')),
-    recorded_at         timestamptz NOT NULL,
+    recorded_at         timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, code),
     UNIQUE (company_id, id),
     CONSTRAINT ck_automation_rule_disabled CHECK ((disabled_at IS NULL) = (disabled_reason IS NULL)),
@@ -76,7 +76,7 @@ CREATE TABLE automation_rule_version (
     drafting_window_from   date,                           -- ADR-0059 rule 15; null: from the beginning
     drafting_window_to     date NOT NULL,                  -- every draft has one; a person's defaults to the draft's date
     change_proposal_id     uuid,                           -- the approved proposal that last raised its state
-    recorded_at            timestamptz NOT NULL,
+    recorded_at            timestamptz NOT NULL DEFAULT now(),
     UNIQUE (automation_rule_id, version),
     UNIQUE (company_id, id),
     UNIQUE (company_id, automation_rule_id, id),
@@ -120,7 +120,7 @@ CREATE TABLE automation_execution (
     is_tainted                  boolean NOT NULL,
     origin_agent_run_id         uuid,
     on_behalf_of_id             uuid NOT NULL REFERENCES user_account (id),   -- the rule's owner at execution (rule 9)
-    recorded_at                 timestamptz NOT NULL,
+    recorded_at                 timestamptz NOT NULL DEFAULT now(),
     UNIQUE (automation_rule_version_id, event_id, mode),  -- rule 17
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, automation_rule_id, automation_rule_version_id) REFERENCES automation_rule_version (company_id, automation_rule_id, id),
@@ -143,20 +143,22 @@ CREATE UNIQUE INDEX ux_automation_execution_chain_target ON automation_execution
 CREATE INDEX ix_automation_execution_rule_recorded ON automation_execution (company_id, automation_rule_id, business_date, recorded_at);
 -- ADR-0058 rule 9: subjects outside the owner's scope are not evaluated; a value-free count per rule and business date.
 CREATE TABLE automation_scope_skip (
+    id                  uuid PRIMARY KEY,
     company_id          uuid NOT NULL,
     automation_rule_id  uuid NOT NULL,
     business_date       date NOT NULL,
     skipped_count       integer NOT NULL CONSTRAINT ck_automation_scope_skip_count CHECK (skipped_count >= 1),
-    recorded_at         timestamptz NOT NULL,
-    PRIMARY KEY (automation_rule_id, business_date),
+    recorded_at         timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_automation_scope_skip_automation_rule_id_business_date UNIQUE (automation_rule_id, business_date),
     FOREIGN KEY (company_id, automation_rule_id) REFERENCES automation_rule (company_id, id)
 );
 -- ADR-0058 rule 15: one row per company, locked by every activation, enable, rollback and demotion (ADR-0027 rule 10, class 3).
 CREATE TABLE configuration_state (
-    company_id        uuid PRIMARY KEY REFERENCES company (id),
+    id                uuid PRIMARY KEY,   -- one row per company (E3, ADR-0006 rule 1 note)
+    company_id        uuid NOT NULL CONSTRAINT uq_configuration_state_company_id UNIQUE REFERENCES company (id),
     registry_version  text NOT NULL,                       -- the registry the active set was last checked against
     last_checked_at   timestamptz,
-    recorded_at       timestamptz NOT NULL
+    recorded_at       timestamptz NOT NULL DEFAULT now()
 );
 
 -- ===== Decision tables [configuration] (ADR-0058 rules 18-20) =====
@@ -168,7 +170,7 @@ CREATE TABLE decision_table (                              -- company data; the 
     owner_user_id       uuid NOT NULL REFERENCES user_account (id),
     current_version_id  uuid,
     shadow_version_id   uuid,
-    recorded_at         timestamptz NOT NULL,
+    recorded_at         timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, code),
     UNIQUE (company_id, id),
     CONSTRAINT ck_decision_table_pointers CHECK (current_version_id IS NULL OR current_version_id IS DISTINCT FROM shadow_version_id)
@@ -194,7 +196,7 @@ CREATE TABLE decision_table_version (                      -- immutable once out
     drafting_window_from   date,
     drafting_window_to     date NOT NULL,
     change_proposal_id     uuid,
-    recorded_at            timestamptz NOT NULL,
+    recorded_at            timestamptz NOT NULL DEFAULT now(),
     UNIQUE (decision_table_id, version),
     UNIQUE (company_id, id),
     UNIQUE (company_id, decision_table_id, id),
@@ -210,13 +212,14 @@ CREATE TABLE decision_table_version (                      -- immutable once out
     CONSTRAINT ck_decision_table_version_window CHECK (drafting_window_from IS NULL OR drafting_window_from <= drafting_window_to)
 );
 CREATE TABLE decision_table_row (                          -- frozen with its version (trigger below)
+    id                         uuid PRIMARY KEY,
     company_id                 uuid NOT NULL,
     decision_table_version_id  uuid NOT NULL,
     row_number                 integer NOT NULL CONSTRAINT ck_decision_table_row_row_number CHECK (row_number BETWEEN 1 AND 200),   -- rule 18
     cells                      jsonb NOT NULL,             -- per input code: {"in": [...]}, {"min": x, "max": y} (half-open) or {"is": true|false}; absent means any
     outputs                    jsonb NOT NULL,             -- per output code: a typed value
-    recorded_at                timestamptz NOT NULL,
-    PRIMARY KEY (decision_table_version_id, row_number),
+    recorded_at                timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_decision_table_row_decision_table_version_id_row_number UNIQUE (decision_table_version_id, row_number),
     FOREIGN KEY (company_id, decision_table_version_id) REFERENCES decision_table_version (company_id, id),
     CONSTRAINT ck_decision_table_row_cells CHECK (jsonb_typeof(cells) = 'object'),
     CONSTRAINT ck_decision_table_row_outputs CHECK (jsonb_typeof(outputs) = 'object')
@@ -230,7 +233,7 @@ CREATE TABLE parameter_set (                               -- company data; one 
     owner_user_id       uuid NOT NULL REFERENCES user_account (id),
     current_version_id  uuid,                              -- null: the core defaults of the registry are in force
     shadow_version_id   uuid,
-    recorded_at         timestamptz NOT NULL,
+    recorded_at         timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, function_code),
     UNIQUE (company_id, id),
     CONSTRAINT ck_parameter_set_pointers CHECK (current_version_id IS NULL OR current_version_id IS DISTINCT FROM shadow_version_id)
@@ -254,7 +257,7 @@ CREATE TABLE parameter_set_version (                       -- immutable once out
     drafting_window_from   date,
     drafting_window_to     date NOT NULL,
     change_proposal_id     uuid,
-    recorded_at            timestamptz NOT NULL,
+    recorded_at            timestamptz NOT NULL DEFAULT now(),
     UNIQUE (parameter_set_id, version),
     UNIQUE (company_id, id),
     UNIQUE (company_id, parameter_set_id, id),
@@ -268,6 +271,7 @@ CREATE TABLE parameter_set_version (                       -- immutable once out
 -- One per declared parameter, with the declaration's type, default and bounds copied at the version's function version;
 -- frozen with its version (trigger below).
 CREATE TABLE parameter_set_value (
+    id                        uuid PRIMARY KEY,
     company_id                uuid NOT NULL,
     parameter_set_version_id  uuid NOT NULL,
     parameter_code            text NOT NULL CONSTRAINT ck_parameter_set_value_code CHECK (parameter_code ~ '^[a-z][a-z0-9_]*$'),
@@ -278,8 +282,8 @@ CREATE TABLE parameter_set_value (
     min_value                 numeric NOT NULL,
     max_value                 numeric NOT NULL,
     is_safety_cap             boolean NOT NULL DEFAULT false,   -- lowered only and never off: the maximum is the core default (rule 3)
-    recorded_at               timestamptz NOT NULL,
-    PRIMARY KEY (parameter_set_version_id, parameter_code),
+    recorded_at               timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_parameter_set_value_parameter_set_version_id_parameter_code UNIQUE (parameter_set_version_id, parameter_code),
     FOREIGN KEY (company_id, parameter_set_version_id) REFERENCES parameter_set_version (company_id, id),
     CONSTRAINT ck_parameter_set_value_bounds CHECK (min_value <= max_value),
     CONSTRAINT ck_parameter_set_value_in_bounds CHECK (value IS NULL OR value BETWEEN min_value AND max_value),   -- parameter_out_of_bounds
@@ -325,7 +329,7 @@ CREATE TABLE artifact_promotion_evidence (                 -- immutable; compute
     drafted_by_filtered_run  boolean NOT NULL DEFAULT false,   -- the version came from a held-out-filtered drafting run, not a person (rule 16)
     created_by_kind          text NOT NULL DEFAULT 'human' CONSTRAINT ck_artifact_promotion_evidence_created_by_kind CHECK (created_by_kind IN ('human', 'system')),
     created_by_user_id       uuid REFERENCES user_account (id),   -- null when the monitor job wrote a re-evaluation
-    recorded_at              timestamptz NOT NULL,
+    recorded_at              timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     CONSTRAINT ck_artifact_promotion_evidence_windows CHECK (evaluation_window_from <= evaluation_window_to
         AND (drafting_window_from IS NULL OR drafting_window_from <= drafting_window_to)),
@@ -363,7 +367,7 @@ CREATE TABLE artifact_transition (                         -- immutable; one per
     actor_kind                   text NOT NULL CONSTRAINT ck_artifact_transition_actor_kind CHECK (actor_kind IN ('human', 'agent', 'integration', 'system')),
     actor_id                     uuid NOT NULL,
     on_behalf_of_id              uuid REFERENCES user_account (id),
-    recorded_at                  timestamptz NOT NULL,
+    recorded_at                  timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     FOREIGN KEY (company_id, evidence_id) REFERENCES artifact_promotion_evidence (company_id, id),
     FOREIGN KEY (company_id, change_proposal_id) REFERENCES change_proposal (company_id, id),
@@ -389,7 +393,7 @@ CREATE TABLE artifact_shadow_outcome (
     shadow_outcome       jsonb NOT NULL,
     current_outcome      jsonb NOT NULL,                   -- what the version in force (or the core defaults) decided
     current_hash         text NOT NULL CONSTRAINT ck_artifact_shadow_outcome_current_hash CHECK (current_hash ~ '^[0-9a-f]{64}$'),
-    recorded_at          timestamptz NOT NULL,
+    recorded_at          timestamptz NOT NULL DEFAULT now(),
     UNIQUE (artifact_version_id, case_table, case_id)
 );
 
@@ -405,7 +409,7 @@ CREATE TABLE golden_case_label (                           -- company data; appe
     labelled_by_user_id  uuid NOT NULL REFERENCES user_account (id),
     labelled_on          date NOT NULL,
     retired_at           timestamptz,                      -- set once when a later label replaces it
-    recorded_at          timestamptz NOT NULL,
+    recorded_at          timestamptz NOT NULL DEFAULT now(),
     UNIQUE (company_id, id),
     -- Rule 16: held out when the first byte of SHA-256 of the UTF-8 text '<company_id>:<case_id>' (canonical UUIDs) is below 51.
     CONSTRAINT ck_golden_case_label_held_out CHECK (is_held_out = (get_byte(sha256(convert_to(company_id::text || ':' || case_id::text, 'UTF8')), 0) < 51))
@@ -428,7 +432,7 @@ CREATE TABLE artifact_monitor_snapshot (                   -- immutable; one per
     thresholds              jsonb NOT NULL,
     result                  text NOT NULL CONSTRAINT ck_artifact_monitor_snapshot_result CHECK (result IN ('within', 'breached', 'too_few_decisions')),
     transition_id           uuid,                          -- the demotion a breach caused
-    recorded_at             timestamptz NOT NULL,
+    recorded_at             timestamptz NOT NULL DEFAULT now(),
     UNIQUE (artifact_version_id, window_to),
     FOREIGN KEY (company_id, transition_id) REFERENCES artifact_transition (company_id, id),
     CONSTRAINT ck_artifact_monitor_snapshot_window CHECK (window_from <= window_to),
@@ -458,7 +462,7 @@ ALTER TABLE parameter_set ADD CONSTRAINT fk_parameter_set_shadow_version
 -- shadow (demotion), or to retired; never back to draft, never out of retired. A version in force is demoted only after
 -- the pointer moved off it. Leaving shadow clears a shadow pointer that names the version; retiring clears both pointers.
 -- Only drafts are deleted. Arguments: the identity table and the version's column naming it.
-CREATE FUNCTION artifact_version_check_insert() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION artifact_version_check_insert() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 BEGIN
     IF NEW.state <> 'draft' THEN
         RAISE EXCEPTION '% rows are inserted only as drafts, not % (artifact_version_not_eligible)', TG_TABLE_NAME, NEW.state USING ERRCODE = 'check_violation';
@@ -466,7 +470,7 @@ BEGIN
     RETURN NEW;
 END
 $$;
-CREATE FUNCTION artifact_version_check_change() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION artifact_version_check_change() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 DECLARE
     v_rank     jsonb := '{"draft": 0, "backtested": 1, "shadow": 2, "assisted": 3, "active": 4}';
     v_mutable  text[] := ARRAY['state', 'effective_from', 'change_proposal_id'];
@@ -527,7 +531,7 @@ $$;
 -- force never pins anything else. One change proposal may raise the table version and then the rule version in one
 -- transaction (rule 24 note). A pinned version is neither retired nor demoted to shadow while a current or shadow rule
 -- version pins it.
-CREATE FUNCTION automation_rule_version_check_pins() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION automation_rule_version_check_pins() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 DECLARE
     v_bad uuid;
 BEGIN
@@ -553,7 +557,7 @@ BEGIN
     RETURN NEW;
 END
 $$;
-CREATE FUNCTION decision_table_version_check_in_use() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION decision_table_version_check_in_use() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 BEGIN
     IF NEW.state IS DISTINCT FROM OLD.state AND (NEW.state = 'retired' OR (NEW.state = 'shadow' AND OLD.state IN ('assisted', 'active'))) AND EXISTS (
         SELECT 1 FROM automation_rule_version v JOIN automation_rule r ON r.id = v.automation_rule_id
@@ -564,7 +568,7 @@ BEGIN
 END
 $$;
 -- ADR-0058 rule 9: the scope count only rises; rows are never deleted.
-CREATE FUNCTION automation_scope_skip_check_change() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION automation_scope_skip_check_change() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 BEGIN
     IF TG_OP = 'DELETE' OR NEW.automation_rule_id <> OLD.automation_rule_id OR NEW.business_date <> OLD.business_date
        OR NEW.company_id <> OLD.company_id OR NEW.skipped_count < OLD.skipped_count THEN
@@ -575,7 +579,7 @@ END
 $$;
 -- Child rows (decision table rows, parameter values) change only while their version is a draft.
 -- Arguments: the version table and the child's column naming it.
-CREATE FUNCTION artifact_child_check_frozen() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION artifact_child_check_frozen() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 DECLARE
     v_ids    uuid[];
     v_id     uuid;
@@ -598,7 +602,7 @@ END
 $$;
 -- ADR-0059 rule 12: the current pointer names a version in state assisted or active, the shadow pointer one in shadow.
 -- Argument: the version table.
-CREATE FUNCTION artifact_pointer_check() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION artifact_pointer_check() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
 DECLARE
     v_state  text;
 BEGIN
@@ -641,30 +645,90 @@ CREATE TRIGGER trg_parameter_set_pointer BEFORE INSERT OR UPDATE ON parameter_se
 CREATE TRIGGER trg_automation_rule_version_pins BEFORE UPDATE ON automation_rule_version FOR EACH ROW EXECUTE FUNCTION automation_rule_version_check_pins();
 CREATE TRIGGER trg_decision_table_version_in_use BEFORE UPDATE ON decision_table_version FOR EACH ROW EXECUTE FUNCTION decision_table_version_check_in_use();
 CREATE TRIGGER trg_automation_scope_skip_check_change BEFORE UPDATE OR DELETE ON automation_scope_skip FOR EACH ROW EXECUTE FUNCTION automation_scope_skip_check_change();
-CREATE TRIGGER trg_automation_execution_immutable BEFORE UPDATE OR DELETE ON automation_execution FOR EACH ROW EXECUTE FUNCTION platform_reject_change();
+CREATE TRIGGER trg_automation_execution_immutable BEFORE UPDATE OR DELETE ON automation_execution FOR EACH ROW EXECUTE FUNCTION platform_reject_change('{condition_results}');
 CREATE TRIGGER trg_artifact_promotion_evidence_immutable BEFORE UPDATE OR DELETE ON artifact_promotion_evidence FOR EACH ROW EXECUTE FUNCTION platform_reject_change();
-CREATE TRIGGER trg_artifact_transition_immutable BEFORE UPDATE OR DELETE ON artifact_transition FOR EACH ROW EXECUTE FUNCTION platform_reject_change();
+CREATE TRIGGER trg_artifact_transition_immutable BEFORE UPDATE OR DELETE ON artifact_transition FOR EACH ROW EXECUTE FUNCTION platform_reject_change('{reason}');
 CREATE TRIGGER trg_artifact_shadow_outcome_immutable BEFORE UPDATE OR DELETE ON artifact_shadow_outcome FOR EACH ROW EXECUTE FUNCTION platform_reject_change();
 CREATE TRIGGER trg_artifact_monitor_snapshot_immutable BEFORE UPDATE OR DELETE ON artifact_monitor_snapshot FOR EACH ROW EXECUTE FUNCTION platform_reject_change();
 CREATE TRIGGER trg_golden_case_label_append_only BEFORE UPDATE OR DELETE ON golden_case_label FOR EACH ROW
     EXECUTE FUNCTION platform_check_append_only('{}', '{retired_at}', '{}');
 
--- ===== Row-level security (ADR-0017 rule 19; ADR-0022 rule 8) =====
--- rls_v1 as DS-05-platform.sql writes it: the company policy, compared as text and failing closed, and the read-only
--- company_ids policy for registered cross-company queries. No table here has installation-scoped rows.
+-- ===== recorded_at on insert and update; TRUNCATE refused (ADR-0007 rules 9, 16 and their notes) =====
+-- Every table of this file has recorded_at timestamptz NOT NULL DEFAULT now(). The DO block attaches the trigger
+-- trg_<table>_set_recorded_at (function set_recorded_at) to every table of v_tables: BEFORE INSERT OR UPDATE on tables
+-- updated in place, BEFORE INSERT on the append-only tables of v_append_only. recorded_at is so the instant of the last
+-- write, set by the system and never taken from a client (ADR-0007 rule 9 and its notes; S2 adversarial review S2).
+-- Append-only tables are those whose guard trigger refuses every update outside an erasure, and pure logs (here: platform_reject_change).
+-- Row guards without UPDATE OF on in-place tables sort before set_recorded_at, so they compare rows before it runs; a
+-- BEFORE INSERT trigger whose function reads NEW.recorded_at sorts after it, so it sees the system's value.
+-- TRUNCATE skips row triggers and row-level security, so every table with company_id, every append-only table and every
+-- table with a BEFORE DELETE guard, unless it has a TRUNCATE trigger of its own, is listed in v_refuse_truncate (default
+-- partitions with their parent) and gets trg_<table>_refuse_truncate (BEFORE TRUNCATE, function refuse_truncate; S2
+-- adversarial review N4; S2 schema review R6-N2). Retention drops partitions and never truncates (ADR-0017 rule 19 note).
+-- Lab gen_overview.py --check compares this section with what schema_phase_b.py writes from the table definitions and
+-- triggers of the design files. The functions are defined in every file because the labs load subsets.
+CREATE OR REPLACE FUNCTION set_recorded_at() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
+BEGIN
+    NEW.recorded_at := now();
+    RETURN NEW;
+END $$;
+CREATE OR REPLACE FUNCTION refuse_truncate() RETURNS trigger LANGUAGE plpgsql SET search_path = nativeflows, pg_temp AS $$
+BEGIN
+    RAISE EXCEPTION '% is never truncated (company, append-only or guarded rows)', TG_TABLE_NAME USING ERRCODE = 'restrict_violation';
+END $$;
 DO $$
 DECLARE
-    v_table text;
+    v_tables            text[] := ARRAY['automation_rule', 'automation_rule_version', 'automation_execution', 'automation_scope_skip',
+        'configuration_state', 'decision_table', 'decision_table_version', 'decision_table_row', 'parameter_set',
+        'parameter_set_version', 'parameter_set_value', 'artifact_promotion_evidence', 'artifact_transition',
+        'artifact_shadow_outcome', 'golden_case_label', 'artifact_monitor_snapshot'];
+    v_append_only       text[] := ARRAY['artifact_monitor_snapshot', 'artifact_promotion_evidence', 'artifact_shadow_outcome', 'artifact_transition',
+        'automation_execution']::text[];
+    v_refuse_truncate   text[] := ARRAY['automation_rule', 'automation_rule_version', 'automation_execution', 'automation_scope_skip',
+        'configuration_state', 'decision_table', 'decision_table_version', 'decision_table_row', 'parameter_set',
+        'parameter_set_version', 'parameter_set_value', 'artifact_promotion_evidence', 'artifact_transition',
+        'artifact_shadow_outcome', 'golden_case_label', 'artifact_monitor_snapshot']::text[];
+    v_table             text;
 BEGIN
-    FOREACH v_table IN ARRAY ARRAY[
-        'automation_rule', 'automation_rule_version', 'automation_execution', 'automation_scope_skip', 'configuration_state', 'decision_table',
-        'decision_table_version', 'decision_table_row', 'parameter_set', 'parameter_set_version', 'parameter_set_value',
-        'artifact_promotion_evidence', 'artifact_transition', 'artifact_shadow_outcome', 'golden_case_label',
-        'artifact_monitor_snapshot'] LOOP
+    FOREACH v_table IN ARRAY v_tables LOOP
+        CONTINUE WHEN to_regclass(v_table) IS NULL;
+        EXECUTE format('CREATE OR REPLACE TRIGGER %I BEFORE ' || CASE WHEN v_table = ANY (v_append_only) THEN 'INSERT' ELSE 'INSERT OR UPDATE' END
+                       || ' ON %I FOR EACH ROW EXECUTE FUNCTION set_recorded_at()', 'trg_' || v_table || '_set_recorded_at', v_table);
+    END LOOP;
+    FOREACH v_table IN ARRAY v_refuse_truncate LOOP
+        CONTINUE WHEN to_regclass(v_table) IS NULL;
+        EXECUTE format('CREATE OR REPLACE TRIGGER %I BEFORE TRUNCATE ON %I FOR EACH STATEMENT EXECUTE FUNCTION refuse_truncate()',
+                       'trg_' || v_table || '_refuse_truncate', v_table);
+    END LOOP;
+END $$;
+-- ===== end of recorded_at and TRUNCATE =====
+
+-- ===== Row-level security, generated (ADR-0017 rule 19; the rls_v1 helper of ADR-0022 rule 8) =====
+-- Every table of this file with company_id gets ENABLE and FORCE ROW LEVEL SECURITY, the company policy company_policy
+-- (company_id compared as text with nativeflows.company_id, failing closed) and the read-only company_ids_policy for
+-- registered cross-company queries (ADR-0017 rule 19). Tables whose company_id is nullable (v_nullable) show their null
+-- rows only under the setting value installation. Default partitions are listed with their parent. Exceptions are in
+-- lab gen_overview.RLS_ALLOWLIST with their reasons; this file has none.
+-- Lab gen_overview.py --check compares this section with what schema_phase_b.py writes.
+DO $$
+DECLARE
+    v_tables    text[] := ARRAY['automation_rule', 'automation_rule_version', 'automation_execution', 'automation_scope_skip',
+        'configuration_state', 'decision_table', 'decision_table_version', 'decision_table_row', 'parameter_set',
+        'parameter_set_version', 'parameter_set_value', 'artifact_promotion_evidence', 'artifact_transition',
+        'artifact_shadow_outcome', 'golden_case_label', 'artifact_monitor_snapshot'];
+    v_nullable  text[] := ARRAY[]::text[];
+    v_table     text;
+BEGIN
+    FOREACH v_table IN ARRAY v_tables LOOP
         EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', v_table);
         EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', v_table);
-        EXECUTE format('CREATE POLICY company_policy ON %I USING (company_id::text = current_setting(''nativeflows.company_id'', true))', v_table);
+        IF v_table = ANY (v_nullable) THEN
+            EXECUTE format('CREATE POLICY company_policy ON %I USING (company_id::text = current_setting(''nativeflows.company_id'', true)'
+                           ' OR (company_id IS NULL AND current_setting(''nativeflows.company_id'', true) = ''installation''))', v_table);
+        ELSE
+            EXECUTE format('CREATE POLICY company_policy ON %I USING (company_id::text = current_setting(''nativeflows.company_id'', true))', v_table);
+        END IF;
         EXECUTE format('CREATE POLICY company_ids_policy ON %I FOR SELECT USING (company_id::text = ANY (string_to_array(current_setting(''nativeflows.company_ids'', true), '','')))', v_table);
     END LOOP;
-END
-$$;
+END $$;
+-- ===== end of row-level security =====
