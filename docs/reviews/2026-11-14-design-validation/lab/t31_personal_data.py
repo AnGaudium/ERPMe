@@ -26,14 +26,20 @@ K: the other catalogs and the field class (rules 5, 11, 15, 16): INV-890 to INV-
    assignment and custom field CHECKs and not in the agent type version CHECK, the processing log kind retention.
 R: reference functions for the retention job (rule 9; EC-354): no verified rule, no destruction; blocking before destruction.
 With --load: the five tables of DS-64-personal-data.sql exist with company_id, recorded_at, UNIQUE (company_id, id) and forced
-row-level security; each CHECK and key refuses a bad row (released subjects, adjusted rules, actor kinds of the read log
+row-level security; each CHECK and key refuses a bad row (released subjects, package and company rules, actor kinds of the read log
 included); the append-only tables refuse UPDATE and DELETE; a simulated erasure of
 a partner, its address and its contact, driven by the catalog, leaves blank or tokenized columns and custom_values without its
 personal keys (clear_keys), one data_erasure_entry per rewritten row (INV-892 in SQL) and entries whose columns carry no values
 (no jsonb, text only for codes and names); document_version has the nullable erased_at of rule 6.
-Not covered: the trigger exception that lets the erasure command rewrite posted documents, versions and journal text columns
-(ADR-0079 rule 7): its DDL is written with the ledger and document DDL in session S2 (open question). Commands, the retention
-job, masking, the read log writers, the erasure journal outside the database and ReapplyErasures are not covered either.
+E: the erasure exception of rule 7 in the DDL text: every refusing trigger that names erasure columns names exactly its
+   table's frozen and append-only catalog columns; posted headers and lines, document_version and the journal take it; the
+   only uncovered guarded tables are the five with guard functions of their own (a follow-up).
+With --load, the exception (S2): a posted document and its version change only catalog columns (and erased_at), only under
+the erasure marker, never by delete; the journal triggers pass note and description; journal_reject_change,
+document_check_frozen and platform_reject_change behave so on a scratch table.
+Not covered: the check that the marker names a committed EraseDataSubject or DestroyRetainedPersonalData (no idempotency
+table in the DDL yet; DS-36). Commands, the retention job, masking, the read log writers, the erasure journal outside the
+database and ReapplyErasures are not covered either.
 The blank check reads these CHECK forms only: nullness pairings "(x) = (col IS [NOT] NULL)", "col IS NOT NULL OR ...",
 num_nonnulls, coalesce(length(col), 0) > 0, length(col) > 0 or BETWEEN 1, col <> '', col ~ 'pattern', jsonb_typeof,
 jsonb_array_length or cardinality > 0, and the erasure flags erased_at and body_removed_at. Other forms (IN lists, comparisons
@@ -382,6 +388,43 @@ check("C08 the retention classes are the ten of rule 9: the catalog uses only th
       len(CLASSES) == 10 and used <= CLASSES and ddl_classes == CLASSES and adr_classes == CLASSES, sorted(used))
 check("C09 the catalog checker passes as a whole", not errs, errs[:8])
 
+# ======================================================================= E: the erasure exception (rule 7), in the DDL text
+# Every refusing trigger names the columns an erasure may rewrite as an argument: the catalog columns of its table. Which
+# argument holds them depends on the function; the erasure flags and crm's content_salt (INV-504) are allowed beside them.
+ERASE_ARG = {"journal_reject_change": 0, "platform_reject_change": 0, "document_check_row_change": 0, "document_version_check_change": 0,
+             "document_check_frozen": 1, "platform_check_append_only": 2, "crm_check_append_only": 2}
+FLAGS = {"erased_at", "body_removed_at", "content_salt"}
+ALL_DDL = "\n".join(t for _, t in FILES)
+TRIGGERS = [(t, fn, re.findall(r"'([^']*)'", args)) for t, fn, args in re.findall(
+    r"CREATE TRIGGER \w+\s+BEFORE [A-Z ,]*UPDATE[A-Z ,]*\s+ON (\w+)\s+FOR EACH ROW\s+EXECUTE FUNCTION (\w+)\(([^)]*)\)", ALL_DDL)]
+CATCOLS, FROZEN = {}, {}
+for (t, col), d in S1.items():
+    if d["erasure_action"] != "keep":
+        CATCOLS.setdefault(t, set()).add(col)
+        if d["store_class"] in ("frozen_document", "append_only"):
+            FROZEN.setdefault(t, set()).add(col)
+passed_cols, wrong = {}, []
+for t, fn, args in TRIGGERS:
+    if fn in ERASE_ARG and len(args) > ERASE_ARG[fn]:
+        cols = {c for c in args[ERASE_ARG[fn]].strip("{}").split(",") if c} - FLAGS
+        mutable = {c for c in args[0].strip("{}").split(",") if c} if fn in ("platform_check_append_only", "crm_check_append_only") else set()
+        passed_cols[t] = cols
+        if not cols <= CATCOLS.get(t, set()) or not CATCOLS.get(t, set()) <= cols | mutable:
+            wrong.append((t, sorted(cols ^ (CATCOLS.get(t, set()) - mutable))))
+check("E01 every trigger that names erasure columns names exactly its table's catalog columns (keep rows aside; erasure flags and columns the trigger leaves mutable allowed)",
+      not wrong and len(passed_cols) >= 25, wrong or f"{len(passed_cols)} tables")
+brief = {"document", "document_version", "payment", "payment_line", "tax_line", "journal_entry", "journal_line"}
+check("E02 posted headers and lines, document_version, journal_entry.note and journal_line.description take the exception (ADR-0079 rule 7)",
+      brief <= set(passed_cols) and passed_cols["journal_entry"] == {"note"} and passed_cols["journal_line"] == {"description"}
+      and "content" in passed_cols["document_version"], sorted(brief - set(passed_cols)))
+guarded = {t for t, fn, _ in TRIGGERS}
+OWN_GUARDS = {"analysis_example", "company_setup_acknowledgement", "document_extraction", "posting_intent", "saved_analysis_version"}
+uncovered = sorted(t for t in FROZEN if t in guarded and t not in passed_cols)
+no_trigger = sorted(t for t in FROZEN if t not in guarded)
+check("E03 the only frozen or append-only catalog tables whose refusing trigger takes no erasure columns are the five with guard functions of their own "
+      "(a follow-up); tables with no trigger in the DDL are the DS-22 headers and lines of the generated document trigger and rows without a guard yet",
+      set(uncovered) == OWN_GUARDS, {"uncovered": uncovered, "no trigger in the DDL": len(no_trigger)})
+
 # ======================================================================= S: self-tests
 F64 = dict(FILES)["DS-64-personal-data.sql"]
 broken_ddl = [(n, t) for n, t in FILES if n != "DS-20-master-data.sql"] + [
@@ -524,10 +567,14 @@ if "--load" in sys.argv:
     trial("X14 an unknown retention class is refused", lambda cx: rule(cx, retention_class="payroll"), "ck_retention_rule_retention_class")
     trial("X15 an unknown start event is refused", lambda cx: rule(cx, retention_class="message", start_event="contract_signed"), "ck_retention_rule_start_event")
     trial("X16 two rules for one class in a company are refused", lambda cx: rule(cx), "retention_rule_company_id_retention_class_key")
-    trial("X17 every rule names the package rule it comes from, also when the company adjusted it", lambda cx: rule(cx, retention_class="message", source="company", is_adjustable=True, package_rule_ref=None), "package_rule_ref")
-    trial("X17a a company adjusts only a rule the package marks adjustable", lambda cx: rule(cx, retention_class="message", source="company", is_adjustable=False), "ck_retention_rule_adjusted")
-    rule(c, retention_class="message", source="company", is_adjustable=True, block_after_months=None, destroy_after_months=None)
-    check("X18 an adjusted rule keeps its package reference, and both periods may be null", True)
+    # Rule 9 note of 2026-11-21 (author): a company's own rule needs no package rule and no adjustable mark, and counts as
+    # verified (S2: X17 and X18 used to require a package reference and an adjustable mark for source company).
+    trial("X17 a package rule names the package rule it comes from", lambda cx: rule(cx, retention_class="message", package_rule_ref=None), "ck_retention_rule_package_rule_ref")
+    trial("X17a a company's own rule is verified: the person who records it confirms it", lambda cx: rule(cx, retention_class="message", source="company", package_rule_ref=None), "ck_retention_rule_company_verified")
+    rule(c, retention_class="message", source="company", package_rule_ref=None, is_verified=True, is_adjustable=False, block_after_months=None, destroy_after_months=None)
+    rule(c, retention_class="intake", source="company", is_verified=True, is_adjustable=False)
+    check("X18 a company's own rule needs no package rule and no adjustable mark, keeps a package reference when it adjusts one, and both periods may be null",
+          X("select count(*) from retention_rule where company_id=%s and source='company' and is_verified and not is_adjustable", (I["co"],)).fetchone()[0] == 2)
 
     def entry(cx, **o):
         v = dict(id=new(), company_id=I["co"], subject_table="partner", subject_id=I["sold"], target_table="partner", target_row_id=I["sold"],
@@ -645,6 +692,46 @@ if "--load" in sys.argv:
     dv = X("select is_nullable, data_type from information_schema.columns where table_schema='nativeflows' and table_name='document_version' and column_name='erased_at'").fetchone()
     check("X40 document_version has a nullable erased_at: an erased version's stored hash is no longer compared with its content (rule 6; INV-10)",
           dv == ("YES", "timestamp with time zone"), dv)
+
+    # ---- the erasure exception of rule 7 on a posted document, its version and the journal triggers
+    from fx_adr74 import doc
+    pd = doc(c, I, "sales_invoice", state="posted", partner="sold")
+    cd = new()      # a canceled document whose cancel note names a person (catalog row document.canceled_note)
+    ins(c, "document", id=cd, company_id=I["co"], document_type="sales_order", state="canceled", version=1, partner_id=I["sold"], document_date="2026-11-10",
+        created_by_user_id=I["user"], canceled_note="Called Sample Person", recorded_at=NOW)
+    ver = new()
+    ins(c, "document_version", id=ver, company_id=I["co"], document_id=pd, version=1, content='{"partner_name": "Sample Person", "lines": []}',
+        version_hash="0" * 64, actor_kind="human", actor_id=I["user"], is_tainted=False, recorded_at=NOW)
+
+    def erasing(cx):
+        cx.execute("select set_config('nativeflows.erasure_command_id', %s, true)", (str(new()),))
+    trial("X41 a document in a final state refuses a change of its catalog column without the erasure marker",
+          lambda cx: cx.execute("update document set canceled_note = null where id=%s", (cd,)), "immutable")
+    trial("X42 under the erasure marker the final document's catalog column is blanked (rolled back afterwards)",
+          lambda cx: (erasing(cx), cx.execute("update document set canceled_note = null where id=%s", (cd,)), cx.execute("select 1/0")), "division by zero")
+    trial("X43 under the erasure marker a non-catalog column of the final document is still refused",
+          lambda cx: (erasing(cx), cx.execute("update document set canceled_note = null, document_date = '2026-11-11' where id=%s", (cd,))), "immutable")
+    trial("X44 under the erasure marker the version's catalog keys are cleared and erased_at is set; the stored hash stays (rule 6)",
+          lambda cx: (erasing(cx), cx.execute("update document_version set content = content - 'partner_name', erased_at = now() where id=%s", (ver,)), cx.execute("select 1/0")), "division by zero")
+    trial("X45 under the erasure marker the version's hash is still refused", lambda cx: (erasing(cx), cx.execute("update document_version set version_hash = %s where id=%s", ("1" * 64, ver))), "never updated")
+    trial("X46 without the marker the version's content is refused", lambda cx: cx.execute("update document_version set content = '{}' where id=%s", (ver,)), "never updated")
+    trial("X47 the erasure marker never allows a delete of a version", lambda cx: (erasing(cx), cx.execute("delete from document_version where id=%s", (ver,))), "never updated")
+    jt = {r[0]: bytes(r[1]).split(b"\x00")[0].decode() for r in X("select c.relname, t.tgargs from pg_trigger t join pg_class c on c.oid = t.tgrelid "
+                                                                    "where t.tgname in ('trg_journal_entry_append_only', 'trg_journal_line_append_only')").fetchall()}
+    check("X48 the journal triggers pass note and description as their catalog columns", jt == {"journal_entry": "{note}", "journal_line": "{description}"}, jt)
+
+    def scratch(cx, fn_args):
+        cx.execute("create temp table lab_frozen (id uuid primary key, note text, amount numeric) on commit drop")
+        cx.execute(f"create trigger lab_frozen_guard before update or delete on lab_frozen for each row execute function {fn_args}")
+        cx.execute("insert into lab_frozen values (%s, 'Sample Person', 10)", (pd,))
+    trial("X49 journal_reject_change: under the marker the catalog column is blanked (rolled back afterwards)",
+          lambda cx: (scratch(cx, "journal_reject_change('{note}')"), erasing(cx), cx.execute("update lab_frozen set note = null"), cx.execute("select 1/0")), "division by zero")
+    trial("X50 journal_reject_change: under the marker an amount is still refused", lambda cx: (scratch(cx, "journal_reject_change('{note}')"), erasing(cx), cx.execute("update lab_frozen set note = null, amount = 0")), "append-only")
+    trial("X51 journal_reject_change: without the marker the catalog column is refused", lambda cx: (scratch(cx, "journal_reject_change('{note}')"), cx.execute("update lab_frozen set note = null")), "append-only")
+    trial("X52 document_check_frozen: a posted document's line takes the erasure of its catalog column (rolled back afterwards)",
+          lambda cx: (scratch(cx, "document_check_frozen('id', '{note}')"), erasing(cx), cx.execute("update lab_frozen set note = ''"), cx.execute("select 1/0")), "division by zero")
+    trial("X53 document_check_frozen: without the marker the same change is refused", lambda cx: (scratch(cx, "document_check_frozen('id', '{note}')"), cx.execute("update lab_frozen set note = ''")), "immutable")
+    trial("X54 platform_reject_change with no catalog columns refuses even under the marker", lambda cx: (scratch(cx, "platform_reject_change()"), erasing(cx), cx.execute("update lab_frozen set note = ''")), "never updated")
     c.close()
 
 passed = sum(1 for ok_, *_ in RESULTS if ok_)

@@ -69,6 +69,9 @@ A command writes its state changes, its journal and stock rows, its events and o
 **Retention, replay and versions**
 
 15. `outbox_event` partitions are dropped after `event_retention_days` (installation setting, default 400), except a partition that still has `pending`, `running` or `held` deliveries, which is kept and shown on the operations dashboard. `done` and `skipped` deliveries older than that are deleted by a daily job; `held` deliveries are never deleted automatically. Finished Procrastinate jobs are deleted after 30 days. Events are not the audit log, which is never deleted (DS-36), and are never used to rebuild state (D4).
+
+    Note (S2 findings closure, 2026-11-21): the registry key of `event_retention_days` is `outbox.event_retention_days` (ADR-0063 rule 2 asks for dotted keys; installation, a deployment value, default 400; ADR-0063 rule 29 note of this date).
+
 16. `ReplayEvents` (consumer, event types, date range; `human_only`) creates `pending` deliveries for retained events that the consumer has no delivery for, and unpauses the consumer, in one transaction. A new consumer is paused until then, so live deliveries wait behind the replayed older ones and subject order holds (rule 7); the unique key prevents duplicates.
 17. A payload change that only adds optional fields is a minor version; anything else is a new major version. The registry keeps an upcaster from each older major to the current one, and consumers always receive the current major, including for events written before a deploy and still in retention. Events for outside subscribers (webhooks, after Phase 1) will need their own deprecation policy.
 

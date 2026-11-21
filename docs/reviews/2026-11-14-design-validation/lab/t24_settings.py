@@ -8,7 +8,8 @@ Run: python t24_settings.py [--load]
 
 C: the catalog settings.csv: constant field count, unique keys, scope, storage, type, a core default or fail-closed,
    bounds, direction and a known leaf on every row, defaults within bounds, order directions listing every allowed value,
-   every setting key ADR-0063 names catalogued, every catalog key named by an ADR its row's source cites, no country content; the ADR's invariant, edge case,
+   every setting key ADR-0063 names catalogued, every catalog key named by an ADR its row's source cites, the row count equal to rule 29's count plus
+   the deltas of the notes on rule 29 (read per note, robust to rewording), no country content; the ADR's invariant, edge case,
    work item kind and leaf rows, their codes unique and the tables they name defined; the DS-04 codes they use.
    The operating presets catalog setting-presets.csv, when present (ADR-0067 rules 2-3): field count, item kinds, unique
    items; setting items within the registry and its bounds; policy rule items never allowing; standard covering the rest.
@@ -215,11 +216,22 @@ named = {t for t in re.findall(r"`([a-z0-9_<>.]+)`", adr_text) if t.startswith(P
 unnamed = sorted(k for k, r in S.items() if not any(f"`{k}`" in adr_text_of(n) for n in cited_adrs(r)))
 check("C11 every setting key ADR-0063 names is in the catalog, and every catalog key is named by an ADR its row's source cites",
       not (named - set(S)) and not unnamed and all(cited_adrs(r) for r in SET), {"missing": sorted(named - set(S)), "unnamed": unnamed})
-m = re.search(r"\[settings\.csv\]\(\.\./catalogs/settings\.csv\), version 0\.1\.0, (\d+) definitions", adr_text)
-added = sum(int(x) for x in re.findall(r"\) adds (\d+) definitions?\b", adr_text))   # ADR-0072 adds 1 definition (singular)
-added -= sum(int(x) for x in re.findall(r"\) removes (\d+) definitions?\b", adr_text))   # ADR-0078 removes 9 definitions
+# C12 reads rule 29 only (from "29. " to the next rule), and each of its notes separately: a note's delta is every "adds N" and
+# "removes N" before "definition(s)", with N a numeral or a number word, optional "new"/"setting" between, and no ")" needed
+# before the verb. So a reworded note still counts, text outside rule 29 never does, and a note may add and remove (S2, 2026-11-21).
+WORDS = {w: i for i, w in enumerate("zero one two three four five six seven eight nine ten eleven twelve".split())}
+r29 = re.search(r"(?ms)^29\. .*?(?=^\d+\. |^## )", adr_text)
+r29 = r29.group(0) if r29 else ""
+m = re.search(r"\[settings\.csv\]\(\.\./catalogs/settings\.csv\), version 0\.1\.0, (\d+) definitions", r29)
+deltas = []
+for note in re.findall(r"(?m)^ +Note \(.*$", r29):
+    d = 0
+    for verb, n in re.findall(r"\b(adds|removes) (\d+|" + "|".join(WORDS) + r")(?: new)?(?: setting)? definitions?\b", note):
+        d += (int(n) if n.isdigit() else WORDS[n]) * (1 if verb == "adds" else -1)
+    deltas.append(d)
+added = sum(deltas)
 check("C12 the catalog's row count is rule 29's stated count plus the definitions that later ADRs' notes on rule 29 add, minus those they remove",
-      m and int(m.group(1)) + added == len(SET), (m and m.group(1), added, len(SET)))
+      m and deltas and int(m.group(1)) + added == len(SET), (m and m.group(1), added, len(SET), f"{len(deltas)} notes"))
 COUNTRY = re.compile(r"Vietnam|vietnam|l10n_vn|\bTT ?99\b|\btt99\b|\bVND\b|\bVAS\b|Decree|Circular|DS-19")
 texts = {"adr": adr_text, "settings.csv": open(os.path.join(CAT, "settings.csv"), encoding="utf-8").read(),
          "DS-28-settings.sql": open(os.path.join(DOCS, "design", "DS-28-settings.sql"), encoding="utf-8").read()}

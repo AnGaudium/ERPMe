@@ -29,7 +29,9 @@
 -- columns (ADR-0028 rule 2). work_item (DS-29) is keyed by (company_id, id) to DS-05-platform.sql; attachment (DS-36)
 -- is referenced by ID only.
 -- The final-state immutability of headers and lines (ADR-0009 rule 14, issuing of ADR-0028 rule 6) is the documents
--- module's generic trigger; material document, warehouse movement and GR/IR posting rows are append-only here.
+-- module's generic trigger (document_check_frozen of DS-05, generated per header and line table with the table's catalog
+-- columns as its second argument, ADR-0079 rule 7); material document, warehouse movement and GR/IR posting rows are
+-- append-only here.
 -- Partner snapshot columns partner_name, partner_tax_id and partner_address (ADR-0028 rule 16) are content of every
 -- header with a partner. interim: those three column names are not stated in ADR-0028.
 -- Rules that need other rows (open quantities, cumulative correction limits, the three-way match, credit exposure,
@@ -1510,6 +1512,7 @@ CREATE TABLE material_document_line (
     catch_weight_quantity   types.quantity,                  -- reserved, empty until after Phase 1
     cost_object_id          uuid REFERENCES cost_object (id),
     owner_partner_id        uuid,                            -- reserved; null for own stock (ADR-0030 rule 8)
+    valuation_type          text,                            -- reserved valuation axis, never set in Phase 1 (ADR-0020 rule 17 note of 2026-11-21)
     posting_date            date NOT NULL,                   -- copied from the posting document (ADR-0031 rule 12; INV-48)
     recorded_at             timestamptz NOT NULL DEFAULT now(),
     UNIQUE (material_document_id, line_number),
@@ -1524,6 +1527,7 @@ CREATE TABLE material_document_line (
     CONSTRAINT ck_material_document_line_lot_or_serial CHECK (lot_id IS NULL OR serial_number_id IS NULL),
     CONSTRAINT ck_material_document_line_serial_quantity CHECK (serial_number_id IS NULL OR quantity = 1),
     CONSTRAINT ck_material_document_line_catch_weight CHECK (catch_weight_quantity IS NULL),
+    CONSTRAINT ck_material_document_line_valuation_type CHECK (valuation_type IS NULL),   -- reserved until split valuation (ADR-0020 rule 17)
     FOREIGN KEY (company_id, valuation_site_id) REFERENCES site (company_id, id),
     CONSTRAINT ck_material_document_line_valuation_area CHECK (valuation_site_id IS NULL OR valuation_warehouse_id IS NULL)
 );
@@ -1538,9 +1542,11 @@ CREATE TABLE stock_value (                                 -- the lock row per (
     company_id       uuid NOT NULL,
     item_id          uuid NOT NULL,
     warehouse_id     uuid NOT NULL,
+    valuation_type   text,                                   -- reserved valuation axis, never set in Phase 1 (ADR-0020 rules 8, 17 notes of 2026-11-21)
     company_amount   types.amount NOT NULL DEFAULT 0 CONSTRAINT ck_stock_value_company_amount CHECK (company_amount >= 0),   -- negative_stock_value (ADR-0021 rule 9)
     recorded_at      timestamptz NOT NULL DEFAULT now(),     -- the last change
-    CONSTRAINT uq_stock_value_company_id_item_id_warehouse_id UNIQUE (company_id, item_id, warehouse_id),
+    CONSTRAINT uq_stock_value_key UNIQUE NULLS NOT DISTINCT (company_id, item_id, warehouse_id, valuation_type),   -- a null type counts as one value
+    CONSTRAINT ck_stock_value_valuation_type CHECK (valuation_type IS NULL),   -- reserved until split valuation (ADR-0020 rule 17)
     FOREIGN KEY (company_id, item_id) REFERENCES item (company_id, id),
     FOREIGN KEY (company_id, warehouse_id) REFERENCES warehouse (company_id, id)
 );

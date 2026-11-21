@@ -1052,7 +1052,8 @@ CREATE TABLE external_id_map (                             -- [master_data] ADR-
     entity_id     uuid NOT NULL,                           -- polymorphic: the row of table_name; checked by INV-860
     recorded_at   timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (company_id, source_system, table_name, external_key),
-    CONSTRAINT uq_external_id_map_entity UNIQUE (company_id, source_system, table_name, entity_id)
+    CONSTRAINT uq_external_id_map_entity UNIQUE (company_id, source_system, table_name, entity_id),
+    CONSTRAINT ck_external_id_map_source_system_reserved CHECK (source_system <> 'group')   -- reserved for the group key until the distribution command exists (rule 7 note; external_id_source_reserved)
 );
 CREATE INDEX ix_external_id_map_entity_id ON external_id_map (company_id, entity_id);
 -- The lookup of ADR-0074 rule 7: the entity of an external key, and the external key of an entity, within one source system.

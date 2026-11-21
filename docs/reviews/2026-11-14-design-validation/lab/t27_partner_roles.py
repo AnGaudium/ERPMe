@@ -10,7 +10,7 @@ P: the party reference functions (rules 1 to 5): defaults from partner_relations
    one payer over several buyers, a relationship change leaving an existing order alone, INV-863 on a list of invoices.
 C: the custom value validation (rule 10): unknown key, wrong value, missing required value, retired field, decimal strings.
 With --load: partner_relationship keys and defaults; the party columns on sales_order, delivery and purchase_order (a name
-exactly when named, an address of the party's own, a partner of the company); external_id_map keys, the lookup functions and
+exactly when named, an address of the party's own, a partner of the company); external_id_map keys (the source system group refused), the lookup functions and
 INV-860; custom_values as an object and the definition CHECKs; the reason kind in the key (document.canceled_reason_id,
 only in state canceled); the header notes and journal_entry.note.
 Not covered: commands, the snapshot copy itself (a command), the generated schemas, the posting of invoices and payments.
@@ -275,6 +275,8 @@ if "--load" in sys.argv:
           X("select external_id_resolve(%s,'shop','partner','C-1') = %s and external_key_of(%s,'edi','partner',%s) = 'C-1' and external_id_resolve(%s,'shop','partner','nope') is null",
             (I["co"], I["sold"], I["co"], I["ship"], I["co"])).fetchone()[0])
     trial("X35 a source system code is a lower-case code", lambda cx: ext(cx, source="Web Shop", key="Z"), "ck_external_id_map_source_system")
+    trial("X35a the source system group is reserved for the group key until the distribution command exists (rule 7 note; external_id_source_reserved)",
+          lambda cx: ext(cx, source="group", key="G-1"), "ck_external_id_map_source_system_reserved")
     ext(c, key="DANGLING", source="shop2", entity=new())
     dang = X("""select count(*) from external_id_map m where m.table_name = 'partner' and not exists (select 1 from partner p where p.company_id = m.company_id and p.id = m.entity_id)""").fetchone()[0]
     check("X36 INV-860's check finds the mapping whose entity does not exist", dang == 1, dang)

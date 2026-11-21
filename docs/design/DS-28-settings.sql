@@ -227,9 +227,9 @@ CREATE TABLE extension_point (                             -- installation data;
 );
 
 -- ===== Guards =====
--- Values are a history: never updated or deleted (rule 2).
+-- Values are a history: never updated or deleted (rule 2); an erasure may tokenize reason (ADR-0079 rule 7).
 CREATE TRIGGER trg_setting_value_immutable BEFORE UPDATE OR DELETE ON setting_value
-    FOR EACH ROW EXECUTE FUNCTION platform_reject_change();
+    FOR EACH ROW EXECUTE FUNCTION platform_reject_change('{reason}');
 -- Whether value a is looser than value b under a direction (rule 3). Lists compare as sets.
 CREATE FUNCTION setting_is_looser(p_direction text, p_order text[], a jsonb, b jsonb) RETURNS boolean LANGUAGE sql IMMUTABLE AS $$
     SELECT CASE p_direction

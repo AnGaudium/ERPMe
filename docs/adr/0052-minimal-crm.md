@@ -326,6 +326,8 @@ Leads, opportunities, marketing automation, appointments, chat connectors and se
     - **Interactions and messages** are kept until erased. Whether they must be deleted after a time when no request comes is a package rule for the author (open question). The setting `crm.interaction_retention_days` is reserved and empty.
     - **Attachments** follow ADR-0038 rule 15. A file from an e-mail that is later linked to a posted document becomes accounting evidence.
 
+    Note (S2 findings closure, 2026-11-21): the reserved setting `crm.interaction_retention_days` is not registered: the retention class `crm_interaction` of [ADR-0079](0079-personal-data-protection.md) rule 9, set per company by `retention_rule`, replaces it (ADR-0063 rule 29 note of this date).
+
 **What the system learned**
 
 31. Summaries, insights and lookups (ADR-0019 rules 18, 20; spec 03 rule 9):

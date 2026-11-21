@@ -13,12 +13,13 @@ P: the permission intersection (rule 31), re-evaluated at every call; the tool l
 O: schema-validated output with at most two retries (rule 35); stated values checked against their source span.
 R: routing switch (rule 9): personal values replaced by placeholders, the residual scan refuses a request that still
    holds one, a required personal input blocks the step.
-M: shadow mode never executes a command (rule 14).
+M: shadow mode never executes a command (rule 14); shadow is kept for Phase 2 (ADR-0078 rule 5).
 D: replay determinism (rule 38): recorded outputs give the same commands and plan hashes; a changed template diverges.
 X: round 1 of the review: outside subjects start tainted, inputs after taint, is_draft_only, seat classes, the human
    acted for, the supplier gate, crash and resume, denial counting, wake-ups, shadow claims, aggregates, the outbound
    check, the bank re-run's guards and comparator, aligned taint instants.
-Y: round 2: start taint from the subject row, two-partner tokens, the effective mode and promoted fallback, shape masks,
+Y: round 2: start taint from the subject row, two-partner tokens, the effective mode (Phase 1: degraded is off, ADR-0078
+   rule 5) and promoted fallback, shape masks,
    numeric projections, the dispatcher's reference check, promotion by two people.
 Z: round 3: frozen promotion evidence, the second approver, the visible mode drop, Unicode shape masks.
 Not covered: the database, RLS, the provider, the queue, the views' SQL.
@@ -497,14 +498,21 @@ check("Y01 a person starting a quotation run on an inbound e-mail gets a tainted
 # Y: the bank re-run: two partners named by tokens give nothing (item 9)
 check("Y02 tokens naming items of two partners draft nothing", rerun("TT INV-0102 INV-01", ["INV-0102", "INV-01"], ITEMS), None)
 
-# Y: effective mode and the promoted fallback chain (item 4)
+# Y: effective mode and the promoted fallback chain (item 4). Phase 1 (ADR-0078 rule 5): a degraded agent drops to off, not
+# shadow (S2 change; ADR-0050 rule 14's shadow is Phase 2), and a stored mode other than off or assisted is refused.
 def effective_mode(stored, behavior_hash, seat_models, promoted_hash, promoted_models):
+    if stored not in ("off", "assisted"): raise ValueError("validation_failed")   # shadow is refused in Phase 1 (ADR-0078 rule 5)
     if stored != "assisted": return stored
-    return "assisted" if behavior_hash == promoted_hash and set(seat_models) <= set(promoted_models) else "shadow"
-check("Y03 the effective mode: a new behavior or a model outside the promoted set runs as shadow; lowered budgets do not",
+    return "assisted" if behavior_hash == promoted_hash and set(seat_models) <= set(promoted_models) else "off"
+def refused_mode(stored):
+    try:
+        effective_mode(stored, "h1", ["m1"], "h1", ["m1"])
+    except ValueError as e:
+        return str(e)
+check("Y03 the effective mode in Phase 1: a new behavior or a model outside the promoted set runs as off (ADR-0078 rule 5); lowered budgets do not; a stored shadow is refused",
       [effective_mode("assisted", "h1", ["m1"], "h1", ["m1", "m2"]), effective_mode("assisted", "h2", ["m1"], "h1", ["m1"]),
-       effective_mode("assisted", "h1", ["m3"], "h1", ["m1"]), effective_mode("shadow", "h2", ["m3"], "h1", ["m1"])],
-      ["assisted", "shadow", "shadow", "shadow"])
+       effective_mode("assisted", "h1", ["m3"], "h1", ["m1"]), effective_mode("off", "h2", ["m3"], "h1", ["m1"]), refused_mode("shadow")],
+      ["assisted", "off", "off", "off", "validation_failed"])
 def call_with_fallback(chain, promoted, healthy):
     for m in [m for m in chain if m in promoted]:
         if m in healthy: return m
@@ -568,16 +576,17 @@ check("Z02 the submitter of a promotion proposal cannot approve it", [approve("P
 open_items = {}
 def check_mode(company, agent_type, stored, effective):
     key = (company, agent_type)
-    if stored == "assisted" and effective == "shadow": open_items.setdefault(key, {"kind": "agent_mode_degraded"})
+    if stored == "assisted" and effective == "off": open_items.setdefault(key, {"kind": "agent_mode_degraded"})   # Phase 1: off (ADR-0078 rule 5)
     elif key in open_items: del open_items[key]  # re-promoted or lowered
     return {"stored": stored, "effective": effective, "reason": "version_changed" if stored != effective else None}
-check_mode("C1", "quotation", "assisted", "shadow"); check_mode("C1", "quotation", "assisted", "shadow")
+check_mode("C1", "purchase_invoice", "assisted", "off"); check_mode("C1", "purchase_invoice", "assisted", "off")
 raised_once = len(open_items)
-res = check_mode("C1", "quotation", "assisted", "assisted")
-check("Z03 the first drop raises one agent_mode_degraded item, a repeat adds none, and re-promotion resolves it",
+res = check_mode("C1", "purchase_invoice", "assisted", "assisted")
+check("Z03 the first drop to off raises one agent_mode_degraded item, a repeat adds none, and re-promotion resolves it",
       (raised_once, len(open_items), res["reason"]), (1, 0, None))
 
 # Z: shape masks over Unicode (nit)
 check("Z04 a letter without case maps to a and any Unicode digit to 9", shape_mask("Đỗ 中 ٣٤"), "Aa a 99")
 
 print(sum(1 for r in RESULTS if r[0]), "/", len(RESULTS), "passed")
+raise SystemExit(0 if all(r[0] for r in RESULTS) else 1)

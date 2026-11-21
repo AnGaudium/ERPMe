@@ -6,22 +6,22 @@ Event types named in backticks in the ADRs, recognised by the event forms of the
 
 | Event | Noun table | Producer module | Consumers named with it | First mentions |
 | --- | --- | --- | --- | --- |
-| `AgentRunCompleted` | `agent_run` | agent_runs | — | ADR-0050:192, ADR-0060:267 |
+| `AgentRunCompleted` | `agent_run` | agent_runs | — | ADR-0050:192, ADR-0060:269 |
 | `AgentRunStarted` | `agent_run` | agent_runs | — | ADR-0050:166, ADR-0050:176 |
 | `AttachmentCreated` | `attachment` | attachments | — | ADR-0038:144, ADR-0038:152 |
 | `BankLineSuggestionRecorded` | — | — | a consumer in `cash` | ADR-0048:126, ADR-0051:198, ADR-0051:202 |
 | `ChangeProposalApproved` | `change_proposal` | documents | — | ADR-0029:48 |
-| `ComplaintClosed` | `complaint` | crm | a consumer in `cash` | ADR-0048:243, ADR-0052:226, ADR-0052:364 |
-| `ComplaintCreated` | `complaint` | crm | a consumer in `cash` | ADR-0048:243, ADR-0052:226, ADR-0052:364 |
+| `ComplaintClosed` | `complaint` | crm | a consumer in `cash` | ADR-0048:243, ADR-0052:226, ADR-0052:366 |
+| `ComplaintCreated` | `complaint` | crm | a consumer in `cash` | ADR-0048:243, ADR-0052:226, ADR-0052:366 |
 | `ComplaintOpened` | `complaint` | crm | — | ADR-0052:226 |
-| `ComplaintReopened` | `complaint` | crm | a consumer in `cash` | ADR-0048:243, ADR-0052:226, ADR-0052:364 |
-| `ComplaintUpdated` | `complaint` | crm | a consumer in `cash` | ADR-0048:243, ADR-0052:226, ADR-0052:364 |
+| `ComplaintReopened` | `complaint` | crm | a consumer in `cash` | ADR-0048:243, ADR-0052:226, ADR-0052:366 |
+| `ComplaintUpdated` | `complaint` | crm | a consumer in `cash` | ADR-0048:243, ADR-0052:226, ADR-0052:366 |
 | `ConfigurationModelRevisionReleased` | `configuration_model_revision` | master_data | — | ADR-0046:213 |
 | `ConfiguredItemCreated` | — | — | — | ADR-0046:136, ADR-0046:137, ADR-0046:174 (+1) |
 | `ContactCreated` | `contact` | master_data | a consumer in `crm` | ADR-0052:183 |
 | `ContactUpdated` | `contact` | master_data | a consumer in `crm` | ADR-0052:183 |
-| `DataErasureRecorded` | — | — | — | ADR-0079:58, ADR-0079:60 |
-| `DataSubjectErased` | — | — | a consumer in `cash`, `imports_data_subject_erasure` | ADR-0052:258, ADR-0052:265, ADR-0052:364 (+1) |
+| `DataErasureRecorded` | — | — | — | ADR-0079:60, ADR-0079:62 |
+| `DataSubjectErased` | — | — | a consumer in `cash`, `imports_data_subject_erasure` | ADR-0052:258, ADR-0052:265, ADR-0052:366 (+1) |
 | `DocumentExtractionCanceled` | `document_extraction` | attachments | — | ADR-0057:243, ADR-0057:311 |
 | `DocumentExtractionRecorded` | `document_extraction` | attachments | `certificate_result_drafter`, a consumer in `crm`, a consumer in `tax` | ADR-0057:77, ADR-0057:255, ADR-0057:259 (+2) |
 | `DocumentExtractionRequested` | `document_extraction` | attachments | `document_extraction_runner` | ADR-0057:56, ADR-0057:61, ADR-0057:311 |
@@ -29,20 +29,20 @@ Event types named in backticks in the ADRs, recognised by the event forms of the
 | `ExtractionFieldCorrected` | `extraction_field` | attachments | — | ADR-0057:241, ADR-0057:248, ADR-0057:311 |
 | `ForecastCompleted` | — | — | — | ADR-0024:284 |
 | `GoodsReceiptPosted` | `goods_receipt` | inventory | `inspection_lot_creator` | ADR-0004:7, ADR-0004:61, ADR-0009:106 (+4) |
-| `InboundMessageRecorded` | `inbound_message` | crm | a consumer in `crm` | ADR-0052:364, ADR-0057:255 |
+| `InboundMessageRecorded` | `inbound_message` | crm | a consumer in `crm` | ADR-0052:366, ADR-0057:255 |
 | `InspectionLotApproved` | `inspection_lot` | quality | `usage_decision_executor` | ADR-0070:140 |
 | `InspectionLotExecutionRecorded` | `inspection_lot_execution` | quality | — | ADR-0070:178 |
 | `InspectionPlanRevisionReleased` | `inspection_plan_revision` | quality | — | ADR-0070:178 |
 | `InspectionResultConfirmed` | `inspection_result` | quality | `usage_decision_auto_drafter` | ADR-0070:138, ADR-0070:178 |
 | `InspectionResultRecorded` | `inspection_result` | quality | `usage_decision_auto_drafter` | ADR-0070:138, ADR-0070:178 |
-| `InteractionCreated` | `interaction` | crm | — | ADR-0052:105, ADR-0052:364 |
-| `InteractionMatched` | `interaction` | crm | — | ADR-0052:105, ADR-0052:364 |
-| `InteractionUnmatched` | `interaction` | crm | — | ADR-0052:105, ADR-0052:364 |
-| `MailboxAuthenticationCheckRecorded` | `mailbox` | crm | — | ADR-0052:364 |
-| `MailboxCreated` | `mailbox` | crm | — | ADR-0052:364 |
-| `MailboxIntakeCompleted` | `mailbox` | crm | — | ADR-0052:125, ADR-0052:364 |
-| `MailboxIntakeOutcomeRecorded` | `mailbox` | crm | — | ADR-0052:364 |
-| `MailboxUpdated` | `mailbox` | crm | — | ADR-0052:364 |
+| `InteractionCreated` | `interaction` | crm | — | ADR-0052:105, ADR-0052:366 |
+| `InteractionMatched` | `interaction` | crm | — | ADR-0052:105, ADR-0052:366 |
+| `InteractionUnmatched` | `interaction` | crm | — | ADR-0052:105, ADR-0052:366 |
+| `MailboxAuthenticationCheckRecorded` | `mailbox` | crm | — | ADR-0052:366 |
+| `MailboxCreated` | `mailbox` | crm | — | ADR-0052:366 |
+| `MailboxIntakeCompleted` | `mailbox` | crm | — | ADR-0052:125, ADR-0052:366 |
+| `MailboxIntakeOutcomeRecorded` | `mailbox` | crm | — | ADR-0052:366 |
+| `MailboxUpdated` | `mailbox` | crm | — | ADR-0052:366 |
 | `MessageCreated` | `message` | work | `messaging_fanout` | ADR-0040:203, ADR-0076:48, ADR-0076:67 (+2) |
 | `NonconformanceCanceled` | `nonconformance` | quality | — | ADR-0070:178 |
 | `NonconformanceClosed` | `nonconformance` | quality | — | ADR-0070:178 |
@@ -59,13 +59,13 @@ Event types named in backticks in the ADRs, recognised by the event forms of the
 | `OperationStarted` | — | — | — | ADR-0071:92 |
 | `OperationTransferred` | — | — | — | ADR-0071:138 |
 | `OtherReceiptPosted` | `other_receipt` | inventory | `inspection_lot_creator` | ADR-0070:77 |
-| `OutboundMessageOutcomeRecorded` | `outbound_message` | crm | — | ADR-0052:364 |
-| `OutboundMessageSendRequested` | `outbound_message` | crm | — | ADR-0052:290, ADR-0052:364 |
+| `OutboundMessageOutcomeRecorded` | `outbound_message` | crm | — | ADR-0052:366 |
+| `OutboundMessageSendRequested` | `outbound_message` | crm | — | ADR-0052:290, ADR-0052:366 |
 | `PartnerCreated` | `partner` | master_data | a consumer in `crm` | ADR-0052:177, ADR-0052:183 |
-| `PartnerDuplicateScanCompleted` | `partner` | master_data | — | ADR-0052:184, ADR-0052:364 |
-| `PartnerEmailDomainCreated` | `partner_email_domain` | crm | — | ADR-0052:364 |
-| `PartnerEmailDomainUpdated` | `partner_email_domain` | crm | — | ADR-0052:364 |
-| `PartnerInsightComputationCompleted` | `partner_insight` | crm | — | ADR-0052:333, ADR-0052:364 |
+| `PartnerDuplicateScanCompleted` | `partner` | master_data | — | ADR-0052:184, ADR-0052:366 |
+| `PartnerEmailDomainCreated` | `partner_email_domain` | crm | — | ADR-0052:366 |
+| `PartnerEmailDomainUpdated` | `partner_email_domain` | crm | — | ADR-0052:366 |
+| `PartnerInsightComputationCompleted` | `partner_insight` | crm | — | ADR-0052:335, ADR-0052:366 |
 | `PartnerUpdated` | `partner` | master_data | a consumer in `crm` | ADR-0052:183, ADR-0058:121 |
 | `PlannedOrderConverted` | `planned_order` | planning | — | ADR-0024:284 |
 | `PlannedOrderFirmed` | `planned_order` | planning | — | ADR-0024:284 |
@@ -76,8 +76,8 @@ Event types named in backticks in the ADRs, recognised by the event forms of the
 | `PostingPeriodUnlocked` | `posting_period` | — (lab stub) | — | ADR-0012:38 |
 | `PriceListEntriesSet` | `price_list` | master_data | — | ADR-0045:92 |
 | `PrintRenderRequested` | — | — | — | ADR-0049:196 |
-| `ProcessingBasisClosed` | `processing_basis` | crm | — | ADR-0052:364 |
-| `ProcessingBasisCreated` | `processing_basis` | crm | — | ADR-0052:364 |
+| `ProcessingBasisClosed` | `processing_basis` | crm | — | ADR-0052:366 |
+| `ProcessingBasisCreated` | `processing_basis` | crm | — | ADR-0052:366 |
 | `ProductionCostSettlementPosted` | `production_cost_settlement` | production | — | ADR-0064:199 |
 | `ProductionOrderApproved` | `production_order` | production | — | ADR-0064:130, ADR-0070:145 |
 | `ProductionOrderCanceled` | `production_order` | production | — | ADR-0070:145 |
@@ -141,7 +141,7 @@ A module name here means the ADR speaks of a consumer of that module without nam
 | `render_worker` | 2 | ADR-0013:25, ADR-0049:199 |
 | a consumer in `sales` | 3 | ADR-0047:114, ADR-0047:246, ADR-0048:262 |
 | a consumer in `tax` | 2 | ADR-0041:152, ADR-0057:259 |
-| `tax_payment_evidence` | 2 | ADR-0044:147, ADR-0053:182 |
+| `tax_payment_evidence` | 2 | ADR-0044:150, ADR-0053:182 |
 | `usage_decision_auto_drafter` | 1 | ADR-0070:138 |
 | `usage_decision_executor` | 1 | ADR-0070:140 |
 | `work_case_opener` | 4 | ADR-0013:55, ADR-0022:76, ADR-0052:164 |

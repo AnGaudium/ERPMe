@@ -59,7 +59,7 @@ Title, status and design item come from each ADR's first lines. **Declared** ADR
 | [ADR-0049](../../adr/0049-statutory-reporting-and-printing.md) | Statutory reporting and printing | accepted 2026-11-15 | DS-26, DS-27 | `reporting`, `ledger`, `master_data`, `attachments` | 4, 3, 2 | `ledger`, `master_data`, `reporting`, `production` |
 | [ADR-0050](../../adr/0050-agent-runtime-and-query-layer.md) | Agent runtime and read-only query layer | accepted 2026-11-15 | DS-32, DS-33 | `cash`, `agent_runs` | 4, 2 | `agent_runs`, `agents`, `query`, `attachments` |
 | [ADR-0051](../../adr/0051-agent-workflows.md) | Agent workflows | accepted 2026-11-15 | DS-34 | — | — | `crm`, `planning`, `master_data`, `purchasing` |
-| [ADR-0052](../../adr/0052-minimal-crm.md) | Minimal CRM: partners, contacts, interaction timeline, email intake | accepted 2026-11-15 | DS-35 | `crm`, `quality`, `audit`, `documents` | 4, 2 | `crm`, `cash`, `documents`, `audit` |
+| [ADR-0052](../../adr/0052-minimal-crm.md) | Minimal CRM: partners, contacts, interaction timeline, email intake | accepted 2026-11-15 | DS-35 | `crm`, `quality`, `audit`, `documents` | 4, 2 | `crm`, `cash`, `audit`, `documents` |
 | [ADR-0053](../../adr/0053-core-neutrality.md) | Core neutrality: Vietnamese accounting and tax as an overlay | accepted 2026-11-15 | none of its own; it amends DS-04, DS-06, DS-14, DS-16, DS-17, DS-19, DS-20, DS-22, DS-23 and DS-25 | `tax` | 3 | `sales`, `master_data` |
 | [ADR-0054](../../adr/0054-users-roles-and-authorizations.md) | Users, roles and authorizations | accepted 2026-11-15 | DS-15 (full part; the envelope part is ADR-0017) | `master_data`, `audit`, `documents`, `permissions`, `work` | 3, 2 | `master_data`, `permissions`, `documents`, `purchasing` |
 | [ADR-0055](../../adr/0055-approval-pools-and-stages.md) | Approval pools and stages | accepted 2026-11-15 | DS-28 (extends ADR-0043) | `production`, `documents`, `policy`, `work` | 3, 2 | `policy`, `sales`, `documents`, `permissions` |
@@ -86,7 +86,7 @@ Title, status and design item come from each ADR's first lines. **Declared** ADR
 | [ADR-0076](../../adr/0076-internal-messaging-and-notifications.md) | Internal messaging and notifications | accepted 2026-11-21 |  | `work` | 2 | `work`, `master_data`, `registry` |
 | [ADR-0077](../../adr/0077-ui-floorplans-annotations-and-embedded-agent.md) | UI floorplans, annotation vocabulary and embedded agent interaction | accepted 2026-11-21 | DS-30 | `agents`, `registry` | 5, 2 | `agents`, `registry` |
 | [ADR-0078](../../adr/0078-agent-simplification-for-phase-1.md) | Agent scope and the common work model for Phase 1 | accepted 2026-11-21 | DS-32, DS-33, DS-34 | — | — | `planning`, `purchasing`, `attachments`, `agent_runs` |
-| [ADR-0079](../../adr/0079-personal-data-protection.md) | Personal data protection in the core | accepted 2026-11-21 |  | `audit` | 2 | `audit`, `master_data`, `crm` |
+| [ADR-0079](../../adr/0079-personal-data-protection.md) | Personal data protection in the core | accepted 2026-11-21 |  | `audit` | 2 | `audit`, `master_data`, `documents`, `crm` |
 
 ## By module
 
@@ -117,7 +117,7 @@ Title, status and design item come from each ADR's first lines. **Declared** ADR
 | 2 | `audit` | ADR-0019, ADR-0038, ADR-0052, ADR-0054, ADR-0079 | ADR-0006, ADR-0019, ADR-0038, ADR-0052, ADR-0058, ADR-0079 |
 | 2 | `configuration` | ADR-0022, ADR-0027, ADR-0058, ADR-0059 | ADR-0058, ADR-0059 |
 | 2 | `db` | — | — |
-| 2 | `documents` | ADR-0004, ADR-0008, ADR-0009, ADR-0028, ADR-0029, ADR-0030, ADR-0043, ADR-0052, ADR-0054, ADR-0055, ADR-0066 | ADR-0009, ADR-0020, ADR-0022, ADR-0028, ADR-0029, ADR-0038, ADR-0043, ADR-0052, ADR-0054, ADR-0055, ADR-0061, ADR-0062, ADR-0075 |
+| 2 | `documents` | ADR-0004, ADR-0008, ADR-0009, ADR-0028, ADR-0029, ADR-0030, ADR-0043, ADR-0052, ADR-0054, ADR-0055, ADR-0066 | ADR-0009, ADR-0020, ADR-0022, ADR-0028, ADR-0029, ADR-0038, ADR-0043, ADR-0052, ADR-0054, ADR-0055, ADR-0061, ADR-0062, ADR-0075, ADR-0079 |
 | 2 | `localization` | — | — |
 | 2 | `outbox` | ADR-0013 | ADR-0013, ADR-0073 |
 | 2 | `periods` | — | — |

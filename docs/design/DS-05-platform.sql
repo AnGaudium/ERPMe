@@ -1365,8 +1365,32 @@ BEGIN
     RETURN NEW;
 END
 $$;
+-- ADR-0079 rule 7, the exception: under the erasure marker an update of a frozen or append-only row may change only the
+-- table's catalog columns (catalogs/personal-data-fields.csv), which its trigger passes as an argument, and set the erasure
+-- flag erased_at or body_removed_at from null. The marker test is platform_check_append_only's; DS-36 adds the check that it
+-- names a committed EraseDataSubject or DestroyRetainedPersonalData (ADR-0038 rule 4 note). No catalog columns: false.
+CREATE FUNCTION erasure_update_allowed(p_old jsonb, p_new jsonb, p_columns text[]) RETURNS boolean LANGUAGE plpgsql STABLE AS $$
+DECLARE
+    v_key  text;
+BEGIN
+    IF coalesce(current_setting('nativeflows.erasure_command_id', true), '') = '' OR coalesce(cardinality(p_columns), 0) = 0 THEN
+        RETURN false;
+    END IF;
+    FOR v_key IN SELECT jsonb_object_keys(p_new) LOOP
+        CONTINUE WHEN (p_old -> v_key) IS NOT DISTINCT FROM (p_new -> v_key);
+        CONTINUE WHEN v_key = ANY (p_columns);
+        CONTINUE WHEN v_key IN ('erased_at', 'body_removed_at') AND jsonb_typeof(p_old -> v_key) = 'null';
+        RETURN false;
+    END LOOP;
+    RETURN true;
+END
+$$;
+-- Optional argument: the table's catalog columns, which an erasure may rewrite (ADR-0079 rule 7).
 CREATE FUNCTION platform_reject_change() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
+    IF TG_OP = 'UPDATE' AND TG_NARGS > 0 AND erasure_update_allowed(to_jsonb(OLD), to_jsonb(NEW), TG_ARGV[0]::text[]) THEN
+        RETURN NEW;
+    END IF;
     RAISE EXCEPTION '% rows are never updated or deleted', TG_TABLE_NAME USING ERRCODE = 'restrict_violation';
 END
 $$;
@@ -1382,6 +1406,9 @@ BEGIN
         RETURN OLD;
     END IF;
     IF OLD.state IN ('posted', 'reversed', 'canceled', 'closed') THEN
+        IF TG_NARGS > 0 AND erasure_update_allowed(to_jsonb(OLD), to_jsonb(NEW), TG_ARGV[0]::text[]) THEN
+            RETURN NEW;   -- ADR-0079 rule 7: the argument is the catalog columns
+        END IF;
         IF OLD.state = 'posted' AND NEW.state = 'reversed' AND (to_jsonb(OLD) - 'state') = (to_jsonb(NEW) - 'state') THEN
             RETURN NEW;
         END IF;
@@ -1397,7 +1424,8 @@ BEGIN
 END
 $$;
 -- ADR-0009 rule 14; ADR-0028 rule 6; ADR-0052 rule 27: header, line and content rows of a document in a final state, or
--- in the frozen states issuing and sending, never change. The argument names the column holding the document ID.
+-- in the frozen states issuing and sending, never change. The argument names the column holding the document ID; the
+-- optional second argument is the table's catalog columns, which an erasure may rewrite (ADR-0079 rule 7).
 CREATE FUNCTION document_check_frozen() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE
     v_ids    uuid[] := ARRAY[]::uuid[];
@@ -1406,7 +1434,8 @@ BEGIN
     IF TG_OP <> 'INSERT' THEN v_ids := v_ids || (to_jsonb(OLD) ->> TG_ARGV[0])::uuid; END IF;
     IF TG_OP <> 'DELETE' THEN v_ids := v_ids || (to_jsonb(NEW) ->> TG_ARGV[0])::uuid; END IF;
     FOR v_state IN SELECT state FROM document WHERE id = ANY (v_ids) LOOP
-        IF v_state IN ('posted', 'reversed', 'canceled', 'closed', 'issuing', 'sending') THEN
+        IF v_state IN ('posted', 'reversed', 'canceled', 'closed', 'issuing', 'sending')
+           AND NOT (TG_OP = 'UPDATE' AND TG_NARGS > 1 AND erasure_update_allowed(to_jsonb(OLD), to_jsonb(NEW), TG_ARGV[1]::text[])) THEN
             RAISE EXCEPTION '% of a document in state % is immutable (ADR-0009 rule 14)', TG_TABLE_NAME, v_state
                 USING ERRCODE = 'restrict_violation';
         END IF;
@@ -1415,9 +1444,13 @@ BEGIN
 END
 $$;
 -- ADR-0009 rule 14: versions are never updated. The generated Delete of a draft removes them with the draft: the
--- dispatcher sets nativeflows.document_delete_id to that document's ID for Delete alone (the pattern of DS-35).
+-- dispatcher sets nativeflows.document_delete_id to that document's ID for Delete alone (the pattern of DS-35). An erasure
+-- may clear catalog keys of content and set erased_at (ADR-0079 rules 6-7; the argument is the catalog columns).
 CREATE FUNCTION document_version_check_change() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
+    IF TG_OP = 'UPDATE' AND TG_NARGS > 0 AND erasure_update_allowed(to_jsonb(OLD), to_jsonb(NEW), TG_ARGV[0]::text[]) THEN
+        RETURN NEW;
+    END IF;
     IF TG_OP = 'DELETE'
        AND coalesce(current_setting('nativeflows.document_delete_id', true), '') = OLD.document_id::text
        AND EXISTS (SELECT 1 FROM document d WHERE d.id = OLD.document_id AND d.state = 'draft') THEN
@@ -1580,16 +1613,16 @@ CREATE TRIGGER trg_agent_run_step_append_only BEFORE UPDATE OR DELETE ON agent_r
 CREATE TRIGGER trg_agent_type_version_immutable BEFORE UPDATE OR DELETE ON agent_type_version FOR EACH ROW EXECUTE FUNCTION platform_reject_change();
 CREATE TRIGGER trg_agent_promotion_evidence_immutable BEFORE UPDATE OR DELETE ON agent_promotion_evidence FOR EACH ROW EXECUTE FUNCTION platform_reject_change();
 CREATE TRIGGER trg_work_item_check_change BEFORE UPDATE OR DELETE ON work_item FOR EACH ROW EXECUTE FUNCTION work_item_check_change();
-CREATE TRIGGER trg_work_item_note_immutable BEFORE UPDATE OR DELETE ON work_item_note FOR EACH ROW EXECUTE FUNCTION platform_reject_change();
+CREATE TRIGGER trg_work_item_note_immutable BEFORE UPDATE OR DELETE ON work_item_note FOR EACH ROW EXECUTE FUNCTION platform_reject_change('{body_text}');
 CREATE TRIGGER trg_work_case_check_change BEFORE UPDATE OR DELETE ON work_case FOR EACH ROW EXECUTE FUNCTION work_case_check_change();
 CREATE TRIGGER trg_work_case_link_append_only BEFORE UPDATE OR DELETE ON work_case_link FOR EACH ROW
     EXECUTE FUNCTION platform_check_append_only('{}', '{unlinked_at}', '{}');
-CREATE TRIGGER trg_document_check_row_change BEFORE UPDATE OR DELETE ON document FOR EACH ROW EXECUTE FUNCTION document_check_row_change();
-CREATE TRIGGER trg_document_version_check_change BEFORE UPDATE OR DELETE ON document_version FOR EACH ROW EXECUTE FUNCTION document_version_check_change();
+CREATE TRIGGER trg_document_check_row_change BEFORE UPDATE OR DELETE ON document FOR EACH ROW EXECUTE FUNCTION document_check_row_change('{canceled_note}');
+CREATE TRIGGER trg_document_version_check_change BEFORE UPDATE OR DELETE ON document_version FOR EACH ROW EXECUTE FUNCTION document_version_check_change('{content}');
 CREATE TRIGGER trg_document_version_check_taint BEFORE INSERT ON document_version FOR EACH ROW EXECUTE FUNCTION document_version_check_taint();
-CREATE TRIGGER trg_taint_clearance_immutable BEFORE UPDATE OR DELETE ON taint_clearance FOR EACH ROW EXECUTE FUNCTION platform_reject_change();
+CREATE TRIGGER trg_taint_clearance_immutable BEFORE UPDATE OR DELETE ON taint_clearance FOR EACH ROW EXECUTE FUNCTION platform_reject_change('{reason}');
 CREATE TRIGGER trg_policy_decision_immutable BEFORE UPDATE OR DELETE ON policy_decision FOR EACH ROW EXECUTE FUNCTION platform_reject_change();
-CREATE TRIGGER trg_approval_immutable BEFORE UPDATE OR DELETE ON approval FOR EACH ROW EXECUTE FUNCTION platform_reject_change();
+CREATE TRIGGER trg_approval_immutable BEFORE UPDATE OR DELETE ON approval FOR EACH ROW EXECUTE FUNCTION platform_reject_change('{reason}');
 CREATE TRIGGER trg_approval_check_plan BEFORE INSERT ON approval FOR EACH ROW EXECUTE FUNCTION approval_check_plan();
 CREATE TRIGGER trg_auto_post_confirmation_immutable BEFORE UPDATE OR DELETE ON auto_post_confirmation FOR EACH ROW EXECUTE FUNCTION platform_reject_change();
 CREATE TRIGGER trg_posting_intent_check_change BEFORE UPDATE OR DELETE ON posting_intent FOR EACH ROW EXECUTE FUNCTION posting_intent_check_change();
@@ -1597,14 +1630,14 @@ CREATE TRIGGER trg_change_proposal_execution_immutable BEFORE UPDATE OR DELETE O
 CREATE TRIGGER trg_change_proposal_execution_item_immutable BEFORE UPDATE OR DELETE ON change_proposal_execution_item FOR EACH ROW EXECUTE FUNCTION platform_reject_change();
 CREATE TRIGGER trg_policy_rule_version_append_only BEFORE UPDATE OR DELETE ON policy_rule_version FOR EACH ROW
     EXECUTE FUNCTION platform_check_append_only('{is_enabled}', '{shadow_evidence,shadow_evidence_outdated_by,evidence_setting_keys}', '{}');
-CREATE TRIGGER trg_change_proposal_frozen BEFORE INSERT OR UPDATE OR DELETE ON change_proposal FOR EACH ROW EXECUTE FUNCTION document_check_frozen('id');
-CREATE TRIGGER trg_change_proposal_item_frozen BEFORE INSERT OR UPDATE OR DELETE ON change_proposal_item FOR EACH ROW EXECUTE FUNCTION document_check_frozen('change_proposal_id');
-CREATE TRIGGER trg_period_unlock_request_frozen BEFORE INSERT OR UPDATE OR DELETE ON period_unlock_request FOR EACH ROW EXECUTE FUNCTION document_check_frozen('id');
+CREATE TRIGGER trg_change_proposal_frozen BEFORE INSERT OR UPDATE OR DELETE ON change_proposal FOR EACH ROW EXECUTE FUNCTION document_check_frozen('id', '{plan,reason}');
+CREATE TRIGGER trg_change_proposal_item_frozen BEFORE INSERT OR UPDATE OR DELETE ON change_proposal_item FOR EACH ROW EXECUTE FUNCTION document_check_frozen('change_proposal_id', '{payload,field_changes}');
+CREATE TRIGGER trg_period_unlock_request_frozen BEFORE INSERT OR UPDATE OR DELETE ON period_unlock_request FOR EACH ROW EXECUTE FUNCTION document_check_frozen('id', '{reason}');
 CREATE TRIGGER trg_document_line_tax_frozen BEFORE INSERT OR UPDATE OR DELETE ON document_line_tax FOR EACH ROW EXECUTE FUNCTION document_check_frozen('document_id');
-CREATE TRIGGER trg_payment_frozen BEFORE INSERT OR UPDATE OR DELETE ON payment FOR EACH ROW EXECUTE FUNCTION document_check_frozen('id');
-CREATE TRIGGER trg_payment_line_frozen BEFORE INSERT OR UPDATE OR DELETE ON payment_line FOR EACH ROW EXECUTE FUNCTION document_check_frozen('payment_id');
+CREATE TRIGGER trg_payment_frozen BEFORE INSERT OR UPDATE OR DELETE ON payment FOR EACH ROW EXECUTE FUNCTION document_check_frozen('id', '{partner_name,partner_tax_id,partner_address,counterparty_name}');
+CREATE TRIGGER trg_payment_line_frozen BEFORE INSERT OR UPDATE OR DELETE ON payment_line FOR EACH ROW EXECUTE FUNCTION document_check_frozen('payment_id', '{supplier_name,supplier_tax_id,description}');
 CREATE TRIGGER trg_payment_line_payment_block BEFORE INSERT OR UPDATE OF open_item_id, line_kind, payment_id ON payment_line FOR EACH ROW EXECUTE FUNCTION payment_line_check_payment_block();
-CREATE TRIGGER trg_tax_line_immutable BEFORE UPDATE OR DELETE ON tax_line FOR EACH ROW EXECUTE FUNCTION platform_reject_change();
+CREATE TRIGGER trg_tax_line_immutable BEFORE UPDATE OR DELETE ON tax_line FOR EACH ROW EXECUTE FUNCTION platform_reject_change('{partner_tax_id}');
 CREATE TRIGGER trg_tax_line_adjustment_immutable BEFORE UPDATE OR DELETE ON tax_line_adjustment FOR EACH ROW EXECUTE FUNCTION platform_reject_change();
 CREATE TRIGGER trg_audit_record_append_only BEFORE UPDATE OR DELETE ON audit_record FOR EACH ROW
     EXECUTE FUNCTION platform_check_append_only('{}', '{}', '{reason,erased_at}');
@@ -1613,7 +1646,7 @@ CREATE TRIGGER trg_audit_change_append_only BEFORE UPDATE OR DELETE ON audit_cha
 CREATE TRIGGER trg_audit_denial_check_change BEFORE UPDATE OR DELETE ON audit_denial FOR EACH ROW EXECUTE FUNCTION audit_denial_check_change();
 CREATE TRIGGER trg_attachment_check_change BEFORE UPDATE OR DELETE ON attachment FOR EACH ROW EXECUTE FUNCTION attachment_check_change();
 CREATE TRIGGER trg_bank_statement_line_append_only BEFORE UPDATE OR DELETE ON bank_statement_line FOR EACH ROW
-    EXECUTE FUNCTION platform_check_append_only('{match_state,ignore_reason,matched_document_id,proposed_document_id,proposal_score,match_parameters_hash,match_function_version,match_parameter_set_version_id,match_parameter_state,match_is_tied,match_basis,suggested_reference_tokens,suggested_payer_name_text,suggested_stable_payer_token,suggested_purpose,suggestion_agent_run_id}', '{}', '{description,counterparty_name,counterparty_account_number,suggested_payer_name_text}');
+    EXECUTE FUNCTION platform_check_append_only('{match_state,ignore_reason,matched_document_id,proposed_document_id,proposal_score,match_parameters_hash,match_function_version,match_parameter_set_version_id,match_parameter_state,match_is_tied,match_basis,suggested_reference_tokens,suggested_payer_name_text,suggested_stable_payer_token,suggested_purpose,suggestion_agent_run_id}', '{}', '{description,counterparty_name,counterparty_bank_code,counterparty_account_number,suggested_payer_name_text}');
 CREATE TRIGGER trg_bank_statement_line_check_match BEFORE INSERT OR UPDATE ON bank_statement_line FOR EACH ROW EXECUTE FUNCTION bank_statement_line_check_match();
 CREATE TRIGGER trg_bank_statement_append_only BEFORE UPDATE OR DELETE ON bank_statement FOR EACH ROW
     EXECUTE FUNCTION platform_check_append_only('{}', '{}', '{}');

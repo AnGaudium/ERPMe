@@ -170,6 +170,8 @@ No external semantic engine runs in the core, and agents still never export file
     - **The same path.** The UI's analysis builder, saved analyses, MCP clients and agents send plans to the same validator. There is no second path.
 11. Settings (installation; companies may lower them, never raise them): `analysis_max_cells` (5,000), `analysis_agent_max_cells` (500), `analysis_max_range_months` (60), `analysis_max_estimated_rows` (5,000,000), `analysis_result_cache_seconds` (300), `analysis_question_retention_days` (400). The values are the agent's proposal, flagged for the author.
 
+    Note (S2 findings closure, 2026-11-21): the registry key of `analysis_question_retention_days` is `analysis.question_retention_days` (ADR-0063 rule 2 asks for dotted keys; installation and company, default 400, a company may only lower it; ADR-0063 rule 29 note of this date). The other settings of this rule are not retention settings and are not changed by this note.
+
 **Compile and execute**
 
 12. The compile-to-SQL contract (ADR-0050 rule 44):

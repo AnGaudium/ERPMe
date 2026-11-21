@@ -909,8 +909,12 @@ for name in ("invariants.csv", "edge-cases.csv", "work-item-kinds.csv", "authori
 check("C06 every catalog row has its header's field count", all(v == [] for v in bad.values()), {k: v[:3] for k, v in bad.items() if v})
 inv = {x[0]: x for x in rows("invariants.csv")[1:]}
 ec = {x[0]: x for x in rows("edge-cases.csv")[1:]}
-check("C07 INV-730 to INV-741 and EC-200 to EC-219 are in the catalogs, without a first step (production core step pending)",
-      all(f"INV-{n}" in inv and inv[f"INV-{n}"][4] == "" for n in range(730, 742)) and all(f"EC-{n}" in ec and ec[f"EC-{n}"][3] == "" for n in range(200, 220)))
+# S2 (2026-11-21, DS-17 rule 22 note): edge cases take the numbered steps 4b (production core) and 5b (planning and multi-level
+# MRP); EC-200 to EC-219 are 4b, their planning cases 5b. The invariants' first step stays pending.
+check("C07 INV-730 to INV-741 (first step pending) and EC-200 to EC-219 are in the catalogs; the edge cases at step 4b, the planning ones at 5b",
+      all(f"INV-{n}" in inv and inv[f"INV-{n}"][4] == "" for n in range(730, 742))
+      and all(f"EC-{n}" in ec and ec[f"EC-{n}"][3] == ("5b" if ec[f"EC-{n}"][2] == "planning" else "4b") for n in range(200, 220) if f"EC-{n}" in ec)
+      and all(f"EC-{n}" in ec for n in range(200, 220)))
 dup = [k for k, n in collections.Counter(x[0] for x in rows("invariants.csv")[1:] + rows("edge-cases.csv")[1:]).items() if n > 1]
 check("C08 no duplicate invariant or edge case codes", dup == [], dup)
 wik = {x[0]: x for x in rows("work-item-kinds.csv")[1:]}
@@ -940,9 +944,12 @@ else:
 oq = open(os.path.join(DOCS, "open-questions.md"), encoding="utf-8").read()
 # author's delegation 2026-11-19: Reservations and Production execution are now answered ("- [x]"), so the state is not part of the key
 oql = {k: [l for l in oq.splitlines() if l[6:].startswith(k[6:]) and l[:6] in ("- [ ] ", "- [x] ")] for k in ("- [ ] (DS-32, DS-34, DS-47) Readings", "- [ ] (DS-32, DS-34) Agent values", "- [ ] (DS-42, DS-22) Reservations", "- [ ] (DS-52) Production execution")}
+# The count is of open question entries (lines "- [ ] " or "- [x] "), not of the string: an entry that names ADR-0064 twice,
+# or a heading or prose line that names it, does not change it (S2, 2026-11-21).
+oq_naming = [l for l in oq.splitlines() if l[:6] in ("- [ ] ", "- [x] ") and "ADR-0064" in l]
 check("C15 B1: four existing open questions name ADR-0064 (readings p-r, budgets and import evidence, reservation priority, a partial note on DS-52; the last two answered on 2026-11-19); none is added",
       all(len(v) == 1 and "ADR-0064" in v[0] for v in oql.values()) and "(p)" in oql["- [ ] (DS-32, DS-34, DS-47) Readings"][0]
-      and oq.count("ADR-0064") == 4)
+      and sorted(oq_naming) == sorted(v[0] for v in oql.values()), [l[:60] for l in oq_naming])
 ds17 = open(os.path.join(DOCS, "design/DS-17-synthetic-dataset.md"), encoding="utf-8").read()
 n_ec = sum(1 for x in rows("edge-cases.csv")[1:] if x and x[0].startswith("EC-"))
 check("C16 N11: DS-17 states the catalog's true edge case count", f"Version 0.1.0 has {n_ec} edge cases." in ds17, n_ec)

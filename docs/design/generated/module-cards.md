@@ -22,7 +22,7 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Owned tables (1):** `assist_request`
 - **Events produced (0):** none found
 - **Commands and queries named in ADRs (1):** `CreateAssistRequest`
-- **Settings (9):** `agents.<agent_type>.drift_action`, `agents.<agent_type>.wake_up_mode.<kind>`, `agents.company_daily_max_cost`, `agents.installation_daily_max_cost`, `agents.internal_reserve_share`, `agents.tainted_reference_reads`, `assist.max_cost_per_run`, `production.agent.readiness_horizon_days`, `production.agent.shortage_candidate_kinds`
+- **Settings (10):** `agents.<agent_type>.drift_action`, `agents.<agent_type>.wake_up_mode.<kind>`, `agents.company_daily_max_cost`, `agents.installation_daily_max_cost`, `agents.internal_reserve_share`, `agents.run_step_retention_days`, `agents.tainted_reference_reads`, `assist.max_cost_per_run`, `production.agent.readiness_horizon_days`, `production.agent.shortage_candidate_kinds`
 - **Work item kinds (7):** `agent_budget_exhausted`, `agent_denials_repeated`, `agent_mode_degraded`, `agent_quality_below_threshold`, `agent_run_stopped`, `agent_task`, `data_processing_permission_suspended`
 - **Authorization areas (16):** `agent`, `agent_analysis`, `agent_assistant`, `agent_auto_post_advisor`, `agent_bank_matching`, `agent_customer_onboarding`, `agent_data_migration`, `agent_document_reader`, `agent_planning`, `agent_product_engineering`, `agent_production`, `agent_production_capture`, `agent_production_variance`, `agent_purchase_invoice`, `agent_quotation`, `data_processing`
 - **ADRs (declared):** [ADR-0077](../../adr/0077-ui-floorplans-annotations-and-embedded-agent.md)
@@ -267,7 +267,7 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Owned tables (9):** `attachment`, `attachment_link`, `document_extraction`, `document_reader`, `extraction_confirmation`, `extraction_field`, `extraction_result_link`, `extraction_rule_run`, `extraction_word`
 - **Events produced (6):** `AttachmentCreated`, `DocumentExtractionCanceled`, `DocumentExtractionRecorded`, `DocumentExtractionRequested`, `DocumentExtractionVerified`, `ExtractionFieldCorrected`
 - **Commands and queries named in ADRs (9):** `CancelDocumentExtraction`, `CorrectExtractionField`, `CreateAttachment`, `GetDocumentExtraction`, `ListDocumentExtraction`, `RecordDocumentExtraction`, `RequestDocumentExtraction`, `RunAttachmentOrphanSweep`, `VerifyDocumentExtraction`
-- **Settings (1):** `attachments.delete_grace_days`
+- **Settings (2):** `attachments.delete_grace_days`, `attachments.evidence_retention_years`
 - **Work item kinds (2):** `attachment_rejected`, `document_extraction_review`
 - **Authorization areas (0):** none
 - **ADRs (declared):** [ADR-0027](../../adr/0027-cross-cutting-ownership.md), [ADR-0038](../../adr/0038-audit-and-observability.md), [ADR-0049](../../adr/0049-statutory-reporting-and-printing.md), [ADR-0057](../../adr/0057-document-intake-and-extraction.md)
@@ -320,7 +320,7 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Authorization areas (1):** `change_proposal`
 - **Tables in DS-05-platform.sql with no stated owner:** `auto_post_confirmation` (section names policy, documents), `period_unlock_request` (section names policy, documents), `policy_decision` (section names policy, documents) ([data-map findings](data-map.md#findings-tables-without-an-owner-and-lab-stubs))
 - **ADRs (declared):** [ADR-0004](../../adr/0004-naming-conventions.md), [ADR-0008](../../adr/0008-command-envelope-and-registry.md), [ADR-0009](../../adr/0009-document-lifecycle.md), [ADR-0028](../../adr/0028-document-lifecycle-hardening.md), [ADR-0029](../../adr/0029-proposals-and-agent-safety.md), [ADR-0030](../../adr/0030-commercial-seams-and-imports.md), [ADR-0043](../../adr/0043-policy-and-approval.md), [ADR-0052](../../adr/0052-minimal-crm.md), [ADR-0054](../../adr/0054-users-roles-and-authorizations.md), [ADR-0055](../../adr/0055-approval-pools-and-stages.md), [ADR-0066](../../adr/0066-work-cases.md)
-- **ADRs that name this module most (mentions; not complete):** [ADR-0009](../../adr/0009-document-lifecycle.md), [ADR-0020](../../adr/0020-inventory-and-costing-model.md), [ADR-0022](../../adr/0022-repository-and-engineering-conventions.md), [ADR-0028](../../adr/0028-document-lifecycle-hardening.md), [ADR-0029](../../adr/0029-proposals-and-agent-safety.md), [ADR-0038](../../adr/0038-audit-and-observability.md), [ADR-0043](../../adr/0043-policy-and-approval.md), [ADR-0052](../../adr/0052-minimal-crm.md), [ADR-0054](../../adr/0054-users-roles-and-authorizations.md), [ADR-0055](../../adr/0055-approval-pools-and-stages.md), [ADR-0061](../../adr/0061-barcodes.md), [ADR-0062](../../adr/0062-product-engineering-workflow.md), [ADR-0075](../../adr/0075-stock-documents.md)
+- **ADRs that name this module most (mentions; not complete):** [ADR-0009](../../adr/0009-document-lifecycle.md), [ADR-0020](../../adr/0020-inventory-and-costing-model.md), [ADR-0022](../../adr/0022-repository-and-engineering-conventions.md), [ADR-0028](../../adr/0028-document-lifecycle-hardening.md), [ADR-0029](../../adr/0029-proposals-and-agent-safety.md), [ADR-0038](../../adr/0038-audit-and-observability.md), [ADR-0043](../../adr/0043-policy-and-approval.md), [ADR-0052](../../adr/0052-minimal-crm.md), [ADR-0054](../../adr/0054-users-roles-and-authorizations.md), [ADR-0055](../../adr/0055-approval-pools-and-stages.md), [ADR-0061](../../adr/0061-barcodes.md), [ADR-0062](../../adr/0062-product-engineering-workflow.md), [ADR-0075](../../adr/0075-stock-documents.md), [ADR-0079](../../adr/0079-personal-data-protection.md)
 
 ## `localization` (layer 2)
 
@@ -340,7 +340,7 @@ One card per module of ADR-0022 rule 2, with the module's note in that table. Ta
 - **Owned tables (4):** `event_consumer`, `event_delivery`, `event_subject`, `outbox_event`
 - **Events produced (0):** none found
 - **Commands and queries named in ADRs (2):** `RetryEventDelivery`, `SkipEventDelivery`
-- **Settings (0):** none in settings.csv
+- **Settings (1):** `outbox.event_retention_days`
 - **Work item kinds (2):** `event_delivery_held`, `external_call_outcome_unknown`
 - **Authorization areas (1):** `event_delivery`
 - **ADRs (declared):** [ADR-0013](../../adr/0013-outbox-and-events.md)

@@ -532,11 +532,16 @@ trial("F10 INV-212: an ended run holds no reservation", lambda cx: run(cx, new()
 trial("F11 tainted_at is never cleared (ADR-0050 rule 25)", lambda cx: cx.execute("update agent_run set tainted_at=null, taint_source_kind=null where id=%s", (R2,)), True, "append-only")
 trial("F12 ... and set once from null", lambda cx: cx.execute("update agent_run set tainted_at=now(), taint_source_kind='untrusted_field' where id=%s", (I["runR1"],)), True, "append-only")
 trial("F13 a live run needs a work item (ADR-0042 rule 11)", lambda cx: run(cx, new(), wi=None), True, "ck_agent_run_work_item")
-BU = new()
-X("insert into agent_budget_usage (id, scope_kind, company_id, agent_type_code, business_date, limit_amount, recorded_at) values (%s,'company_agent_type',%s,'bank_matching',%s,5,now())",
+# ADR-0078 rule 7: two budget tiers. The company row holds the daily cap; the per-type row counts usage with the company cap
+# as its limit and no run limit, so it never binds before the company row (S2: F14 used to test a per-type limit of its own).
+BU, BUT = new(), new()
+X("insert into agent_budget_usage (id, scope_kind, company_id, business_date, limit_amount, recorded_at) values (%s,'company',%s,%s,5,now())",
   (BU, I["co"], TODAY))
-trial("F14 a reservation within the daily limit passes", lambda cx: cx.execute("update agent_budget_usage set reserved_amount = reserved_amount + 4 where id=%s", (BU,)), False)
-trial("F15 a reservation that would pass the limit reserves nothing (rule 23 guard)", lambda cx: cx.execute(
+X("insert into agent_budget_usage (id, scope_kind, company_id, agent_type_code, business_date, limit_amount, recorded_at) values (%s,'company_agent_type',%s,'bank_matching',%s,5,now())",
+  (BUT, I["co"], TODAY))
+trial("F14 a reservation within the company's daily cap passes on the company row and the per-type row, whose limit is the company cap (ADR-0078 rule 7)",
+      lambda cx: cx.execute("update agent_budget_usage set reserved_amount = reserved_amount + 4 where id in (%s, %s)", (BU, BUT)), False)
+trial("F15 a reservation that would pass the company's daily cap reserves nothing (rule 23 guard)", lambda cx: cx.execute(
     "update agent_budget_usage set reserved_amount = reserved_amount + 6 where id=%s", (BU,)), True, "ck_agent_budget_usage_guard")
 trial("F16 one usage row per scope and date, an installation row without company", lambda cx: [cx.execute(
     "insert into agent_budget_usage (id, scope_kind, business_date, limit_amount, recorded_at) values (%s,'installation',%s,200,now())", (new(), TODAY)) for _ in range(2)],
